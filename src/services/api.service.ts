@@ -1,11 +1,14 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+// Solo estas rutas son públicas (no necesitan Bearer token)
+const PUBLIC_PATHS = ['/auth/login', '/auth/refresh'];
+
 export class ApiService {
-  private static getHeaders(isAuthPath = false) {
+  private static getHeaders(isPublicPath = false) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return {
       'Content-Type': 'application/json',
-      ...(token && !isAuthPath ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token && !isPublicPath ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
 
@@ -18,14 +21,14 @@ export class ApiService {
   }
 
   static async post(path: string, body: unknown) {
-    const isAuth = path.startsWith('/auth/');
+    const isPublic = PUBLIC_PATHS.includes(path);
     const res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: this.getHeaders(isAuth),
+      headers: this.getHeaders(isPublic),
       body: JSON.stringify(body),
     });
 
-    if (res.status === 401 && !isAuth) {
+    if (res.status === 401 && !isPublic) {
       this.handle401();
       throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
     }
@@ -39,13 +42,13 @@ export class ApiService {
   }
 
   static async get(path: string) {
-    const isAuth = path.startsWith('/auth/');
+    const isPublic = PUBLIC_PATHS.includes(path);
     const res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'GET',
-      headers: this.getHeaders(isAuth),
+      headers: this.getHeaders(isPublic),
     });
 
-    if (res.status === 401 && !isAuth) {
+    if (res.status === 401 && !isPublic) {
       this.handle401();
       throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
     }
@@ -57,4 +60,3 @@ export class ApiService {
     return res.json();
   }
 }
-

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ApiService } from '../services/api.service';
 import { db } from '../db/local-db';
-import { Truck, Plus, Loader2, CheckCircle, Clock, Trash2, Tag, Calendar, ShieldCheck, Mail, Phone, MapPin, FileText } from 'lucide-react';
+import { Truck, Plus, Loader2, CheckCircle, Clock, Trash2, Tag, Calendar, ShieldCheck, Mail, Phone, MapPin, FileText, AlertTriangle } from 'lucide-react';
 
 interface ProveedoresProps {
   online: boolean;
