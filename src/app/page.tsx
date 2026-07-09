@@ -99,7 +99,7 @@ export default function Home() {
     setLoading(true);
     try {
       if (online) {
-        const response = await ApiService.post('/auth/login', { username, password });
+        const response = await ApiService.post('/auth/login', { email: username, password });
         localStorage.setItem('token', response.access_token);
       } else {
         if (username !== 'admin' || password !== 'admin123') {
