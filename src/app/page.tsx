@@ -102,10 +102,10 @@ export default function Home() {
     setLoading(true);
     try {
       if (online) {
-        const response = await ApiService.post('/auth/login', { email: username, password });
+        const response = await ApiService.post('/auth/login', { email: username.trim(), password: password.trim() });
         localStorage.setItem('token', response.access_token);
       } else {
-        if (username !== 'admin@nexora.com' || password !== 'Admin123!') {
+        if (username.trim() !== 'admin@nexora.com' || password.trim() !== 'Admin123!') {
           throw new Error('Modo Offline: use admin@nexora.com / Admin123!');
         }
         localStorage.setItem('token', 'offline-token-mock');
