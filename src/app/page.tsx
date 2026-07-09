@@ -38,8 +38,9 @@ const ComercialComponent = dynamic(() => import('@/components/comercial'), { ssr
 const FinancieroComponent = dynamic(() => import('@/components/financiero'), { ssr: false });
 const ProveedoresComponent = dynamic(() => import('@/components/proveedores'), { ssr: false });
 const UsuariosComponent = dynamic(() => import('@/components/usuarios'), { ssr: false });
+const ModelosComponent = dynamic(() => import('@/components/modelos'), { ssr: false });
 
-type Vista = 'dashboard' | 'inventario' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios';
+type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios';
 
 interface NavItem {
   id: Vista;
@@ -48,12 +49,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard',    label: 'Dashboard',         icon: <LayoutDashboard size={18} /> },
-  { id: 'inventario',   label: 'Inventario',         icon: <ShoppingBag size={18} /> },
-  { id: 'clientes',     label: 'Clientes & Crédito', icon: <Users size={18} /> },
-  { id: 'comercial',    label: 'Pedidos',            icon: <Package size={18} /> },
-  { id: 'financiero',   label: 'Cobros & Finanzas',  icon: <DollarSign size={18} /> },
-  { id: 'proveedores',  label: 'Proveedores',        icon: <Truck size={18} /> },
+  { id: 'dashboard',    label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
+  { id: 'inventario',   label: 'Inventario',            icon: <ShoppingBag size={18} /> },
+  { id: 'modelos',      label: 'Catálogo de Modelos',   icon: <Package size={18} /> },
+  { id: 'clientes',     label: 'Clientes & Crédito',   icon: <Users size={18} /> },
+  { id: 'comercial',    label: 'Pedidos',               icon: <CreditCard size={18} /> },
+  { id: 'financiero',   label: 'Cobros & Finanzas',    icon: <DollarSign size={18} /> },
+  { id: 'proveedores',  label: 'Proveedores',           icon: <Truck size={18} /> },
   { id: 'usuarios',     label: 'Vendedores & Personal', icon: <User size={18} /> },
 ];
 
@@ -283,13 +285,14 @@ export default function Home() {
             </div>
             {NAV_ITEMS.filter((item) => {
               if (!user) return true;
+              if (user.rol === 'ROL_ADMIN') return true; // Admin ve todo
               if (user.rol === 'ROL_VENDEDOR') {
-                return item.id !== 'proveedores' && item.id !== 'usuarios';
+                return !['proveedores', 'usuarios', 'modelos'].includes(item.id);
               }
               if (user.rol === 'ROL_BODEGUERO') {
-                return item.id !== 'clientes' && item.id !== 'financiero' && item.id !== 'usuarios';
+                return !['clientes', 'financiero', 'usuarios', 'modelos'].includes(item.id);
               }
-              return true;
+              return !['modelos'].includes(item.id); // Por defecto ocultar modelos
             }).map((item) => (
               <button
                 key={item.id}
@@ -376,6 +379,7 @@ export default function Home() {
           {/* Renderizado condicional de vistas */}
           {vistaActual === 'dashboard' && <DashboardView stats={stats} />}
           {vistaActual === 'inventario' && <InventarioComponent online={online} userRole={user?.rol} />}
+          {vistaActual === 'modelos' && <ModelosComponent online={online} />}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
           {vistaActual === 'comercial' && <ComercialComponent online={online} />}
           {vistaActual === 'financiero' && <FinancieroComponent online={online} />}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ApiService } from '../services/api.service';
-import { User, Plus, Loader2, ShieldCheck, UserCheck, UserMinus, AlertTriangle } from 'lucide-react';
+import { User, Plus, Loader2, ShieldCheck, UserCheck, UserMinus, AlertTriangle, X, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface UsuariosProps {
   online: boolean;
@@ -143,22 +143,33 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h3 className="text-xl font-bold">Gestión de Personal & Vendedores</h3>
-          <p className="text-xs text-muted-foreground">Control de acceso y asignación de roles operativos de Nexora</p>
+          <p className="text-xs text-[var(--muted-foreground)]">Control de acceso y asignación de roles operativos de Nexora</p>
         </div>
-
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
-        >
-          <Plus size={16} />
-          <span>Registrar Personal</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={loadUsers} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+            <RefreshCw size={16} />
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            <Plus size={16} />
+            <span>Registrar Personal</span>
+          </button>
+        </div>
       </div>
 
       {successMsg && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-sm rounded-xl flex items-center gap-2">
-          <ShieldCheck size={18} />
+        <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-sm rounded-xl">
+          <CheckCircle size={16} />
           <span>{successMsg}</span>
+        </div>
+      )}
+
+      {errorMsg && !showAddModal && (
+        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl">
+          <AlertCircle size={16} />
+          <span>{errorMsg}</span>
         </div>
       )}
 
@@ -233,84 +244,75 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* MODAL REGISTRAR USUARIO */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 border-b border-border flex justify-between items-center">
-              <h3 className="font-bold text-lg">Registrar Nuevo Personal</h3>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base">Registrar Nuevo Personal</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Crea una cuenta con rol asignado para el sistema</p>
+              </div>
               <button
                 onClick={() => { setShowAddModal(false); resetForm(); }}
-                className="text-muted-foreground hover:text-foreground text-sm"
+                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
               >
-                Cerrar
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+            <form onSubmit={handleCreateUser} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nombre Completo *</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre Completo <span className="text-red-400">*</span></label>
                 <input
-                  type="text"
-                  required
-                  placeholder="Ej. Carlos Mendoza"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  className="w-full px-3 py-2 bg-muted/30 border border-border rounded-xl text-sm focus:outline-none focus:border-primary"
+                  type="text" required placeholder="Ej. Carlos Mendoza"
+                  value={nombre} onChange={(e) => setNombre(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Email / Correo Electrónico *</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Email <span className="text-red-400">*</span></label>
                 <input
-                  type="email"
-                  required
-                  placeholder="Ej. carlos@nexora.app"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-muted/30 border border-border rounded-xl text-sm focus:outline-none focus:border-primary"
+                  type="email" required placeholder="Ej. carlos@nexora.app"
+                  value={email} onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Contraseña (Mín. 6 caracteres) *</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Contraseña (mín. 8 car.) <span className="text-red-400">*</span></label>
                 <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-muted/30 border border-border rounded-xl text-sm focus:outline-none focus:border-primary"
+                  type="password" required minLength={8} placeholder="••••••••"
+                  value={password} onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Rol / Permisos del Sistema *</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol / Permisos <span className="text-red-400">*</span></label>
                 <select
-                  required
-                  value={rol}
-                  onChange={(e) => setRol(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-muted/30 border border-border rounded-xl text-sm focus:outline-none focus:border-primary"
+                  required value={rol} onChange={(e) => setRol(e.target.value as any)}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
                 >
-                  <option value="ROL_VENDEDOR">Vendedor (Venta y pedidos)</option>
-                  <option value="ROL_BODEGUERO">Bodeguero (Gestión de stock)</option>
-                  <option value="ROL_ADMIN">Administrador (Control total)</option>
+                  <option value="ROL_VENDEDOR">Vendedor — Ventas y pedidos</option>
+                  <option value="ROL_BODEGUERO">Bodeguero — Gestión de stock</option>
+                  <option value="ROL_ADMIN">Administrador — Control total</option>
                 </select>
               </div>
 
               {errorMsg && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl">
-                  {errorMsg}
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} /> {errorMsg}
                 </div>
               )}
 
               <button
-                type="submit"
-                disabled={saving}
-                className="w-full py-3 bg-primary text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                type="submit" disabled={saving}
+                className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? (
-                  <><Loader2 size={14} className="animate-spin" /><span>Guardando...</span></>
+                  <><Loader2 size={16} className="animate-spin" /><span>Guardando...</span></>
                 ) : (
-                  <><User size={14} /><span>Registrar Usuario</span></>
+                  <><User size={16} /><span>Registrar Usuario</span></>
                 )}
               </button>
             </form>
