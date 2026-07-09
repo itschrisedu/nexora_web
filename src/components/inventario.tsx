@@ -6,9 +6,10 @@ import { Search, Plus, Filter, Image as ImageIcon, Check, Loader2 } from 'lucide
 
 interface InventarioProps {
   online: boolean;
+  userRole?: string;
 }
 
-export default function InventarioComponent({ online }: InventarioProps) {
+export default function InventarioComponent({ online, userRole }: InventarioProps) {
   const [products, setProducts] = useState<LocalProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,17 +27,23 @@ export default function InventarioComponent({ online }: InventarioProps) {
   const [fotoBase64, setFotoBase64] = useState<string | null>(null);
   const [fotoLoading, setFotoLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
-  // Series Mock para el formulario (usadas en la tesis)
-  const seriesList = [
-    { id: '1', nombre: 'Serie Niños (24-30)' },
-    { id: '2', nombre: 'Serie Juvenil (31-37)' },
-    { id: '3', nombre: 'Serie Adultos (38-44)' },
-  ];
+  const [seriesList, setSeriesList] = useState<any[]>([]);
 
   useEffect(() => {
     loadProducts();
+    if (online) {
+      loadSeries();
+    }
   }, [online]);
+
+  const loadSeries = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/series');
+      setSeriesList(data);
+    } catch (err) {
+      console.error('Error al cargar series:', err);
+    }
+  };
 
   const loadProducts = async () => {
     setLoading(true);
@@ -90,6 +97,14 @@ export default function InventarioComponent({ online }: InventarioProps) {
       return;
     }
 
+    const selectedSerie = seriesList.find((s) => s.id === serieId);
+    const tallasConfig = selectedSerie && Array.isArray(selectedSerie.tallas)
+      ? selectedSerie.tallas.map((t: any) => ({
+          tallaId: t.id,
+          stockMinimo: 5,
+        }))
+      : [];
+
     const payload = {
       codigo,
       nombre,
@@ -100,10 +115,7 @@ export default function InventarioComponent({ online }: InventarioProps) {
       precioCosto: parseFloat(precioCosto),
       precioVenta: parseFloat(precioVenta),
       serieId,
-      tallas: [
-        { tallaId: 'talla-38', stockMinimo: 5 },
-        { tallaId: 'talla-39', stockMinimo: 5 },
-      ], // Tallas por defecto para inicializar stock
+      tallas: tallasConfig,
     };
 
     try {
@@ -159,13 +171,15 @@ export default function InventarioComponent({ online }: InventarioProps) {
           <p className="text-xs text-muted-foreground">Administra el inventario físico y de venta</p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
-        >
-          <Plus size={16} />
-          <span>Agregar Modelo</span>
-        </button>
+        {userRole !== 'ROL_VENDEDOR' && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            <Plus size={16} />
+            <span>Agregar Modelo</span>
+          </button>
+        )}
       </div>
 
       {/* Filtros */}

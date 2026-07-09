@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db, type LocalClient } from '../db/local-db';
 import { ApiService } from '../services/api.service';
-import { Search, ShieldAlert, Award, TrendingUp, DollarSign, Loader2 } from 'lucide-react';
+import { Search, ShieldAlert, Award, TrendingUp, DollarSign, Loader2, Plus } from 'lucide-react';
 
 interface ClientesProps {
   online: boolean;
@@ -13,9 +13,82 @@ export default function ClientesComponent({ online }: ClientesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState<LocalClient | null>(null);
 
+  // Formulario Nuevo Cliente
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [apellido, setApellido] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [email, setEmail] = useState('');
+  const [ruc, setRuc] = useState('');
+  const [cedula, setCedula] = useState('');
+  const [direccion, setDireccion] = useState('');
+  const [notas, setNotas] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     loadClients();
   }, [online]);
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    if (!nombre || !apellido || !telefono) {
+      setErrorMsg('Nombre, Apellido y Teléfono son campos obligatorios.');
+      return;
+    }
+
+    const payload = {
+      nombre,
+      apellido,
+      telefono,
+      email: email || undefined,
+      ruc: ruc || undefined,
+      cedula: cedula || undefined,
+      direccion: direccion || undefined,
+      notas: notas || undefined,
+    };
+
+    setSaving(true);
+    try {
+      if (online) {
+        await ApiService.post('/clientes', payload);
+      } else {
+        const offlineId = `offline-${Date.now()}`;
+        await db.clientes.add({
+          id: offlineId,
+          nombre: `${nombre} ${apellido}`,
+          cedula: cedula || ruc || 'S/N',
+          email: email || undefined,
+          telefono,
+          limiteCredito: 0,
+          cupoDisponible: 0,
+          score: 100,
+          nivelCredito: 'SIN_CREDITO',
+        });
+      }
+
+      setShowAddModal(false);
+      resetForm();
+      loadClients();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al guardar el cliente.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetForm = () => {
+    setNombre('');
+    setApellido('');
+    setTelefono('');
+    setEmail('');
+    setRuc('');
+    setCedula('');
+    setDireccion('');
+    setNotas('');
+    setErrorMsg('');
+  };
 
   const loadClients = async () => {
     setLoading(true);
@@ -69,9 +142,18 @@ export default function ClientesComponent({ online }: ClientesProps) {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Listado de Clientes */}
       <div className="lg:col-span-2 space-y-6">
-        <div>
-          <h3 className="text-xl font-bold">Gestión de Clientes</h3>
-          <p className="text-xs text-muted-foreground">Scoring Crediticio e Historial de Calificación de Comerciantes</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-bold">Gestión de Clientes</h3>
+            <p className="text-xs text-muted-foreground">Scoring Crediticio e Historial de Calificación de Comerciantes</p>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            <Plus size={16} />
+            <span>Agregar Cliente</span>
+          </button>
         </div>
 
         {/* Buscador */}
@@ -211,6 +293,63 @@ export default function ClientesComponent({ online }: ClientesProps) {
           </div>
         )}
       </div>
+      {/* MODAL AGREGAR CLIENTE */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+              <h3 className="font-bold text-lg">Registrar Nuevo Cliente</h3>
+              <button onClick={() => { setShowAddModal(false); resetForm(); }} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-sm">Cerrar</button>
+            </div>
+            <form onSubmit={handleCreateClient} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Nombre *</label>
+                  <input type="text" required placeholder="Ej. Juan" value={nombre} onChange={(e) => setNombre(e.target.value)} className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Apellido *</label>
+                  <input type="text" required placeholder="Ej. Pérez" value={apellido} onChange={(e) => setApellido(e.target.value)} className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Teléfono *</label>
+                  <input type="text" required placeholder="Ej. 0991234567" value={telefono} onChange={(e) => setTelefono(e.target.value)} className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Cédula</label>
+                  <input type="text" placeholder="Ej. 0950123456" value={cedula} onChange={(e) => setCedula(e.target.value)} className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">RUC</label>
+                  <input type="text" placeholder="Ej. 0950123456001" value={ruc} onChange={(e) => setRuc(e.target.value)} className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Email</label>
+                  <input type="email" placeholder="Ej. juan@correo.com" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Dirección</label>
+                <input type="text" placeholder="Ej. Av. Principal 123" value={direccion} onChange={(e) => setDireccion(e.target.value)} className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Notas</label>
+                <textarea placeholder="Observaciones del cliente..." value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] resize-none" />
+              </div>
+              {errorMsg && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">{errorMsg}</div>
+              )}
+              <button type="submit" disabled={saving} className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50">
+                {saving ? 'Guardando...' : 'Registrar Cliente'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

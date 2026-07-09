@@ -37,8 +37,9 @@ const ClientesComponent = dynamic(() => import('@/components/clientes'), { ssr: 
 const ComercialComponent = dynamic(() => import('@/components/comercial'), { ssr: false });
 const FinancieroComponent = dynamic(() => import('@/components/financiero'), { ssr: false });
 const ProveedoresComponent = dynamic(() => import('@/components/proveedores'), { ssr: false });
+const UsuariosComponent = dynamic(() => import('@/components/usuarios'), { ssr: false });
 
-type Vista = 'dashboard' | 'inventario' | 'clientes' | 'comercial' | 'financiero' | 'proveedores';
+type Vista = 'dashboard' | 'inventario' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios';
 
 interface NavItem {
   id: Vista;
@@ -53,6 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'comercial',    label: 'Pedidos',            icon: <Package size={18} /> },
   { id: 'financiero',   label: 'Cobros & Finanzas',  icon: <DollarSign size={18} /> },
   { id: 'proveedores',  label: 'Proveedores',        icon: <Truck size={18} /> },
+  { id: 'usuarios',     label: 'Vendedores & Personal', icon: <User size={18} /> },
 ];
 
 export default function Home() {
@@ -65,6 +67,7 @@ export default function Home() {
   const [loginError, setLoginError] = useState('');
   const [loading, setLoading] = useState(false);
   const [vistaActual, setVistaActual] = useState<Vista>('dashboard');
+  const [user, setUser] = useState<any>(null);
 
   const [stats, setStats] = useState({
     totalSales: 0,
@@ -85,7 +88,14 @@ export default function Home() {
     else document.documentElement.classList.remove('dark');
 
     const token = localStorage.getItem('token');
-    if (token) { setIsLoggedIn(true); fetchStats(); }
+    const storedUser = localStorage.getItem('user');
+    if (token) { 
+      setIsLoggedIn(true); 
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+      fetchStats(); 
+    }
   }, []);
 
   const toggleTheme = () => {
@@ -104,11 +114,16 @@ export default function Home() {
       if (online) {
         const response = await ApiService.post('/auth/login', { email: username.trim(), password: password.trim() });
         localStorage.setItem('token', response.accessToken);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        setUser(response.user);
       } else {
         if (username.trim() !== 'admin@nexora.com' || password.trim() !== 'Admin123!') {
           throw new Error('Modo Offline: use admin@nexora.com / Admin123!');
         }
+        const mockUser = { id: 'offline-admin', email: 'admin@nexora.com', nombre: 'Administrador', rol: 'ROL_ADMIN' };
         localStorage.setItem('token', 'offline-token-mock');
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        setUser(mockUser);
       }
       setIsLoggedIn(true);
       fetchStats();
@@ -121,6 +136,8 @@ export default function Home() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
     setIsLoggedIn(false);
     setVistaActual('dashboard');
   };
@@ -129,13 +146,45 @@ export default function Home() {
     try {
       const pendingOrders = await db.pedidosOffline.count();
       const pendingMovements = await db.movimientosOffline.count();
+      
+      let realSales = 0;
+      let realClients = 0;
+      let realLowStock = 0;
+
+      if (navigator.onLine) {
+        try {
+          const [resumen, clientes, productos] = await Promise.all([
+            ApiService.get('/financiero/resumen').catch(() => ({ totalFacturado: 0 })),
+            ApiService.get('/clientes').catch(() => []),
+            ApiService.get('/inventario/productos').catch(() => []),
+          ]);
+
+          realSales = resumen.totalFacturado || 0;
+          realClients = Array.isArray(clientes) ? clientes.length : 0;
+          
+          if (Array.isArray(productos)) {
+            // Contar productos donde la suma de stock de todas sus tallas sea menor a 15
+            realLowStock = productos.filter((p: any) => {
+              const totalStock = Array.isArray(p.tallas) 
+                ? p.tallas.reduce((sum: number, t: any) => sum + (t.stock || 0), 0)
+                : 0;
+              return totalStock < 15;
+            }).length;
+          }
+        } catch (apiErr) {
+          console.warn('Error al obtener estadísticas del servidor:', apiErr);
+        }
+      }
+
       setStats({
-        totalSales: 12450.75,
-        activeClients: 42,
-        lowStockCount: 5,
+        totalSales: realSales,
+        activeClients: realClients,
+        lowStockCount: realLowStock,
         pendingSyncCount: pendingOrders + pendingMovements,
       });
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleSyncManual = async () => {
@@ -232,7 +281,16 @@ export default function Home() {
             <div className="px-3 py-2 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
               Módulos Operativos
             </div>
-            {NAV_ITEMS.map((item) => (
+            {NAV_ITEMS.filter((item) => {
+              if (!user) return true;
+              if (user.rol === 'ROL_VENDEDOR') {
+                return item.id !== 'proveedores' && item.id !== 'usuarios';
+              }
+              if (user.rol === 'ROL_BODEGUERO') {
+                return item.id !== 'clientes' && item.id !== 'financiero' && item.id !== 'usuarios';
+              }
+              return true;
+            }).map((item) => (
               <button
                 key={item.id}
                 onClick={() => setVistaActual(item.id)}
@@ -252,10 +310,14 @@ export default function Home() {
         {/* Usuario */}
         <div className="p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-bold text-xs">AD</div>
+            <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-bold text-xs">
+              {user?.nombre ? user.nombre.slice(0, 2).toUpperCase() : 'US'}
+            </div>
             <div>
-              <div className="text-xs font-semibold">Administrador</div>
-              <div className="text-[10px] text-[var(--muted-foreground)]">{online ? 'En línea' : 'Offline'}</div>
+              <div className="text-xs font-semibold truncate max-w-[120px]">{user?.nombre || 'Usuario'}</div>
+              <div className="text-[10px] text-[var(--muted-foreground)]">
+                {user?.rol === 'ROL_ADMIN' ? 'Administrador' : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
+              </div>
             </div>
           </div>
           <button onClick={handleLogout} className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Cerrar sesión">
@@ -313,11 +375,12 @@ export default function Home() {
 
           {/* Renderizado condicional de vistas */}
           {vistaActual === 'dashboard' && <DashboardView stats={stats} />}
-          {vistaActual === 'inventario' && <InventarioComponent online={online} />}
+          {vistaActual === 'inventario' && <InventarioComponent online={online} userRole={user?.rol} />}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
           {vistaActual === 'comercial' && <ComercialComponent online={online} />}
           {vistaActual === 'financiero' && <FinancieroComponent online={online} />}
-          {vistaActual === 'proveedores' && <ProveedoresComponent online={online} />}
+          {vistaActual === 'proveedores' && <ProveedoresComponent online={online} userRole={user?.rol} />}
+          {vistaActual === 'usuarios' && <UsuariosComponent online={online} />}
         </section>
       </main>
     </div>
@@ -326,13 +389,46 @@ export default function Home() {
 
 // ─── Dashboard KPIs View ───────────────────────────────────────
 function DashboardView({ stats }: { stats: { totalSales: number; activeClients: number; lowStockCount: number; pendingSyncCount: number } }) {
+  const hasSales = stats.totalSales > 0;
+  const hasClients = stats.activeClients > 0;
+  const hasLowStock = stats.lowStockCount > 0;
+  const hasPendingSync = stats.pendingSyncCount > 0;
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiCard title="Ventas Acumuladas" value={`$${stats.totalSales.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`} subtitle="+14.2% este mes" subtitleColor="text-emerald-500" icon={<TrendingUp size={16} />} iconBg="bg-emerald-500/10 text-emerald-500" />
-        <KpiCard title="Clientes Activos" value={String(stats.activeClients)} subtitle="Con scoring crediticio activo" icon={<Users size={16} />} iconBg="bg-indigo-500/10 text-indigo-500" />
-        <KpiCard title="Calzado Stock Bajo" value={String(stats.lowStockCount)} subtitle="Requiere orden de compra" subtitleColor="text-red-500" valueColor="text-red-500" icon={<TrendingDown size={16} />} iconBg="bg-red-500/10 text-red-500" />
-        <KpiCard title="Tareas Pendientes" value={String(stats.pendingSyncCount)} subtitle="Por sincronizar" icon={<AlertTriangle size={16} />} iconBg="bg-amber-500/10 text-amber-500" />
+        <KpiCard 
+          title="Ventas Acumuladas" 
+          value={`$${stats.totalSales.toLocaleString('es-EC', { minimumFractionDigits: 2 })}`} 
+          subtitle={hasSales ? "Ventas del periodo actual" : "Sin facturación registrada"} 
+          subtitleColor={hasSales ? "text-emerald-500" : "text-[var(--muted-foreground)]"} 
+          icon={<TrendingUp size={16} />} 
+          iconBg={hasSales ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-500/10 text-slate-500"} 
+        />
+        <KpiCard 
+          title="Clientes Activos" 
+          value={String(stats.activeClients)} 
+          subtitle={hasClients ? "Registrados con scoring crediticio" : "Sin clientes en el sistema"} 
+          icon={<Users size={16} />} 
+          iconBg="bg-indigo-500/10 text-indigo-500" 
+        />
+        <KpiCard 
+          title="Calzado Stock Bajo" 
+          value={String(stats.lowStockCount)} 
+          subtitle={hasLowStock ? "Requiere orden de compra" : "Todo el inventario óptimo"} 
+          subtitleColor={hasLowStock ? "text-red-500" : "text-emerald-500"} 
+          valueColor={hasLowStock ? "text-red-500" : ""} 
+          icon={<TrendingDown size={16} />} 
+          iconBg={hasLowStock ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-500"} 
+        />
+        <KpiCard 
+          title="Tareas Pendientes" 
+          value={String(stats.pendingSyncCount)} 
+          subtitle={hasPendingSync ? "Por sincronizar" : "Todo sincronizado"} 
+          subtitleColor={hasPendingSync ? "text-amber-500" : "text-emerald-500"}
+          icon={<AlertTriangle size={16} />} 
+          iconBg={hasPendingSync ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500"} 
+        />
       </div>
 
       <div className="p-8 bg-gradient-to-r from-indigo-900 to-slate-900 rounded-3xl border border-indigo-950 text-white relative overflow-hidden">

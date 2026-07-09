@@ -9,6 +9,14 @@ export class ApiService {
     };
   }
 
+  private static handle401() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/'; // Redirigir al inicio/login
+    }
+  }
+
   static async post(path: string, body: unknown) {
     const isAuth = path.startsWith('/auth/');
     const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -16,6 +24,11 @@ export class ApiService {
       headers: this.getHeaders(isAuth),
       body: JSON.stringify(body),
     });
+
+    if (res.status === 401 && !isAuth) {
+      this.handle401();
+      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+    }
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
@@ -32,6 +45,11 @@ export class ApiService {
       headers: this.getHeaders(isAuth),
     });
 
+    if (res.status === 401 && !isAuth) {
+      this.handle401();
+      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+    }
+
     if (!res.ok) {
       throw new Error(`Error en la petición: ${res.status}`);
     }
@@ -39,3 +57,4 @@ export class ApiService {
     return res.json();
   }
 }
+
