@@ -1,18 +1,19 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export class ApiService {
-  private static getHeaders() {
+  private static getHeaders(isAuthPath = false) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token && !isAuthPath ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
 
   static async post(path: string, body: unknown) {
+    const isAuth = path.startsWith('/auth/');
     const res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers: this.getHeaders(isAuth),
       body: JSON.stringify(body),
     });
 
@@ -25,9 +26,10 @@ export class ApiService {
   }
 
   static async get(path: string) {
+    const isAuth = path.startsWith('/auth/');
     const res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'GET',
-      headers: this.getHeaders(),
+      headers: this.getHeaders(isAuth),
     });
 
     if (!res.ok) {
