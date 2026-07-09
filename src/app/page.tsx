@@ -27,6 +27,8 @@ import {
   Truck,
   DollarSign,
   LayoutDashboard,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 // Importaciones dinámicas para evitar SSR con Dexie
@@ -59,6 +61,7 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [loading, setLoading] = useState(false);
   const [vistaActual, setVistaActual] = useState<Vista>('dashboard');
@@ -102,8 +105,8 @@ export default function Home() {
         const response = await ApiService.post('/auth/login', { email: username, password });
         localStorage.setItem('token', response.access_token);
       } else {
-        if (username !== 'admin' || password !== 'admin123') {
-          throw new Error('Modo Offline: use admin / admin123');
+        if (username !== 'admin@nexora.com' || password !== 'Admin123!') {
+          throw new Error('Modo Offline: use admin@nexora.com / Admin123!');
         }
         localStorage.setItem('token', 'offline-token-mock');
       }
@@ -177,8 +180,15 @@ export default function Home() {
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Contraseña</label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><Lock size={16} /></span>
-                <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/50 border border-slate-700/60 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors" />
+                <input type={showPassword ? 'text' : 'password'} required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-950/50 border border-slate-700/60 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
             {loginError && (
@@ -192,7 +202,7 @@ export default function Home() {
             </button>
           </form>
           <div className="mt-6 text-center text-[10px] text-slate-500">
-            {online ? 'Conectado al servidor NestJS' : 'Offline: use admin / admin123'}
+            {online ? 'Conectado al servidor NestJS' : 'Offline: use admin@nexora.com / Admin123!'}
           </div>
         </div>
       </div>
