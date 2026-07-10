@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { ApiService } from "../services/api.service";
@@ -54,7 +54,7 @@ const SERIES_ORDEN = [
 ];
 
 const SERIES_NOMBRES: Record<string, string> = {
-  ADULTO: "Adulto (37-42)",
+  ADULTO: "Adulto (37-43)",
   JUVENIL: "Juvenil (34-38)",
   NINO: "Junior (27-32)",
   NINO_PEQUENO_A: "Niño (21-26)",
@@ -115,11 +115,17 @@ export default function ModelosComponent({ online }: ModelosProps) {
     const elegida = series.find(s => s.id === serieId);
     if (elegida && elegida.tallas) {
       setTallasDeSerie(elegida.tallas);
+      // Seleccionar todas por defecto
+      const allIds = elegida.tallas.map(t => t.id);
+      setTallasSel(allIds);
+      // Asignar stock de 1 unidad (un par) por defecto a cada una
+      const defaultStock = allIds.reduce((acc, id) => ({ ...acc, [id]: 1 }), {});
+      setTallaStock(defaultStock);
     } else {
       setTallasDeSerie([]);
+      setTallasSel([]);
+      setTallaStock({});
     }
-    setTallasSel([]);
-    setTallaStock({});
   }, [serieId, series]);
 
   const loadData = async () => {
