@@ -11,9 +11,15 @@ interface ModelosProps {
   online: boolean;
 }
 
+interface TallaConfig {
+  id: string;
+  numero: number;
+}
+
 interface Serie {
   id: string;
   nombre: string;
+  tallas: TallaConfig[];
 }
 
 interface Talla {
@@ -38,7 +44,27 @@ interface Producto {
   activo: boolean;
 }
 
-const TALLAS_ESTANDAR = ["35","36","37","38","39","40","41","42","43","44","45"];
+const SERIES_ORDEN = [
+  "ADULTO",
+  "JUVENIL",
+  "NINO",
+  "NINO_PEQUENO_A",
+  "BEBE",
+  "TALLA_GRANDE"
+];
+
+const SERIES_NOMBRES: Record<string, string> = {
+  ADULTO: "Adulto (37-42)",
+  JUVENIL: "Juvenil (34-38)",
+  NINO: "Junior (27-32)",
+  NINO_PEQUENO_A: "Niño (21-26)",
+  BEBE: "Bebé (18-20)",
+  TALLA_GRANDE: "Adulto Grande (43-45)"
+};
+
+const getNombreSerie = (nombreRaw: string): string => {
+  return SERIES_NOMBRES[nombreRaw] || nombreRaw;
+};
 
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors";
 
@@ -62,6 +88,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Formulario de creación
   const [codigo, setCodigo] = useState("");
   const [nombre, setNombre] = useState("");
   const [marca, setMarca] = useState("");
@@ -71,16 +98,29 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [costo, setCosto] = useState("");
   const [venta, setVenta] = useState("");
   const [foto, setFoto] = useState<string | null>(null);
-  const [tallasSel, setTallasSel] = useState<string[]>([]);
-  const [tallaStock, setTallaStock] = useState<Record<string, number>>(
-    TALLAS_ESTANDAR.reduce((a, t) => ({ ...a, [t]: 0 }), {})
-  );
+  
+  // Tallas dinámicas de la serie elegida
+  const [tallasDeSerie, setTallasDeSerie] = useState<TallaConfig[]>([]);
+  const [tallasSel, setTallasSel] = useState<string[]>([]); // Almacena los UUIDs de TallaConfig
+  const [tallaStock, setTallaStock] = useState<Record<string, number>>({}); // tId -> stock
 
   const [newCosto, setNewCosto] = useState("");
   const [newVenta, setNewVenta] = useState("");
   const [motivo, setMotivo] = useState("");
 
   useEffect(() => { loadData(); }, [online]);
+
+  // Manejar cambio de serie seleccionada
+  useEffect(() => {
+    const elegida = series.find(s => s.id === serieId);
+    if (elegida && elegida.tallas) {
+      setTallasDeSerie(elegida.tallas);
+    } else {
+      setTallasDeSerie([]);
+    }
+    setTallasSel([]);
+    setTallaStock({});
+  }, [serieId, series]);
 
   const loadData = async () => {
     setLoading(true);
@@ -90,7 +130,18 @@ export default function ModelosComponent({ online }: ModelosProps) {
       if (online) {
         try {
           const srs = await ApiService.get("/configuracion/series");
-          setSeries(Array.isArray(srs) ? srs : []);
+          if (Array.isArray(srs)) {
+            const filtradasYOrdenadas = srs
+              .filter((s: any) => s.nombre !== "NINO_PEQUENO_B")
+              .sort((a: any, b: any) => {
+                const idxA = SERIES_ORDEN.indexOf(a.nombre);
+                const idxB = SERIES_ORDEN.indexOf(b.nombre);
+                const valA = idxA === -1 ? 999 : idxA;
+                const valB = idxB === -1 ? 999 : idxB;
+                return valA - valB;
+              });
+            setSeries(filtradasYOrdenadas);
+          }
         } catch {}
       }
     } catch (e: any) {
@@ -108,14 +159,14 @@ export default function ModelosComponent({ online }: ModelosProps) {
     reader.readAsDataURL(f);
   };
 
-  const toggleTalla = (t: string) =>
-    setTallasSel(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+  const toggleTalla = (tId: string) =>
+    setTallasSel(prev => prev.includes(tId) ? prev.filter(x => x !== tId) : [...prev, tId]);
 
   const resetForm = () => {
     setCodigo(""); setNombre(""); setMarca(""); setModelo(""); setMaterial("");
     setSerieId(""); setCosto(""); setVenta(""); setFoto(null);
     setTallasSel([]);
-    setTallaStock(TALLAS_ESTANDAR.reduce((a, t) => ({ ...a, [t]: 0 }), {}));
+    setTallaStock({});
     setError("");
   };
 
@@ -132,9 +183,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
     }
     setSaving(true);
     try {
-      const tallasPayload = tallasSel.map(t => ({
-        tallaId: t,
-        stockInicial: tallaStock[t] || 0,
+      const tallasPayload = tallasSel.map(tId => ({
+        tallaId: tId,
+        stockInicial: tallaStock[tId] || 0,
         stockMinimo: 5,
       }));
       await ApiService.post("/inventario/productos", {
@@ -293,7 +344,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   </div>
                 )}
                 <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
-                  <span className="text-[10px] text-[var(--muted-foreground)]">{p.serie?.nombre || "Sin serie"}</span>
+                  <span className="text-[10px] text-[var(--muted-foreground)]">{p.serie?.nombre ? getNombreSerie(p.serie.nombre) : "Sin serie"}</span>
                   <button onClick={() => openPrice(p)}
                     className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold text-[var(--primary)] border border-[var(--primary)]/30 rounded-lg hover:bg-[var(--primary)]/10 transition-colors">
                     <Edit2 size={11} /> Precios
@@ -339,7 +390,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 <div><Lbl t="Serie" req />
                   <select value={serieId} onChange={e => setSerieId(e.target.value)} className={INPUT}>
                     <option value="">Seleccionar...</option>
-                    {series.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                    {series.map(s => <option key={s.id} value={s.id}>{getNombreSerie(s.nombre)}</option>)}
                     {series.length === 0 && <option value="GENERAL">GENERAL</option>}
                   </select>
                 </div>
@@ -362,27 +413,31 @@ export default function ModelosComponent({ online }: ModelosProps) {
               {/* Tallas */}
               <div>
                 <Lbl t="Tallas disponibles" req />
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {TALLAS_ESTANDAR.map(t => (
-                    <button key={t} type="button" onClick={() => toggleTalla(t)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                        tallasSel.includes(t)
-                          ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                          : "bg-[var(--muted)]/40 text-[var(--muted-foreground)] border-[var(--border)] hover:border-[var(--primary)]"
-                      }`}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                {tallasDeSerie.length === 0 ? (
+                  <p className="text-xs text-[var(--muted-foreground)] italic">Selecciona una serie primero para ver sus tallas configuradas.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {tallasDeSerie.map(tc => (
+                      <button key={tc.id} type="button" onClick={() => toggleTalla(tc.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                          tallasSel.includes(tc.id)
+                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                            : "bg-[var(--muted)]/40 text-[var(--muted-foreground)] border-[var(--border)] hover:border-[var(--primary)]"
+                        }`}>
+                        {tc.numero}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {tallasSel.length > 0 && (
                   <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl p-4">
                     <p className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-3">Stock Inicial por Talla</p>
                     <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
-                      {[...tallasSel].sort().map(t => (
-                        <div key={t} className="flex flex-col items-center gap-1">
-                          <span className="text-[10px] font-bold text-[var(--primary)]">T-{t}</span>
-                          <input type="number" min="0" value={tallaStock[t] || 0}
-                            onChange={e => setTallaStock(prev => ({ ...prev, [t]: parseInt(e.target.value) || 0 }))}
+                      {tallasDeSerie.filter(tc => tallasSel.includes(tc.id)).map(tc => (
+                        <div key={tc.id} className="flex flex-col items-center gap-1">
+                          <span className="text-[10px] font-bold text-[var(--primary)]">T-{tc.numero}</span>
+                          <input type="number" min="0" value={tallaStock[tc.id] || 0}
+                            onChange={e => setTallaStock(prev => ({ ...prev, [tc.id]: parseInt(e.target.value) || 0 }))}
                             className="w-full text-center px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-sm font-semibold focus:outline-none focus:border-[var(--primary)]" />
                         </div>
                       ))}
