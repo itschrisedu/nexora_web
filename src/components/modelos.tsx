@@ -83,6 +83,46 @@ function Lbl({ t, req }: { t: string; req?: boolean }) {
   );
 }
 
+const compressImageToWebP = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(base64Str);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+      const webpBase64 = canvas.toDataURL("image/webp", quality);
+      resolve(webpBase64);
+    };
+    img.onerror = (err) => {
+      reject(err);
+    };
+  });
+};
+
 export default function ModelosComponent({ online }: ModelosProps) {
   const [modelos, setModelos] = useState<ModeloAgrupado[]>([]);
   const [series, setSeries] = useState<{ id: string; nombre: string }[]>([]);
@@ -154,12 +194,17 @@ export default function ModelosComponent({ online }: ModelosProps) {
     const f = e.target.files?.[0];
     if (!f) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setColors(prev => {
-        const copy = [...prev];
-        copy[index].foto = reader.result as string;
-        return copy;
-      });
+    reader.onloadend = async () => {
+      try {
+        const compressed = await compressImageToWebP(reader.result as string);
+        setColors(prev => {
+          const copy = [...prev];
+          copy[index].foto = compressed;
+          return copy;
+        });
+      } catch (err) {
+        console.error("Error comprimiendo imagen:", err);
+      }
     };
     reader.readAsDataURL(f);
   };
@@ -329,11 +374,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
         <div className="space-y-4">
           {filteredModelos.map(m => {
             // Obtener colores únicos disponibles en el modelo
-            const uniqueColors = Array.from(new Set(m.products.map(p => p.color)));
+            const products = m.products || [];
+            const uniqueColors = Array.from(new Set(products.map(p => p.color)));
             const activeColor = selectedColorForModel[m.id] || uniqueColors[0] || "";
 
             // Variante seleccionada por color (primer producto que coincida con el color activo)
-            const activeProduct = m.products.find(p => p.color === activeColor);
+            const activeProduct = products.find(p => p.color === activeColor);
 
             const isExpanded = expandedModels[m.id];
 
@@ -376,7 +422,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                         {isExpanded ? (
                           <><span>Ocultar Variantes</span><ChevronUp size={14} /></>
                         ) : (
-                          <><span>Ver Variantes ({m.products.length})</span><ChevronDown size={14} /></>
+                          <><span>Ver Variantes ({products.length})</span><ChevronDown size={14} /></>
                         )}
                       </button>
                     </div>
@@ -403,8 +449,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
                     {/* Tabla/Listado de Series para el Color Seleccionado */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {m.products.filter(p => p.color === activeColor).map(p => {
-                        const totalStock = Array.isArray(p.tallas) ? p.tallas.reduce((acc, t) => acc + (t.cantidad || 0), 0) : 0;
+                      {products.filter(p => p.color === activeColor).map(p => {
+                        const tallas = p.tallas || [];
+                        const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad || 0), 0);
 
                         return (
                           <div key={p.id} className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm">
@@ -427,7 +474,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                             <div className="bg-[var(--muted)]/20 rounded-lg p-2.5 space-y-1.5">
                               <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Stock Físico por Talla</span>
                               <div className="flex flex-wrap gap-1.5">
-                                {p.tallas.map(t => (
+                                {tallas.map(t => (
                                   <span key={t.tallaId} title={`Stock: ${t.cantidad} pares`}
                                     className={`px-2 py-1 rounded-md text-[10px] font-bold border ${
                                       t.cantidad === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
