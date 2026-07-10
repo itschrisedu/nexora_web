@@ -103,10 +103,14 @@ export class SyncService {
         await db.movimientosOffline.update(movement.id, { estadoSync: 'PROCESANDO' });
 
         // Enviar movimiento al backend
-        await ApiService.post(`/inventario/productos/${movement.productId}/movimiento`, {
+        const url = movement.tipo === 'INGRESO'
+          ? `/inventario/productos/${movement.productId}/entrada`
+          : `/inventario/productos/${movement.productId}/salida`;
+
+        await ApiService.post(url, {
           tallaId: movement.tallaId,
           cantidad: movement.cantidad,
-          tipo: movement.tipo,
+          motivo: 'Sincronización Offline',
         });
 
         await db.movimientosOffline.delete(movement.id);
