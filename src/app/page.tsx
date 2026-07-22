@@ -30,6 +30,7 @@ import {
   LayoutDashboard,
   Eye,
   EyeOff,
+  FileText,
 } from 'lucide-react';
 
 // Importaciones dinámicas para evitar SSR con Dexie
@@ -41,8 +42,9 @@ const ProveedoresComponent = dynamic(() => import('@/components/proveedores'), {
 const UsuariosComponent = dynamic(() => import('@/components/usuarios'), { ssr: false });
 const ModelosComponent = dynamic(() => import('@/components/modelos'), { ssr: false });
 const SuperAdminComponent = dynamic(() => import('@/components/super-admin'), { ssr: false });
+const SriComponent = dynamic(() => import('@/components/sri'), { ssr: false });
 
-type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin';
+type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri';
 
 interface NavItem {
   id: Vista;
@@ -53,6 +55,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',    label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
   { id: 'super-admin',  label: 'Gestión de Tenants',   icon: <Building2 size={18} /> },
+  { id: 'sri',          label: 'Facturación SRI',       icon: <FileText size={18} /> },
   { id: 'inventario',   label: 'Inventario',            icon: <ShoppingBag size={18} /> },
   { id: 'modelos',      label: 'Catálogo de Modelos',   icon: <Package size={18} /> },
   { id: 'clientes',     label: 'Clientes & Crédito',   icon: <Users size={18} /> },
@@ -390,6 +393,7 @@ export default function Home() {
           {vistaActual === 'proveedores' && <ProveedoresComponent online={online} userRole={user?.rol} />}
           {vistaActual === 'usuarios' && <UsuariosComponent online={online} />}
           {vistaActual === 'super-admin' && <SuperAdminComponent online={online} />}
+          {vistaActual === 'sri' && <SriComponent />}
         </section>
       </main>
     </div>

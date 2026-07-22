@@ -102,4 +102,50 @@ export class ApiService {
     const text = await res.text();
     return text ? JSON.parse(text) : {};
   }
+
+  static async put(path: string, body: unknown) {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+    });
+
+    if (res.status === 401) {
+      this.handle401();
+      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+    }
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(errorData.message || `Error en la petición: ${res.status}`);
+    }
+
+    return res.json();
+  }
+
+  static async postFormData(path: string, formData: FormData) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (res.status === 401) {
+      this.handle401();
+      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+    }
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(errorData.message || `Error en la petición: ${res.status}`);
+    }
+
+    return res.json();
+  }
 }
