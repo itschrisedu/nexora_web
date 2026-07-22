@@ -14,6 +14,7 @@ interface UserListItem {
   nombre: string;
   rol: 'ROL_ADMIN' | 'ROL_VENDEDOR' | 'ROL_BODEGUERO';
   activo: boolean;
+  permiteCambiarPrecio?: boolean;
   createdAt: string;
 }
 
@@ -29,6 +30,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rol, setRol] = useState<'ROL_VENDEDOR' | 'ROL_BODEGUERO' | 'ROL_ADMIN'>('ROL_VENDEDOR');
+  const [permiteCambiarPrecio, setPermiteCambiarPrecio] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         email,
         password,
         rol,
+        permiteCambiarPrecio,
       });
 
       setSuccessMsg('Usuario registrado con éxito.');
@@ -88,6 +91,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       loadUsers();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al cambiar estado del usuario.');
+    }
+  };
+
+  const handleTogglePermisoPrecio = async (id: string) => {
+    setErrorMsg('');
+    try {
+      await ApiService.patch(`/auth/usuarios/${id}/toggle-permiso-precio`, {});
+      loadUsers();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al cambiar permiso de precio.');
     }
   };
 
@@ -192,6 +205,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   <th className="px-6 py-4">Nombre</th>
                   <th className="px-6 py-4">Correo Electrónico</th>
                   <th className="px-6 py-4">Rol Asignado</th>
+                  <th className="px-6 py-4 text-center">Permiso Precios</th>
                   <th className="px-6 py-4 text-center">Estado</th>
                   <th className="px-6 py-4 text-right">Acciones</th>
                 </tr>
@@ -210,6 +224,23 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-lg border text-[10px] font-bold ${getRoleBadge(u.rol)}`}>
                         {getRoleLabel(u.rol)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {u.rol === 'ROL_VENDEDOR' ? (
+                        <button
+                          onClick={() => handleTogglePermisoPrecio(u.id)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                            u.permiteCambiarPrecio
+                              ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20'
+                              : 'bg-slate-500/10 text-slate-500 border border-slate-500/20 hover:bg-slate-500/20'
+                          }`}
+                          title="Haz clic para activar/desactivar el permiso de modificar precios"
+                        >
+                          {u.permiteCambiarPrecio ? '✓ Autorizado' : '✕ Bloqueado'}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground font-semibold">Ilimitado</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold ${

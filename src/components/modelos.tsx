@@ -727,9 +727,68 @@ export default function ModelosComponent({ online }: ModelosProps) {
             </div>
             <form onSubmit={handleUpdatePrice} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><Lbl t="Precio de Costo ($)" req /><input type="number" min="0.01" step="0.01" value={newCosto} onChange={e => setNewCosto(e.target.value)} className={INPUT} /></div>
-                <div><Lbl t="Precio de Venta ($)" req /><input type="number" min="0.01" step="0.01" value={newVenta} onChange={e => setNewVenta(e.target.value)} className={INPUT} /></div>
+                <div>
+                  <Lbl t="Precio de Costo ($)" req />
+                  <input type="number" min="0.01" step="0.01" value={newCosto} onChange={e => setNewCosto(e.target.value)} className={INPUT} />
+                </div>
+                <div>
+                  <Lbl t="Precio de Venta ($)" req />
+                  <input type="number" min="0.01" step="0.01" value={newVenta} onChange={e => setNewVenta(e.target.value)} className={INPUT} />
+                </div>
               </div>
+
+              {/* Recomendación y Margen de Rentabilidad */}
+              {(() => {
+                const c = parseFloat(newCosto) || 0;
+                const v = parseFloat(newVenta) || 0;
+                const rec20 = c > 0 ? (c * 1.20).toFixed(2) : "0.00";
+                const diff = v - c;
+                const pct = c > 0 ? ((diff / c) * 100).toFixed(1) : "0";
+                const esPerdida = c > 0 && v < c;
+
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-xs">
+                      <div>
+                        <span className="text-[var(--muted-foreground)]">Recomendación (+20% mínimo): </span>
+                        <span className="font-bold text-emerald-500">${rec20}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNewVenta(rec20)}
+                        className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 font-bold rounded-lg text-[10px] transition-colors"
+                      >
+                        Aplicar +20%
+                      </button>
+                    </div>
+
+                    {c > 0 && (
+                      <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                        esPerdida
+                          ? "bg-rose-500/10 border-rose-500/30 text-rose-500 animate-pulse font-bold"
+                          : parseFloat(pct) >= 20
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 font-semibold"
+                          : "bg-amber-500/10 border-amber-500/20 text-amber-500 font-semibold"
+                      }`}>
+                        <div>
+                          {esPerdida ? "⚠️ PÉRDIDA DETECTADA" : "Ganancia Estimada:"}
+                        </div>
+                        <div>
+                          ${diff.toFixed(2)} ({pct}%)
+                        </div>
+                      </div>
+                    )}
+
+                    {esPerdida && (
+                      <div className="p-3 bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs rounded-xl font-bold flex items-center gap-2">
+                        <AlertCircle size={16} className="shrink-0 text-rose-500 animate-bounce" />
+                        <span>¡ALERTA ROJA! El precio de venta es MENOR al costo de compra. Estás vendiendo a pérdida.</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div><Lbl t="Motivo (opcional)" /><input type="text" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej. Ajuste de temporada..." className={INPUT} /></div>
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
