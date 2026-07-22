@@ -315,6 +315,42 @@ export default function ModelosComponent({ online }: ModelosProps) {
     }
   };
 
+  const handleToggleModel = async (id: string, name: string, currentActive: boolean) => {
+    if (currentActive) {
+      const confirm = window.confirm(`¿Estás seguro de que deseas deshabilitar el modelo "${name}"? Esto también deshabilitará todas sus variantes de color y serie.`);
+      if (!confirm) return;
+    }
+    setSaving(true);
+    try {
+      await ApiService.patch(`/inventario/modelos/${id}/toggle`, {});
+      setSuccess(`Modelo ${currentActive ? "deshabilitado" : "habilitado"} correctamente.`);
+      loadData();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al cambiar estado del modelo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleProduct = async (id: string, code: string, currentActive: boolean) => {
+    if (currentActive) {
+      const confirm = window.confirm(`¿Estás seguro de que deseas deshabilitar la variante con código "${code}"?`);
+      if (!confirm) return;
+    }
+    setSaving(true);
+    try {
+      await ApiService.patch(`/inventario/productos/${id}/toggle`, {});
+      setSuccess(`Variante ${currentActive ? "deshabilitada" : "habilitada"} correctamente.`);
+      loadData();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al cambiar estado de la variante.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const toggleExpandModel = (id: string) => {
     setExpandedModels(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -384,7 +420,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
             const isExpanded = expandedModels[m.id];
 
             return (
-              <div key={m.id} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <div key={m.id} className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all ${
+                !m.active ? "opacity-60 bg-[var(--muted)]/20" : ""
+              }`}>
                 {/* Resumen del Modelo */}
                 <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start sm:items-center gap-4">
@@ -402,6 +440,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
                         {m.material && (
                           <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded-lg text-[10px] font-semibold">{m.material}</span>
                         )}
+                        {!m.active && (
+                          <span className="px-2 py-0.5 bg-red-500/15 text-red-500 rounded-lg text-[10px] font-bold">Deshabilitado</span>
+                        )}
                       </div>
                       <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{m.brand} · {uniqueColors.length} colores disponibles</p>
                     </div>
@@ -417,6 +458,16 @@ export default function ModelosComponent({ online }: ModelosProps) {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {online && (
+                        <button type="button" onClick={() => handleToggleModel(m.id, m.name, m.active)}
+                          className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors ${
+                            m.active
+                              ? "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
+                              : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                          }`}>
+                          {m.active ? "Deshabilitar" : "Habilitar"}
+                        </button>
+                      )}
                       <button onClick={() => toggleExpandModel(m.id)}
                         className="flex items-center gap-1.5 px-3 py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-xs font-semibold rounded-xl transition-colors">
                         {isExpanded ? (
@@ -435,16 +486,24 @@ export default function ModelosComponent({ online }: ModelosProps) {
                     {/* Selector de Color */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1"><Palette size={12}/> Color Activo:</span>
-                      {uniqueColors.map(col => (
-                        <button key={col} onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: col }))}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                            activeColor === col
-                              ? "bg-slate-900 text-white border-slate-900"
-                              : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
-                          }`}>
-                          {col}
-                        </button>
-                      ))}
+                      {uniqueColors.map(col => {
+                        const countActive = products.filter(p => p.color === col && p.activo).length;
+                        const countTotal = products.filter(p => p.color === col).length;
+
+                        return (
+                          <button key={col} onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: col }))}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${
+                              activeColor === col
+                                ? "bg-slate-900 text-white border-slate-900"
+                                : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
+                            }`}>
+                            <span>{col}</span>
+                            {countActive < countTotal && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-400" title="Contiene variantes deshabilitadas" />
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {/* Tabla/Listado de Series para el Color Seleccionado */}
@@ -454,10 +513,17 @@ export default function ModelosComponent({ online }: ModelosProps) {
                         const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad || 0), 0);
 
                         return (
-                          <div key={p.id} className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm">
+                          <div key={p.id} className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${
+                            !p.activo ? "opacity-60 bg-[var(--muted)]/10 border-dashed" : ""
+                          }`}>
                             <div className="flex items-center justify-between">
                               <div>
-                                <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Código Variante</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Código Variante</span>
+                                  {!p.activo && (
+                                    <span className="px-1.5 py-0.5 bg-red-500/15 text-red-500 rounded text-[9px] font-bold leading-none">Deshabilitada</span>
+                                  )}
+                                </div>
                                 <span className="text-xs font-mono font-bold text-slate-800">{p.codigo}</span>
                               </div>
                               <div>
@@ -490,8 +556,18 @@ export default function ModelosComponent({ online }: ModelosProps) {
                               </div>
                             </div>
 
-                            {/* Botón precios */}
-                            <div className="flex justify-end pt-1">
+                            {/* Botones de acción */}
+                            <div className="flex justify-end items-center gap-2 pt-1">
+                              {online && (
+                                <button type="button" onClick={() => handleToggleProduct(p.id, p.codigo, p.activo)}
+                                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                                    p.activo
+                                      ? "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
+                                      : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                                  }`}>
+                                  {p.activo ? "Deshabilitar" : "Habilitar"}
+                                </button>
+                              )}
                               <button onClick={() => openPrice(p)}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[var(--primary)] border border-[var(--primary)]/30 rounded-lg hover:bg-[var(--primary)]/10 transition-colors">
                                 <Edit2 size={12} /><span>Ajustar Precios</span>

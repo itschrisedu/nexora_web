@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { SyncService } from '@/services/sync.service';
 import { ApiService } from '@/services/api.service';
+import { Building2 } from 'lucide-react';
 import { db } from '@/db/local-db';
 import {
   Wifi,
@@ -39,8 +40,9 @@ const FinancieroComponent = dynamic(() => import('@/components/financiero'), { s
 const ProveedoresComponent = dynamic(() => import('@/components/proveedores'), { ssr: false });
 const UsuariosComponent = dynamic(() => import('@/components/usuarios'), { ssr: false });
 const ModelosComponent = dynamic(() => import('@/components/modelos'), { ssr: false });
+const SuperAdminComponent = dynamic(() => import('@/components/super-admin'), { ssr: false });
 
-type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios';
+type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin';
 
 interface NavItem {
   id: Vista;
@@ -50,6 +52,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',    label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
+  { id: 'super-admin',  label: 'Gestión de Tenants',   icon: <Building2 size={18} /> },
   { id: 'inventario',   label: 'Inventario',            icon: <ShoppingBag size={18} /> },
   { id: 'modelos',      label: 'Catálogo de Modelos',   icon: <Package size={18} /> },
   { id: 'clientes',     label: 'Clientes & Crédito',   icon: <Users size={18} /> },
@@ -284,15 +287,16 @@ export default function Home() {
               Módulos Operativos
             </div>
             {NAV_ITEMS.filter((item) => {
-              if (!user) return true;
-              if (user.rol === 'ROL_ADMIN') return true; // Admin ve todo
+              if (!user) return item.id !== 'super-admin';
+              if (user.rol === 'ROL_SUPER_ADMIN') return true; // Super Admin ve todo
+              if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin'; // Admin ve todo excepto gestión de tenants
               if (user.rol === 'ROL_VENDEDOR') {
-                return !['proveedores', 'usuarios', 'modelos'].includes(item.id);
+                return !['proveedores', 'usuarios', 'modelos', 'super-admin'].includes(item.id);
               }
               if (user.rol === 'ROL_BODEGUERO') {
-                return !['clientes', 'financiero', 'usuarios', 'modelos'].includes(item.id);
+                return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin'].includes(item.id);
               }
-              return !['modelos'].includes(item.id); // Por defecto ocultar modelos
+              return !['modelos', 'super-admin'].includes(item.id); // Por defecto ocultar modelos y super-admin
             }).map((item) => (
               <button
                 key={item.id}
@@ -319,7 +323,7 @@ export default function Home() {
             <div>
               <div className="text-xs font-semibold truncate max-w-[120px]">{user?.nombre || 'Usuario'}</div>
               <div className="text-[10px] text-[var(--muted-foreground)]">
-                {user?.rol === 'ROL_ADMIN' ? 'Administrador' : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
+                {user?.rol === 'ROL_SUPER_ADMIN' ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? 'Administrador' : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
               </div>
             </div>
           </div>
@@ -385,6 +389,7 @@ export default function Home() {
           {vistaActual === 'financiero' && <FinancieroComponent online={online} />}
           {vistaActual === 'proveedores' && <ProveedoresComponent online={online} userRole={user?.rol} />}
           {vistaActual === 'usuarios' && <UsuariosComponent online={online} />}
+          {vistaActual === 'super-admin' && <SuperAdminComponent online={online} />}
         </section>
       </main>
     </div>
