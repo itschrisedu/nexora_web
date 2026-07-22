@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { SyncService } from '@/services/sync.service';
 import { ApiService } from '@/services/api.service';
-import { Building2, Store } from 'lucide-react';
+import { Building2, Store, BrainCircuit } from 'lucide-react';
 import { db } from '@/db/local-db';
 import {
   Wifi,
@@ -45,8 +45,9 @@ const SuperAdminComponent = dynamic(() => import('@/components/super-admin'), { 
 const SriComponent = dynamic(() => import('@/components/sri'), { ssr: false });
 const CatalogoDigitalComponent = dynamic(() => import('@/components/catalogo-digital'), { ssr: false });
 const PosComponent = dynamic(() => import('@/components/pos'), { ssr: false });
+const PrediccionDemandaComponent = dynamic(() => import('@/components/prediccion-demanda'), { ssr: false });
 
-type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'catalogo' | 'pos';
+type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'catalogo' | 'pos' | 'prediccion-ml';
 
 interface NavItem {
   id: Vista;
@@ -60,6 +61,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'sri',          label: 'Facturación SRI',       icon: <FileText size={18} /> },
   { id: 'catalogo',     label: 'Catálogo WhatsApp',    icon: <ShoppingBag size={18} /> },
   { id: 'pos',           label: 'POS Mostrador',        icon: <Store size={18} /> },
+  { id: 'prediccion-ml', label: 'Predicción ML Demanda', icon: <BrainCircuit size={18} /> },
   { id: 'inventario',   label: 'Inventario',            icon: <ShoppingBag size={18} /> },
   { id: 'modelos',      label: 'Catálogo de Modelos',   icon: <Package size={18} /> },
   { id: 'clientes',     label: 'Clientes & Crédito',   icon: <Users size={18} /> },
@@ -400,6 +402,7 @@ export default function Home() {
           {vistaActual === 'sri' && <SriComponent />}
           {vistaActual === 'catalogo' && <CatalogoDigitalComponent />}
           {vistaActual === 'pos' && <PosComponent />}
+          {vistaActual === 'prediccion-ml' && <PrediccionDemandaComponent />}
         </section>
       </main>
     </div>
