@@ -374,10 +374,10 @@ export default function Home() {
       <main className="flex-1 flex flex-col overflow-hidden">
 
         {/* Navbar superior */}
-        <header className="h-16 border-b border-[var(--border)] bg-[var(--card)]/50 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-30">
-          <h2 className="text-md font-bold text-slate-700 dark:text-slate-200">
+        <header className="h-16 border-b border-[var(--border)] bg-white dark:bg-slate-900 px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+          <h1 className="text-xl font-black text-[#0F172A] dark:text-white tracking-tight">
             {NAV_ITEMS.find((n) => n.id === vistaActual)?.label ?? 'Panel de Control'}
-          </h2>
+          </h1>
           <div className="flex items-center gap-4">
             {online
               ? <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><Wifi size={13} className="animate-pulse" /><span>Online</span></div>

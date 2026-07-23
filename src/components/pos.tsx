@@ -260,8 +260,7 @@ export default function PosComponent() {
               <Store className="text-emerald-600 dark:text-emerald-400" size={22} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-[var(--card-foreground)]">Punto de Venta (POS)</h1>
-              <p className="text-xs text-[var(--muted-foreground)]">
+              <p className="text-xs text-[var(--muted-foreground)] font-medium">
                 Caja abierta desde {new Date(cajaEstado.caja!.fechaApertura).toLocaleTimeString("es-EC")}
               </p>
             </div>

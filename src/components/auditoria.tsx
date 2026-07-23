@@ -118,8 +118,7 @@ export default function AuditoriaComponent() {
               <ShieldCheck className="text-amber-600 dark:text-amber-400" size={26} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-[var(--card-foreground)]">Bitácora de Auditoría & Seguridad</h1>
-              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+              <p className="text-xs text-[var(--muted-foreground)] font-medium">
                 Trazabilidad inmutable multi-tenant con registro de IP, cambios de estado y operaciones críticas.
               </p>
             </div>

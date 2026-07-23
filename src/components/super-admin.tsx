@@ -379,11 +379,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold flex items-center gap-3">
-            <Building2 size={24} className="text-[var(--primary)]" />
-            Gestión de Tenants & Organizaciones
-          </h1>
-          <p className="text-sm text-[var(--muted-foreground)] mt-1">
+          <p className="text-sm text-[var(--muted-foreground)] font-medium flex items-center gap-2">
+            <Building2 size={18} className="text-[var(--primary)]" />
             Administración global del sistema SaaS: Crear, editar, activar/desactivar y eliminar organizaciones o usuarios.
           </p>
         </div>

@@ -104,9 +104,6 @@ export default function PrediccionDemandaComponent() {
               <BrainCircuit size={14} className="animate-pulse" />
               Machine Learning & Business Intelligence
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-[var(--card-foreground)]">
-              Predicción de Demanda de Calzado
-            </h1>
             <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
               Algoritmo predictivo basado en Gradient Boosting Regressor que proyecta la rotación de stock por modelo, serie y talla utilizando patrones estacionales y series de tiempo.
             </p>

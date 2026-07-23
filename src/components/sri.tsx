@@ -149,11 +149,8 @@ export default function SriComponent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)] shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--card-foreground)] flex items-center gap-2">
-            <FileText className="text-emerald-600 dark:text-emerald-400" size={28} />
-            Facturación Electrónica SRI (Ecuador)
-          </h1>
-          <p className="text-[var(--muted-foreground)] text-sm mt-1">
+          <p className="text-[var(--muted-foreground)] text-sm font-medium flex items-center gap-2">
+            <FileText className="text-emerald-600 dark:text-emerald-400" size={18} />
             Firma de comprobantes XAdES-BES y conexión directa con los Servidores del SRI
           </p>
         </div>
