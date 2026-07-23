@@ -110,9 +110,24 @@ export default function Home() {
       if (storedUser) {
         setUser(JSON.parse(storedUser));
       }
-      fetchStats(); 
+      fetchStats();
+      fetchBusinessBranding();
     }
   }, []);
+
+  const [businessLogo, setBusinessLogo] = useState<string>('');
+
+  const fetchBusinessBranding = async () => {
+    try {
+      const config = await ApiService.get('/configuracion/negocio');
+      if (config) {
+        if (config.logoUrl) setBusinessLogo(config.logoUrl);
+        if (config.primaryColor && typeof document !== 'undefined') {
+          document.documentElement.style.setProperty('--primary', config.primaryColor);
+        }
+      }
+    } catch (err) {}
+  };
 
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light';
@@ -143,6 +158,7 @@ export default function Home() {
       }
       setIsLoggedIn(true);
       fetchStats();
+      fetchBusinessBranding();
     } catch (err: any) {
       setLoginError(err.message || 'Error de conexión con el servidor');
     } finally {
@@ -285,7 +301,17 @@ export default function Home() {
         <div>
           {/* Logo + Toggle tema */}
           <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
-            <span className="text-xl font-black tracking-widest text-[var(--primary)]">NEXORA</span>
+            <div className="flex items-center gap-2.5">
+              {businessLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={businessLogo} alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-[var(--primary)] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                  N
+                </div>
+              )}
+              <span className="text-xl font-black tracking-widest text-[var(--primary)]">NEXORA</span>
+            </div>
             <button onClick={toggleTheme}
               className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}

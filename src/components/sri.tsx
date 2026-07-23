@@ -23,6 +23,8 @@ interface BusinessConfig {
   direccion: string;
   telefono?: string;
   email?: string;
+  logoUrl?: string;
+  primaryColor?: string;
   sriAmbiente: string;
   sriEstablecimiento: string;
   sriPuntoEmision: string;
@@ -78,18 +80,24 @@ export default function SriComponent() {
       setLoadingConfig(true);
       const data = await ApiService.get("/configuracion/negocio");
       if (data) {
+        const color = data.primaryColor || "#6366f1";
         setConfig({
           nombre: data.nombre || "",
           ruc: data.ruc || "",
           direccion: data.direccion || "",
           telefono: data.telefono || "",
           email: data.email || "",
+          logoUrl: data.logoUrl || "",
+          primaryColor: color,
           sriAmbiente: data.sriAmbiente || "1",
           sriEstablecimiento: data.sriEstablecimiento || "001",
           sriPuntoEmision: data.sriPuntoEmision || "001",
           sriObligadoContabilidad: !!data.sriObligadoContabilidad,
           tieneP12: !!data.tieneP12,
         });
+        if (typeof document !== "undefined" && color) {
+          document.documentElement.style.setProperty("--primary", color);
+        }
       }
     } catch (err: any) {
       console.error("Error al cargar configuración de negocio:", err);
@@ -116,7 +124,10 @@ export default function SriComponent() {
     try {
       setLoadingConfig(true);
       await ApiService.put("/configuracion/negocio", config);
-      setMsgConfig({ type: "success", text: "Configuración guardada exitosamente." });
+      if (typeof document !== "undefined" && config.primaryColor) {
+        document.documentElement.style.setProperty("--primary", config.primaryColor);
+      }
+      setMsgConfig({ type: "success", text: "Configuración y personalización de marca guardadas exitosamente." });
     } catch (err: any) {
       setMsgConfig({ type: "error", text: err.message || "Error al guardar la configuración." });
     } finally {
@@ -290,25 +301,106 @@ export default function SriComponent() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
-                <input
-                  type="checkbox"
-                  id="obligado"
-                  checked={config.sriObligadoContabilidad}
-                  onChange={(e) => setConfig({ ...config, sriObligadoContabilidad: e.target.checked })}
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500/20"
-                />
-                <label htmlFor="obligado" className="text-slate-300">
-                  Obligado a llevar contabilidad
-                </label>
+              {/* Personalización de Marca (Logo & Color) */}
+              <div className="border-t border-slate-700/60 pt-4 mt-4 space-y-3">
+                <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[var(--primary)]" />
+                  Personalización de Marca & Color de Espacio
+                </h3>
+
+                {/* Subir Logo */}
+                <div>
+                  <label className="block text-slate-400 mb-1">Logo Institucional (PNG / JPG / SVG)</label>
+                  <div className="flex items-center gap-3">
+                    {config.logoUrl ? (
+                      <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 p-1 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={config.logoUrl} alt="Logo preview" className="max-w-full max-h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700/60 flex items-center justify-center text-slate-500 text-xs font-bold flex-shrink-0">
+                        LOGO
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setConfig((prev) => ({ ...prev, logoUrl: reader.result as string }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600"
+                    />
+                    {config.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setConfig((prev) => ({ ...prev, logoUrl: "" }))}
+                        className="text-xs text-rose-400 hover:underline"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Color de Tema */}
+                <div>
+                  <label className="block text-slate-400 mb-1.5">Color Principal de la Interfaz</label>
+                  <div className="flex items-center gap-2">
+                    {[
+                      { hex: "#6366f1", label: "Índigo" },
+                      { hex: "#10b981", label: "Esmeralda" },
+                      { hex: "#8b5cf6", label: "Púrpura" },
+                      { hex: "#06b6d4", label: "Cian" },
+                      { hex: "#f43f5e", label: "Rosa" },
+                      { hex: "#f59e0b", label: "Ámbar" },
+                    ].map((c) => (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => {
+                          setConfig((prev) => ({ ...prev, primaryColor: c.hex }));
+                          if (typeof document !== "undefined") {
+                            document.documentElement.style.setProperty("--primary", c.hex);
+                          }
+                        }}
+                        style={{ backgroundColor: c.hex }}
+                        className={`w-7 h-7 rounded-lg transition-transform hover:scale-110 flex items-center justify-center ${
+                          config.primaryColor === c.hex ? "ring-2 ring-white scale-110 shadow-lg" : "opacity-80 hover:opacity-100"
+                        }`}
+                        title={c.label}
+                      />
+                    ))}
+                    {/* Custom Color Input */}
+                    <input
+                      type="color"
+                      value={config.primaryColor || "#6366f1"}
+                      onChange={(e) => {
+                        const hex = e.target.value;
+                        setConfig((prev) => ({ ...prev, primaryColor: hex }));
+                        if (typeof document !== "undefined") {
+                          document.documentElement.style.setProperty("--primary", hex);
+                        }
+                      }}
+                      className="w-8 h-8 rounded-lg border-0 bg-transparent cursor-pointer"
+                      title="Color Personalizado"
+                    />
+                  </div>
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loadingConfig}
-                className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-emerald-950/40"
+                className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2"
               >
-                {loadingConfig ? "Guardando..." : "Guardar Configuración Emisor"}
+                {loadingConfig ? "Guardando..." : "Guardar Configuración & Marca"}
               </button>
             </form>
           </div>
