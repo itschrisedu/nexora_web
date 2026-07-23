@@ -104,7 +104,7 @@ export default function AuditoriaComponent() {
       case "OPERACION_CRITICA":
         return "bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse";
       case "LOGIN":
-        return "bg-purple-500/10 text-purple-400 border-purple-500/20";
+        return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
       default:
         return "bg-slate-700/20 text-slate-400 border-slate-700/30";
     }
@@ -116,8 +116,8 @@ export default function AuditoriaComponent() {
       <div className="bg-slate-800/40 border border-slate-700/50 p-6 rounded-3xl backdrop-blur-xl">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center border border-purple-500/30">
-              <ShieldCheck className="text-purple-400" size={26} />
+            <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20">
+              <ShieldCheck className="text-amber-600 dark:text-amber-400" size={26} />
             </div>
             <div>
               <h1 className="text-2xl font-black text-white">Bitácora de Auditoría & Seguridad</h1>
@@ -130,7 +130,7 @@ export default function AuditoriaComponent() {
           <button
             onClick={() => { cargarResumen(); cargarLogs(); }}
             disabled={loading}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700/60 flex items-center gap-2 transition-all disabled:opacity-50"
+            className="px-4 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] text-xs font-semibold rounded-xl border border-[var(--border)] flex items-center gap-2 transition-all disabled:opacity-50 shadow-sm"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             Actualizar Logs
@@ -139,34 +139,34 @@ export default function AuditoriaComponent() {
 
         {/* KPIs de Auditoría */}
         {resumen && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-slate-700/40">
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center gap-4">
-              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-[var(--border)]">
+            <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
+              <div className="p-3 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl">
                 <Activity size={20} />
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Total de Eventos</span>
-                <span className="text-xl font-black text-white font-mono">{resumen.totalEventos}</span>
+                <span className="text-[11px] text-[var(--muted-foreground)] font-medium block">Total de Eventos</span>
+                <span className="text-xl font-black text-[var(--card-foreground)] font-mono">{resumen.totalEventos}</span>
               </div>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center gap-4">
-              <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
+            <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
+              <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
                 <ShieldAlert size={20} />
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Operaciones Críticas</span>
-                <span className="text-xl font-black text-amber-400 font-mono">{resumen.operacionesCriticas}</span>
+                <span className="text-[11px] text-[var(--muted-foreground)] font-medium block">Eventos Sensibles</span>
+                <span className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">{resumen.sensibles}</span>
               </div>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center gap-4">
-              <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
-                <Lock size={20} />
+            <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
+              <div className="p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                <Users size={20} />
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Inicios de Sesión (24h)</span>
-                <span className="text-xl font-black text-emerald-400 font-mono">{resumen.loginsUltimas24h}</span>
+                <span className="text-[11px] text-[var(--muted-foreground)] font-medium block">Usuarios Activos</span>
+                <span className="text-xl font-black text-[var(--card-foreground)] font-mono">{resumen.usuariosConEventos}</span>
               </div>
             </div>
           </div>
@@ -174,7 +174,7 @@ export default function AuditoriaComponent() {
       </div>
 
       {/* Filtros y Buscador */}
-      <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 space-y-4">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Tabs de Filtro de Acción */}
           <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
@@ -184,7 +184,7 @@ export default function AuditoriaComponent() {
                 onClick={() => { setAccionFiltro(acc); setPagina(1); }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                   accionFiltro === acc
-                    ? "bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-950/40"
+                    ? "bg-[#0F172A] text-white border-slate-700 shadow-sm"
                     : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700"
                 }`}
               >
@@ -200,7 +200,7 @@ export default function AuditoriaComponent() {
               placeholder="Filtrar por entidad o recurso..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-900/80 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+              className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
             />
             <Search size={14} className="absolute left-3 top-2.5 text-slate-500" />
           </form>
@@ -223,7 +223,7 @@ export default function AuditoriaComponent() {
               {loading ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-500">
-                    <RefreshCw size={20} className="animate-spin mx-auto text-purple-400 mb-2" />
+                    <RefreshCw size={20} className="animate-spin mx-auto text-amber-500 mb-2" />
                     Cargando bitácora de seguridad...
                   </td>
                 </tr>
@@ -258,7 +258,7 @@ export default function AuditoriaComponent() {
                     <td className="py-3 text-center">
                       <button
                         onClick={() => setLogSeleccionado(log)}
-                        className="p-1.5 bg-slate-900 hover:bg-purple-950/40 border border-slate-700 hover:border-purple-500/40 rounded-lg text-slate-300 hover:text-purple-300 transition-all"
+                        className="p-1.5 bg-[var(--muted)] hover:bg-[var(--border)] border border-[var(--border)] rounded-lg text-[var(--foreground)] transition-all"
                         title="Ver payload JSON"
                       >
                         <FileJson size={14} />
@@ -306,7 +306,7 @@ export default function AuditoriaComponent() {
             </button>
 
             <div className="flex items-center gap-2 text-lg font-bold text-white">
-              <FileJson className="text-purple-400" size={22} />
+              <FileJson className="text-amber-600 dark:text-amber-400" size={22} />
               Detalles del Registro de Auditoría
             </div>
 

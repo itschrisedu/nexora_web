@@ -366,7 +366,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
   const getRolColor = (rol: string) => {
     switch (rol) {
-      case "ROL_SUPER_ADMIN": return "bg-purple-500/10 text-purple-500 border-purple-500/20";
+      case "ROL_SUPER_ADMIN": return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "ROL_ADMIN": return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "ROL_VENDEDOR": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
       case "ROL_BODEGUERO": return "bg-amber-500/10 text-amber-500 border-amber-500/20";
@@ -516,7 +516,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <div className="text-[9px] text-[var(--muted-foreground)]">Clientes</div>
                 </div>
                 <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                  <ShoppingCart size={14} className="mx-auto text-purple-500 mb-1" />
+                  <ShoppingCart size={14} className="mx-auto text-amber-500 mb-1" />
                   <div className="text-sm font-bold">{tenant.stats.orders}</div>
                   <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
                 </div>
@@ -943,7 +943,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                         { label: "Usuarios", value: selectedTenantDetail.stats.users, icon: Users, color: "text-blue-500" },
                         { label: "Modelos", value: selectedTenantDetail.stats.models, icon: Package, color: "text-emerald-500" },
                         { label: "Clientes", value: selectedTenantDetail.stats.clients, icon: UserCircle, color: "text-amber-500" },
-                        { label: "Pedidos", value: selectedTenantDetail.stats.orders, icon: ShoppingCart, color: "text-purple-500" },
+                        { label: "Pedidos", value: selectedTenantDetail.stats.orders, icon: ShoppingCart, color: "text-amber-500" },
                         { label: "Proveedores", value: selectedTenantDetail.stats.suppliers ?? 0, icon: Truck, color: "text-cyan-500" },
                         { label: "Notas Venta", value: selectedTenantDetail.stats.saleNotes ?? 0, icon: FileText, color: "text-rose-500" },
                       ].map((stat) => (
