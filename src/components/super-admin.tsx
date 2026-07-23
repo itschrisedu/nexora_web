@@ -11,8 +11,6 @@ import {
   UserCircle,
   ToggleLeft,
   ToggleRight,
-  ChevronDown,
-  ChevronUp,
   AlertTriangle,
   CheckCircle2,
   XCircle,
@@ -20,6 +18,12 @@ import {
   Loader2,
   Truck,
   FileText,
+  Pencil,
+  Trash2,
+  UserPlus,
+  Lock,
+  KeyRound,
+  ShieldAlert,
 } from "lucide-react";
 
 interface TenantStats {
@@ -74,23 +78,62 @@ interface TenantDetail {
 export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedTenantDetail, setSelectedTenantDetail] = useState<TenantDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [confirmToggle, setConfirmToggle] = useState<{ id: string; name: string; active: boolean } | null>(null);
-  const [toggleLoading, setToggleLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Formulario de creación
+  // Modales Tenant
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
   const [newTenant, setNewTenant] = useState({
     name: "",
     adminEmail: "",
     adminNombre: "",
     adminPassword: "",
   });
-  const [createLoading, setCreateLoading] = useState(false);
+
+  const [showEditTenantModal, setShowEditTenantModal] = useState(false);
+  const [editTenantLoading, setEditTenantLoading] = useState(false);
+  const [editingTenant, setEditingTenant] = useState<{
+    id: string;
+    name: string;
+    ruc: string;
+    direccion: string;
+    telefono: string;
+  } | null>(null);
+
+  const [confirmToggle, setConfirmToggle] = useState<{ id: string; name: string; active: boolean } | null>(null);
+  const [toggleLoading, setToggleLoading] = useState(false);
+
+  const [confirmDeleteTenant, setConfirmDeleteTenant] = useState<{ id: string; name: string } | null>(null);
+  const [deleteTenantLoading, setDeleteTenantLoading] = useState(false);
+
+  // Modales Detalle y Usuarios
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedTenantDetail, setSelectedTenantDetail] = useState<TenantDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [createUserLoading, setCreateUserLoading] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: "",
+    nombre: "",
+    password: "",
+    rol: "ROL_ADMIN",
+  });
+
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editUserLoading, setEditUserLoading] = useState(false);
+  const [editingUser, setEditingUser] = useState<{
+    id: string;
+    nombre: string;
+    email: string;
+    rol: string;
+    activo: boolean;
+    password: string;
+  } | null>(null);
+
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<{ id: string; nombre: string; email: string } | null>(null);
+  const [deleteUserLoading, setDeleteUserLoading] = useState(false);
 
   const fetchTenants = useCallback(async () => {
     if (!online) return;
@@ -99,7 +142,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       const data = await ApiService.get("/tenants");
       setTenants(data);
     } catch (err: any) {
-      setErrorMsg(err.message || "Error al cargar tenants");
+      setErrorMsg(err.message || "Error al cargar los tenants");
     } finally {
       setLoading(false);
     }
@@ -109,13 +152,13 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     fetchTenants();
   }, [fetchTenants]);
 
-  // Auto-clear messages
   useEffect(() => {
     if (successMsg) {
       const t = setTimeout(() => setSuccessMsg(""), 4000);
       return () => clearTimeout(t);
     }
   }, [successMsg]);
+
   useEffect(() => {
     if (errorMsg) {
       const t = setTimeout(() => setErrorMsg(""), 5000);
@@ -123,6 +166,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     }
   }, [errorMsg]);
 
+  // ═══ HANDLERS TENANT ═══
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateLoading(true);
@@ -140,6 +184,55 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     }
   };
 
+  const handleOpenEditTenant = (tenant: Tenant) => {
+    setEditingTenant({
+      id: tenant.id,
+      name: tenant.name,
+      ruc: "",
+      direccion: "",
+      telefono: "",
+    });
+    setShowEditTenantModal(true);
+    // Cargar config actual si está abierta el detalle o mediante endpoint
+    ApiService.get(`/tenants/${tenant.id}`).then((detail) => {
+      setEditingTenant({
+        id: tenant.id,
+        name: detail.name,
+        ruc: detail.businessConfig?.ruc || "",
+        direccion: detail.businessConfig?.direccion || "",
+        telefono: detail.businessConfig?.telefono || "",
+      });
+    }).catch(() => {});
+  };
+
+  const handleUpdateTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTenant) return;
+    setEditTenantLoading(true);
+    try {
+      const updated = await ApiService.patch(`/tenants/${editingTenant.id}`, {
+        name: editingTenant.name,
+        businessConfig: {
+          nombre: editingTenant.name,
+          ruc: editingTenant.ruc,
+          direccion: editingTenant.direccion,
+          telefono: editingTenant.telefono,
+        },
+      });
+      setSuccessMsg(`Tenant "${editingTenant.name}" actualizado correctamente.`);
+      setShowEditTenantModal(false);
+      setEditingTenant(null);
+      await fetchTenants();
+      if (selectedTenantDetail?.id === updated.id) {
+        setSelectedTenantDetail(updated);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al actualizar el tenant");
+    } finally {
+      setEditTenantLoading(false);
+    }
+  };
+
   const handleToggleTenant = async () => {
     if (!confirmToggle) return;
     setToggleLoading(true);
@@ -152,10 +245,32 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       );
       setConfirmToggle(null);
       await fetchTenants();
+      if (selectedTenantDetail?.id === confirmToggle.id) {
+        handleViewDetail(confirmToggle.id);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || "Error al cambiar estado del tenant");
     } finally {
       setToggleLoading(false);
+    }
+  };
+
+  const handleDeleteTenant = async () => {
+    if (!confirmDeleteTenant) return;
+    setDeleteTenantLoading(true);
+    try {
+      await ApiService.delete(`/tenants/${confirmDeleteTenant.id}`);
+      setSuccessMsg(`Tenant "${confirmDeleteTenant.name}" fue eliminado permanentemente.`);
+      setConfirmDeleteTenant(null);
+      if (selectedTenantDetail?.id === confirmDeleteTenant.id) {
+        setShowDetailModal(false);
+        setSelectedTenantDetail(null);
+      }
+      await fetchTenants();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al eliminar el tenant");
+    } finally {
+      setDeleteTenantLoading(false);
     }
   };
 
@@ -170,6 +285,72 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       setShowDetailModal(false);
     } finally {
       setLoadingDetail(false);
+    }
+  };
+
+  // ═══ HANDLERS USUARIOS ═══
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTenantDetail) return;
+    setCreateUserLoading(true);
+    try {
+      await ApiService.post(`/tenants/${selectedTenantDetail.id}/users`, newUser);
+      setSuccessMsg(`Usuario "${newUser.nombre}" creado exitosamente.`);
+      setShowCreateUserModal(false);
+      setNewUser({ email: "", nombre: "", password: "", rol: "ROL_ADMIN" });
+      await handleViewDetail(selectedTenantDetail.id);
+      await fetchTenants();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al crear usuario");
+    } finally {
+      setCreateUserLoading(false);
+    }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setEditUserLoading(true);
+    try {
+      const payload: any = {
+        nombre: editingUser.nombre,
+        email: editingUser.email,
+        rol: editingUser.rol,
+        activo: editingUser.activo,
+      };
+      if (editingUser.password.trim()) {
+        payload.password = editingUser.password.trim();
+      }
+      await ApiService.patch(`/tenants/users/${editingUser.id}`, payload);
+      setSuccessMsg(`Usuario "${editingUser.nombre}" actualizado.`);
+      setShowEditUserModal(false);
+      setEditingUser(null);
+      if (selectedTenantDetail) {
+        await handleViewDetail(selectedTenantDetail.id);
+      }
+      await fetchTenants();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al actualizar usuario");
+    } finally {
+      setEditUserLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!confirmDeleteUser) return;
+    setDeleteUserLoading(true);
+    try {
+      await ApiService.delete(`/tenants/users/${confirmDeleteUser.id}`);
+      setSuccessMsg(`Usuario "${confirmDeleteUser.nombre}" eliminado.`);
+      setConfirmDeleteUser(null);
+      if (selectedTenantDetail) {
+        await handleViewDetail(selectedTenantDetail.id);
+      }
+      await fetchTenants();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al eliminar el usuario");
+    } finally {
+      setDeleteUserLoading(false);
     }
   };
 
@@ -200,10 +381,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         <div>
           <h1 className="text-2xl font-extrabold flex items-center gap-3">
             <Building2 size={24} className="text-[var(--primary)]" />
-            Gestión de Tenants
+            Gestión de Tenants & Organizaciones
           </h1>
           <p className="text-sm text-[var(--muted-foreground)] mt-1">
-            Administra las organizaciones y sus administradores.
+            Administración global del sistema SaaS: Crear, editar, activar/desactivar y eliminar organizaciones o usuarios.
           </p>
         </div>
         <button
@@ -273,13 +454,22 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     </span>
                   </div>
                 </div>
+
+                {/* Acciones principales */}
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleViewDetail(tenant.id)}
                     className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-                    title="Ver detalles"
+                    title="Ver detalle y usuarios"
                   >
                     <Eye size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleOpenEditTenant(tenant)}
+                    className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors"
+                    title="Editar Tenant y Negocio"
+                  >
+                    <Pencil size={16} />
                   </button>
                   <button
                     onClick={() =>
@@ -297,6 +487,13 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     title={tenant.active ? "Desactivar" : "Reactivar"}
                   >
                     {tenant.active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
+                    className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors"
+                    title="Eliminar Tenant Definitivamente"
+                  >
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
@@ -325,7 +522,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
               </div>
 
-              {/* Admins */}
+              {/* Admins list */}
               <div className="border-t border-[var(--border)] pt-3">
                 <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
                   Administradores
@@ -345,11 +542,37 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                             <span className="text-[var(--muted-foreground)] ml-2">{admin.email}</span>
                           </div>
                         </div>
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            admin.activo ? "bg-emerald-500" : "bg-rose-500"
-                          }`}
-                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingUser({
+                                id: admin.id,
+                                nombre: admin.nombre,
+                                email: admin.email,
+                                rol: "ROL_ADMIN",
+                                activo: admin.activo,
+                                password: "",
+                              });
+                              setShowEditUserModal(true);
+                            }}
+                            className="p-1 rounded hover:bg-[var(--muted)] text-amber-500 transition-colors"
+                            title="Editar Administrador"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteUser({ id: admin.id, nombre: admin.nombre, email: admin.email })}
+                            className="p-1 rounded hover:bg-rose-500/10 text-rose-500 transition-colors"
+                            title="Eliminar Administrador"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              admin.activo ? "bg-emerald-500" : "bg-rose-500"
+                            }`}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -365,7 +588,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       )}
 
-      {/* ═══ Modal: Crear Tenant ═══ */}
+      {/* ═══ MODAL: CREAR TENANT ═══ */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
@@ -453,7 +676,94 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       )}
 
-      {/* ═══ Modal: Confirmar Toggle ═══ */}
+      {/* ═══ MODAL: EDITAR TENANT Y DATOS DE NEGOCIO ═══ */}
+      {showEditTenantModal && editingTenant && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="p-6 border-b border-[var(--border)]">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Pencil size={20} className="text-amber-500" />
+                Editar Tenant & Negocio
+              </h2>
+              <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                Modifica el nombre y datos de facturación/configuración de la organización.
+              </p>
+            </div>
+            <form onSubmit={handleUpdateTenant} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Nombre de la Organización
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingTenant.name}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, name: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  RUC del Negocio
+                </label>
+                <input
+                  type="text"
+                  value={editingTenant.ruc}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, ruc: e.target.value })}
+                  placeholder="1792945281001"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Dirección Comercial
+                </label>
+                <input
+                  type="text"
+                  value={editingTenant.direccion}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, direccion: e.target.value })}
+                  placeholder="Av. Amazonas N24-123"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Teléfono de Contacto
+                </label>
+                <input
+                  type="text"
+                  value={editingTenant.telefono}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, telefono: e.target.value })}
+                  placeholder="0991234567"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditTenantModal(false);
+                    setEditingTenant(null);
+                  }}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={editTenantLoading}
+                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {editTenantLoading && <Loader2 size={14} className="animate-spin" />}
+                  {editTenantLoading ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL CONFIRMACIÓN: TOGGLE TENANT ═══ */}
       {confirmToggle && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
@@ -500,17 +810,60 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       )}
 
-      {/* ═══ Modal: Detalle Tenant ═══ */}
+      {/* ═══ MODAL CONFIRMACIÓN: ELIMINAR TENANT ═══ */}
+      {confirmDeleteTenant && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-rose-500/30 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center flex-shrink-0">
+                <ShieldAlert size={28} />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-rose-500">¿Eliminar Tenant Permanentemente?</h3>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                  Está a punto de borrar el tenant <strong className="text-[var(--foreground)]">"{confirmDeleteTenant.name}"</strong>.
+                </p>
+              </div>
+            </div>
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl text-xs space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <AlertTriangle size={14} /> ADVERTENCIA DE ELIMINACIÓN DE DATOS
+              </p>
+              <p>
+                Esta acción eliminará de forma irreversible la organización, sus administradores, usuarios, catálogo de calzado, clientes, notas de venta y configuraciones.
+              </p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setConfirmDeleteTenant(null)}
+                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteTenant}
+                disabled={deleteTenantLoading}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+              >
+                {deleteTenantLoading && <Loader2 size={14} className="animate-spin" />}
+                {deleteTenantLoading ? "Eliminando..." : "Eliminar Definitivamente"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL DETALLE TENANT ═══ */}
       {showDetailModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-2xl shadow-2xl max-h-[85vh] overflow-y-auto">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
             {loadingDetail ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 size={32} className="animate-spin text-[var(--primary)]" />
               </div>
             ) : selectedTenantDetail ? (
               <>
-                {/* Header */}
+                {/* Header modal */}
                 <div className="p-6 border-b border-[var(--border)] flex items-center justify-between sticky top-0 bg-[var(--card)] z-10">
                   <div className="flex items-center gap-3">
                     <div
@@ -535,15 +888,23 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setShowDetailModal(false);
-                      setSelectedTenantDetail(null);
-                    }}
-                    className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-                  >
-                    <XCircle size={20} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenEditTenant({ id: selectedTenantDetail.id, name: selectedTenantDetail.name } as any)}
+                      className="px-3 py-1.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-lg text-xs font-bold hover:bg-amber-500/20 transition-colors flex items-center gap-1.5"
+                    >
+                      <Pencil size={14} /> Editar Tenant
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowDetailModal(false);
+                        setSelectedTenantDetail(null);
+                      }}
+                      className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+                    >
+                      <XCircle size={20} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-6 space-y-6">
@@ -575,7 +936,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   {/* Stats */}
                   <div>
                     <h3 className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-3">
-                      Estadísticas
+                      Estadísticas Generales
                     </h3>
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                       {[
@@ -595,11 +956,20 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     </div>
                   </div>
 
-                  {/* Users Table */}
+                  {/* Tabla de Usuarios del Tenant */}
                   <div>
-                    <h3 className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-3">
-                      Usuarios ({selectedTenantDetail.users.length})
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                        Usuarios y Administradores ({selectedTenantDetail.users.length})
+                      </h3>
+                      <button
+                        onClick={() => setShowCreateUserModal(true)}
+                        className="px-3 py-1.5 bg-[var(--primary)] text-white rounded-lg text-xs font-bold hover:opacity-90 transition-all flex items-center gap-1.5"
+                      >
+                        <UserPlus size={14} /> Nuevo Usuario
+                      </button>
+                    </div>
+
                     <div className="border border-[var(--border)] rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
@@ -608,6 +978,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                             <th className="text-left px-4 py-2.5 font-semibold">Email</th>
                             <th className="text-left px-4 py-2.5 font-semibold">Rol</th>
                             <th className="text-center px-4 py-2.5 font-semibold">Estado</th>
+                            <th className="text-right px-4 py-2.5 font-semibold">Acciones</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -628,6 +999,40 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                                   title={user.activo ? "Activo" : "Inactivo"}
                                 />
                               </td>
+                              <td className="px-4 py-2.5 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    onClick={() => {
+                                      setEditingUser({
+                                        id: user.id,
+                                        nombre: user.nombre,
+                                        email: user.email,
+                                        rol: user.rol,
+                                        activo: user.activo,
+                                        password: "",
+                                      });
+                                      setShowEditUserModal(true);
+                                    }}
+                                    className="p-1.5 rounded-lg hover:bg-amber-500/10 text-amber-500 transition-colors"
+                                    title="Editar Usuario"
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      setConfirmDeleteUser({
+                                        id: user.id,
+                                        nombre: user.nombre,
+                                        email: user.email,
+                                      })
+                                    }
+                                    className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors"
+                                    title="Eliminar Usuario"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -637,6 +1042,230 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
               </>
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: CREAR USUARIO PARA TENANT ═══ */}
+      {showCreateUserModal && selectedTenantDetail && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="p-6 border-b border-[var(--border)]">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <UserPlus size={20} className="text-[var(--primary)]" />
+                Agregar Usuario a {selectedTenantDetail.name}
+              </h2>
+            </div>
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Nombre Completo
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newUser.nombre}
+                  onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })}
+                  placeholder="Ej: Juan Pérez"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  placeholder="usuario@negocio.com"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Rol del Usuario
+                </label>
+                <select
+                  value={newUser.rol}
+                  onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                >
+                  <option value="ROL_ADMIN">Administrador de Tenant</option>
+                  <option value="ROL_VENDEDOR">Vendedor</option>
+                  <option value="ROL_BODEGUERO">Bodeguero</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateUserModal(false)}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={createUserLoading}
+                  className="flex-1 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {createUserLoading && <Loader2 size={14} className="animate-spin" />}
+                  {createUserLoading ? "Creando..." : "Crear Usuario"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: EDITAR USUARIO ═══ */}
+      {showEditUserModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="p-6 border-b border-[var(--border)]">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Pencil size={20} className="text-amber-500" />
+                Editar Usuario
+              </h2>
+            </div>
+            <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Nombre Completo
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingUser.nombre}
+                  onChange={(e) => setEditingUser({ ...editingUser, nombre: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Rol
+                </label>
+                <select
+                  value={editingUser.rol}
+                  onChange={(e) => setEditingUser({ ...editingUser, rol: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                >
+                  <option value="ROL_ADMIN">Administrador</option>
+                  <option value="ROL_VENDEDOR">Vendedor</option>
+                  <option value="ROL_BODEGUERO">Bodeguero</option>
+                  <option value="ROL_SUPER_ADMIN">Super Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Estado
+                </label>
+                <select
+                  value={editingUser.activo ? "true" : "false"}
+                  onChange={(e) => setEditingUser({ ...editingUser, activo: e.target.value === "true" })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                >
+                  <option value="true">Activo</option>
+                  <option value="false">Inactivo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Cambiar Contraseña (Opcional)
+                </label>
+                <input
+                  type="password"
+                  value={editingUser.password}
+                  onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
+                  placeholder="Dejar en blanco para mantener contraseña"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditUserModal(false);
+                    setEditingUser(null);
+                  }}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={editUserLoading}
+                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {editUserLoading && <Loader2 size={14} className="animate-spin" />}
+                  {editUserLoading ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL CONFIRMACIÓN: ELIMINAR USUARIO ═══ */}
+      {confirmDeleteUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-rose-500/30 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-rose-500">¿Eliminar Usuario?</h3>
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                  Está a punto de eliminar a <strong className="text-[var(--foreground)]">{confirmDeleteUser.nombre}</strong> ({confirmDeleteUser.email}).
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-[var(--muted-foreground)] bg-rose-500/10 p-2.5 rounded-lg border border-rose-500/20 text-rose-500">
+              Esta acción no se puede deshacer. El usuario perderá el acceso al sistema inmediatamente.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteUser(null)}
+                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                disabled={deleteUserLoading}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleteUserLoading && <Loader2 size={14} className="animate-spin" />}
+                {deleteUserLoading ? "Eliminando..." : "Eliminar Usuario"}
+              </button>
+            </div>
           </div>
         </div>
       )}
