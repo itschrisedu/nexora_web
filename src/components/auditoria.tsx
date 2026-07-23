@@ -1,35 +1,26 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ApiService } from "@/services/api.service";
 import {
-  ShieldAlert,
   ShieldCheck,
-  Search,
-  Filter,
-  RefreshCw,
-  Eye,
-  FileJson,
-  User,
-  Clock,
-  Globe,
-  Lock,
+  ShieldAlert,
   Activity,
+  Users,
+  Search,
+  RefreshCw,
+  FileJson,
+  X,
   ChevronLeft,
   ChevronRight,
-  AlertOctagon,
-  CheckCircle,
-  Database,
-  X,
+  Lock,
 } from "lucide-react";
 
-interface AuditLogItem {
+interface AuditLog {
   id: string;
-  tenantId: string;
-  userId?: string;
   userEmail?: string;
   userRol?: string;
-  accion: "CREAR" | "ACTUALIZAR" | "ELIMINAR" | "LOGIN" | "LOGOUT" | "EXPORTAR" | "OPERACION_CRITICA";
+  accion: string;
   entidad: string;
   entidadId?: string;
   detalles?: any;
@@ -38,22 +29,23 @@ interface AuditLogItem {
   createdAt: string;
 }
 
-interface ResumenSeguridad {
+interface ResumenAuditoria {
   totalEventos: number;
-  operacionesCriticas: number;
+  sensibles: number;
+  usuariosConEventos: number;
   loginsUltimas24h: number;
 }
 
 export default function AuditoriaComponent() {
-  const [logs, setLogs] = useState<AuditLogItem[]>([]);
-  const [resumen, setResumen] = useState<ResumenSeguridad | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [search, setSearch] = useState<string>("");
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [resumen, setResumen] = useState<ResumenAuditoria | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [limite] = useState(15);
   const [accionFiltro, setAccionFiltro] = useState<string>("TODAS");
-  const [pagina, setPagina] = useState<number>(1);
-  const [totalPaginas, setTotalPaginas] = useState<number>(1);
-  const [totalLogs, setTotalLogs] = useState<number>(0);
-  const [logSeleccionado, setLogSeleccionado] = useState<AuditLogItem | null>(null);
+  const [search, setSearch] = useState<string>("");
+  const [logSeleccionado, setLogSeleccionado] = useState<AuditLog | null>(null);
 
   useEffect(() => {
     cargarResumen();
@@ -62,26 +54,30 @@ export default function AuditoriaComponent() {
 
   const cargarResumen = async () => {
     try {
-      const data = await ApiService.get("/auditoria/resumen");
-      setResumen(data);
-    } catch (err: any) {
-      console.error("Error al cargar resumen de seguridad:", err);
+      const data = await ApiService.get("/auditoria/stats");
+      if (data) setResumen(data);
+    } catch (e) {
+      console.warn("No se pudieron cargar estadísticas de auditoría:", e);
     }
   };
 
   const cargarLogs = async () => {
     setLoading(true);
     try {
-      let query = `/auditoria?page=${pagina}&limit=15`;
+      let query = `/auditoria?page=${pagina}&limit=${limite}`;
       if (accionFiltro !== "TODAS") query += `&accion=${accionFiltro}`;
-      if (search.trim()) query += `&entidad=${encodeURIComponent(search)}`;
+      if (search.trim()) query += `&search=${encodeURIComponent(search.trim())}`;
 
-      const data = await ApiService.get(query);
-      setLogs(data.logs || []);
-      setTotalPaginas(data.totalPaginas || 1);
-      setTotalLogs(data.total || 0);
-    } catch (err: any) {
-      console.error("Error al cargar logs de auditoría:", err);
+      const res = await ApiService.get(query);
+      if (res && res.data) {
+        setLogs(res.data);
+        setTotalLogs(res.total || 0);
+      } else if (Array.isArray(res)) {
+        setLogs(res);
+        setTotalLogs(res.length);
+      }
+    } catch (e) {
+      console.warn("Error cargando bitácora de auditoría:", e);
     } finally {
       setLoading(false);
     }
@@ -93,35 +89,37 @@ export default function AuditoriaComponent() {
     cargarLogs();
   };
 
+  const totalPaginas = Math.ceil(totalLogs / limite) || 1;
+
   const getAccionBadge = (accion: string) => {
     switch (accion) {
       case "CREAR":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+        return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
       case "ACTUALIZAR":
-        return "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
+        return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
       case "ELIMINAR":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/20";
+        return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
       case "OPERACION_CRITICA":
-        return "bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse";
+        return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 animate-pulse";
       case "LOGIN":
         return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
       default:
-        return "bg-slate-700/20 text-slate-400 border-slate-700/30";
+        return "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]";
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-slate-800/40 border border-slate-700/50 p-6 rounded-3xl backdrop-blur-xl">
+      <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-6 rounded-3xl">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20">
               <ShieldCheck className="text-amber-600 dark:text-amber-400" size={26} />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-white">Bitácora de Auditoría & Seguridad</h1>
-              <p className="text-xs text-slate-400">
+              <h1 className="text-2xl font-bold text-[var(--card-foreground)]">Bitácora de Auditoría & Seguridad</h1>
+              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
                 Trazabilidad inmutable multi-tenant con registro de IP, cambios de estado y operaciones críticas.
               </p>
             </div>
@@ -140,7 +138,7 @@ export default function AuditoriaComponent() {
         {/* KPIs de Auditoría */}
         {resumen && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-[var(--border)]">
-            <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
+            <div className="bg-[var(--muted)]/40 border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
               <div className="p-3 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl">
                 <Activity size={20} />
               </div>
@@ -150,7 +148,7 @@ export default function AuditoriaComponent() {
               </div>
             </div>
 
-            <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
+            <div className="bg-[var(--muted)]/40 border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
               <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
                 <ShieldAlert size={20} />
               </div>
@@ -160,7 +158,7 @@ export default function AuditoriaComponent() {
               </div>
             </div>
 
-            <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
+            <div className="bg-[var(--muted)]/40 border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-4">
               <div className="p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
                 <Users size={20} />
               </div>
@@ -174,7 +172,7 @@ export default function AuditoriaComponent() {
       </div>
 
       {/* Filtros y Buscador */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-4">
+      <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 space-y-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Tabs de Filtro de Acción */}
           <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
@@ -185,7 +183,7 @@ export default function AuditoriaComponent() {
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                   accionFiltro === acc
                     ? "bg-[#0F172A] text-white border-slate-700 shadow-sm"
-                    : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700"
+                    : "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--border)]"
                 }`}
               >
                 {acc}
@@ -202,7 +200,7 @@ export default function AuditoriaComponent() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
             />
-            <Search size={14} className="absolute left-3 top-2.5 text-slate-500" />
+            <Search size={14} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
           </form>
         </div>
 
@@ -210,7 +208,7 @@ export default function AuditoriaComponent() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-700/60 text-slate-400">
+              <tr className="border-b border-[var(--border)] text-[var(--muted-foreground)] uppercase">
                 <th className="pb-3 font-semibold">Fecha & Hora</th>
                 <th className="pb-3 font-semibold">Usuario</th>
                 <th className="pb-3 font-semibold text-center">Acción</th>
@@ -219,46 +217,46 @@ export default function AuditoriaComponent() {
                 <th className="pb-3 font-semibold text-center">Detalles</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-[var(--border)]">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                  <td colSpan={6} className="py-8 text-center text-[var(--muted-foreground)]">
                     <RefreshCw size={20} className="animate-spin mx-auto text-amber-500 mb-2" />
                     Cargando bitácora de seguridad...
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                  <td colSpan={6} className="py-8 text-center text-[var(--muted-foreground)]">
                     No se encontraron registros de auditoría.
                   </td>
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 font-mono text-slate-400 whitespace-nowrap">
+                  <tr key={log.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                    <td className="py-3 font-mono text-[var(--muted-foreground)] whitespace-nowrap">
                       {new Date(log.createdAt).toLocaleString("es-EC")}
                     </td>
                     <td className="py-3">
-                      <div className="font-semibold text-slate-200">{log.userEmail || "Sistema"}</div>
-                      <div className="text-[10px] text-slate-500 capitalize">{log.userRol || "N/A"}</div>
+                      <div className="font-semibold text-[var(--card-foreground)]">{log.userEmail || "Sistema"}</div>
+                      <div className="text-[10px] text-[var(--muted-foreground)] capitalize">{log.userRol || "N/A"}</div>
                     </td>
                     <td className="py-3 text-center">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${getAccionBadge(log.accion)}`}>
                         {log.accion}
                       </span>
                     </td>
-                    <td className="py-3 font-mono text-slate-300">
+                    <td className="py-3 font-mono text-[var(--card-foreground)]">
                       {log.entidad}
-                      {log.entidadId && <span className="text-slate-500 text-[10px] ml-1">({log.entidadId.slice(0, 8)}...)</span>}
+                      {log.entidadId && <span className="text-[var(--muted-foreground)] text-[10px] ml-1">({log.entidadId.slice(0, 8)}...)</span>}
                     </td>
-                    <td className="py-3 font-mono text-slate-400 text-[11px]">
+                    <td className="py-3 font-mono text-[var(--muted-foreground)] text-[11px]">
                       {log.ipAddress || "127.0.0.1"}
                     </td>
                     <td className="py-3 text-center">
                       <button
                         onClick={() => setLogSeleccionado(log)}
-                        className="p-1.5 bg-[var(--muted)] hover:bg-[var(--border)] border border-[var(--border)] rounded-lg text-[var(--foreground)] transition-all"
+                        className="p-1.5 bg-[var(--muted)] hover:bg-[var(--border)] border border-[var(--border)] rounded-lg text-[var(--foreground)] transition-all shadow-sm"
                         title="Ver payload JSON"
                       >
                         <FileJson size={14} />
@@ -272,21 +270,21 @@ export default function AuditoriaComponent() {
         </div>
 
         {/* Paginador */}
-        <div className="flex justify-between items-center pt-3 border-t border-slate-800 text-xs text-slate-400">
+        <div className="flex justify-between items-center pt-3 border-t border-[var(--border)] text-xs text-[var(--muted-foreground)]">
           <span>Mostrando {logs.length} de {totalLogs} registros</span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPagina((p) => Math.max(1, p - 1))}
               disabled={pagina === 1 || loading}
-              className="p-1.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-300 disabled:opacity-40"
+              className="p-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-[var(--foreground)] disabled:opacity-40 shadow-sm"
             >
               <ChevronLeft size={14} />
             </button>
-            <span className="font-mono text-slate-300">{pagina} / {totalPaginas}</span>
+            <span className="font-mono text-[var(--foreground)]">{pagina} / {totalPaginas}</span>
             <button
               onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
               disabled={pagina === totalPaginas || loading}
-              className="p-1.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-300 disabled:opacity-40"
+              className="p-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-[var(--foreground)] disabled:opacity-40 shadow-sm"
             >
               <ChevronRight size={14} />
             </button>
@@ -296,49 +294,49 @@ export default function AuditoriaComponent() {
 
       {/* Modal Inspector de Detalles JSON */}
       {logSeleccionado && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 relative">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] shadow-2xl rounded-3xl max-w-2xl w-full p-6 space-y-4 relative">
             <button
               onClick={() => setLogSeleccionado(null)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-200"
+              className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
             >
               <X size={20} />
             </button>
 
-            <div className="flex items-center gap-2 text-lg font-bold text-white">
+            <div className="flex items-center gap-2 text-lg font-bold text-[var(--card-foreground)]">
               <FileJson className="text-amber-600 dark:text-amber-400" size={22} />
               Detalles del Registro de Auditoría
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <div className="grid grid-cols-2 gap-3 text-xs bg-[var(--muted)]/50 p-3 rounded-xl border border-[var(--border)]">
               <div>
-                <span className="text-slate-500 block">ID Evento:</span>
-                <span className="font-mono text-slate-300">{logSeleccionado.id}</span>
+                <span className="text-[var(--muted-foreground)] block">ID Evento:</span>
+                <span className="font-mono text-[var(--foreground)]">{logSeleccionado.id}</span>
               </div>
               <div>
-                <span className="text-slate-500 block">Fecha y Hora:</span>
-                <span className="font-mono text-slate-300">{new Date(logSeleccionado.createdAt).toLocaleString("es-EC")}</span>
+                <span className="text-[var(--muted-foreground)] block">Fecha y Hora:</span>
+                <span className="font-mono text-[var(--foreground)]">{new Date(logSeleccionado.createdAt).toLocaleString("es-EC")}</span>
               </div>
               <div>
-                <span className="text-slate-500 block">Usuario:</span>
-                <span className="text-slate-200 font-semibold">{logSeleccionado.userEmail || "Sistema"}</span>
+                <span className="text-[var(--muted-foreground)] block">Usuario:</span>
+                <span className="text-[var(--card-foreground)] font-semibold">{logSeleccionado.userEmail || "Sistema"}</span>
               </div>
               <div>
-                <span className="text-slate-500 block">Navegador / UserAgent:</span>
-                <span className="text-slate-400 text-[11px] truncate block">{logSeleccionado.userAgent || "Desconocido"}</span>
+                <span className="text-[var(--muted-foreground)] block">Navegador / UserAgent:</span>
+                <span className="text-[var(--muted-foreground)] text-[11px] truncate block">{logSeleccionado.userAgent || "Desconocido"}</span>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5">Payload de Cambios (JSON):</label>
-              <pre className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-emerald-400 max-h-72 overflow-y-auto">
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Payload de Cambios (JSON):</label>
+              <pre className="bg-[#0F172A] border border-slate-800 rounded-xl p-4 text-xs font-mono text-emerald-400 max-h-72 overflow-y-auto">
                 {JSON.stringify(logSeleccionado.detalles || {}, null, 2)}
               </pre>
             </div>
 
             <button
               onClick={() => setLogSeleccionado(null)}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl transition-all"
+              className="w-full bg-[#0F172A] hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl transition-all border border-slate-700"
             >
               Cerrar Inspector
             </button>

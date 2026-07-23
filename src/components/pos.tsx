@@ -217,29 +217,29 @@ export default function PosComponent() {
   if (!cajaEstado.abierta) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-3xl p-10 max-w-md w-full text-center space-y-6">
+        <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-3xl p-10 max-w-md w-full text-center space-y-6">
           <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto">
-            <Lock size={40} className="text-amber-400" />
+            <Lock size={40} className="text-amber-500" />
           </div>
-          <h2 className="text-2xl font-black text-white">Apertura de Caja POS</h2>
-          <p className="text-sm text-slate-400">
+          <h2 className="text-2xl font-bold text-[var(--card-foreground)]">Apertura de Caja POS</h2>
+          <p className="text-sm text-[var(--muted-foreground)]">
             Ingrese el monto de efectivo inicial para comenzar el turno de ventas en mostrador.
           </p>
           <div>
-            <label className="block text-xs text-slate-400 mb-1 text-left">Monto Inicial (USD)</label>
+            <label className="block text-xs text-[var(--muted-foreground)] mb-1 text-left font-medium">Monto Inicial (USD)</label>
             <input
               type="number"
               min="0"
               step="0.01"
               value={montoApertura}
               onChange={(e) => setMontoApertura(e.target.value)}
-              className="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-lg text-center font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
+              className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-lg text-center font-mono text-emerald-600 dark:text-emerald-400 focus:outline-none focus:border-emerald-500"
             />
           </div>
           <button
             onClick={handleAbrirCaja}
             disabled={loadingCaja}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
           >
             <Unlock size={18} />
             {loadingCaja ? "Abriendo..." : "Abrir Caja y Comenzar Turno"}
@@ -253,40 +253,40 @@ export default function PosComponent() {
   return (
     <div className="space-y-6">
       {/* Header con resumen de caja */}
-      <div className="bg-slate-800/60 border border-slate-700/50 p-5 rounded-2xl backdrop-blur-xl">
+      <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-5 rounded-2xl">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-              <Store className="text-emerald-400" size={22} />
+            <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
+              <Store className="text-emerald-600 dark:text-emerald-400" size={22} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Punto de Venta (POS)</h1>
-              <p className="text-xs text-slate-400">
+              <h1 className="text-xl font-bold text-[var(--card-foreground)]">Punto de Venta (POS)</h1>
+              <p className="text-xs text-[var(--muted-foreground)]">
                 Caja abierta desde {new Date(cajaEstado.caja!.fechaApertura).toLocaleTimeString("es-EC")}
               </p>
             </div>
           </div>
 
           <div className="flex gap-3 flex-wrap">
-            <div className="px-4 py-2 bg-slate-900/60 rounded-xl border border-slate-700/40 text-center">
-              <span className="text-[10px] text-slate-500 uppercase block">Efectivo</span>
-              <span className="text-sm font-bold text-emerald-400">${cajaEstado.caja!.ventasEfectivo.toFixed(2)}</span>
+            <div className="px-4 py-2 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)] text-center">
+              <span className="text-[10px] text-[var(--muted-foreground)] uppercase block font-semibold">Efectivo</span>
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${cajaEstado.caja!.ventasEfectivo.toFixed(2)}</span>
             </div>
-            <div className="px-4 py-2 bg-slate-900/60 rounded-xl border border-slate-700/40 text-center">
-              <span className="text-[10px] text-slate-500 uppercase block">Tarjeta</span>
-              <span className="text-sm font-bold text-cyan-400">${cajaEstado.caja!.ventasTarjeta.toFixed(2)}</span>
+            <div className="px-4 py-2 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)] text-center">
+              <span className="text-[10px] text-[var(--muted-foreground)] uppercase block font-semibold">Tarjeta</span>
+              <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400">${cajaEstado.caja!.ventasTarjeta.toFixed(2)}</span>
             </div>
-            <div className="px-4 py-2 bg-slate-900/60 rounded-xl border border-slate-700/40 text-center">
-              <span className="text-[10px] text-slate-500 uppercase block">Transfer.</span>
-              <span className="text-sm font-bold text-violet-400">${cajaEstado.caja!.ventasTransferencia.toFixed(2)}</span>
+            <div className="px-4 py-2 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)] text-center">
+              <span className="text-[10px] text-[var(--muted-foreground)] uppercase block font-semibold">Transfer.</span>
+              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">${cajaEstado.caja!.ventasTransferencia.toFixed(2)}</span>
             </div>
-            <div className="px-4 py-2 bg-emerald-950/40 rounded-xl border border-emerald-800/40 text-center">
-              <span className="text-[10px] text-emerald-500 uppercase block">Total Turno</span>
-              <span className="text-sm font-bold text-white">${cajaEstado.caja!.totalVentas.toFixed(2)}</span>
+            <div className="px-4 py-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-center">
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase block font-semibold">Total Turno</span>
+              <span className="text-sm font-bold text-[var(--card-foreground)]">${cajaEstado.caja!.totalVentas.toFixed(2)}</span>
             </div>
             <button
               onClick={() => { setShowCierre(true); setResultadoCierre(null); }}
-              className="px-4 py-2 bg-rose-900/40 hover:bg-rose-800/60 text-rose-300 text-xs font-semibold rounded-xl border border-rose-800/40 flex items-center gap-1.5 transition-all"
+              className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-xl border border-rose-500/20 flex items-center gap-1.5 transition-all"
             >
               <Calculator size={14} /> Arqueo & Cierre
             </button>
@@ -304,29 +304,29 @@ export default function PosComponent() {
       {/* Layout POS: Productos + Ticket */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Panel Izquierdo: Búsqueda de Productos */}
-        <div className="lg:col-span-2 bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 space-y-4">
+        <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 space-y-4">
           <input
             type="text"
             placeholder="🔍 Buscar calzado por nombre o código..."
             value={searchProduct}
             onChange={(e) => setSearchProduct(e.target.value)}
-            className="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-emerald-500"
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[55vh] overflow-y-auto pr-1">
             {productosFiltrados.slice(0, 20).map((prod) => (
               <div
                 key={prod.id}
-                className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 hover:border-slate-700 transition-all"
+                className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl p-3 hover:border-[var(--primary)] transition-all"
               >
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <h4 className="font-bold text-sm text-slate-200">{prod.modelName}</h4>
-                    <p className="text-xs text-slate-400">
+                    <h4 className="font-bold text-sm text-[var(--card-foreground)]">{prod.modelName}</h4>
+                    <p className="text-xs text-[var(--muted-foreground)]">
                       {prod.color} | {prod.serieNombre} | <span className="font-mono">{prod.code}</span>
                     </p>
                   </div>
-                  <span className="text-emerald-400 font-bold text-sm">${prod.salePrice.toFixed(2)}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">${prod.salePrice.toFixed(2)}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {prod.tallas.map((t) => (
@@ -336,8 +336,8 @@ export default function PosComponent() {
                       onClick={() => handleAgregarItem(prod, t)}
                       className={`px-2 py-1 text-[11px] rounded-lg font-semibold transition-all ${
                         t.cantidad > 0
-                          ? "bg-slate-800 text-slate-200 hover:bg-emerald-600 hover:text-white border border-slate-700"
-                          : "bg-slate-950 text-slate-700 cursor-not-allowed border border-slate-900"
+                          ? "bg-[var(--card)] text-[var(--foreground)] hover:bg-emerald-600 hover:text-white border border-[var(--border)]"
+                          : "bg-[var(--muted)] text-[var(--muted-foreground)] cursor-not-allowed border border-[var(--border)]"
                       }`}
                       title={`${t.cantidad} disponibles`}
                     >
@@ -351,7 +351,7 @@ export default function PosComponent() {
         </div>
 
         {/* Panel Derecho: Ticket de Venta */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 flex flex-col justify-between">
+        <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-slate-200 mb-3 flex items-center gap-2">
               <ShoppingCart size={18} className="text-emerald-400" />
