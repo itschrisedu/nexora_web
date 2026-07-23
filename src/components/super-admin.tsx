@@ -367,7 +367,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const getRolColor = (rol: string) => {
     switch (rol) {
       case "ROL_SUPER_ADMIN": return "bg-purple-500/10 text-purple-500 border-purple-500/20";
-      case "ROL_ADMIN": return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
+      case "ROL_ADMIN": return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "ROL_VENDEDOR": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
       case "ROL_BODEGUERO": return "bg-amber-500/10 text-amber-500 border-amber-500/20";
       default: return "bg-slate-500/10 text-slate-500 border-slate-500/20";
@@ -435,7 +435,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm ${
                       tenant.active
-                        ? "bg-gradient-to-br from-indigo-500 to-purple-600"
+                        ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
                         : "bg-slate-500"
                     }`}
                   >
@@ -501,7 +501,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               {/* Stats */}
               <div className="grid grid-cols-4 gap-3 mb-4">
                 <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                  <Users size={14} className="mx-auto text-indigo-500 mb-1" />
+                  <Users size={14} className="mx-auto text-amber-500 mb-1" />
                   <div className="text-sm font-bold">{tenant.stats.users}</div>
                   <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
                 </div>
@@ -534,7 +534,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     {tenant.admins.map((admin) => (
                       <div key={admin.id} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-500 text-[10px] font-bold">
+                          <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold">
                             {admin.nombre.slice(0, 1).toUpperCase()}
                           </div>
                           <div>
@@ -869,7 +869,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     <div
                       className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold ${
                         selectedTenantDetail.active
-                          ? "bg-gradient-to-br from-indigo-500 to-purple-600"
+                          ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
                           : "bg-slate-500"
                       }`}
                     >
@@ -940,7 +940,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     </h3>
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                       {[
-                        { label: "Usuarios", value: selectedTenantDetail.stats.users, icon: Users, color: "text-indigo-500" },
+                        { label: "Usuarios", value: selectedTenantDetail.stats.users, icon: Users, color: "text-blue-500" },
                         { label: "Modelos", value: selectedTenantDetail.stats.models, icon: Package, color: "text-emerald-500" },
                         { label: "Clientes", value: selectedTenantDetail.stats.clients, icon: UserCircle, color: "text-amber-500" },
                         { label: "Pedidos", value: selectedTenantDetail.stats.orders, icon: ShoppingCart, color: "text-purple-500" },

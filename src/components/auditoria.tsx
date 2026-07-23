@@ -141,7 +141,7 @@ export default function AuditoriaComponent() {
         {resumen && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-slate-700/40">
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center gap-4">
-              <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl">
+              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl">
                 <Activity size={20} />
               </div>
               <div>
