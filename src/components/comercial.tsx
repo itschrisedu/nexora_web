@@ -96,8 +96,7 @@ export default function ComercialComponent({ online }: ComercialProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold">Gestión de Pedidos</h3>
-          <p className="text-xs text-[var(--muted-foreground)]">Cola de Prioridad FIFO y Control de Despacho</p>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium">Cola de Prioridad FIFO y Control de Despacho</p>
         </div>
         <button onClick={() => setShowModal(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">

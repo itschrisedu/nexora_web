@@ -289,8 +289,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold">Proveedores & Trazabilidad de Compra</h3>
-          <p className="text-xs text-muted-foreground">Gestión de aprovisionamiento, órdenes de compra y recepción en bodega</p>
+          <p className="text-xs text-muted-foreground font-medium">Gestión de aprovisionamiento, órdenes de compra y recepción en bodega</p>
         </div>
 
         {online && userRole === 'ROL_ADMIN' && (

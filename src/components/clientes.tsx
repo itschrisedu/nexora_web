@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { ApiService } from "../services/api.service";
@@ -295,8 +295,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h3 className="text-xl font-bold">Clientes & Crédito</h3>
-            <p className="text-xs text-[var(--muted-foreground)]">Gestiona la cartera de clientes y su scoring crediticio</p>
+            <p className="text-xs text-[var(--muted-foreground)] font-medium">Gestiona la cartera de clientes y su scoring crediticio</p>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={loadClientes} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">

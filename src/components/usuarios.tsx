@@ -155,8 +155,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold">Gestión de Personal & Vendedores</h3>
-          <p className="text-xs text-[var(--muted-foreground)]">Control de acceso y asignación de roles operativos de Nexora</p>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium">Control de acceso y asignación de roles operativos de Nexora</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={loadUsers} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">

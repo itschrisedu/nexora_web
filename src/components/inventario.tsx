@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { db } from "../db/local-db";
@@ -151,8 +151,7 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold">Inventario</h3>
-          <p className="text-xs text-[var(--muted-foreground)]">Consulta el stock actual y registra movimientos de entrada/salida</p>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium">Consulta el stock actual y registra movimientos de entrada/salida</p>
         </div>
         <button onClick={loadProducts} className="flex items-center gap-2 p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors self-start">
           <RefreshCw size={16} />

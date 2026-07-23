@@ -106,8 +106,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold">Cobros y Cuentas por Cobrar</h3>
-          <p className="text-xs text-[var(--muted-foreground)]">Registro de abonos y seguimiento de cartera</p>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium">Registro de abonos y seguimiento de cartera</p>
         </div>
         <div className="px-5 py-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-sm">
           <span className="text-[var(--muted-foreground)] text-xs">Saldo Total Pendiente: </span>

@@ -366,8 +366,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold">Catálogo de Modelos</h3>
-          <p className="text-xs text-[var(--muted-foreground)]">Administra diseños base y sus variantes de color y serie</p>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium">Administra diseños base y sus variantes de color y serie</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={loadData} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
