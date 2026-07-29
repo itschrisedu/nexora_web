@@ -65,7 +65,7 @@ export default function ComercialComponent({ online }: ComercialProps) {
   // Catálogo de Productos y Líneas de Pedido
   const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
   const [lineasPedido, setLineasPedido] = useState<
-    { productId: string; modelName: string; color: string; tallaId: string; numeroTalla: number; cantidad: number; precioUnitario: number; tipoVenta: 'PAR' | 'DOCENA' | 'CURVA' }[]
+    { productId: string; modelName: string; color: string; tallaId: string; numeroTalla: number; cantidad: number; precioUnitario: number; tipoVenta: 'SERIE_COMPLETA' | 'TALLA_ESPECIFICA' }[]
   >([]);
 
   // Selección de Producto actual para agregar
@@ -73,11 +73,17 @@ export default function ComercialComponent({ online }: ComercialProps) {
   const [selectedTallaId, setSelectedTallaId] = useState('');
   const [cantidadItem, setCantidadItem] = useState(1);
   const [precioItem, setPrecioItem] = useState(0);
-  const [tipoVentaItem, setTipoVentaItem] = useState<'PAR' | 'DOCENA' | 'CURVA'>('PAR');
+  const [tipoVentaItem, setTipoVentaItem] = useState<'SERIE_COMPLETA' | 'TALLA_ESPECIFICA'>('TALLA_ESPECIFICA');
   const [canalEntrada, setCanalEntrada] = useState<'VENTA_DIRECTA' | 'POS' | 'CATALOGO_DIGITAL'>('VENTA_DIRECTA');
   const [notasPedido, setNotasPedido] = useState('');
 
   const [creatingOrder, setCreatingOrder] = useState(false);
+
+  // Precio sugerido con 30% ganancia, costo del producto y último precio al cliente
+  const [costoProdSeleccionado, setCostoProdSeleccionado] = useState(0);
+  const [precioSugerido30, setPrecioSugerido30] = useState(0);
+  const [ultimoPrecioCliente, setUltimoPrecioCliente] = useState<number | null>(null);
+  const [fechaUltimaVenta, setFechaUltimaVenta] = useState<string | null>(null);
 
   // Debounce de 3 segundos para la búsqueda de clientes (como solicitó el usuario)
   useEffect(() => {
@@ -94,6 +100,26 @@ export default function ComercialComponent({ online }: ComercialProps) {
 
     return () => clearTimeout(timer);
   }, [busquedaCliente]);
+
+  // Consultar último precio al cliente cuando cambia el producto seleccionado o el cliente
+  useEffect(() => {
+    const fetchUltimoPrecio = async () => {
+      if (!clientId || !selectedProductId || !online) {
+        setUltimoPrecioCliente(null);
+        setFechaUltimaVenta(null);
+        return;
+      }
+      try {
+        const data = await ApiService.get(`/pedidos/ultimo-precio?clientId=${clientId}&productId=${selectedProductId}`);
+        setUltimoPrecioCliente(data.precioAnterior || null);
+        setFechaUltimaVenta(data.fechaUltimaVenta ? new Date(data.fechaUltimaVenta).toLocaleDateString('es-EC') : null);
+      } catch {
+        setUltimoPrecioCliente(null);
+        setFechaUltimaVenta(null);
+      }
+    };
+    fetchUltimoPrecio();
+  }, [clientId, selectedProductId, online]);
 
   useEffect(() => {
     loadPedidos();
@@ -112,6 +138,7 @@ export default function ComercialComponent({ online }: ComercialProps) {
               id: v.id,
               code: v.code,
               color: v.color,
+              costPrice: Number(v.costPrice || 0),
               salePrice: Number(v.salePrice || 0),
               modelName: modelo.name,
               serieNombre: v.serieNombre,
@@ -156,6 +183,29 @@ export default function ComercialComponent({ online }: ComercialProps) {
     }
   };
 
+  const handleSeleccionarProducto = (pid: string) => {
+    setSelectedProductId(pid);
+    const pObj = catalogoProductos.find((p) => p.id === pid);
+    if (pObj) {
+      const costo = pObj.costPrice || 0;
+      const sugerido = Math.round(costo * 1.30 * 100) / 100; // 30% ganancia
+      setCostoProdSeleccionado(costo);
+      setPrecioSugerido30(sugerido);
+      setPrecioItem(sugerido); // Pre-llenar con precio sugerido
+      if (pObj.tallas && pObj.tallas.length > 0) {
+        setSelectedTallaId(pObj.tallas[0].tallaId);
+      } else {
+        setSelectedTallaId('');
+      }
+    } else {
+      setCostoProdSeleccionado(0);
+      setPrecioSugerido30(0);
+      setPrecioItem(0);
+    }
+  };
+
+  const esPrecioMenorAlCosto = precioItem > 0 && costoProdSeleccionado > 0 && precioItem < costoProdSeleccionado;
+
   const handleAgregarLinea = () => {
     if (!selectedProductId || !selectedTallaId || cantidadItem <= 0 || precioItem <= 0) {
       alert('Por favor selecciona un producto, talla válida, cantidad y precio.');
@@ -185,6 +235,9 @@ export default function ComercialComponent({ online }: ComercialProps) {
     setSelectedTallaId('');
     setCantidadItem(1);
     setPrecioItem(0);
+    setCostoProdSeleccionado(0);
+    setPrecioSugerido30(0);
+    setUltimoPrecioCliente(null);
   };
 
   const handleEliminarLinea = (index: number) => {
@@ -592,28 +645,19 @@ export default function ComercialComponent({ online }: ComercialProps) {
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Modelo / Producto *</label>
                     <select
                       value={selectedProductId}
-                      onChange={(e) => {
-                        const pid = e.target.value;
-                        setSelectedProductId(pid);
-                        const pObj = catalogoProductos.find((p) => p.id === pid);
-                        if (pObj) {
-                          setPrecioItem(pObj.salePrice || 0);
-                          if (pObj.tallas && pObj.tallas.length > 0) {
-                            setSelectedTallaId(pObj.tallas[0].tallaId);
-                          } else {
-                            setSelectedTallaId('');
-                          }
-                        }
-                      }}
+                      onChange={(e) => handleSeleccionarProducto(e.target.value)}
                       className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
                     >
                       <option value="">-- Selecciona un Modelo / Producto --</option>
                       {catalogoProductos.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.modelName} — {p.color} ({p.serieNombre || 'Serie Estándar'}) — ${p.salePrice}
+                          {p.modelName} — {p.color} ({p.serieNombre || 'Serie Estándar'}) — Costo: ${p.costPrice} | PVP: ${p.salePrice}
                         </option>
                       ))}
                     </select>
+                    {catalogoProductos.length === 0 && (
+                      <p className="mt-1 text-[10px] text-amber-600">⚠️ No hay productos cargados. Verifica que tengas modelos activos en el catálogo.</p>
+                    )}
                   </div>
 
                   <div>
@@ -643,9 +687,8 @@ export default function ComercialComponent({ online }: ComercialProps) {
                       onChange={(e) => setTipoVentaItem(e.target.value as any)}
                       className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
                     >
-                      <option value="PAR">Por Par</option>
-                      <option value="DOCENA">Por Docena</option>
-                      <option value="CURVA">Por Curva Completa</option>
+                      <option value="TALLA_ESPECIFICA">Talla Específica (Individual)</option>
+                      <option value="SERIE_COMPLETA">Serie Completa</option>
                     </select>
                   </div>
 
@@ -661,22 +704,57 @@ export default function ComercialComponent({ online }: ComercialProps) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Precio Unitario ($)</label>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Precio Unitario ($)
+                      {precioSugerido30 > 0 && (
+                        <span className="ml-1 text-[10px] text-emerald-600 font-normal">
+                          Sugerido +30%: ${precioSugerido30.toFixed(2)}
+                        </span>
+                      )}
+                    </label>
                     <input
                       type="number"
                       step="0.01"
                       min="0.01"
                       value={precioItem}
+                      placeholder={precioSugerido30 > 0 ? `$${precioSugerido30.toFixed(2)} (30% ganancia)` : '0.00'}
                       onChange={(e) => setPrecioItem(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                      className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none ${
+                        esPrecioMenorAlCosto
+                          ? 'bg-red-50 border-red-500 text-red-700 focus:border-red-600'
+                          : 'bg-[var(--card)] border-[var(--border)] focus:border-[var(--primary)]'
+                      }`}
                     />
+                    {esPrecioMenorAlCosto && (
+                      <p className="mt-1 text-[10px] text-red-600 font-bold flex items-center gap-1">
+                        ⚠️ ¡ALERTA! El precio ${precioItem.toFixed(2)} es MENOR al costo de compra (${costoProdSeleccionado.toFixed(2)}). Estás perdiendo dinero.
+                      </p>
+                    )}
+                    {costoProdSeleccionado > 0 && !esPrecioMenorAlCosto && precioItem > 0 && (
+                      <p className="mt-1 text-[10px] text-emerald-600">
+                        ✅ Ganancia: ${(precioItem - costoProdSeleccionado).toFixed(2)} ({((precioItem - costoProdSeleccionado) / costoProdSeleccionado * 100).toFixed(1)}%)
+                      </p>
+                    )}
                   </div>
                 </div>
+
+                {/* Información de último precio al cliente */}
+                {ultimoPrecioCliente !== null && selectedProductId && clientId && (
+                  <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-2">
+                    <span className="text-blue-600 text-lg">💡</span>
+                    <div className="text-[11px]">
+                      <span className="font-bold text-blue-700">Último precio a este cliente: </span>
+                      <span className="font-black text-blue-800">${ultimoPrecioCliente.toFixed(2)}</span>
+                      {fechaUltimaVenta && <span className="text-blue-600 ml-1">(vendido el {fechaUltimaVenta})</span>}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   type="button"
                   onClick={handleAgregarLinea}
-                  className="w-full py-2 bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 hover:bg-[var(--primary)] hover:text-white transition-all font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5"
+                  disabled={!selectedProductId || !selectedTallaId}
+                  className="w-full py-2 bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 hover:bg-[var(--primary)] hover:text-white transition-all font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Plus size={14} /> Agregar Producto al Pedido
                 </button>
