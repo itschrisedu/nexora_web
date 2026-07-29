@@ -263,79 +263,6 @@ export default function ClientesComponent({ online }: ClientesProps) {
     );
   });
 
-  const FormModal = ({ title, onSubmit, onClose }: { title: string; onSubmit: (e: React.FormEvent) => void; onClose: () => void }) => (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl">
-        <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-base">{title}</h3>
-            <p className="text-xs text-[var(--muted-foreground)]">Los campos con * son obligatorios</p>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
-            <X size={18} />
-          </button>
-        </div>
-        <form onSubmit={onSubmit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
-            <div><Lbl t="Nombre" req /><input type="text" required value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej. Juan" className={INPUT} /></div>
-            <div><Lbl t="Apellido" req /><input type="text" required value={apellido} onChange={e => setApellido(e.target.value)} placeholder="Ej. Pérez" className={INPUT} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Lbl t="Teléfono" req /><input type="tel" required value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Ej. 0991234567" className={INPUT} /></div>
-            <div><Lbl t="Email" /><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Ej. juan@correo.com" className={INPUT} /></div>
-          </div>
-          <div className="space-y-2">
-            <Lbl t="Tipo de Documento de Identificación" />
-            <div className="grid grid-cols-3 gap-2">
-              {(["CEDULA", "RUC", "PASAPORTE"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => { setTipoDoc(t); setDocErr(""); }}
-                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
-                    tipoDoc === t
-                      ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
-                      : "bg-[var(--muted)]/40 text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]"
-                  }`}
-                >
-                  {t === "CEDULA" ? "Cédula" : t === "RUC" ? "RUC" : "Pasaporte / Extranjero"}
-                </button>
-              ))}
-            </div>
-            <div>
-              <input
-                type="text"
-                maxLength={tipoDoc === "CEDULA" ? 10 : tipoDoc === "RUC" ? 13 : 20}
-                value={numDoc}
-                onChange={(e) => { setNumDoc(e.target.value); if (docErr) setDocErr(""); }}
-                placeholder={
-                  tipoDoc === "CEDULA"
-                    ? "Ingrese los 10 dígitos de la Cédula"
-                    : tipoDoc === "RUC"
-                    ? "Ingrese los 13 dígitos del RUC (ej. 1801234567001)"
-                    : "Ingrese número de pasaporte o ID extranjero"
-                }
-                className={`${INPUT} ${docErr ? "border-red-400" : ""}`}
-              />
-              {docErr && <p className="text-[10px] text-red-400 mt-1">{docErr}</p>}
-            </div>
-          </div>
-          <div><Lbl t="Dirección" /><input type="text" value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Ej. Av. Principal 123, Guayaquil" className={INPUT} /></div>
-          <div><Lbl t="Notas" /><textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2} placeholder="Observaciones del cliente..." className={`${INPUT} resize-none`} /></div>
-          {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-              <AlertCircle size={14} /> {error}
-            </div>
-          )}
-          <button type="submit" disabled={saving}
-            className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
-            {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><CheckCircle size={16} />{title}</>}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex gap-6 h-full">
       {/* Lista de clientes */}
@@ -513,8 +440,79 @@ export default function ClientesComponent({ online }: ClientesProps) {
         )}
       </div>
 
-      {showCreate && <FormModal title="Registrar Cliente" onSubmit={handleCreate} onClose={() => { setShowCreate(false); resetForm(); }} />}
-      {showEdit && selected && <FormModal title="Editar Cliente" onSubmit={handleEdit} onClose={() => { setShowEdit(false); resetForm(); }} />}
+      {/* Modal Crear / Editar */}
+      {(showCreate || (showEdit && selected)) && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base">{showCreate ? "Registrar Cliente" : "Editar Cliente"}</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Los campos con * son obligatorios</p>
+              </div>
+              <button onClick={() => { setShowCreate(false); setShowEdit(false); resetForm(); }} className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={showCreate ? handleCreate : handleEdit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div><Lbl t="Nombre" req /><input type="text" required value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej. Juan" className={INPUT} /></div>
+                <div><Lbl t="Apellido" req /><input type="text" required value={apellido} onChange={e => setApellido(e.target.value)} placeholder="Ej. Pérez" className={INPUT} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><Lbl t="Teléfono" req /><input type="tel" required value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Ej. 0991234567" className={INPUT} /></div>
+                <div><Lbl t="Email" /><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Ej. juan@correo.com" className={INPUT} /></div>
+              </div>
+              <div className="space-y-2">
+                <Lbl t="Tipo de Documento de Identificación" />
+                <div className="grid grid-cols-3 gap-2">
+                  {(["CEDULA", "RUC", "PASAPORTE"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => { setTipoDoc(t); setDocErr(""); }}
+                      className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
+                        tipoDoc === t
+                          ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
+                          : "bg-[var(--muted)]/40 text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]"
+                      }`}
+                    >
+                      {t === "CEDULA" ? "Cédula" : t === "RUC" ? "RUC" : "Pasaporte / Extranjero"}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    maxLength={tipoDoc === "CEDULA" ? 10 : tipoDoc === "RUC" ? 13 : 20}
+                    value={numDoc}
+                    onChange={(e) => { setNumDoc(e.target.value); if (docErr) setDocErr(""); }}
+                    placeholder={
+                      tipoDoc === "CEDULA"
+                        ? "Ingrese los 10 dígitos de la Cédula"
+                        : tipoDoc === "RUC"
+                        ? "Ingrese los 13 dígitos del RUC (ej. 1801234567001)"
+                        : "Ingrese número de pasaporte o ID extranjero"
+                    }
+                    className={`${INPUT} ${docErr ? "border-red-400" : ""}`}
+                  />
+                  {docErr && <p className="text-[10px] text-red-400 mt-1">{docErr}</p>}
+                </div>
+              </div>
+              <div><Lbl t="Dirección" /><input type="text" value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Ej. Av. Principal 123, Guayaquil" className={INPUT} /></div>
+              <div><Lbl t="Notas" /><textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2} placeholder="Observaciones del cliente..." className={`${INPUT} resize-none`} /></div>
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+              <button type="submit" disabled={saving}
+                className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><CheckCircle size={16} />{showCreate ? "Registrar Cliente" : "Guardar Cambios"}</>}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
