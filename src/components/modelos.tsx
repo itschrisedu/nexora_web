@@ -832,43 +832,68 @@ export default function ModelosComponent({ online }: ModelosProps) {
                         </button>
 
                         {/* Price inputs (solo si está activa) */}
-                        {isActive && (
-                          <div className="px-4 pb-4 pt-1 border-t border-[var(--border)]/50">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Lbl t="Precio de Compra ($)" req />
-                                <input type="number" min="0.01" step="0.01"
-                                  value={prices.costPrice}
-                                  onChange={e => setSeriesPrices(prev => ({
-                                    ...prev,
-                                    [s.id]: { ...prev[s.id], costPrice: e.target.value }
-                                  }))}
-                                  placeholder="0.00" className={INPUT} />
+                        {isActive && (() => {
+                          const costVal = parseFloat(prices.costPrice);
+                          const saleVal = parseFloat(prices.salePrice);
+                          const hasCost = !isNaN(costVal) && costVal > 0;
+                          const hasSale = !isNaN(saleVal) && saleVal > 0;
+                          const suggestedSale = hasCost ? (costVal * 1.30).toFixed(2) : "";
+                          const isLoss = hasCost && hasSale && saleVal < costVal;
+                          const marginPercent = hasCost && hasSale ? ((saleVal - costVal) / costVal) * 100 : 0;
+                          const profitAmount = hasCost && hasSale ? saleVal - costVal : 0;
+
+                          return (
+                            <div className="px-4 pb-4 pt-1 border-t border-[var(--border)]/50 space-y-2">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Lbl t="Precio de Compra ($)" req />
+                                  <input type="number" min="0.01" step="0.01"
+                                    value={prices.costPrice}
+                                    onChange={e => setSeriesPrices(prev => ({
+                                      ...prev,
+                                      [s.id]: { ...prev[s.id], costPrice: e.target.value }
+                                    }))}
+                                    placeholder="0.00" className={INPUT} />
+                                </div>
+                                <div>
+                                  <Lbl t="Precio de Venta ($)" req />
+                                  <input type="number" min="0.01" step="0.01"
+                                    value={prices.salePrice}
+                                    onChange={e => setSeriesPrices(prev => ({
+                                      ...prev,
+                                      [s.id]: { ...prev[s.id], salePrice: e.target.value }
+                                    }))}
+                                    placeholder={suggestedSale ? `$${suggestedSale} (+30%)` : "0.00"}
+                                    className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
+                                </div>
                               </div>
-                              <div>
-                                <Lbl t="Precio de Venta ($)" req />
-                                <input type="number" min="0.01" step="0.01"
-                                  value={prices.salePrice}
-                                  onChange={e => setSeriesPrices(prev => ({
-                                    ...prev,
-                                    [s.id]: { ...prev[s.id], salePrice: e.target.value }
-                                  }))}
-                                  placeholder="0.00" className={INPUT} />
-                              </div>
+
+                              {/* Indicador de Margen de Ganancia / Sugerencia 30% */}
+                              {hasCost && (
+                                <div className="text-[11px] font-semibold pt-1">
+                                  {hasSale ? (
+                                    isLoss ? (
+                                      <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+                                        <AlertCircle size={14} className="shrink-0 animate-bounce" />
+                                        <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                      </div>
+                                    ) : (
+                                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+                                        <CheckCircle size={14} className="shrink-0" />
+                                        <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+                                      <DollarSign size={14} className="shrink-0" />
+                                      <span>Precio sugerido (30% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${(costVal * 0.30).toFixed(2)})</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            {prices.costPrice && prices.salePrice && parseFloat(prices.salePrice) > 0 && parseFloat(prices.costPrice) > 0 && (
-                              <div className={`mt-2 text-[10px] font-semibold flex items-center gap-1.5 ${
-                                parseFloat(prices.salePrice) < parseFloat(prices.costPrice)
-                                  ? "text-red-500"
-                                  : "text-emerald-600"
-                              }`}>
-                                <DollarSign size={10} />
-                                Margen: {((parseFloat(prices.salePrice) - parseFloat(prices.costPrice)) / parseFloat(prices.costPrice) * 100).toFixed(1)}%
-                                {parseFloat(prices.salePrice) < parseFloat(prices.costPrice) && " — ⚠️ Precio de venta menor al costo"}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     );
                   })}
