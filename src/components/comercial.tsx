@@ -207,29 +207,57 @@ export default function ComercialComponent({ online }: ComercialProps) {
   const esPrecioMenorAlCosto = precioItem > 0 && costoProdSeleccionado > 0 && precioItem < costoProdSeleccionado;
 
   const handleAgregarLinea = () => {
-    if (!selectedProductId || !selectedTallaId || cantidadItem <= 0 || precioItem <= 0) {
-      alert('Por favor selecciona un producto, talla válida, cantidad y precio.');
+    if (!selectedProductId || cantidadItem <= 0 || precioItem <= 0) {
+      alert('Por favor selecciona un producto, cantidad y precio válidos.');
       return;
     }
 
     const prodObj = catalogoProductos.find((p) => p.id === selectedProductId);
     if (!prodObj) return;
 
-    const tallaObj = prodObj.tallas.find((t: any) => t.tallaId === selectedTallaId);
-    if (!tallaObj) return;
+    if (tipoVentaItem === 'SERIE_COMPLETA') {
+      if (!prodObj.tallas || prodObj.tallas.length === 0) {
+        alert('Este modelo no tiene tallas asociadas en la serie.');
+        return;
+      }
 
-    const nuevaLinea = {
-      productId: prodObj.id,
-      modelName: prodObj.modelName,
-      color: prodObj.color,
-      tallaId: tallaObj.tallaId,
-      numeroTalla: tallaObj.numero,
-      cantidad: Number(cantidadItem),
-      precioUnitario: Number(precioItem),
-      tipoVenta: tipoVentaItem,
-    };
+      // Agregar automáticamente cada talla de la serie con la cantidad indicada
+      const lineasSerie = prodObj.tallas.map((t: any) => ({
+        productId: prodObj.id,
+        modelName: prodObj.modelName,
+        color: prodObj.color,
+        tallaId: t.tallaId,
+        numeroTalla: t.numero,
+        cantidad: Number(cantidadItem),
+        precioUnitario: Number(precioItem),
+        tipoVenta: 'SERIE_COMPLETA' as const,
+      }));
 
-    setLineasPedido([...lineasPedido, nuevaLinea]);
+      setLineasPedido([...lineasPedido, ...lineasSerie]);
+    } else {
+      // Venta por talla específica
+      if (!selectedTallaId) {
+        alert('Por favor selecciona una talla específica.');
+        return;
+      }
+
+      const tallaObj = prodObj.tallas.find((t: any) => t.tallaId === selectedTallaId);
+      if (!tallaObj) return;
+
+      const nuevaLinea = {
+        productId: prodObj.id,
+        modelName: prodObj.modelName,
+        color: prodObj.color,
+        tallaId: tallaObj.tallaId,
+        numeroTalla: tallaObj.numero,
+        cantidad: Number(cantidadItem),
+        precioUnitario: Number(precioItem),
+        tipoVenta: 'TALLA_ESPECIFICA' as const,
+      };
+
+      setLineasPedido([...lineasPedido, nuevaLinea]);
+    }
+
     // Limpiar selección de producto
     setSelectedProductId('');
     setSelectedTallaId('');
@@ -651,7 +679,7 @@ export default function ComercialComponent({ online }: ComercialProps) {
                       <option value="">-- Selecciona un Modelo / Producto --</option>
                       {catalogoProductos.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.modelName} — {p.color} ({p.serieNombre || 'Serie Estándar'}) — Costo: ${p.costPrice} | PVP: ${p.salePrice}
+                          {p.modelName} — {p.color} ({p.serieNombre || 'Serie Estándar'})
                         </option>
                       ))}
                     </select>
@@ -661,39 +689,53 @@ export default function ComercialComponent({ online }: ComercialProps) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Talla Disponible *</label>
-                    <select
-                      value={selectedTallaId}
-                      onChange={(e) => setSelectedTallaId(e.target.value)}
-                      disabled={!selectedProductId}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)] disabled:opacity-50"
-                    >
-                      <option value="">-- Selecciona Talla --</option>
-                      {selectedProductId &&
-                        catalogoProductos
-                          .find((p) => p.id === selectedProductId)
-                          ?.tallas.map((t: any) => (
-                            <option key={t.tallaId} value={t.tallaId}>
-                              Talla #{t.numero} (Stock: {t.cantidad})
-                            </option>
-                          ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Tipo de Venta</label>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Modalidad de Venta *</label>
                     <select
                       value={tipoVentaItem}
                       onChange={(e) => setTipoVentaItem(e.target.value as any)}
                       className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
                     >
-                      <option value="TALLA_ESPECIFICA">Talla Específica (Individual)</option>
-                      <option value="SERIE_COMPLETA">Serie Completa</option>
+                      <option value="TALLA_ESPECIFICA">👟 Venta por Talla Específica</option>
+                      <option value="SERIE_COMPLETA">📦 Venta por Serie Completa (Toda la curva)</option>
                     </select>
                   </div>
 
+                  {tipoVentaItem === 'TALLA_ESPECIFICA' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Talla Disponible *</label>
+                      <select
+                        value={selectedTallaId}
+                        onChange={(e) => setSelectedTallaId(e.target.value)}
+                        disabled={!selectedProductId}
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)] disabled:opacity-50"
+                      >
+                        <option value="">-- Selecciona Talla --</option>
+                        {selectedProductId &&
+                          catalogoProductos
+                            .find((p) => p.id === selectedProductId)
+                            ?.tallas.map((t: any) => (
+                              <option key={t.tallaId} value={t.tallaId}>
+                                Talla #{t.numero} (Stock disponible: {t.cantidad})
+                              </option>
+                            ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Serie Completa Seleccionada</label>
+                      <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-700 font-semibold flex items-center justify-between">
+                        <span>📦 Se incluirán todas las tallas de la serie</span>
+                        {selectedProductId && (
+                          <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">
+                            {catalogoProductos.find((p) => p.id === selectedProductId)?.tallas?.length || 0} tallas
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Cantidad</label>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Cantidad {tipoVentaItem === 'SERIE_COMPLETA' ? '(por cada talla de la serie)' : ''}</label>
                     <input
                       type="number"
                       min="1"
@@ -753,10 +795,10 @@ export default function ComercialComponent({ online }: ComercialProps) {
                 <button
                   type="button"
                   onClick={handleAgregarLinea}
-                  disabled={!selectedProductId || !selectedTallaId}
+                  disabled={!selectedProductId || (tipoVentaItem === 'TALLA_ESPECIFICA' && !selectedTallaId)}
                   className="w-full py-2 bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 hover:bg-[var(--primary)] hover:text-white transition-all font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Plus size={14} /> Agregar Producto al Pedido
+                  <Plus size={14} /> {tipoVentaItem === 'SERIE_COMPLETA' ? 'Agregar Serie Completa al Pedido' : 'Agregar Producto al Pedido'}
                 </button>
               </div>
 
