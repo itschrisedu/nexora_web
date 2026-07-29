@@ -23,10 +23,15 @@ interface Cliente {
   ruc?: string;
   direccion?: string;
   notas?: string;
-  limiteCredito: number;
-  cupoDisponible: number;
-  score: number;
-  nivelCredito: string;
+  limiteCredito?: number;
+  creditoUtilizado?: number;
+  creditoDisponible?: number;
+  cupoDisponible?: number;
+  score?: number;
+  scoringCredito?: number;
+  nivelCredito?: string;
+  totalCompras?: number;
+  comprasSinAtraso?: number;
   activo: boolean;
 }
 
@@ -96,14 +101,13 @@ export default function ClientesComponent({ online }: ClientesProps) {
   const [apellido, setApellido] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-  const [cedula, setCedula] = useState("");
-  const [ruc, setRuc] = useState("");
+  const [tipoDoc, setTipoDoc] = useState<"CEDULA" | "RUC" | "PASAPORTE">("CEDULA");
+  const [numDoc, setNumDoc] = useState("");
   const [direccion, setDireccion] = useState("");
   const [notas, setNotas] = useState("");
 
   // Errores de validación inline
-  const [cedulaErr, setCedulaErr] = useState("");
-  const [rucErr, setRucErr] = useState("");
+  const [docErr, setDocErr] = useState("");
 
   useEffect(() => { loadClientes(); }, [online]);
 
@@ -145,17 +149,28 @@ export default function ClientesComponent({ online }: ClientesProps) {
 
   const resetForm = () => {
     setNombre(""); setApellido(""); setTelefono(""); setEmail("");
-    setCedula(""); setRuc(""); setDireccion(""); setNotas("");
-    setError(""); setCedulaErr(""); setRucErr("");
+    setTipoDoc("CEDULA"); setNumDoc(""); setDireccion(""); setNotas("");
+    setError(""); setDocErr("");
   };
 
   const openCreate = () => { resetForm(); setShowCreate(true); };
   const openEdit = (c: Cliente) => {
     setNombre(c.nombre || ""); setApellido(c.apellido || "");
     setTelefono(c.telefono || ""); setEmail(c.email || "");
-    setCedula(c.cedula || ""); setRuc(c.ruc || "");
     setDireccion(c.direccion || ""); setNotas(c.notas || "");
-    setError(""); setCedulaErr(""); setRucErr("");
+    
+    if (c.ruc) {
+      setTipoDoc("RUC");
+      setNumDoc(c.ruc);
+    } else if (c.cedula && c.cedula.length !== 10) {
+      setTipoDoc("PASAPORTE");
+      setNumDoc(c.cedula);
+    } else {
+      setTipoDoc("CEDULA");
+      setNumDoc(c.cedula || "");
+    }
+    
+    setError(""); setDocErr("");
     setShowEdit(true);
   };
 
@@ -165,14 +180,19 @@ export default function ClientesComponent({ online }: ClientesProps) {
       setError("Nombre, Apellido y Teléfono son obligatorios.");
       return false;
     }
-    if (cedula && !validarCedula(cedula)) {
-      setCedulaErr("Cédula ecuatoriana inválida (10 dígitos, verificado).");
-      valid = false;
-    } else { setCedulaErr(""); }
-    if (ruc && !validarRuc(ruc)) {
-      setRucErr("RUC inválido (13 dígitos, debe terminar en 001).");
-      valid = false;
-    } else { setRucErr(""); }
+    if (numDoc) {
+      if (tipoDoc === "CEDULA" && !validarCedula(numDoc)) {
+        setDocErr("Cédula ecuatoriana inválida (debe tener 10 dígitos verificado).");
+        valid = false;
+      } else if (tipoDoc === "RUC" && !validarRuc(numDoc)) {
+        setDocErr("RUC ecuatoriano inválido (13 dígitos, debe terminar en 001).");
+        valid = false;
+      } else {
+        setDocErr("");
+      }
+    } else {
+      setDocErr("");
+    }
     return valid;
   };
 
@@ -182,17 +202,20 @@ export default function ClientesComponent({ online }: ClientesProps) {
     if (!validateForm()) return;
     setSaving(true);
     try {
+      const cedulaVal = tipoDoc === "CEDULA" || tipoDoc === "PASAPORTE" ? (numDoc || undefined) : undefined;
+      const rucVal = tipoDoc === "RUC" ? (numDoc || undefined) : undefined;
+
       if (online) {
         await ApiService.post("/clientes", {
           nombre, apellido, telefono,
-          email: email || undefined, cedula: cedula || undefined,
-          ruc: ruc || undefined, direccion: direccion || undefined, notas: notas || undefined,
+          email: email || undefined, cedula: cedulaVal,
+          ruc: rucVal, direccion: direccion || undefined, notas: notas || undefined,
         });
       } else {
         await db.clientes.add({
           id: `offline-${Date.now()}`,
           nombre: `${nombre} ${apellido}`.trim(),
-          cedula: cedula || ruc || "S/N",
+          cedula: numDoc || "S/N",
           email: email || undefined, telefono,
           limiteCredito: 0, cupoDisponible: 0, score: 100, nivelCredito: "SIN_CREDITO",
         });
@@ -212,10 +235,13 @@ export default function ClientesComponent({ online }: ClientesProps) {
     if (!validateForm()) return;
     setSaving(true);
     try {
+      const cedulaVal = tipoDoc === "CEDULA" || tipoDoc === "PASAPORTE" ? (numDoc || undefined) : undefined;
+      const rucVal = tipoDoc === "RUC" ? (numDoc || undefined) : undefined;
+
       await ApiService.patch(`/clientes/${selected.id}`, {
         nombre, apellido, telefono,
-        email: email || undefined, cedula: cedula || undefined,
-        ruc: ruc || undefined, direccion: direccion || undefined, notas: notas || undefined,
+        email: email || undefined, cedula: cedulaVal,
+        ruc: rucVal, direccion: direccion || undefined, notas: notas || undefined,
       });
       setSuccess("Cliente actualizado correctamente.");
       setShowEdit(false); setSelected(null); resetForm(); loadClientes();
@@ -258,18 +284,40 @@ export default function ClientesComponent({ online }: ClientesProps) {
             <div><Lbl t="Teléfono" req /><input type="tel" required value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Ej. 0991234567" className={INPUT} /></div>
             <div><Lbl t="Email" /><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Ej. juan@correo.com" className={INPUT} /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Lbl t="Cédula" />
-              <input type="text" maxLength={10} value={cedula} onChange={e => { setCedula(e.target.value); if (cedulaErr) setCedulaErr(""); }}
-                placeholder="10 dígitos" className={`${INPUT} ${cedulaErr ? "border-red-400" : ""}`} />
-              {cedulaErr && <p className="text-[10px] text-red-400 mt-1">{cedulaErr}</p>}
+          <div className="space-y-2">
+            <Lbl t="Tipo de Documento de Identificación" />
+            <div className="grid grid-cols-3 gap-2">
+              {(["CEDULA", "RUC", "PASAPORTE"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => { setTipoDoc(t); setDocErr(""); }}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
+                    tipoDoc === t
+                      ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
+                      : "bg-[var(--muted)]/40 text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]"
+                  }`}
+                >
+                  {t === "CEDULA" ? "Cédula" : t === "RUC" ? "RUC" : "Pasaporte / Extranjero"}
+                </button>
+              ))}
             </div>
             <div>
-              <Lbl t="RUC" />
-              <input type="text" maxLength={13} value={ruc} onChange={e => { setRuc(e.target.value); if (rucErr) setRucErr(""); }}
-                placeholder="13 dígitos (termina 001)" className={`${INPUT} ${rucErr ? "border-red-400" : ""}`} />
-              {rucErr && <p className="text-[10px] text-red-400 mt-1">{rucErr}</p>}
+              <input
+                type="text"
+                maxLength={tipoDoc === "CEDULA" ? 10 : tipoDoc === "RUC" ? 13 : 20}
+                value={numDoc}
+                onChange={(e) => { setNumDoc(e.target.value); if (docErr) setDocErr(""); }}
+                placeholder={
+                  tipoDoc === "CEDULA"
+                    ? "Ingrese los 10 dígitos de la Cédula"
+                    : tipoDoc === "RUC"
+                    ? "Ingrese los 13 dígitos del RUC (ej. 1801234567001)"
+                    : "Ingrese número de pasaporte o ID extranjero"
+                }
+                className={`${INPUT} ${docErr ? "border-red-400" : ""}`}
+              />
+              {docErr && <p className="text-[10px] text-red-400 mt-1">{docErr}</p>}
             </div>
           </div>
           <div><Lbl t="Dirección" /><input type="text" value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Ej. Av. Principal 123, Guayaquil" className={INPUT} /></div>
@@ -358,7 +406,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
                         </div>
                         <div>
                           <div className="font-semibold text-sm">{c.nombre} {c.apellido || ""}</div>
-                          <div className="text-[10px] text-[var(--muted-foreground)]">{c.telefono || "Sin teléfono"}</div>
+                          {c.direccion && <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[160px]">{c.direccion}</div>}
                         </div>
                       </div>
                     </td>
@@ -366,14 +414,15 @@ export default function ClientesComponent({ online }: ClientesProps) {
                       <span className="text-xs font-mono text-[var(--muted-foreground)]">{c.cedula || c.ruc || "—"}</span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <span className="text-xs text-[var(--muted-foreground)]">{c.email || "—"}</span>
+                      <div className="text-xs font-semibold text-[var(--foreground)]">{c.telefono || "—"}</div>
+                      {c.email && <div className="text-[10px] text-[var(--muted-foreground)]">{c.email}</div>}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`font-bold text-sm ${scoreColor(c.score)}`}>{c.score}</span>
+                      <span className={`font-bold text-sm ${scoreColor(Number(c.score ?? c.scoringCredito ?? 100))}`}>{Number(c.score ?? c.scoringCredito ?? 100)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${nivelColor(c.nivelCredito)}`}>
-                        {c.nivelCredito?.replace("_", " ") || "SIN CRÉDITO"}
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${nivelColor(c.nivelCredito || "SIN_CREDITO")}`}>
+                        {(c.nivelCredito || "SIN_CREDITO").replace("_", " ")}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -417,21 +466,32 @@ export default function ClientesComponent({ online }: ClientesProps) {
               {selected.direccion && <div className="flex items-center gap-2"><MapPin size={13} />{selected.direccion}</div>}
             </div>
 
-            <div className="p-3 bg-[var(--muted)]/30 rounded-xl border border-[var(--border)]">
-              <div className="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase tracking-wider">Score NEXORA</div>
-              <div className={`text-2xl font-black mt-1 ${scoreColor(selected.score)}`}>{selected.score}<span className="text-xs text-[var(--muted-foreground)] ml-1">/ 100</span></div>
-            </div>
+            {(() => {
+              const limite = Number(selected.limiteCredito ?? 0);
+              const utilizado = Number(selected.creditoUtilizado ?? 0);
+              const disponible = Number(selected.creditoDisponible ?? selected.cupoDisponible ?? Math.max(0, limite - utilizado));
+              const scoreVal = Number(selected.score ?? selected.scoringCredito ?? 100);
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-[var(--muted-foreground)] flex items-center gap-1.5"><DollarSign size={13} />Cupo Disponible</span>
-                <span className="font-bold text-emerald-600">${Number(selected.cupoDisponible).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-[var(--muted-foreground)] flex items-center gap-1.5"><ShieldAlert size={13} />Límite de Crédito</span>
-                <span className="font-bold">${Number(selected.limiteCredito).toFixed(2)}</span>
-              </div>
-            </div>
+              return (
+                <>
+                  <div className="p-3 bg-[var(--muted)]/30 rounded-xl border border-[var(--border)]">
+                    <div className="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase tracking-wider">Score Crediticio</div>
+                    <div className={`text-2xl font-black mt-1 ${scoreColor(scoreVal)}`}>{scoreVal}<span className="text-xs text-[var(--muted-foreground)] ml-1">/ 100</span></div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[var(--muted-foreground)] flex items-center gap-1.5"><DollarSign size={13} />Cupo Disponible</span>
+                      <span className="font-bold text-emerald-600">${disponible.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[var(--muted-foreground)] flex items-center gap-1.5"><ShieldAlert size={13} />Límite de Crédito</span>
+                      <span className="font-bold">${limite.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
 
             {selected.notas && (
               <div className="p-3 bg-[var(--muted)]/20 rounded-xl text-xs text-[var(--muted-foreground)] border border-[var(--border)]">
