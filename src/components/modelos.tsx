@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ApiService } from "../services/api.service";
 import {
-  Plus, Search, Loader2, ImageIcon, Package, Edit2,
+  Plus, Search, Loader2, ImageIcon, Package, Edit2, Trash2, AlertTriangle,
   DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette
 } from "lucide-react";
 
@@ -137,6 +137,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
   // Acordeones abiertos
   const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
+
+  // Modal de confirmación UI (reemplaza window.confirm sin 'localhost:3000 dice')
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    danger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   // Color seleccionado para previsualización por cada modelo
   const [selectedColorForModel, setSelectedColorForModel] = useState<Record<string, string>>({});
@@ -315,39 +331,108 @@ export default function ModelosComponent({ online }: ModelosProps) {
     }
   };
 
-  const handleToggleModel = async (id: string, name: string, currentActive: boolean) => {
+  const handleToggleModel = (id: string, modelName: string, currentActive: boolean) => {
     if (currentActive) {
-      const confirm = window.confirm(`¿Estás seguro de que deseas deshabilitar el modelo "${name}"? Esto también deshabilitará todas sus variantes de color y serie.`);
-      if (!confirm) return;
-    }
-    setSaving(true);
-    try {
-      await ApiService.patch(`/inventario/modelos/${id}/toggle`, {});
-      setSuccess(`Modelo ${currentActive ? "deshabilitado" : "habilitado"} correctamente.`);
-      loadData();
-      setTimeout(() => setSuccess(""), 4000);
-    } catch (err: any) {
-      setError(err.message || "Error al cambiar estado del modelo.");
-    } finally {
-      setSaving(false);
+      setConfirmModal({
+        isOpen: true,
+        title: "Deshabilitar Modelo",
+        message: `¿Estás seguro de que deseas deshabilitar el modelo "${modelName}"? Esto también deshabilitará todas sus variantes de color y serie.`,
+        confirmText: "Sí, deshabilitar",
+        danger: true,
+        onConfirm: async () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          setSaving(true);
+          try {
+            await ApiService.patch(`/inventario/modelos/${id}/toggle`, {});
+            setSuccess(`Modelo deshabilitado correctamente.`);
+            loadData();
+            setTimeout(() => setSuccess(""), 4000);
+          } catch (err: any) {
+            setError(err.message || "Error al cambiar estado del modelo.");
+          } finally {
+            setSaving(false);
+          }
+        },
+      });
+    } else {
+      // Habilitar no necesita confirmación
+      (async () => {
+        setSaving(true);
+        try {
+          await ApiService.patch(`/inventario/modelos/${id}/toggle`, {});
+          setSuccess(`Modelo habilitado correctamente.`);
+          loadData();
+          setTimeout(() => setSuccess(""), 4000);
+        } catch (err: any) {
+          setError(err.message || "Error al cambiar estado del modelo.");
+        } finally {
+          setSaving(false);
+        }
+      })();
     }
   };
 
-  const handleToggleProduct = async (id: string, code: string, currentActive: boolean) => {
+  const handleDeleteModel = (id: string, modelName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Eliminar Modelo Permanentemente",
+      message: `¿Estás seguro de que deseas ELIMINAR PERMANENTEMENTE el modelo "${modelName}"?\n\nEsta acción eliminará el modelo, todas sus variantes de color y su inventario de la base de datos. Esta acción no se puede deshacer.`,
+      confirmText: "Eliminar permanentemente",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setSaving(true);
+        try {
+          await ApiService.delete(`/inventario/modelos/${id}`, {});
+          setSuccess(`Modelo "${modelName}" eliminado permanentemente.`);
+          loadData();
+          setTimeout(() => setSuccess(""), 4000);
+        } catch (err: any) {
+          setError(err.message || "Error al eliminar el modelo.");
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
+  };
+
+  const handleToggleProduct = (id: string, code: string, currentActive: boolean) => {
     if (currentActive) {
-      const confirm = window.confirm(`¿Estás seguro de que deseas deshabilitar la variante con código "${code}"?`);
-      if (!confirm) return;
-    }
-    setSaving(true);
-    try {
-      await ApiService.patch(`/inventario/productos/${id}/toggle`, {});
-      setSuccess(`Variante ${currentActive ? "deshabilitada" : "habilitada"} correctamente.`);
-      loadData();
-      setTimeout(() => setSuccess(""), 4000);
-    } catch (err: any) {
-      setError(err.message || "Error al cambiar estado de la variante.");
-    } finally {
-      setSaving(false);
+      setConfirmModal({
+        isOpen: true,
+        title: "Deshabilitar Variante",
+        message: `¿Estás seguro de que deseas deshabilitar la variante con código "${code}"?`,
+        confirmText: "Sí, deshabilitar",
+        danger: true,
+        onConfirm: async () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          setSaving(true);
+          try {
+            await ApiService.patch(`/inventario/productos/${id}/toggle`, {});
+            setSuccess(`Variante deshabilitada correctamente.`);
+            loadData();
+            setTimeout(() => setSuccess(""), 4000);
+          } catch (err: any) {
+            setError(err.message || "Error al cambiar estado de la variante.");
+          } finally {
+            setSaving(false);
+          }
+        },
+      });
+    } else {
+      (async () => {
+        setSaving(true);
+        try {
+          await ApiService.patch(`/inventario/productos/${id}/toggle`, {});
+          setSuccess(`Variante habilitada correctamente.`);
+          loadData();
+          setTimeout(() => setSuccess(""), 4000);
+        } catch (err: any) {
+          setError(err.message || "Error al cambiar estado de la variante.");
+        } finally {
+          setSaving(false);
+        }
+      })();
     }
   };
 
@@ -458,14 +543,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
                     <div className="flex items-center gap-2">
                       {online && (
-                        <button type="button" onClick={() => handleToggleModel(m.id, m.name, m.active)}
-                          className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors ${
-                            m.active
-                              ? "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
-                              : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
-                          }`}>
-                          {m.active ? "Deshabilitar" : "Habilitar"}
-                        </button>
+                        <>
+                          <button type="button" onClick={() => handleToggleModel(m.id, m.name, m.active)}
+                            className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors ${
+                              m.active
+                                ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+                                : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                            }`}>
+                            {m.active ? "Deshabilitar" : "Habilitar"}
+                          </button>
+                          <button type="button" onClick={() => handleDeleteModel(m.id, m.name)}
+                            title="Eliminar modelo permanentemente"
+                            className="px-3 py-2 text-xs font-semibold rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1">
+                            <Trash2 size={13} />
+                            <span>Eliminar</span>
+                          </button>
+                        </>
                       )}
                       <button onClick={() => toggleExpandModel(m.id)}
                         className="flex items-center gap-1.5 px-3 py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-xs font-semibold rounded-xl transition-colors">
@@ -799,6 +892,51 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><DollarSign size={16} />Actualizar Precios</>}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Confirmación Global (reemplaza window.confirm) ── */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+          onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}>
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in"
+            onClick={e => e.stopPropagation()}
+            style={{ animation: "modalSlideIn 0.2s ease-out" }}>
+            {/* Header */}
+            <div className={`p-5 flex items-start gap-4 ${confirmModal.danger ? "bg-red-500/5" : "bg-amber-500/5"}`}>
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                confirmModal.danger
+                  ? "bg-red-500/15 text-red-500"
+                  : "bg-amber-500/15 text-amber-500"
+              }`}>
+                <AlertTriangle size={22} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-base">{confirmModal.title}</h3>
+                <p className="text-sm text-[var(--muted-foreground)] mt-1.5 whitespace-pre-line leading-relaxed">
+                  {confirmModal.message}
+                </p>
+              </div>
+            </div>
+
+            {/* Botones */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-[var(--border)]">
+              <button type="button"
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-5 py-2.5 text-sm font-semibold rounded-xl border border-[var(--border)] bg-[var(--muted)]/50 hover:bg-[var(--muted)] transition-colors">
+                {confirmModal.cancelText || "Cancelar"}
+              </button>
+              <button type="button"
+                onClick={() => confirmModal.onConfirm()}
+                className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-all ${
+                  confirmModal.danger
+                    ? "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20"
+                    : "bg-[var(--primary)] hover:opacity-90 text-white"
+                }`}>
+                {confirmModal.confirmText || "Confirmar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

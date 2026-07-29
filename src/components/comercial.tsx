@@ -65,7 +65,7 @@ export default function ComercialComponent({ online }: ComercialProps) {
   // Catálogo de Productos y Líneas de Pedido
   const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
   const [lineasPedido, setLineasPedido] = useState<
-    { productId: string; modelName: string; color: string; tallaId: string; numeroTalla: number; cantidad: number; precioUnitario: number; tipoVenta: 'SERIE_COMPLETA' | 'TALLA_ESPECIFICA' }[]
+    { productId: string; modelName: string; color: string; serieNombre?: string; imageUrl?: string; tallaId: string; numeroTalla: number; cantidad: number; precioUnitario: number; tipoVenta: 'SERIE_COMPLETA' | 'TALLA_ESPECIFICA' }[]
   >([]);
 
   // Selección de Producto actual para agregar
@@ -143,6 +143,7 @@ export default function ComercialComponent({ online }: ComercialProps) {
               id: v.id,
               code: v.code,
               color: v.color,
+              imageUrl: v.imageUrl,
               costPrice: Number(v.costPrice || 0),
               salePrice: Number(v.salePrice || 0),
               modelName: modelo.name,
@@ -235,6 +236,8 @@ export default function ComercialComponent({ online }: ComercialProps) {
         productId: prodObj.id,
         modelName: prodObj.modelName,
         color: prodObj.color,
+        serieNombre: prodObj.serieNombre,
+        imageUrl: prodObj.imageUrl,
         tallaId: t.tallaId,
         numeroTalla: t.numero,
         cantidad: Number(cantidadItem),
@@ -257,6 +260,8 @@ export default function ComercialComponent({ online }: ComercialProps) {
         productId: prodObj.id,
         modelName: prodObj.modelName,
         color: prodObj.color,
+        serieNombre: prodObj.serieNombre,
+        imageUrl: prodObj.imageUrl,
         tallaId: tallaObj.tallaId,
         numeroTalla: tallaObj.numero,
         cantidad: Number(cantidadItem),
@@ -698,9 +703,19 @@ export default function ComercialComponent({ online }: ComercialProps) {
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Modelo / Producto * (Buscar por Nombre o Color)</label>
                     {productoSeleccionadoObj ? (
                       <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
-                        <div>
-                          <div className="font-bold text-sm text-[var(--foreground)]">
-                            {productoSeleccionadoObj.modelName} — {productoSeleccionadoObj.color}
+                        <div className="flex items-center gap-3">
+                          {productoSeleccionadoObj.imageUrl ? (
+                            <img src={productoSeleccionadoObj.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-base shrink-0">👟</div>
+                          )}
+                          <div>
+                            <div className="font-bold text-sm text-[var(--foreground)]">
+                              {productoSeleccionadoObj.modelName} — {productoSeleccionadoObj.color}
+                            </div>
+                            <div className="text-[11px] font-semibold text-emerald-600">
+                              Serie: {productoSeleccionadoObj.serieNombre || 'Serie Estándar'}
+                            </div>
                           </div>
                         </div>
                         <button
@@ -733,14 +748,16 @@ export default function ComercialComponent({ online }: ComercialProps) {
                         />
 
                         {showDropdownModelo && busquedaModelo.trim().length > 0 && (
-                          <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto">
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto">
                             {catalogoProductos
                               .filter((p) => {
                                 const q = busquedaModelo.toLowerCase().trim();
                                 if (!q) return false;
                                 return (
                                   p.modelName.toLowerCase().includes(q) ||
-                                  (p.color && p.color.toLowerCase().includes(q))
+                                  (p.color && p.color.toLowerCase().includes(q)) ||
+                                  (p.serieNombre && p.serieNombre.toLowerCase().includes(q)) ||
+                                  (p.code && p.code.toLowerCase().includes(q))
                                 );
                               })
                               .map((p) => (
@@ -748,9 +765,22 @@ export default function ComercialComponent({ online }: ComercialProps) {
                                   key={p.id}
                                   type="button"
                                   onClick={() => handleSeleccionarProducto(p)}
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--primary)]/10 transition-colors border-b border-[var(--border)] last:border-none font-bold text-[var(--foreground)]"
+                                  className="w-full text-left px-3 py-2.5 text-xs hover:bg-[var(--primary)]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center gap-3 font-bold text-[var(--foreground)]"
                                 >
-                                  {p.modelName} — {p.color}
+                                  {p.imageUrl ? (
+                                    <img src={p.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">👟</div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <span className="block font-bold text-[var(--foreground)] truncate">{p.modelName}</span>
+                                    <div className="flex items-center gap-2 text-[10px] mt-0.5">
+                                      <span className="text-[var(--muted-foreground)] font-medium">Color: <strong className="text-[var(--foreground)]">{p.color}</strong></span>
+                                      <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                        Serie: {p.serieNombre || 'Estándar'}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </button>
                               ))}
                             {catalogoProductos.filter((p) => {
@@ -758,11 +788,13 @@ export default function ComercialComponent({ online }: ComercialProps) {
                               if (!q) return false;
                               return (
                                 p.modelName.toLowerCase().includes(q) ||
-                                (p.color && p.color.toLowerCase().includes(q))
+                                (p.color && p.color.toLowerCase().includes(q)) ||
+                                (p.serieNombre && p.serieNombre.toLowerCase().includes(q)) ||
+                                (p.code && p.code.toLowerCase().includes(q))
                               );
                             }).length === 0 && (
                               <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
-                                No se encontraron modelos con "{busquedaModelo}".
+                                No se encontraron combinaciones coincidentes con "{busquedaModelo}".
                               </div>
                             )}
                           </div>
@@ -909,7 +941,17 @@ export default function ComercialComponent({ online }: ComercialProps) {
                       <tbody className="divide-y divide-[var(--border)]">
                         {lineasPedido.map((l, idx) => (
                           <tr key={idx} className="hover:bg-[var(--muted)]/20">
-                            <td className="px-3 py-2 font-bold">{l.modelName} ({l.color})</td>
+                            <td className="px-3 py-2 font-bold flex items-center gap-2">
+                              {l.imageUrl ? (
+                                <img src={l.imageUrl} alt="" className="w-7 h-7 object-cover rounded-md border border-[var(--border)] shrink-0" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-md bg-[var(--muted)]/50 flex items-center justify-center text-xs shrink-0">👟</div>
+                              )}
+                              <div>
+                                <span className="block font-bold text-[var(--foreground)]">{l.modelName} ({l.color})</span>
+                                <span className="text-[10px] text-emerald-600 font-semibold block">Serie: {l.serieNombre || 'Serie Estándar'}</span>
+                              </div>
+                            </td>
                             <td className="px-3 py-2 font-medium text-[var(--muted-foreground)]">Talla #{l.numeroTalla}</td>
                             <td className="px-3 py-2 text-center font-bold">{l.cantidad}</td>
                             <td className="px-3 py-2 text-right">${l.precioUnitario.toFixed(2)}</td>
