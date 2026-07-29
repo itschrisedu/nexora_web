@@ -6,24 +6,31 @@ import { DollarSign, CheckCircle, Clock, AlertTriangle, Loader2 } from 'lucide-r
 
 interface FinancieroProps { online: boolean; }
 
-type EstadoCobro = 'PENDIENTE' | 'PARCIALMENTE_PAGADO' | 'PAGADO' | 'VENCIDO';
+type EstadoCobro = 'PENDIENTE' | 'PARCIALMENTE_PAGADO' | 'SALDADO' | 'PAGADO' | 'VENCIDO';
 
 interface Cobro {
   id: string;
-  numeroCobro: string;
+  numeroCobro?: string;
   clientId: string;
-  montoOriginal: number;
+  montoOriginal?: number;
+  montoTotal?: number;
   saldoPendiente: number;
   estado: EstadoCobro;
   fechaVencimiento?: string;
+  saleNote?: { numero: number; total: number };
 }
 
-const COBRO_ESTADO: Record<EstadoCobro, { label: string; color: string }> = {
+const COBRO_ESTADO: Record<string, { label: string; color: string }> = {
   PENDIENTE:            { label: 'Pendiente',       color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
   PARCIALMENTE_PAGADO:  { label: 'Parcial',          color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
   PAGADO:               { label: 'Pagado',           color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+  SALDADO:              { label: 'Saldado',          color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
   VENCIDO:              { label: 'Vencido',          color: 'bg-rose-500/10 text-rose-600 border-rose-500/20' },
 };
+
+function getCobroConfig(estado?: string) {
+  return COBRO_ESTADO[estado || 'PENDIENTE'] || { label: estado || 'Pendiente', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' };
+}
 
 export default function FinancieroComponent({ online }: FinancieroProps) {
   const [cobros, setCobros] = useState<Cobro[]>([]);
@@ -44,8 +51,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     setLoading(true);
     try {
       if (online) {
-        const data = await ApiService.get('/cobros');
-        setCobros(data);
+        const data = await ApiService.get('/financiero/cobros');
+        setCobros(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error('Error al cargar cobros:', err);
@@ -58,7 +65,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     if (!selectedCobro || !monto) return;
     setSavingAbono(true);
     try {
-      await ApiService.post(`/cobros/${selectedCobro.id}/abonos`, { monto: parseFloat(monto) });
+      await ApiService.post(`/financiero/cobros/${selectedCobro.id}/abono`, { monto: parseFloat(monto), metodo: 'EFECTIVO' });
       alert('Abono registrado exitosamente.');
       setSelectedCobro(null);
       setMonto('');
@@ -116,14 +123,14 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2">
-        {(['TODOS', 'PENDIENTE', 'PARCIALMENTE_PAGADO', 'PAGADO', 'VENCIDO'] as const).map((e) => (
-          <button key={e} onClick={() => setFiltro(e)}
+        {(['TODOS', 'PENDIENTE', 'PARCIALMENTE_PAGADO', 'SALDADO', 'PAGADO', 'VENCIDO'] as const).map((e) => (
+          <button key={e} onClick={() => setFiltro(e as any)}
             className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
               filtro === e
                 ? 'bg-[var(--primary)] text-white border-transparent'
                 : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]'
             }`}>
-            {e === 'TODOS' ? 'Todos' : COBRO_ESTADO[e].label}
+            {e === 'TODOS' ? 'Todos' : getCobroConfig(e).label}
           </button>
         ))}
       </div>
@@ -155,16 +162,18 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
                     {filtrados.map((cobro) => {
-                      const cfg = COBRO_ESTADO[cobro.estado];
+                      const cfg = getCobroConfig(cobro.estado);
+                      const num = cobro.numeroCobro || cobro.saleNote?.numero ? `#${cobro.numeroCobro || cobro.saleNote?.numero}` : `#${cobro.id.slice(0, 8).toUpperCase()}`;
+                      const montoOrig = Number(cobro.montoOriginal ?? cobro.montoTotal ?? 0);
                       return (
                         <tr key={cobro.id}
                           onClick={() => setSelectedCobro(cobro)}
                           className={`hover:bg-[var(--muted)]/30 cursor-pointer transition-colors ${selectedCobro?.id === cobro.id ? 'bg-[var(--primary)]/5' : ''}`}>
-                          <td className="px-5 py-4 font-bold">{cobro.numeroCobro}</td>
+                          <td className="px-5 py-4 font-bold">{num}</td>
                           <td className="px-5 py-4 text-center">
                             <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-bold ${cfg.color}`}>{cfg.label}</span>
                           </td>
-                          <td className="px-5 py-4 text-right text-[var(--muted-foreground)]">${Number(cobro.montoOriginal).toFixed(2)}</td>
+                          <td className="px-5 py-4 text-right text-[var(--muted-foreground)]">${montoOrig.toFixed(2)}</td>
                           <td className="px-5 py-4 text-right font-extrabold text-red-500">${Number(cobro.saldoPendiente).toFixed(2)}</td>
                           <td className="px-5 py-4 text-right text-[10px] text-[var(--muted-foreground)]">
                             {cobro.fechaVencimiento ? new Date(cobro.fechaVencimiento).toLocaleDateString('es-EC') : '—'}
@@ -186,7 +195,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-4 shadow-sm">
               <div className="space-y-2 pb-4 border-b border-[var(--border)]">
                 <div className="text-xs text-[var(--muted-foreground)]">Cobro seleccionado:</div>
-                <div className="font-bold">{selectedCobro.numeroCobro}</div>
+                <div className="font-bold">#{selectedCobro.numeroCobro || selectedCobro.saleNote?.numero || selectedCobro.id.slice(0, 8).toUpperCase()}</div>
                 <div className="flex justify-between text-sm">
                   <span className="text-[var(--muted-foreground)]">Saldo Pendiente</span>
                   <span className="font-extrabold text-red-500">${Number(selectedCobro.saldoPendiente).toFixed(2)}</span>
@@ -226,7 +235,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
             <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
               <h3 className="font-bold text-sm text-rose-500 flex items-center gap-2">
                 <AlertTriangle size={16} />
-                Devolución de Cliente — {selectedCobro.numeroCobro}
+                Devolución de Cliente — #{selectedCobro.numeroCobro || selectedCobro.saleNote?.numero || selectedCobro.id.slice(0, 8).toUpperCase()}
               </h3>
               <button onClick={() => setShowDevolucionModal(false)} className="text-[var(--muted-foreground)] text-sm">✕</button>
             </div>

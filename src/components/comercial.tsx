@@ -23,6 +23,7 @@ interface Pedido {
   id: string;
   numero: number;
   clientId: string;
+  clienteNombre?: string;
   montoTotal: number;
   estado: EstadoPedido;
   tipoPago: string;
@@ -50,6 +51,8 @@ export default function ComercialComponent({ online }: ComercialProps) {
   const [errorMsg, setErrorMsg] = useState('');
   const [savingOffline, setSavingOffline] = useState(false);
 
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
   useEffect(() => { loadPedidos(); }, [online]);
 
   const loadPedidos = async () => {
@@ -57,12 +60,32 @@ export default function ComercialComponent({ online }: ComercialProps) {
     try {
       if (online) {
         const data = await ApiService.get('/pedidos');
-        setPedidos(data);
+        setPedidos(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error('Error al cargar pedidos:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCambiarEstado = async (pedidoId: string, nuevoEstado: string) => {
+    try {
+      setUpdatingId(pedidoId);
+      if (nuevoEstado === 'EN_PREPARACION') {
+        await ApiService.post(`/pedidos/${pedidoId}/iniciar-preparacion`, {});
+      } else if (nuevoEstado === 'EN_TRANSITO') {
+        await ApiService.post(`/pedidos/${pedidoId}/marcar-en-transito`, {});
+      } else if (nuevoEstado === 'ENTREGADO') {
+        await ApiService.post(`/pedidos/${pedidoId}/confirmar-entrega`, {});
+      } else if (nuevoEstado === 'CANCELADO') {
+        await ApiService.delete(`/pedidos/${pedidoId}`, { motivo: 'Cancelado por el usuario' });
+      }
+      await loadPedidos();
+    } catch (err: any) {
+      alert(err.message || 'Error al actualizar el estado del pedido.');
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -145,15 +168,20 @@ export default function ComercialComponent({ online }: ComercialProps) {
                   <th className="px-6 py-4">Tipo Pago</th>
                   <th className="px-6 py-4 text-right">Total</th>
                   <th className="px-6 py-4 text-right">Fecha</th>
+                  <th className="px-6 py-4 text-center">Acciones / Cambiar Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {pedidosFiltrados.map((p) => {
                   const cfg = ESTADO_CONFIG[p.estado];
+                  const isUpdating = updatingId === p.id;
+
                   return (
                     <tr key={p.id} className="hover:bg-[var(--muted)]/30 transition-colors cursor-default">
                       <td className="px-6 py-4 font-bold">#{p.numero}</td>
-                      <td className="px-6 py-4 text-[var(--muted-foreground)] text-xs">{p.clientId.slice(0, 8).toUpperCase()}</td>
+                      <td className="px-6 py-4 text-xs font-semibold text-[var(--foreground)]">
+                        {p.clienteNombre || (p.clientId ? p.clientId.slice(0, 8).toUpperCase() : 'Consumidor Final')}
+                      </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>
                           {cfg.icon}{cfg.label}
@@ -165,6 +193,65 @@ export default function ComercialComponent({ online }: ComercialProps) {
                       <td className="px-6 py-4 text-right font-extrabold">${Number(p.montoTotal).toFixed(2)}</td>
                       <td className="px-6 py-4 text-right text-[10px] text-[var(--muted-foreground)]">
                         {new Date(p.createdAt).toLocaleDateString('es-EC')}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {isUpdating ? (
+                            <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+                              <Loader2 size={12} className="animate-spin text-[var(--primary)]" /> Actualizando...
+                            </span>
+                          ) : p.estado === 'PENDIENTE' ? (
+                            <>
+                              <button
+                                onClick={() => handleCambiarEstado(p.id, 'EN_PREPARACION')}
+                                title="Iniciar preparación en bodega"
+                                className="px-2.5 py-1 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-600/20 flex items-center gap-1"
+                              >
+                                <Package size={12} /> Preparar
+                              </button>
+                              <button
+                                onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
+                                title="Cancelar pedido"
+                                className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
+                              >
+                                <XCircle size={12} /> Cancelar
+                              </button>
+                            </>
+                          ) : p.estado === 'EN_PREPARACION' ? (
+                            <>
+                              <button
+                                onClick={() => handleCambiarEstado(p.id, 'EN_TRANSITO')}
+                                title="Marcar como enviado en tránsito"
+                                className="px-2.5 py-1 bg-sky-600/10 text-sky-600 hover:bg-sky-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-sky-600/20 flex items-center gap-1"
+                              >
+                                <Truck size={12} /> En Tránsito
+                              </button>
+                              <button
+                                onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
+                                title="Cancelar pedido"
+                                className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
+                              >
+                                <XCircle size={12} /> Cancelar
+                              </button>
+                            </>
+                          ) : p.estado === 'EN_TRANSITO' ? (
+                            <button
+                              onClick={() => handleCambiarEstado(p.id, 'ENTREGADO')}
+                              title="Confirmar entrega al cliente"
+                              className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
+                            >
+                              <CheckCircle size={12} /> Entregar
+                            </button>
+                          ) : p.estado === 'ENTREGADO' ? (
+                            <span className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+                              <CheckCircle size={12} /> Completado
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-medium text-rose-500 flex items-center gap-1">
+                              <XCircle size={12} /> Cancelado
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
