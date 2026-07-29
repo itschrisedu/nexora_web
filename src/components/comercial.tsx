@@ -13,6 +13,7 @@ import {
   XCircle,
   Truck,
   ArrowUpDown,
+  X,
 } from 'lucide-react';
 
 interface ComercialProps { online: boolean; }
@@ -53,7 +54,183 @@ export default function ComercialComponent({ online }: ComercialProps) {
 
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  useEffect(() => { loadPedidos(); }, [online]);
+  // Búsqueda de clientes con Debounce de 3 segundos
+  const [listaClientes, setListaClientes] = useState<{ id: string; nombre: string; cedula?: string; telefono?: string }[]>([]);
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [busquedaDebounced, setBusquedaDebounced] = useState('');
+  const [esperandoDebounce, setEsperandoDebounce] = useState(false);
+  const [showDropdownCliente, setShowDropdownCliente] = useState(false);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<{ id: string; nombre: string; cedula?: string } | null>(null);
+
+  // Catálogo de Productos y Líneas de Pedido
+  const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
+  const [lineasPedido, setLineasPedido] = useState<
+    { productId: string; modelName: string; color: string; tallaId: string; numeroTalla: number; cantidad: number; precioUnitario: number; tipoVenta: 'PAR' | 'DOCENA' | 'CURVA' }[]
+  >([]);
+
+  // Selección de Producto actual para agregar
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedTallaId, setSelectedTallaId] = useState('');
+  const [cantidadItem, setCantidadItem] = useState(1);
+  const [precioItem, setPrecioItem] = useState(0);
+  const [tipoVentaItem, setTipoVentaItem] = useState<'PAR' | 'DOCENA' | 'CURVA'>('PAR');
+  const [canalEntrada, setCanalEntrada] = useState<'VENTA_DIRECTA' | 'POS' | 'CATALOGO_DIGITAL'>('VENTA_DIRECTA');
+  const [notasPedido, setNotasPedido] = useState('');
+
+  const [creatingOrder, setCreatingOrder] = useState(false);
+
+  // Debounce de 3 segundos para la búsqueda de clientes (como solicitó el usuario)
+  useEffect(() => {
+    if (!busquedaCliente.trim()) {
+      setBusquedaDebounced('');
+      setEsperandoDebounce(false);
+      return;
+    }
+    setEsperandoDebounce(true);
+    const timer = setTimeout(() => {
+      setBusquedaDebounced(busquedaCliente.trim());
+      setEsperandoDebounce(false);
+    }, 3000); // 3 segundos de retardo exactos
+
+    return () => clearTimeout(timer);
+  }, [busquedaCliente]);
+
+  useEffect(() => {
+    loadPedidos();
+    loadListaClientes();
+    cargarCatalogo();
+  }, [online]);
+
+  const cargarCatalogo = async () => {
+    try {
+      if (online) {
+        const data = await ApiService.get('/catalogo/productos');
+        const flat: any[] = [];
+        (data || []).forEach((modelo: any) => {
+          (modelo.variantes || []).forEach((v: any) => {
+            flat.push({
+              id: v.id,
+              code: v.code,
+              color: v.color,
+              salePrice: Number(v.salePrice || 0),
+              modelName: modelo.name,
+              serieNombre: v.serieNombre,
+              tallas: v.tallas || [],
+            });
+          });
+        });
+        setCatalogoProductos(flat);
+      }
+    } catch (e) {
+      console.error('Error cargando catálogo para nuevo pedido:', e);
+    }
+  };
+
+  const loadListaClientes = async () => {
+    try {
+      if (online) {
+        const data = await ApiService.get('/clientes');
+        if (Array.isArray(data)) {
+          setListaClientes(
+            data.map((c: any) => ({
+              id: c.id,
+              nombre: `${c.nombre || ''} ${c.apellido || ''}`.trim(),
+              cedula: c.cedula || c.ruc || '',
+              telefono: c.telefono || '',
+            }))
+          );
+        }
+      } else {
+        const local = await db.clientes.toArray();
+        setListaClientes(
+          local.map((c: any) => ({
+            id: c.id,
+            nombre: c.nombre,
+            cedula: c.cedula,
+            telefono: c.telefono,
+          }))
+        );
+      }
+    } catch (e) {
+      console.error('Error cargando clientes:', e);
+    }
+  };
+
+  const handleAgregarLinea = () => {
+    if (!selectedProductId || !selectedTallaId || cantidadItem <= 0 || precioItem <= 0) {
+      alert('Por favor selecciona un producto, talla válida, cantidad y precio.');
+      return;
+    }
+
+    const prodObj = catalogoProductos.find((p) => p.id === selectedProductId);
+    if (!prodObj) return;
+
+    const tallaObj = prodObj.tallas.find((t: any) => t.tallaId === selectedTallaId);
+    if (!tallaObj) return;
+
+    const nuevaLinea = {
+      productId: prodObj.id,
+      modelName: prodObj.modelName,
+      color: prodObj.color,
+      tallaId: tallaObj.tallaId,
+      numeroTalla: tallaObj.numero,
+      cantidad: Number(cantidadItem),
+      precioUnitario: Number(precioItem),
+      tipoVenta: tipoVentaItem,
+    };
+
+    setLineasPedido([...lineasPedido, nuevaLinea]);
+    // Limpiar selección de producto
+    setSelectedProductId('');
+    setSelectedTallaId('');
+    setCantidadItem(1);
+    setPrecioItem(0);
+  };
+
+  const handleEliminarLinea = (index: number) => {
+    setLineasPedido(lineasPedido.filter((_, i) => i !== index));
+  };
+
+  const handleCrearPedidoOnline = async () => {
+    if (!clientId) {
+      setErrorMsg('Debes seleccionar un cliente.');
+      return;
+    }
+    if (lineasPedido.length === 0) {
+      setErrorMsg('Debes agregar al menos una línea de producto al pedido.');
+      return;
+    }
+
+    setCreatingOrder(true);
+    setErrorMsg('');
+    try {
+      await ApiService.post('/pedidos', {
+        clientId,
+        canal: canalEntrada,
+        tipoPago,
+        lineas: lineasPedido.map((l) => ({
+          productId: l.productId,
+          tallaId: l.tallaId,
+          cantidad: l.cantidad,
+          tipoVenta: l.tipoVenta,
+        })),
+        notas: notasPedido || undefined,
+      });
+
+      alert('¡Pedido creado exitosamente!');
+      setShowModal(false);
+      // Resetear estado
+      setClientId('');
+      setClienteSeleccionado(null);
+      setLineasPedido([]);
+      setNotasPedido('');
+      await loadPedidos();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al crear el pedido.');
+    } finally {
+      setCreatingOrder(false);
+    }
+  };
 
   const loadPedidos = async () => {
     setLoading(true);
@@ -104,6 +281,8 @@ export default function ComercialComponent({ online }: ComercialProps) {
       await db.pedidosOffline.add(offlineOrder);
       setShowModal(false);
       setClientId('');
+      setClienteSeleccionado(null);
+      setBusquedaCliente('');
       alert('Pedido guardado localmente. Se sincronizará cuando haya conexión a internet.');
     } catch (err) {
       setErrorMsg('Error al guardar offline.');
@@ -262,43 +441,330 @@ export default function ComercialComponent({ online }: ComercialProps) {
         </div>
       )}
 
-      {/* Modal Nuevo Pedido (Offline Compatible) */}
+      {/* Modal Nuevo Pedido (Completo con Selección de Producto, Modelo, Talla y Debounce de 3s) */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
-              <h3 className="font-bold text-lg">Nuevo Pedido</h3>
-              <button onClick={() => setShowModal(false)} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-sm">Cerrar</button>
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/20">
+              <div>
+                <h3 className="font-extrabold text-base">Crear Nuevo Pedido Completo</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Selecciona el cliente, tipo de pago y añade los productos con sus tallas</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setLineasPedido([]);
+                  setClienteSeleccionado(null);
+                  setClientId('');
+                  setBusquedaCliente('');
+                }}
+                className="p-1.5 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div className="p-6 space-y-4">
+
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
               {!online && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs rounded-xl">
-                  📡 Modo Offline: El pedido se guardará localmente y se sincronizará cuando vuelva la conexión.
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs rounded-xl flex items-center gap-2">
+                  <span>📡 Modo Offline: El pedido se guardará localmente y se sincronizará cuando vuelva la conexión.</span>
                 </div>
               )}
-              <div>
-                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">ID del Cliente *</label>
-                <input type="text" required placeholder="UUID del cliente registrado" value={clientId} onChange={(e) => setClientId(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+
+              {/* 1. SECCIÓN CLIENTE & PAGO */}
+              <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">1. Datos del Cliente & Pago</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="relative sm:col-span-2">
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Cliente *</label>
+                    {clienteSeleccionado ? (
+                      <div className="flex items-center justify-between p-3 bg-[var(--primary)]/10 border border-[var(--primary)]/30 rounded-xl">
+                        <div>
+                          <div className="font-bold text-sm text-[var(--foreground)]">{clienteSeleccionado.nombre}</div>
+                          {clienteSeleccionado.cedula && <div className="text-[10px] text-[var(--muted-foreground)]">C.I / RUC: {clienteSeleccionado.cedula}</div>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setClienteSeleccionado(null);
+                            setClientId('');
+                            setBusquedaCliente('');
+                            setBusquedaDebounced('');
+                          }}
+                          className="text-xs font-semibold text-red-500 hover:underline"
+                        >
+                          Cambiar
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Escribe apellido, nombre o número de cédula..."
+                            value={busquedaCliente}
+                            onChange={(e) => {
+                              setBusquedaCliente(e.target.value);
+                              setShowDropdownCliente(true);
+                            }}
+                            onFocus={() => {
+                              if (listaClientes.length === 0) loadListaClientes();
+                              setShowDropdownCliente(true);
+                            }}
+                            className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] pr-24"
+                          />
+                          {esperandoDebounce && (
+                            <span className="absolute right-3 top-2.5 text-[10px] text-amber-600 flex items-center gap-1 font-semibold animate-pulse">
+                              <Loader2 size={12} className="animate-spin" /> Buscando en 3s...
+                            </span>
+                          )}
+                        </div>
+
+                        {showDropdownCliente && (
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto">
+                            {listaClientes
+                              .filter((c) => {
+                                const q = (busquedaDebounced || busquedaCliente).toLowerCase().trim();
+                                if (!q) return true;
+                                return (
+                                  c.nombre.toLowerCase().includes(q) ||
+                                  (c.cedula && c.cedula.toLowerCase().includes(q)) ||
+                                  (c.telefono && c.telefono.toLowerCase().includes(q))
+                                );
+                              })
+                              .slice(0, 10)
+                              .map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setClientId(c.id);
+                                    setClienteSeleccionado(c);
+                                    setShowDropdownCliente(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--primary)]/10 transition-colors border-b border-[var(--border)] last:border-none flex justify-between items-center"
+                                >
+                                  <div>
+                                    <span className="font-bold block text-[var(--foreground)]">{c.nombre}</span>
+                                    {c.cedula && <span className="text-[10px] text-[var(--muted-foreground)]">C.I: {c.cedula}</span>}
+                                  </div>
+                                  {c.telefono && <span className="text-[10px] text-[var(--muted-foreground)]">{c.telefono}</span>}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Tipo de Pago *</label>
+                    <select
+                      value={tipoPago}
+                      onChange={(e) => setTipoPago(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]"
+                    >
+                      <option value="CONTADO">Contado</option>
+                      <option value="CREDITO">Crédito</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Canal de Venta</label>
+                    <select
+                      value={canalEntrada}
+                      onChange={(e) => setCanalEntrada(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]"
+                    >
+                      <option value="VENTA_DIRECTA">Venta Directa</option>
+                      <option value="POS">POS Mostrador</option>
+                      <option value="CATALOGO_DIGITAL">Catálogo Digital / WhatsApp</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Tipo de Pago *</label>
-                <select value={tipoPago} onChange={(e) => setTipoPago(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]">
-                  <option value="CONTADO">Contado</option>
-                  <option value="CREDITO">Crédito</option>
-                </select>
+
+              {/* 2. SECCIÓN AGREGAR PRODUCTO, MODELO Y TALLA */}
+              <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">2. Seleccionar Modelo, Talla y Cantidad</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Modelo / Producto *</label>
+                    <select
+                      value={selectedProductId}
+                      onChange={(e) => {
+                        const pid = e.target.value;
+                        setSelectedProductId(pid);
+                        const pObj = catalogoProductos.find((p) => p.id === pid);
+                        if (pObj) {
+                          setPrecioItem(pObj.salePrice || 0);
+                          if (pObj.tallas && pObj.tallas.length > 0) {
+                            setSelectedTallaId(pObj.tallas[0].tallaId);
+                          } else {
+                            setSelectedTallaId('');
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                    >
+                      <option value="">-- Selecciona un Modelo / Producto --</option>
+                      {catalogoProductos.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.modelName} — {p.color} ({p.serieNombre || 'Serie Estándar'}) — ${p.salePrice}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Talla Disponible *</label>
+                    <select
+                      value={selectedTallaId}
+                      onChange={(e) => setSelectedTallaId(e.target.value)}
+                      disabled={!selectedProductId}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)] disabled:opacity-50"
+                    >
+                      <option value="">-- Selecciona Talla --</option>
+                      {selectedProductId &&
+                        catalogoProductos
+                          .find((p) => p.id === selectedProductId)
+                          ?.tallas.map((t: any) => (
+                            <option key={t.tallaId} value={t.tallaId}>
+                              Talla #{t.numero} (Stock: {t.cantidad})
+                            </option>
+                          ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Tipo de Venta</label>
+                    <select
+                      value={tipoVentaItem}
+                      onChange={(e) => setTipoVentaItem(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                    >
+                      <option value="PAR">Por Par</option>
+                      <option value="DOCENA">Por Docena</option>
+                      <option value="CURVA">Por Curva Completa</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Cantidad</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={cantidadItem}
+                      onChange={(e) => setCantidadItem(parseInt(e.target.value) || 1)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Precio Unitario ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={precioItem}
+                      onChange={(e) => setPrecioItem(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAgregarLinea}
+                  className="w-full py-2 bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 hover:bg-[var(--primary)] hover:text-white transition-all font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  <Plus size={14} /> Agregar Producto al Pedido
+                </button>
               </div>
+
+              {/* 3. TABLA DE PRODUCTOS EN EL PEDIDO */}
+              {lineasPedido.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase">Productos en este pedido ({lineasPedido.length})</span>
+                    <span className="text-xs font-bold text-emerald-600">
+                      Total: ${lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--muted)]/40 font-semibold uppercase text-[var(--muted-foreground)] text-[10px]">
+                        <tr>
+                          <th className="px-3 py-2">Modelo / Color</th>
+                          <th className="px-3 py-2">Talla</th>
+                          <th className="px-3 py-2 text-center">Cant.</th>
+                          <th className="px-3 py-2 text-right">Precio</th>
+                          <th className="px-3 py-2 text-right">Subtotal</th>
+                          <th className="px-3 py-2 text-center">Quitar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {lineasPedido.map((l, idx) => (
+                          <tr key={idx} className="hover:bg-[var(--muted)]/20">
+                            <td className="px-3 py-2 font-bold">{l.modelName} ({l.color})</td>
+                            <td className="px-3 py-2 font-medium text-[var(--muted-foreground)]">Talla #{l.numeroTalla}</td>
+                            <td className="px-3 py-2 text-center font-bold">{l.cantidad}</td>
+                            <td className="px-3 py-2 text-right">${l.precioUnitario.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-bold text-emerald-600">${(l.cantidad * l.precioUnitario).toFixed(2)}</td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleEliminarLinea(idx)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <XCircle size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {errorMsg && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl">{errorMsg}</div>}
-              <div className="flex gap-3 pt-2">
+            </div>
+
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-between gap-3">
+              <div className="text-xs">
+                <span className="text-[var(--muted-foreground)]">Monto Total: </span>
+                <span className="font-black text-base text-emerald-600">
+                  ${lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                >
+                  Cancelar
+                </button>
+
                 {online ? (
-                  <button onClick={() => { alert('Implementar formulario de líneas completo para pedido online.'); }}
-                    className="flex-1 py-2.5 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity">
-                    Crear Pedido Online
+                  <button
+                    type="button"
+                    disabled={creatingOrder || lineasPedido.length === 0 || !clientId}
+                    onClick={handleCrearPedidoOnline}
+                    className="px-5 py-2 bg-[var(--primary)] text-white font-bold text-xs rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {creatingOrder ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                    {creatingOrder ? 'Creando Pedido...' : 'Guardar Pedido Completo'}
                   </button>
                 ) : (
-                  <button onClick={handleGuardarOffline} disabled={savingOffline}
-                    className="flex-1 py-2.5 bg-amber-500 text-slate-900 font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50">
+                  <button
+                    type="button"
+                    onClick={handleGuardarOffline}
+                    disabled={savingOffline}
+                    className="px-5 py-2 bg-amber-500 text-slate-900 font-bold text-xs rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
                     {savingOffline ? 'Guardando...' : 'Guardar Offline'}
                   </button>
                 )}
