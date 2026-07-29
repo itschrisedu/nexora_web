@@ -119,7 +119,7 @@ export default function AuditoriaComponent() {
             </div>
             <div>
               <p className="text-xs text-[var(--muted-foreground)] font-medium">
-                Trazabilidad inmutable multi-tenant con registro de IP, cambios de estado y operaciones críticas.
+                Historial completo de todas las acciones realizadas en el sistema para mayor seguridad y control.
               </p>
             </div>
           </div>

@@ -246,7 +246,7 @@ export default function Home() {
             <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-amber-300 bg-clip-text text-transparent">
               NEXORA
             </h1>
-            <p className="text-xs text-slate-400 mt-2">Trazabilidad Operativa y Scoring Crediticio de Calzado</p>
+            <p className="text-xs text-slate-400 mt-2">Sistema integral de gestión para negocios de calzado</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
@@ -283,7 +283,7 @@ export default function Home() {
             </button>
           </form>
           <div className="mt-6 text-center text-[10px] text-slate-500">
-            {online ? 'Conectado al servidor NestJS' : 'Offline: use admin@nexora.com / Admin123!'}
+            {online ? 'Conectado al servidor' : 'Sin conexión: use admin@nexora.com / Admin123!'}
           </div>
         </div>
       </div>
@@ -459,7 +459,7 @@ function DashboardView({ stats }: { stats: { totalSales: number; activeClients: 
         <KpiCard 
           title="Clientes Activos" 
           value={String(stats.activeClients)} 
-          subtitle={hasClients ? "Registrados con scoring crediticio" : "Sin clientes en el sistema"} 
+          subtitle={hasClients ? "Registrados con historial de crédito" : "Sin clientes en el sistema"} 
           icon={<Users size={16} />} 
           iconBg="bg-slate-800/10 text-slate-700 dark:text-slate-300" 
         />
@@ -486,9 +486,9 @@ function DashboardView({ stats }: { stats: { totalSales: number; activeClients: 
         <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl" />
         <div className="relative z-10 max-w-xl space-y-4">
           <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-600 text-white">NEXORA WEB</span>
-          <h3 className="text-2xl font-black">Sistema de Trazabilidad e Inteligencia de Crédito</h3>
+          <h3 className="text-2xl font-black">Sistema de Gestión Integral para tu Negocio</h3>
           <p className="text-sm text-slate-300 leading-relaxed">
-            Esta interfaz controla en tiempo real todos los procesos del almacén. El sistema detecta caídas de red de forma transparente y almacena los pedidos en IndexedDB garantizando la continuidad operativa.
+            Administra tu inventario, ventas, clientes y facturación desde un solo lugar. El sistema funciona incluso sin internet, guardando tus datos de forma segura hasta que se restablezca la conexión.
           </p>
         </div>
       </div>

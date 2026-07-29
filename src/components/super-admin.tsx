@@ -381,7 +381,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         <div>
           <p className="text-sm text-[var(--muted-foreground)] font-medium flex items-center gap-2">
             <Building2 size={18} className="text-[var(--primary)]" />
-            Administración global del sistema SaaS: Crear, editar, activar/desactivar y eliminar organizaciones o usuarios.
+            Crear, editar, activar/desactivar y administrar organizaciones o usuarios del sistema.
           </p>
         </div>
         <button

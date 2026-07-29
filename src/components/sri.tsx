@@ -123,7 +123,7 @@ export default function SriComponent() {
       formData.append("file", fileP12);
       formData.append("password", passwordP12);
 
-      await ApiService.postMultipart("/sri/upload-p12", formData);
+      await ApiService.postFormData("/sri/upload-p12", formData);
       setMsgConfig({ type: "success", text: "Certificado de firma .p12 subido y encriptado con éxito." });
       setConfig((prev) => ({ ...prev, tieneP12: true }));
       setFileP12(null);
@@ -151,7 +151,7 @@ export default function SriComponent() {
         <div>
           <p className="text-[var(--muted-foreground)] text-sm font-medium flex items-center gap-2">
             <FileText className="text-emerald-600 dark:text-emerald-400" size={18} />
-            Firma de comprobantes XAdES-BES y conexión directa con los Servidores del SRI
+            Genera, firma y envía tus comprobantes electrónicos directamente al SRI
           </p>
         </div>
         <div className="flex bg-[var(--muted)]/60 p-1 rounded-xl border border-[var(--border)]">

@@ -102,10 +102,10 @@ export default function PrediccionDemandaComponent() {
           <div className="space-y-2 max-w-2xl">
             <div className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase text-[#0F172A] dark:text-amber-400 bg-slate-900/10 dark:bg-amber-400/10 px-3 py-1 rounded-full w-fit border border-slate-900/20 dark:border-amber-400/20">
               <BrainCircuit size={14} className="animate-pulse" />
-              Machine Learning & Business Intelligence
+              Inteligencia Artificial
             </div>
             <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
-              Algoritmo predictivo basado en Gradient Boosting Regressor que proyecta la rotación de stock por modelo, serie y talla utilizando patrones estacionales y series de tiempo.
+              El sistema analiza tus ventas anteriores para calcular qué productos, tallas y colores vas a necesitar en los próximos días, ayudándote a planificar tus compras.
             </p>
           </div>
 
@@ -143,19 +143,19 @@ export default function PrediccionDemandaComponent() {
             <div>
               <span className="text-[var(--muted-foreground)] block">Estado del Servicio</span>
               <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
-                <CheckCircle2 size={13} /> Activo (Python ML)
+                <CheckCircle2 size={13} /> Activo
               </span>
             </div>
             <div>
-              <span className="text-[var(--muted-foreground)] block">Precisión (R² Score)</span>
+              <span className="text-[var(--muted-foreground)] block">Nivel de Confianza</span>
               <span className="font-bold text-[#0F172A] dark:text-amber-400 font-mono mt-0.5 block">
                 {estadoModelo.score_r2 ? `${(estadoModelo.score_r2 * 100).toFixed(1)}%` : "N/A"}
               </span>
             </div>
             <div>
-              <span className="text-[var(--muted-foreground)] block">Ventas de Entrenamiento</span>
+              <span className="text-[var(--muted-foreground)] block">Ventas Analizadas</span>
               <span className="font-bold text-[var(--card-foreground)] font-mono mt-0.5 block">
-                {estadoModelo.registros_entrenamiento ?? 0} registros
+                {estadoModelo.registros_entrenamiento ?? 0} ventas
               </span>
             </div>
             <div>
