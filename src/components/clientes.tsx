@@ -95,6 +95,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
+  const [updatingLevel, setUpdatingLevel] = useState(false);
 
   // Campos del formulario
   const [nombre, setNombre] = useState("");
@@ -249,6 +250,26 @@ export default function ClientesComponent({ online }: ClientesProps) {
     } catch (err: any) {
       setError(err.message || "Error al actualizar el cliente.");
     } finally { setSaving(false); }
+  };
+
+  const handleAjustarNivel = async (clienteId: string, nuevoNivel: string) => {
+    try {
+      setUpdatingLevel(true);
+      setError("");
+      await ApiService.post(`/clientes/${clienteId}/ajustar-nivel`, { nuevoNivel });
+      setSuccess(`Línea de crédito actualizada a: ${nuevoNivel === "SIN_CREDITO" ? "Sin Crédito (Bloqueado)" : nuevoNivel.replace("_", " ")}`);
+      const updatedData = await ApiService.get("/clientes");
+      if (Array.isArray(updatedData)) {
+        setClientes(updatedData);
+        const updatedObj = updatedData.find((c: Cliente) => c.id === clienteId);
+        if (updatedObj) setSelected(updatedObj);
+      }
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al actualizar la línea de crédito");
+    } finally {
+      setUpdatingLevel(false);
+    }
   };
 
   const filtered = clientes.filter(c => {
@@ -425,6 +446,70 @@ export default function ClientesComponent({ online }: ClientesProps) {
                 <span className="font-semibold block mb-1">Notas:</span>{selected.notas}
               </div>
             )}
+
+            {/* Control Administrativo de Crédito */}
+            <div className="p-3.5 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] flex items-center gap-1.5">
+                  <CreditCard size={13} /> Autorización de Crédito
+                </span>
+                {updatingLevel && <Loader2 size={12} className="animate-spin text-[var(--primary)]" />}
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  disabled={updatingLevel}
+                  onClick={() => handleAjustarNivel(selected.id, "SIN_CREDITO")}
+                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all ${
+                    selected.nivelCredito === "SIN_CREDITO"
+                      ? "bg-red-500 text-white border-red-500 shadow-sm"
+                      : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-red-500/10 hover:text-red-500"
+                  }`}
+                >
+                  Sin Crédito
+                </button>
+
+                <button
+                  type="button"
+                  disabled={updatingLevel}
+                  onClick={() => handleAjustarNivel(selected.id, "NIVEL_1")}
+                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all ${
+                    selected.nivelCredito === "NIVEL_1"
+                      ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                      : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-blue-500/10 hover:text-blue-600"
+                  }`}
+                >
+                  Nivel 1
+                </button>
+
+                <button
+                  type="button"
+                  disabled={updatingLevel}
+                  onClick={() => handleAjustarNivel(selected.id, "NIVEL_2")}
+                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all ${
+                    selected.nivelCredito === "NIVEL_2"
+                      ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                      : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-amber-500/10 hover:text-amber-600"
+                  }`}
+                >
+                  Nivel 2
+                </button>
+
+                <button
+                  type="button"
+                  disabled={updatingLevel}
+                  onClick={() => handleAjustarNivel(selected.id, "NIVEL_3")}
+                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all ${
+                    selected.nivelCredito === "NIVEL_3" || selected.nivelCredito === "NIVEL_4"
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                      : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-emerald-500/10 hover:text-emerald-600"
+                  }`}
+                >
+                  Nivel 3+
+                </button>
+              </div>
+            </div>
 
             <button onClick={() => { setSelected(selected); openEdit(selected); }}
               className="w-full py-2.5 flex items-center justify-center gap-2 border border-[var(--primary)] text-[var(--primary)] rounded-xl text-xs font-semibold hover:bg-[var(--primary)]/10 transition-colors">
