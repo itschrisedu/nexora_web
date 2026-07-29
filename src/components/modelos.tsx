@@ -162,10 +162,10 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [material, setMaterial] = useState("");
-  const [costPrice, setCostPrice] = useState("");
-  const [salePrice, setSalePrice] = useState("");
   const [colors, setColors] = useState<ColorInput[]>([{ color: "", foto: null }]);
   const [serieIds, setSerieIds] = useState<string[]>([]);
+  // Precios individuales por serie: { [serieId]: { costPrice: string, salePrice: string } }
+  const [seriesPrices, setSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [stockInicial, setStockInicial] = useState("1"); // 1 por defecto
 
   const [newCosto, setNewCosto] = useState("");
@@ -194,8 +194,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 return valA - valB;
               });
             setSeries(filtradasYOrdenadas);
-            // Preseleccionar todas las series por defecto
-            setSerieIds(filtradasYOrdenadas.map(s => s.id));
+            // Las series empiezan desactivadas por defecto
           }
         } catch {}
       }
@@ -235,7 +234,24 @@ export default function ModelosComponent({ online }: ModelosProps) {
   };
 
   const toggleSerie = (id: string) => {
-    setSerieIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setSerieIds(prev => {
+      if (prev.includes(id)) {
+        // Desactivar: quitar de la lista y limpiar precios
+        setSeriesPrices(sp => {
+          const copy = { ...sp };
+          delete copy[id];
+          return copy;
+        });
+        return prev.filter(x => x !== id);
+      } else {
+        // Activar: agregar y crear entrada de precios vacía
+        setSeriesPrices(sp => ({
+          ...sp,
+          [id]: { costPrice: "", salePrice: "" }
+        }));
+        return [...prev, id];
+      }
+    });
   };
 
   const resetForm = () => {
@@ -243,9 +259,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setName("");
     setBrand("");
     setMaterial("");
-    setCostPrice("");
-    setSalePrice("");
     setColors([{ color: "", foto: null }]);
+    setSerieIds([]);
+    setSeriesPrices({});
     setStockInicial("1");
     setError("");
   };
@@ -254,7 +270,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
     e.preventDefault();
     setError("");
 
-    if (!baseCode || !name || !brand || !costPrice || !salePrice) {
+    if (!baseCode || !name || !brand) {
       setError("Completa todos los campos obligatorios del modelo.");
       return;
     }
@@ -266,9 +282,36 @@ export default function ModelosComponent({ online }: ModelosProps) {
     }
 
     if (serieIds.length === 0) {
-      setError("Selecciona al menos una serie.");
+      setError("Activa al menos una serie.");
       return;
     }
+
+    // Validar que cada serie activa tenga precios válidos
+    for (const sid of serieIds) {
+      const sp = seriesPrices[sid];
+      const serieName = series.find(s => s.id === sid)?.nombre || sid;
+      if (!sp || !sp.costPrice || !sp.salePrice) {
+        setError(`Ingresa ambos precios para la serie "${getNombreSerie(serieName)}".`);
+        return;
+      }
+      if (parseFloat(sp.costPrice) <= 0 || parseFloat(sp.salePrice) <= 0) {
+        setError(`Los precios de la serie "${getNombreSerie(serieName)}" deben ser mayores a 0.`);
+        return;
+      }
+    }
+
+    // Construir mapa de precios por serie
+    const seriesPricesMap: Record<string, { costPrice: number; salePrice: number }> = {};
+    for (const sid of serieIds) {
+      const sp = seriesPrices[sid];
+      seriesPricesMap[sid] = {
+        costPrice: parseFloat(sp.costPrice),
+        salePrice: parseFloat(sp.salePrice),
+      };
+    }
+
+    // Usar los precios de la primera serie como fallback global (requerido por el DTO)
+    const firstPrices = seriesPricesMap[serieIds[0]];
 
     setSaving(true);
     try {
@@ -277,15 +320,16 @@ export default function ModelosComponent({ online }: ModelosProps) {
         name,
         brand,
         material: material || undefined,
-        costPrice: parseFloat(costPrice),
-        salePrice: parseFloat(salePrice),
+        costPrice: firstPrices.costPrice,
+        salePrice: firstPrices.salePrice,
         colors: filteredColors.map(c => ({
           color: c.color,
           imageUrl: c.foto || undefined
         })),
         serieIds,
         stockInicial: parseInt(stockInicial) || 0,
-        stockMinimo: 0
+        stockMinimo: 0,
+        seriesPrices: seriesPricesMap,
       });
 
       setSuccess("Modelo y sus variantes creados exitosamente.");
@@ -706,11 +750,6 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   <div><Lbl t="Marca" req /><input type="text" value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej. Nike" className={INPUT} /></div>
                   <div><Lbl t="Material" /><input type="text" value={material} onChange={e => setMaterial(e.target.value)} placeholder="Ej. Cuero sintético y malla" className={INPUT} /></div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div><Lbl t="Precio de Costo ($)" req /><input type="number" min="0.01" step="0.01" value={costPrice} onChange={e => setCostPrice(e.target.value)} placeholder="0.00" className={INPUT} /></div>
-                  <div><Lbl t="Precio de Venta ($)" req /><input type="number" min="0.01" step="0.01" value={salePrice} onChange={e => setSalePrice(e.target.value)} placeholder="0.00" className={INPUT} /></div>
-                </div>
               </div>
 
               {/* Sección 2: Variantes de Color */}
@@ -756,23 +795,81 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 </div>
               </div>
 
-              {/* Sección 3: Selección de Series */}
+              {/* Sección 3: Series y Precios */}
               <div className="space-y-4">
-                <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">3. Series a Generar</h5>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">3. Series y Precios</h5>
+                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">Activa las series que deseas generar y define los precios de compra y venta para cada una.</p>
+
+                <div className="space-y-3">
                   {series.map(s => {
-                    const isChecked = serieIds.includes(s.id);
+                    const isActive = serieIds.includes(s.id);
+                    const prices = seriesPrices[s.id] || { costPrice: "", salePrice: "" };
                     return (
-                      <button key={s.id} type="button" onClick={() => toggleSerie(s.id)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold border text-left transition-colors flex items-center justify-between ${
-                          isChecked
-                            ? "bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]"
-                            : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
-                        }`}>
-                        <span>{getNombreSerie(s.nombre)}</span>
-                        <input type="checkbox" checked={isChecked} readOnly className="pointer-events-none accent-[var(--primary)]" />
-                      </button>
+                      <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
+                        isActive
+                          ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-sm"
+                          : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
+                      }`}>
+                        {/* Toggle Header */}
+                        <button type="button" onClick={() => toggleSerie(s.id)}
+                          className="w-full flex items-center justify-between px-4 py-3 cursor-pointer">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-5 rounded-full relative transition-colors ${
+                              isActive ? "bg-[var(--primary)]" : "bg-[var(--border)]"
+                            }`}>
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                isActive ? "translate-x-5" : "translate-x-0.5"
+                              }`} />
+                            </div>
+                            <span className={`text-sm font-bold ${
+                              isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+                            }`}>{getNombreSerie(s.nombre)}</span>
+                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({s.nombre})</span>
+                          </div>
+                          {isActive && (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
+                          )}
+                        </button>
+
+                        {/* Price inputs (solo si está activa) */}
+                        {isActive && (
+                          <div className="px-4 pb-4 pt-1 border-t border-[var(--border)]/50">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Lbl t="Precio de Compra ($)" req />
+                                <input type="number" min="0.01" step="0.01"
+                                  value={prices.costPrice}
+                                  onChange={e => setSeriesPrices(prev => ({
+                                    ...prev,
+                                    [s.id]: { ...prev[s.id], costPrice: e.target.value }
+                                  }))}
+                                  placeholder="0.00" className={INPUT} />
+                              </div>
+                              <div>
+                                <Lbl t="Precio de Venta ($)" req />
+                                <input type="number" min="0.01" step="0.01"
+                                  value={prices.salePrice}
+                                  onChange={e => setSeriesPrices(prev => ({
+                                    ...prev,
+                                    [s.id]: { ...prev[s.id], salePrice: e.target.value }
+                                  }))}
+                                  placeholder="0.00" className={INPUT} />
+                              </div>
+                            </div>
+                            {prices.costPrice && prices.salePrice && parseFloat(prices.salePrice) > 0 && parseFloat(prices.costPrice) > 0 && (
+                              <div className={`mt-2 text-[10px] font-semibold flex items-center gap-1.5 ${
+                                parseFloat(prices.salePrice) < parseFloat(prices.costPrice)
+                                  ? "text-red-500"
+                                  : "text-emerald-600"
+                              }`}>
+                                <DollarSign size={10} />
+                                Margen: {((parseFloat(prices.salePrice) - parseFloat(prices.costPrice)) / parseFloat(prices.costPrice) * 100).toFixed(1)}%
+                                {parseFloat(prices.salePrice) < parseFloat(prices.costPrice) && " — ⚠️ Precio de venta menor al costo"}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -783,7 +880,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                     <input type="number" min="0" value={stockInicial} onChange={e => setStockInicial(e.target.value)} className="px-3 py-1.5 w-full bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none" />
                   </div>
                   <div className="flex items-center text-[10px] text-[var(--muted-foreground)] italic leading-relaxed">
-                    Cada talla de las series marcadas se creará inicialmente con esta cantidad de stock en inventario (un par equivale a 1 unidad).
+                    Cada talla de las series activadas se creará inicialmente con esta cantidad de stock.
                   </div>
                 </div>
               </div>
