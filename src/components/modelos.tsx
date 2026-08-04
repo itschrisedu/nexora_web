@@ -606,18 +606,6 @@ export default function ModelosComponent({ online }: ModelosProps) {
     }
   };
 
-  const resetForm = () => {
-    setBaseCode("");
-    setName("");
-    setBrand("");
-    setMaterial("");
-    setColors([{ color: "", foto: null }]);
-    setSerieIds([]);
-    setSeriesPrices({});
-    setStockInicial("1");
-    setError("");
-  };
-
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
