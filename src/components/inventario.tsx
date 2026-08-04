@@ -139,7 +139,13 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
 
   const stockBajo = (p: Producto) => {
     const list = p.tallas || (p as any).stockPorTalla || [];
-    return Array.isArray(list) && list.some(t => (t.stock ?? t.cantidad ?? t.disponible ?? 0) <= (t.stockMinimo || 0));
+    const total = stockTotal(p);
+    if (total <= 12) return true;
+    return Array.isArray(list) && list.some(t => {
+      const qty = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+      const min = t.stockMinimo || 0;
+      return min > 0 ? qty <= min : qty === 0;
+    });
   };
 
   const filtered = products.filter(p =>
@@ -228,7 +234,7 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
                         <div className="text-xs text-[var(--muted-foreground)]">{p.marca} · {p.modelo} · <span className="font-mono text-[10px]">{p.codigo}</span></div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className={`text-lg font-black ${st < 10 ? "text-red-500" : "text-emerald-600"}`}>{st}</div>
+                        <div className={`text-lg font-black ${bajo ? "text-red-500" : "text-emerald-600"}`}>{st}</div>
                         <div className="text-[10px] text-[var(--muted-foreground)]">unidades</div>
                       </div>
                     </div>
