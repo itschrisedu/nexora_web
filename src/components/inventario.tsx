@@ -19,6 +19,7 @@ interface Talla {
   numero?: number;
   stock: number;
   cantidad?: number;
+  disponible?: number;
   stockMinimo: number;
   stockReservado: number;
 }
