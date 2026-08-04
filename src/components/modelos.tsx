@@ -565,7 +565,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         setSaving(true);
         try {
-          await ApiService.delete(`/inventario/modelos/${id}`, {});
+          await ApiService.delete(`/inventario/modelos/${id}`);
           setSuccess(`Modelo "${modelName}" eliminado permanentemente.`);
           loadData();
           setTimeout(() => setSuccess(""), 4000);

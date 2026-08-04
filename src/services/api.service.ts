@@ -83,10 +83,11 @@ export class ApiService {
     return text ? JSON.parse(text) : {};
   }
 
-  static async delete(path: string) {
+  static async delete(path: string, body?: unknown) {
     const res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
+      ...(body ? { body: JSON.stringify(body) } : {}),
     });
 
     if (res.status === 401) {
