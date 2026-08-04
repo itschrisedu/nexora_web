@@ -130,11 +130,15 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
     }
   };
 
-  const stockTotal = (p: Producto) =>
-    Array.isArray(p.tallas) ? p.tallas.reduce((s, t) => s + (t.stock || 0), 0) : 0;
+  const stockTotal = (p: Producto) => {
+    const list = p.tallas || (p as any).stockPorTalla || [];
+    return Array.isArray(list) ? list.reduce((s, t) => s + (t.stock ?? t.cantidad ?? t.disponible ?? 0), 0) : 0;
+  };
 
-  const stockBajo = (p: Producto) =>
-    Array.isArray(p.tallas) && p.tallas.some(t => t.stock <= t.stockMinimo);
+  const stockBajo = (p: Producto) => {
+    const list = p.tallas || (p as any).stockPorTalla || [];
+    return Array.isArray(list) && list.some(t => (t.stock ?? t.cantidad ?? t.disponible ?? 0) <= (t.stockMinimo || 0));
+  };
 
   const filtered = products.filter(p =>
     p.nombre?.toLowerCase().includes(search.toLowerCase()) ||

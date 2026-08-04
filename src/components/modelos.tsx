@@ -784,20 +784,13 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           </button>
                         );
                       })}
-                      {online && (
-                        <button type="button" onClick={() => openAddColorModal(m)}
-                          className="px-3 py-1.5 rounded-xl text-xs font-bold border border-dashed border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition-colors flex items-center gap-1">
-                          <Plus size={12} />
-                          <span>+ Añadir Color</span>
-                        </button>
-                      )}
                     </div>
 
                     {/* Tabla/Listado de Series para el Color Seleccionado */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {products.filter(p => p.color === activeColor).map(p => {
-                        const tallas = p.tallas || [];
-                        const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad || 0), 0);
+                        const tallas = p.tallas || (p as any).stockPorTalla || [];
+                        const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad ?? t.stock ?? t.disponible ?? 0), 0);
 
                         return (
                           <div key={p.id} className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${
