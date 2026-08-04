@@ -51,6 +51,18 @@ interface ColorInput {
   foto: string | null;
 }
 
+interface SerieTallaConfig {
+  id: string;
+  numero: number;
+}
+
+interface SerieConfig {
+  id: string;
+  nombre: string;
+  activa?: boolean;
+  tallas?: SerieTallaConfig[];
+}
+
 const SERIES_ORDEN = [
   "ADULTO",
   "JUVENIL",
@@ -69,8 +81,28 @@ const SERIES_NOMBRES: Record<string, string> = {
   TALLA_GRANDE: "Adulto Grande (43-45)"
 };
 
-const getNombreSerie = (nombreRaw: string): string => {
-  return SERIES_NOMBRES[nombreRaw] || nombreRaw;
+const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?: SerieConfig[]): string => {
+  if (!s) return "—";
+  let target: SerieConfig | undefined;
+  if (typeof s === "string") {
+    target = seriesList?.find(x => x.nombre === s || x.id === s);
+    if (!target) {
+      return SERIES_NOMBRES[s] || s.toLowerCase().replace(/_/g, " ");
+    }
+  } else {
+    target = s;
+  }
+
+  if (target && target.tallas && target.tallas.length > 0) {
+    const sorted = [...target.tallas].sort((a, b) => a.numero - b.numero);
+    const min = sorted[0].numero;
+    const max = sorted[sorted.length - 1].numero;
+    const nombreClean = target.nombre.toLowerCase().replace(/_/g, " ");
+    return `${nombreClean} (${min}-${max})`;
+  }
+
+  const nombreClean = target ? target.nombre : String(s);
+  return SERIES_NOMBRES[nombreClean] || nombreClean.toLowerCase().replace(/_/g, " ");
 };
 
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors";
@@ -125,7 +157,7 @@ const compressImageToWebP = (base64Str: string, maxWidth = 800, maxHeight = 800,
 
 export default function ModelosComponent({ online }: ModelosProps) {
   const [modelos, setModelos] = useState<ModeloAgrupado[]>([]);
-  const [series, setSeries] = useState<{ id: string; nombre: string }[]>([]);
+  const [series, setSeries] = useState<SerieConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -134,6 +166,21 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Tallas personalizadas seleccionadas por serie: { [serieId]: tallaId[] }
+  const [customTallas, setCustomTallas] = useState<Record<string, string[]>>({});
+
+  // Modales de Crear / Editar Serie
+  const [showCreateSeriesModal, setShowCreateSeriesModal] = useState(false);
+  const [newSerieNombre, setNewSerieNombre] = useState("");
+  const [newSerieTallasDesde, setNewSerieTallasDesde] = useState("38");
+  const [newSerieTallasHasta, setNewSerieTallasHasta] = useState("43");
+
+  const [showEditSeriesModal, setShowEditSeriesModal] = useState(false);
+  const [editingSerie, setEditingSerie] = useState<SerieConfig | null>(null);
+  const [editSerieNombre, setEditSerieNombre] = useState("");
+  const [editSerieTallasDesde, setEditSerieTallasDesde] = useState("");
+  const [editSerieTallasHasta, setEditSerieTallasHasta] = useState("");
 
   // Acordeones abiertos
   const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
@@ -175,6 +222,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [newColorFoto, setNewColorFoto] = useState<string | null>(null);
   const [newColorSerieIds, setNewColorSerieIds] = useState<string[]>([]);
   const [newColorSeriesPrices, setNewColorSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+  const [newColorCustomTallas, setNewColorCustomTallas] = useState<Record<string, string[]>>({});
   const [newColorStockInicial, setNewColorStockInicial] = useState("1");
 
   const [newCosto, setNewCosto] = useState("");
@@ -203,7 +251,6 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 return valA - valB;
               });
             setSeries(filtradasYOrdenadas);
-            // Las series empiezan desactivadas por defecto
           }
         } catch {}
       }
@@ -212,6 +259,19 @@ export default function ModelosComponent({ online }: ModelosProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setBaseCode("");
+    setName("");
+    setBrand("");
+    setMaterial("");
+    setColors([{ color: "", foto: null }]);
+    setSerieIds([]);
+    setSeriesPrices({});
+    setCustomTallas({});
+    setStockInicial("1");
+    setError("");
   };
 
   const handleFoto = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,15 +305,21 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const toggleSerie = (id: string) => {
     setSerieIds(prev => {
       if (prev.includes(id)) {
-        // Desactivar: quitar de la lista y limpiar precios
         setSeriesPrices(sp => {
           const copy = { ...sp };
           delete copy[id];
           return copy;
         });
+        setCustomTallas(ct => {
+          const copy = { ...ct };
+          delete copy[id];
+          return copy;
+        });
         return prev.filter(x => x !== id);
       } else {
-        // Activar: agregar y crear entrada de precios vacía
+        const sObj = series.find(s => s.id === id);
+        const defaultTallaIds = sObj?.tallas?.map(t => t.id) || [];
+        setCustomTallas(ct => ({ ...ct, [id]: defaultTallaIds }));
         setSeriesPrices(sp => ({
           ...sp,
           [id]: { costPrice: "", salePrice: "" }
@@ -263,29 +329,64 @@ export default function ModelosComponent({ online }: ModelosProps) {
     });
   };
 
+  const toggleTallaInSerie = (serieId: string, tallaId: string) => {
+    setCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      const count = current.filter(id => id === tallaId).length;
+      if (count > 0) {
+        return { ...prev, [serieId]: current.filter(id => id !== tallaId) };
+      } else {
+        return { ...prev, [serieId]: [...current, tallaId] };
+      }
+    });
+  };
+
+  const addTallaRepeatInSerie = (serieId: string, tallaId: string) => {
+    setCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      return { ...prev, [serieId]: [...current, tallaId] };
+    });
+  };
+
+  const removeOneTallaInSerie = (serieId: string, tallaId: string) => {
+    setCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      const idx = current.indexOf(tallaId);
+      if (idx > -1) {
+        const copy = [...current];
+        copy.splice(idx, 1);
+        return { ...prev, [serieId]: copy };
+      }
+      return prev;
+    });
+  };
+
   const openAddColorModal = (m: ModeloAgrupado) => {
     setSelectedModelForColor(m);
     setNewColorName("");
     setNewColorFoto(null);
 
-    // Pre-activar por defecto las series que ya tenga este modelo
     const existingSerieIds = Array.from(
       new Set((m.products || []).map(p => p.serie?.id).filter(Boolean))
     ) as string[];
 
     setNewColorSerieIds(existingSerieIds);
     
-    // Inicializar mapa de precios para las series existentes
     const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+    const initialCustomTallas: Record<string, string[]> = {};
+
     existingSerieIds.forEach(sid => {
-      // Buscar si algún producto tiene esa serie para pre-llenar precios de sugerencia
       const prod = m.products.find(p => p.serie?.id === sid);
       initialPrices[sid] = {
         costPrice: prod ? String(prod.precioCosto) : "",
         salePrice: prod ? String(prod.precioVenta) : "",
       };
+      const sObj = series.find(s => s.id === sid);
+      initialCustomTallas[sid] = sObj?.tallas?.map(t => t.id) || [];
     });
+
     setNewColorSeriesPrices(initialPrices);
+    setNewColorCustomTallas(initialCustomTallas);
     setNewColorStockInicial("1");
     setError("");
     setShowAddColorModal(true);
@@ -299,8 +400,16 @@ export default function ModelosComponent({ online }: ModelosProps) {
           delete copy[id];
           return copy;
         });
+        setNewColorCustomTallas(ct => {
+          const copy = { ...ct };
+          delete copy[id];
+          return copy;
+        });
         return prev.filter(x => x !== id);
       } else {
+        const sObj = series.find(s => s.id === id);
+        const defaultTallaIds = sObj?.tallas?.map(t => t.id) || [];
+        setNewColorCustomTallas(ct => ({ ...ct, [id]: defaultTallaIds }));
         setNewColorSeriesPrices(sp => ({
           ...sp,
           [id]: { costPrice: "", salePrice: "" }
@@ -308,6 +417,110 @@ export default function ModelosComponent({ online }: ModelosProps) {
         return [...prev, id];
       }
     });
+  };
+
+  const toggleTallaInNewColorSerie = (serieId: string, tallaId: string) => {
+    setNewColorCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      const count = current.filter(id => id === tallaId).length;
+      if (count > 0) {
+        return { ...prev, [serieId]: current.filter(id => id !== tallaId) };
+      } else {
+        return { ...prev, [serieId]: [...current, tallaId] };
+      }
+    });
+  };
+
+  const addTallaRepeatInNewColorSerie = (serieId: string, tallaId: string) => {
+    setNewColorCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      return { ...prev, [serieId]: [...current, tallaId] };
+    });
+  };
+
+  const removeOneTallaInNewColorSerie = (serieId: string, tallaId: string) => {
+    setNewColorCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      const idx = current.indexOf(tallaId);
+      if (idx > -1) {
+        const copy = [...current];
+        copy.splice(idx, 1);
+        return { ...prev, [serieId]: copy };
+      }
+      return prev;
+    });
+  };
+
+  // Handlers para Crear y Editar Series
+  const handleCreateSeriesWithTallas = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSerieNombre.trim()) { setError("Ingresa un nombre para la serie."); return; }
+    const desde = parseInt(newSerieTallasDesde);
+    const hasta = parseInt(newSerieTallasHasta);
+    if (isNaN(desde) || isNaN(hasta) || hasta < desde) {
+      setError("Ingresa un rango de tallas válido (ej: 38 a 43).");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const createdSerie = await ApiService.post("/configuracion/series-completa", {
+        nombre: newSerieNombre,
+        tallasDesde: desde,
+        tallasHasta: hasta,
+      });
+      setSuccess(`Serie "${createdSerie.nombre}" creada correctamente.`);
+      setShowCreateSeriesModal(false);
+      setNewSerieNombre("");
+      await loadData();
+      if (createdSerie?.id) {
+        toggleSerie(createdSerie.id);
+      }
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al crear la serie.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditSeriesModal = (s: SerieConfig) => {
+    setEditingSerie(s);
+    setEditSerieNombre(s.nombre);
+    const sorted = s.tallas && s.tallas.length > 0 ? [...s.tallas].sort((a, b) => a.numero - b.numero) : [];
+    setEditSerieTallasDesde(sorted.length > 0 ? String(sorted[0].numero) : "38");
+    setEditSerieTallasHasta(sorted.length > 0 ? String(sorted[sorted.length - 1].numero) : "43");
+    setError("");
+    setShowEditSeriesModal(true);
+  };
+
+  const handleUpdateSeries = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSerie) return;
+    const desde = parseInt(editSerieTallasDesde);
+    const hasta = parseInt(editSerieTallasHasta);
+    if (isNaN(desde) || isNaN(hasta) || hasta < desde) {
+      setError("Ingresa un rango de tallas válido (ej: 38 a 43).");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+        nombre: editSerieNombre,
+        tallasDesde: desde,
+        tallasHasta: hasta,
+      });
+      setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
+      setShowEditSeriesModal(false);
+      setEditingSerie(null);
+      await loadData();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al actualizar la serie.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleNewColorFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -370,6 +583,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         serieIds: newColorSerieIds,
         stockInicial: parseInt(newColorStockInicial) || 0,
         seriesPrices: seriesPricesMap,
+        customTallas: newColorCustomTallas,
       });
 
       const addedColor = newColorName.trim();
@@ -468,6 +682,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         stockInicial: parseInt(stockInicial) || 0,
         stockMinimo: 0,
         seriesPrices: seriesPricesMap,
+        customTallas,
       });
 
       setSuccess("Modelo y sus variantes creados exitosamente.");
@@ -941,13 +1156,21 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
               {/* Sección 3: Series y Precios */}
               <div className="space-y-4">
-                <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">3. Series y Precios</h5>
-                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">Activa las series que deseas generar y define los precios de compra y venta para cada una.</p>
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+                  <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">3. Series y Precios</h5>
+                  <button type="button" onClick={() => { setNewSerieNombre(""); setNewSerieTallasDesde("38"); setNewSerieTallasHasta("43"); setError(""); setShowCreateSeriesModal(true); }}
+                    className="flex items-center gap-1 text-[11px] font-bold text-[var(--primary)] hover:underline">
+                    <Plus size={13} /> <span>Crear Nueva Serie</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">Activa las series que deseas generar, personaliza sus tallas y define precios.</p>
 
                 <div className="space-y-3">
                   {series.map(s => {
                     const isActive = serieIds.includes(s.id);
                     const prices = seriesPrices[s.id] || { costPrice: "", salePrice: "" };
+                    const selectedTallaIds = customTallas[s.id] || [];
+
                     return (
                       <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
                         isActive
@@ -955,9 +1178,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
                       }`}>
                         {/* Toggle Header */}
-                        <button type="button" onClick={() => toggleSerie(s.id)}
-                          className="w-full flex items-center justify-between px-4 py-3 cursor-pointer">
-                          <div className="flex items-center gap-3">
+                        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+                          <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleSerie(s.id)}>
                             <div className={`w-10 h-5 rounded-full relative transition-colors ${
                               isActive ? "bg-[var(--primary)]" : "bg-[var(--border)]"
                             }`}>
@@ -967,15 +1189,24 @@ export default function ModelosComponent({ online }: ModelosProps) {
                             </div>
                             <span className={`text-sm font-bold ${
                               isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-                            }`}>{getNombreSerie(s.nombre)}</span>
+                            }`}>{getNombreSerie(s, series)}</span>
                             <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({s.nombre})</span>
                           </div>
-                          {isActive && (
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
-                          )}
-                        </button>
 
-                        {/* Price inputs (solo si está activa) */}
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => openEditSeriesModal(s)}
+                              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+                              title="Editar rango o nombre de esta serie">
+                              <Edit2 size={13} />
+                              <span>Editar</span>
+                            </button>
+                            {isActive && (
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Detalle si la serie está activa */}
                         {isActive && (() => {
                           const costVal = parseFloat(prices.costPrice);
                           const saleVal = parseFloat(prices.salePrice);
@@ -987,7 +1218,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           const profitAmount = hasCost && hasSale ? saleVal - costVal : 0;
 
                           return (
-                            <div className="px-4 pb-4 pt-1 border-t border-[var(--border)]/50 space-y-2">
+                            <div className="px-4 pb-4 pt-3 space-y-3">
+                              {/* Inputs de Precio */}
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <Lbl t="Precio de Compra ($)" req />
@@ -1012,9 +1244,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                 </div>
                               </div>
 
-                              {/* Indicador de Margen de Ganancia / Sugerencia 30% */}
+                              {/* Indicador de Margen 30% */}
                               {hasCost && (
-                                <div className="text-[11px] font-semibold pt-1">
+                                <div className="text-[11px] font-semibold">
                                   {hasSale ? (
                                     isLoss ? (
                                       <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
@@ -1035,6 +1267,54 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                   )}
                                 </div>
                               )}
+
+                              {/* Personalizador de Tallas y Media Docena */}
+                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                                    Tallas para esta serie ({selectedTallaIds.length} pares)
+                                  </span>
+                                  {selectedTallaIds.length === 6 ? (
+                                    <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <CheckCircle size={12} /> Media Docena (6 pares) ✅
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                                      {selectedTallaIds.length}/6 pares (sugerido 6 para media docena)
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                  {s.tallas?.map(t => {
+                                    const count = selectedTallaIds.filter(id => id === t.id).length;
+                                    return (
+                                      <div key={t.id} className="flex items-center">
+                                        <button type="button" onClick={() => toggleTallaInSerie(s.id, t.id)}
+                                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
+                                            count > 0
+                                              ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
+                                              : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] opacity-60 hover:opacity-100"
+                                          }`}>
+                                          <span>T{t.numero}</span>
+                                          {count > 1 && (
+                                            <span className="bg-amber-400 text-slate-900 px-1.5 py-0.2 text-[9px] font-black rounded-full">
+                                              x{count}
+                                            </span>
+                                          )}
+                                        </button>
+                                        {count > 0 && (
+                                          <button type="button" onClick={() => addTallaRepeatInSerie(s.id, t.id)}
+                                            title={`Repetir talla ${t.numero} para sumar un par extra (media docena)`}
+                                            className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-md transition-colors">
+                                            +1
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             </div>
                           );
                         })()}
@@ -1137,6 +1417,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   {series.map(s => {
                     const isActive = newColorSerieIds.includes(s.id);
                     const prices = newColorSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
+                    const selectedTallaIds = newColorCustomTallas[s.id] || [];
+
                     return (
                       <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
                         isActive
@@ -1144,9 +1426,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
                       }`}>
                         {/* Toggle Header */}
-                        <button type="button" onClick={() => toggleNewColorSerie(s.id)}
-                          className="w-full flex items-center justify-between px-4 py-3 cursor-pointer">
-                          <div className="flex items-center gap-3">
+                        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+                          <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleNewColorSerie(s.id)}>
                             <div className={`w-10 h-5 rounded-full relative transition-colors ${
                               isActive ? "bg-[var(--primary)]" : "bg-[var(--border)]"
                             }`}>
@@ -1156,13 +1437,14 @@ export default function ModelosComponent({ online }: ModelosProps) {
                             </div>
                             <span className={`text-sm font-bold ${
                               isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-                            }`}>{getNombreSerie(s.nombre)}</span>
+                            }`}>{getNombreSerie(s, series)}</span>
                             <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({s.nombre})</span>
                           </div>
+
                           {isActive && (
                             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
                           )}
-                        </button>
+                        </div>
 
                         {/* Inputs de Precio */}
                         {isActive && (() => {
@@ -1176,7 +1458,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           const profitAmount = hasCost && hasSale ? saleVal - costVal : 0;
 
                           return (
-                            <div className="px-4 pb-4 pt-1 border-t border-[var(--border)]/50 space-y-2">
+                            <div className="px-4 pb-4 pt-3 space-y-3">
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <Lbl t="Precio de Compra ($)" req />
@@ -1224,6 +1506,54 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                   )}
                                 </div>
                               )}
+
+                              {/* Personalizador de Tallas */}
+                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                                    Tallas para este color ({selectedTallaIds.length} pares)
+                                  </span>
+                                  {selectedTallaIds.length === 6 ? (
+                                    <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <CheckCircle size={12} /> Media Docena (6 pares) ✅
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                                      {selectedTallaIds.length}/6 pares (sugerido 6 para media docena)
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                  {s.tallas?.map(t => {
+                                    const count = selectedTallaIds.filter(id => id === t.id).length;
+                                    return (
+                                      <div key={t.id} className="flex items-center">
+                                        <button type="button" onClick={() => toggleTallaInNewColorSerie(s.id, t.id)}
+                                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
+                                            count > 0
+                                              ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
+                                              : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] opacity-60 hover:opacity-100"
+                                          }`}>
+                                          <span>T{t.numero}</span>
+                                          {count > 1 && (
+                                            <span className="bg-amber-400 text-slate-900 px-1.5 py-0.2 text-[9px] font-black rounded-full">
+                                              x{count}
+                                            </span>
+                                          )}
+                                        </button>
+                                        {count > 0 && (
+                                          <button type="button" onClick={() => addTallaRepeatInNewColorSerie(s.id, t.id)}
+                                            title={`Repetir talla ${t.numero} para sumar un par extra (media docena)`}
+                                            className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-md transition-colors">
+                                            +1
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             </div>
                           );
                         })()}
@@ -1346,6 +1676,112 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><DollarSign size={16} />Actualizar Precios</>}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL CREAR SERIE PERSONALIZADA ── */}
+      {showCreateSeriesModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base">Crear Nueva Serie</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Define un nombre y rango de tallas para la serie (ej: CHINO, 35-40)</p>
+              </div>
+              <button onClick={() => setShowCreateSeriesModal(false)}
+                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateSeriesWithTallas} className="p-5 space-y-4">
+              <div>
+                <Lbl t="Nombre de la Serie" req />
+                <input type="text" value={newSerieNombre} onChange={e => setNewSerieNombre(e.target.value)}
+                  placeholder="Ej. CHINO, ESPECIAL, DAMA..." className={INPUT} required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Lbl t="Talla Desde" req />
+                  <input type="number" min="1" max="60" value={newSerieTallasDesde}
+                    onChange={e => setNewSerieTallasDesde(e.target.value)} className={INPUT} required />
+                </div>
+                <div>
+                  <Lbl t="Talla Hasta" req />
+                  <input type="number" min="1" max="60" value={newSerieTallasHasta}
+                    onChange={e => setNewSerieTallasHasta(e.target.value)} className={INPUT} required />
+                </div>
+              </div>
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowCreateSeriesModal(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={saving}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--primary)] text-white hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  <span>Crear Serie</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDITAR SERIE EXISTENTE ── */}
+      {showEditSeriesModal && editingSerie && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base">Editar Serie "{editingSerie.nombre}"</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Modifica el nombre o rango de tallas configurado</p>
+              </div>
+              <button onClick={() => { setShowEditSeriesModal(false); setEditingSerie(null); }}
+                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateSeries} className="p-5 space-y-4">
+              <div>
+                <Lbl t="Nombre de la Serie" req />
+                <input type="text" value={editSerieNombre} onChange={e => setEditSerieNombre(e.target.value)}
+                  className={INPUT} required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Lbl t="Talla Desde" req />
+                  <input type="number" min="1" max="60" value={editSerieTallasDesde}
+                    onChange={e => setEditSerieTallasDesde(e.target.value)} className={INPUT} required />
+                </div>
+                <div>
+                  <Lbl t="Talla Hasta" req />
+                  <input type="number" min="1" max="60" value={editSerieTallasHasta}
+                    onChange={e => setEditSerieTallasHasta(e.target.value)} className={INPUT} required />
+                </div>
+              </div>
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => { setShowEditSeriesModal(false); setEditingSerie(null); }}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={saving}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--primary)] text-white hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Edit2 size={14} />}
+                  <span>Guardar Cambios</span>
+                </button>
+              </div>
             </form>
           </div>
         </div>
