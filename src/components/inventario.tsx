@@ -15,8 +15,10 @@ interface InventarioProps {
 
 interface Talla {
   id: string;
-  nombre: string;
+  nombre?: string;
+  numero?: number;
   stock: number;
+  cantidad?: number;
   stockMinimo: number;
   stockReservado: number;
 }
@@ -233,16 +235,21 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
 
                     {/* Tallas */}
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {Array.isArray(p.tallas) && p.tallas.map(t => (
-                        <span key={t.id}
-                          className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${
-                            t.stock === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
-                            : t.stock <= t.stockMinimo ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                            : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                          }`}>
-                          T{t.nombre}: {t.stock}
-                        </span>
-                      ))}
+                      {Array.isArray(p.tallas) && p.tallas.map((t, idx) => {
+                        const st = t.stock ?? t.cantidad ?? 0;
+                        const min = t.stockMinimo ?? 0;
+                        const num = t.numero ?? t.nombre ?? "—";
+                        return (
+                          <span key={t.id || idx}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                              st === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
+                              : min > 0 && st <= min ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                              : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            }`}>
+                            T{num}: {st}
+                          </span>
+                        );
+                      })}
                     </div>
 
                     {/* Alertas y acciones */}
