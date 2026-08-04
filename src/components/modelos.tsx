@@ -61,7 +61,7 @@ const SERIES_ORDEN = [
 ];
 
 const SERIES_NOMBRES: Record<string, string> = {
-  ADULTO: "adulto (37-42)",
+  ADULTO: "adulto (38-43)",
   JUVENIL: "juvenil (34-38)",
   NINO: "junior (27-32)",
   NINO_PEQUENO_A: "niño (21-26)",
