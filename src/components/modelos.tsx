@@ -168,6 +168,15 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [seriesPrices, setSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [stockInicial, setStockInicial] = useState("1"); // 1 por defecto
 
+  // Estado para el modal de añadir nuevo color a modelo existente
+  const [showAddColorModal, setShowAddColorModal] = useState(false);
+  const [selectedModelForColor, setSelectedModelForColor] = useState<ModeloAgrupado | null>(null);
+  const [newColorName, setNewColorName] = useState("");
+  const [newColorFoto, setNewColorFoto] = useState<string | null>(null);
+  const [newColorSerieIds, setNewColorSerieIds] = useState<string[]>([]);
+  const [newColorSeriesPrices, setNewColorSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+  const [newColorStockInicial, setNewColorStockInicial] = useState("1");
+
   const [newCosto, setNewCosto] = useState("");
   const [newVenta, setNewVenta] = useState("");
   const [motivo, setMotivo] = useState("");
@@ -252,6 +261,135 @@ export default function ModelosComponent({ online }: ModelosProps) {
         return [...prev, id];
       }
     });
+  };
+
+  const openAddColorModal = (m: ModeloAgrupado) => {
+    setSelectedModelForColor(m);
+    setNewColorName("");
+    setNewColorFoto(null);
+
+    // Pre-activar por defecto las series que ya tenga este modelo
+    const existingSerieIds = Array.from(
+      new Set((m.products || []).map(p => p.serie?.id).filter(Boolean))
+    ) as string[];
+
+    setNewColorSerieIds(existingSerieIds);
+    
+    // Inicializar mapa de precios para las series existentes
+    const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+    existingSerieIds.forEach(sid => {
+      // Buscar si algún producto tiene esa serie para pre-llenar precios de sugerencia
+      const prod = m.products.find(p => p.serie?.id === sid);
+      initialPrices[sid] = {
+        costPrice: prod ? String(prod.precioCosto) : "",
+        salePrice: prod ? String(prod.precioVenta) : "",
+      };
+    });
+    setNewColorSeriesPrices(initialPrices);
+    setNewColorStockInicial("1");
+    setError("");
+    setShowAddColorModal(true);
+  };
+
+  const toggleNewColorSerie = (id: string) => {
+    setNewColorSerieIds(prev => {
+      if (prev.includes(id)) {
+        setNewColorSeriesPrices(sp => {
+          const copy = { ...sp };
+          delete copy[id];
+          return copy;
+        });
+        return prev.filter(x => x !== id);
+      } else {
+        setNewColorSeriesPrices(sp => ({
+          ...sp,
+          [id]: { costPrice: "", salePrice: "" }
+        }));
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleNewColorFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const compressed = await compressImageToWebP(reader.result as string);
+        setNewColorFoto(compressed);
+      } catch (err) {
+        console.error("Error comprimiendo imagen:", err);
+      }
+    };
+    reader.readAsDataURL(f);
+  };
+
+  const handleCreateNewColor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedModelForColor) return;
+    setError("");
+
+    if (!newColorName.trim()) {
+      setError("Ingresa el nombre del nuevo color.");
+      return;
+    }
+
+    if (newColorSerieIds.length === 0) {
+      setError("Activa al menos una serie para este nuevo color.");
+      return;
+    }
+
+    for (const sid of newColorSerieIds) {
+      const sp = newColorSeriesPrices[sid];
+      const serieName = series.find(s => s.id === sid)?.nombre || sid;
+      if (!sp || !sp.costPrice || !sp.salePrice) {
+        setError(`Ingresa ambos precios para la serie "${getNombreSerie(serieName)}".`);
+        return;
+      }
+      if (parseFloat(sp.costPrice) <= 0 || parseFloat(sp.salePrice) <= 0) {
+        setError(`Los precios de la serie "${getNombreSerie(serieName)}" deben ser mayores a 0.`);
+        return;
+      }
+    }
+
+    const seriesPricesMap: Record<string, { costPrice: number; salePrice: number }> = {};
+    for (const sid of newColorSerieIds) {
+      const sp = newColorSeriesPrices[sid];
+      seriesPricesMap[sid] = {
+        costPrice: parseFloat(sp.costPrice),
+        salePrice: parseFloat(sp.salePrice),
+      };
+    }
+
+    setSaving(true);
+    try {
+      await ApiService.post(`/inventario/modelos/${selectedModelForColor.id}/colores`, {
+        color: newColorName.trim(),
+        imageUrl: newColorFoto || undefined,
+        serieIds: newColorSerieIds,
+        stockInicial: parseInt(newColorStockInicial) || 0,
+        seriesPrices: seriesPricesMap,
+      });
+
+      const addedColor = newColorName.trim();
+      const modelId = selectedModelForColor.id;
+
+      setSuccess(`Nuevo color "${addedColor}" añadido exitosamente al modelo "${selectedModelForColor.name}".`);
+      setShowAddColorModal(false);
+      setSelectedModelForColor(null);
+
+      // Auto-seleccionar el nuevo color y expandir variante
+      setSelectedColorForModel(prev => ({ ...prev, [modelId]: addedColor }));
+      setExpandedModels(prev => ({ ...prev, [modelId]: true }));
+
+      loadData();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al añadir el nuevo color.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const resetForm = () => {
@@ -588,6 +726,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
                     <div className="flex items-center gap-2">
                       {online && (
                         <>
+                          <button type="button" onClick={() => openAddColorModal(m)}
+                            title="Añadir un nuevo color a este modelo"
+                            className="px-3 py-2 text-xs font-bold rounded-xl bg-[var(--primary)] text-white hover:opacity-90 transition-all flex items-center gap-1 shadow-sm">
+                            <Plus size={13} />
+                            <span>Añadir Color</span>
+                          </button>
                           <button type="button" onClick={() => handleToggleModel(m.id, m.name, m.active)}
                             className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors ${
                               m.active
@@ -640,6 +784,13 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           </button>
                         );
                       })}
+                      {online && (
+                        <button type="button" onClick={() => openAddColorModal(m)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold border border-dashed border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition-colors flex items-center gap-1">
+                          <Plus size={12} />
+                          <span>+ Añadir Color</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* Tabla/Listado de Series para el Color Seleccionado */}
@@ -919,6 +1070,195 @@ export default function ModelosComponent({ online }: ModelosProps) {
               <button type="submit" disabled={saving}
                 className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 size={16} className="animate-spin" />Generando variantes en lote...</> : <><Plus size={16} />Crear Modelo y Variantes</>}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL AÑADIR NUEVO COLOR A MODELO EXISTENTE ── */}
+      {showAddColorModal && selectedModelForColor && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <Palette size={18} className="text-[var(--primary)]" />
+                  <span>Añadir Nuevo Color a "{selectedModelForColor.name}"</span>
+                </h3>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Código Base: <span className="font-mono font-bold text-[var(--foreground)]">{selectedModelForColor.baseCode}</span> · Marca: {selectedModelForColor.brand}
+                </p>
+              </div>
+              <button onClick={() => { setShowAddColorModal(false); setSelectedModelForColor(null); }}
+                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNewColor} className="p-5 space-y-5 max-h-[80vh] overflow-y-auto">
+              {/* Sección 1: Detalle del Color */}
+              <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
+                <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
+                  1. Detalle del Nuevo Color
+                </h5>
+                <div className="flex gap-4 items-start">
+                  <div className="w-16 h-16 bg-[var(--muted)]/40 border-2 border-dashed border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                    {newColorFoto ? (
+                      <img src={newColorFoto} className="w-full h-full object-cover" alt="preview" />
+                    ) : (
+                      <ImageIcon size={18} className="text-[var(--muted-foreground)] opacity-40" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Lbl t="Nombre del Color" req />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={newColorName}
+                        onChange={e => setNewColorName(e.target.value)}
+                        placeholder="Ej. Azul Marino / Negro-Rojo"
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleNewColorFoto}
+                        className="w-full text-[10px] text-[var(--muted-foreground)] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-900 file:text-white file:text-[9px] file:font-semibold hover:file:opacity-90 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 2: Series y Precios para este Color */}
+              <div className="space-y-4">
+                <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
+                  2. Series y Precios para este Color
+                </h5>
+                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
+                  Activa las series que deseas generar para este nuevo color y asigna sus precios de compra y venta.
+                </p>
+
+                <div className="space-y-3">
+                  {series.map(s => {
+                    const isActive = newColorSerieIds.includes(s.id);
+                    const prices = newColorSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
+                    return (
+                      <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
+                        isActive
+                          ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-sm"
+                          : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
+                      }`}>
+                        {/* Toggle Header */}
+                        <button type="button" onClick={() => toggleNewColorSerie(s.id)}
+                          className="w-full flex items-center justify-between px-4 py-3 cursor-pointer">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-5 rounded-full relative transition-colors ${
+                              isActive ? "bg-[var(--primary)]" : "bg-[var(--border)]"
+                            }`}>
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                isActive ? "translate-x-5" : "translate-x-0.5"
+                              }`} />
+                            </div>
+                            <span className={`text-sm font-bold ${
+                              isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+                            }`}>{getNombreSerie(s.nombre)}</span>
+                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({s.nombre})</span>
+                          </div>
+                          {isActive && (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
+                          )}
+                        </button>
+
+                        {/* Inputs de Precio */}
+                        {isActive && (() => {
+                          const costVal = parseFloat(prices.costPrice);
+                          const saleVal = parseFloat(prices.salePrice);
+                          const hasCost = !isNaN(costVal) && costVal > 0;
+                          const hasSale = !isNaN(saleVal) && saleVal > 0;
+                          const suggestedSale = hasCost ? (costVal * 1.30).toFixed(2) : "";
+                          const isLoss = hasCost && hasSale && saleVal < costVal;
+                          const marginPercent = hasCost && hasSale ? ((saleVal - costVal) / costVal) * 100 : 0;
+                          const profitAmount = hasCost && hasSale ? saleVal - costVal : 0;
+
+                          return (
+                            <div className="px-4 pb-4 pt-1 border-t border-[var(--border)]/50 space-y-2">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Lbl t="Precio de Compra ($)" req />
+                                  <input type="number" min="0.01" step="0.01"
+                                    value={prices.costPrice}
+                                    onChange={e => setNewColorSeriesPrices(prev => ({
+                                      ...prev,
+                                      [s.id]: { ...prev[s.id], costPrice: e.target.value }
+                                    }))}
+                                    placeholder="0.00" className={INPUT} />
+                                </div>
+                                <div>
+                                  <Lbl t="Precio de Venta ($)" req />
+                                  <input type="number" min="0.01" step="0.01"
+                                    value={prices.salePrice}
+                                    onChange={e => setNewColorSeriesPrices(prev => ({
+                                      ...prev,
+                                      [s.id]: { ...prev[s.id], salePrice: e.target.value }
+                                    }))}
+                                    placeholder={suggestedSale ? `$${suggestedSale} (+30%)` : "0.00"}
+                                    className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
+                                </div>
+                              </div>
+
+                              {/* Indicadores de Ganancia */}
+                              {hasCost && (
+                                <div className="text-[11px] font-semibold pt-1">
+                                  {hasSale ? (
+                                    isLoss ? (
+                                      <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+                                        <AlertCircle size={14} className="shrink-0 animate-bounce" />
+                                        <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                      </div>
+                                    ) : (
+                                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+                                        <CheckCircle size={14} className="shrink-0" />
+                                        <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+                                      <DollarSign size={14} className="shrink-0" />
+                                      <span>Precio sugerido (30% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${(costVal * 0.30).toFixed(2)})</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 bg-[var(--muted)]/20 p-3.5 rounded-xl border border-[var(--border)]">
+                  <div>
+                    <Lbl t="Stock Físico por Talla (Por Defecto)" req />
+                    <input type="number" min="0" value={newColorStockInicial} onChange={e => setNewColorStockInicial(e.target.value)} className="px-3 py-1.5 w-full bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none" />
+                  </div>
+                  <div className="flex items-center text-[10px] text-[var(--muted-foreground)] italic leading-relaxed">
+                    Cada talla de las series activadas se creará inicialmente con esta cantidad de stock.
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+
+              <button type="submit" disabled={saving}
+                className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                {saving ? <><Loader2 size={16} className="animate-spin" />Añadiendo nuevo color...</> : <><Palette size={16} />Añadir Color al Modelo</>}
               </button>
             </form>
           </div>
