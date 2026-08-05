@@ -115,7 +115,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'ROL_ADMIN':
-        return 'bg-violet-500/10 text-violet-500 border-violet-500/20';
+        return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
       case 'ROL_VENDEDOR':
         return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
       case 'ROL_BODEGUERO':

@@ -425,7 +425,7 @@ export default function PosComponent() {
                 {[
                   { id: "EFECTIVO" as const, icon: <Banknote size={14} />, color: "emerald" },
                   { id: "TARJETA" as const, icon: <CreditCard size={14} />, color: "cyan" },
-                  { id: "TRANSFERENCIA" as const, icon: <ArrowRightLeft size={14} />, color: "violet" },
+                  { id: "TRANSFERENCIA" as const, icon: <ArrowRightLeft size={14} />, color: "sky" },
                 ].map((m) => (
                   <button
                     key={m.id}
