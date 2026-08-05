@@ -73,10 +73,13 @@ export default function SriComponent() {
           sriAmbiente: data.sriAmbiente || prev.sriAmbiente,
           tieneP12: !!data.sriP12Path,
           logoUrl: data.logoUrl || prev.logoUrl,
-          primaryColor: data.primaryColor || prev.primaryColor,
+          primaryColor: (data.primaryColor && (data.primaryColor.includes("6366f1") || data.primaryColor.includes("8b5cf6"))) ? "#0F172A" : (data.primaryColor || prev.primaryColor),
         }));
         if (data.primaryColor && typeof document !== "undefined") {
-          document.documentElement.style.setProperty("--primary", data.primaryColor);
+          const lowerColor = data.primaryColor.toLowerCase();
+          const isPurple = lowerColor.includes('6366f1') || lowerColor.includes('8b5cf6') || lowerColor.includes('7c3aed') || lowerColor.includes('violet') || lowerColor.includes('purple');
+          const finalColor = isPurple ? '#0F172A' : data.primaryColor;
+          document.documentElement.style.setProperty("--primary", finalColor);
         }
       }
     } catch (e) {
@@ -327,8 +330,8 @@ export default function SriComponent() {
                   <div className="flex items-center gap-2">
                     {[
                       { hex: "#0F172A", label: "Azul Profundo" },
+                      { hex: "#1d4ed8", label: "Azul Real" },
                       { hex: "#10b981", label: "Esmeralda" },
-                      { hex: "#8b5cf6", label: "Púrpura" },
                       { hex: "#06b6d4", label: "Cian" },
                       { hex: "#f43f5e", label: "Rosa" },
                       { hex: "#B8860B", label: "Dorado" },

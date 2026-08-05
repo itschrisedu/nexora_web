@@ -2,35 +2,35 @@
 
 :root {
   --background: #f8fafc;
-  --foreground: #0f172a; /* Azul Profundo */
+  --foreground: #0f172a;
   --card: #ffffff;
   --card-foreground: #0f172a;
   --border: #e2e8f0;
-  --primary: #0F172A; /* Azul Profundo RGB(15,23,42) */
+  --primary: #0f172a; /* Azul Profundo Exacto */
   --primary-foreground: #ffffff;
-  --secondary: #464D57; /* Gris Pizarra RGB(70,77,87) */
+  --secondary: #464D57;
   --muted: #f1f5f9;
   --muted-foreground: #464D57;
-  --accent: #FFF8E7; /* Dorado suave fondo */
-  --accent-foreground: #B8860B; /* Dorado Premium RGB(184,134,11) */
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
   --success: #10b981;
   --danger: #ef4444;
-  --warning: #B8860B; /* Dorado Premium */
+  --warning: #B8860B;
 }
 
 .dark {
-  --background: #0f172a; /* Slate 900 */
-  --foreground: #f8fafc; /* Slate 50 */
-  --card: #1e293b; /* Slate 800 */
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --card: #1e293b;
   --card-foreground: #f8fafc;
-  --border: #334155; /* Slate 700 */
-  --primary: #e2e8f0; /* Slate 200 — elegante sin lila */
+  --border: #334155;
+  --primary: #f8fafc;
   --primary-foreground: #0f172a;
-  --secondary: #94a3b8; /* Slate 400 */
+  --secondary: #94a3b8;
   --muted: #1e293b;
   --muted-foreground: #94a3b8;
-  --accent: #1c2536; /* Azul oscuro sutil */
-  --accent-foreground: #D4A843; /* Dorado Premium oscuro */
+  --accent: #1e293b;
+  --accent-foreground: #f8fafc;
   --success: #10b981;
   --danger: #ef4444;
   --warning: #f59e0b;
