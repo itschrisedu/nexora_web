@@ -163,7 +163,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
           >
             <Plus size={16} />
             <span>Registrar Personal</span>
@@ -295,7 +295,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <input
                   type="text" required placeholder="Ej. Carlos Mendoza"
                   value={nombre} onChange={(e) => setNombre(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
 
@@ -304,7 +304,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <input
                   type="email" required placeholder="Ej. carlos@nexora.app"
                   value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
 
@@ -313,7 +313,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <input
                   type="password" required minLength={8} placeholder="••••••••"
                   value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
 
@@ -321,7 +321,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol / Permisos <span className="text-red-400">*</span></label>
                 <select
                   required value={rol} onChange={(e) => setRol(e.target.value as any)}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 >
                   <option value="ROL_VENDEDOR">Vendedor — Ventas y pedidos</option>
                   <option value="ROL_BODEGUERO">Bodeguero — Gestión de stock</option>
@@ -337,7 +337,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
               <button
                 type="submit" disabled={saving}
-                className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? (
                   <><Loader2 size={16} className="animate-spin" /><span>Guardando...</span></>

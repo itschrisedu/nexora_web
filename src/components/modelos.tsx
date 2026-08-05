@@ -105,7 +105,7 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
   return SERIES_NOMBRES[nombreClean] || nombreClean.toLowerCase().replace(/_/g, " ");
 };
 
-const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors";
+const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
 
 function Lbl({ t, req }: { t: string; req?: boolean }) {
   return (
@@ -851,7 +851,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
           </button>
           {online && (
             <button onClick={() => { resetForm(); setShowCreate(true); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
               <Plus size={16} /><span>Nuevo Modelo</span>
             </button>
           )}
@@ -868,12 +868,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
         <input type="text" placeholder="Buscar por código base, nombre o marca..."
           value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors" />
+          className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors" />
       </div>
 
       {loading ? (
         <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
-          <Loader2 className="animate-spin text-[var(--primary)] mb-3" size={36} />
+          <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
           <span className="text-sm">Cargando catálogo...</span>
         </div>
       ) : filteredModelos.length === 0 ? (
@@ -928,7 +928,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
                     <div className="text-left md:text-right">
                       <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precios Variantes</span>
-                      <span className="text-sm font-extrabold text-[var(--primary)]">
+                      <span className="text-sm font-extrabold text-[#0F172A]">
                         {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
                       </span>
                     </div>
@@ -938,7 +938,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                         <>
                           <button type="button" onClick={() => openAddColorModal(m)}
                             title="Añadir un nuevo color a este modelo"
-                            className="px-3 py-2 text-xs font-bold rounded-xl bg-[var(--primary)] text-white hover:opacity-90 transition-all flex items-center gap-1 shadow-sm">
+                            className="px-3 py-2 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm">
                             <Plus size={13} />
                             <span>Añadir Color</span>
                           </button>
@@ -1022,7 +1022,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                               </div>
                               <div className="text-right">
                                 <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precio</span>
-                                <span className="text-xs font-extrabold text-[var(--primary)]">${Number(p.precioVenta).toFixed(2)}</span>
+                                <span className="text-xs font-extrabold text-[#0F172A]">${Number(p.precioVenta).toFixed(2)}</span>
                               </div>
                             </div>
 
@@ -1059,7 +1059,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                 </button>
                               )}
                               <button onClick={() => openPrice(p)}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[var(--primary)] border border-[var(--primary)]/30 rounded-lg hover:bg-[var(--primary)]/10 transition-colors">
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#0F172A] border border-[#0F172A]/30 rounded-lg hover:bg-[#0F172A]/10 transition-colors">
                                 <Edit2 size={12} /><span>Ajustar Precios</span>
                               </button>
                             </div>
@@ -1093,7 +1093,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
               
               {/* Sección 1: Datos Base */}
               <div className="space-y-4">
-                <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">1. Información del Modelo</h5>
+                <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">1. Información del Modelo</h5>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div><Lbl t="Código Base" req /><input type="text" value={baseCode} onChange={e => setBaseCode(e.target.value)} placeholder="Ej. NK-AIR" className={INPUT} /></div>
@@ -1119,9 +1119,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
               {/* Sección 2: Variantes de Color */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
-                  <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">2. Colores y Fotografías</h5>
+                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">2. Colores y Fotografías</h5>
                   <button type="button" onClick={addColorField}
-                    className="flex items-center gap-1 text-[11px] font-bold text-[var(--primary)] hover:opacity-80 transition-opacity">
+                    className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:opacity-80 transition-opacity">
                     <Plus size={12} /><span>Añadir Color</span>
                   </button>
                 </div>
@@ -1148,7 +1148,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                             const copy = [...prev];
                             copy[idx].color = e.target.value;
                             return copy;
-                          })} placeholder="Ej. Blanco / Negro-Rojo" className="w-full px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs focus:outline-none focus:border-[var(--primary)]" />
+                          })} placeholder="Ej. Blanco / Negro-Rojo" className="w-full px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs focus:outline-none focus:border-[#0F172A]" />
                           
                           <input type="file" accept="image/*" onChange={e => handleFoto(idx, e)}
                             className="w-full text-[10px] text-[var(--muted-foreground)] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-900 file:text-white file:text-[9px] file:font-semibold hover:file:opacity-90 cursor-pointer" />
@@ -1162,9 +1162,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
               {/* Sección 3: Series y Precios */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
-                  <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest">3. Series y Precios</h5>
+                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">3. Series y Precios</h5>
                   <button type="button" onClick={() => { setNewSerieNombre(""); setNewSerieTallasDesde("38"); setNewSerieTallasHasta("43"); setError(""); setShowCreateSeriesModal(true); }}
-                    className="flex items-center gap-1 text-[11px] font-bold text-[var(--primary)] hover:underline">
+                    className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:underline">
                     <Plus size={13} /> <span>Crear Nueva Serie</span>
                   </button>
                 </div>
@@ -1179,14 +1179,14 @@ export default function ModelosComponent({ online }: ModelosProps) {
                     return (
                       <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
                         isActive
-                          ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-sm"
+                          ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
                           : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
                       }`}>
                         {/* Toggle Header */}
                         <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
                           <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleSerie(s.id)}>
                             <div className={`w-10 h-5 rounded-full relative transition-colors ${
-                              isActive ? "bg-[var(--primary)]" : "bg-[var(--border)]"
+                              isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
                             }`}>
                               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
                                 isActive ? "translate-x-5" : "translate-x-0.5"
@@ -1298,7 +1298,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                         <button type="button" onClick={() => toggleTallaInSerie(s.id, t.id)}
                                           className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
                                             count > 0
-                                              ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
+                                              ? "bg-[#0F172A] text-white border-[#0F172A] shadow-sm"
                                               : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] opacity-60 hover:opacity-100"
                                           }`}>
                                           <span>T{t.numero}</span>
@@ -1311,7 +1311,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                         {count > 0 && (
                                           <button type="button" onClick={() => addTallaRepeatInSerie(s.id, t.id)}
                                             title={`Repetir talla ${t.numero} para sumar un par extra (media docena)`}
-                                            className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-md transition-colors">
+                                            className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-[#0F172A] bg-[#0F172A]/10 hover:bg-[#0F172A]/20 rounded-md transition-colors">
                                             +1
                                           </button>
                                         )}
@@ -1346,7 +1346,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
               )}
               
               <button type="submit" disabled={saving}
-                className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 size={16} className="animate-spin" />Generando variantes en lote...</> : <><Plus size={16} />Crear Modelo y Variantes</>}
               </button>
             </form>
@@ -1361,7 +1361,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
             <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-2">
-                  <Palette size={18} className="text-[var(--primary)]" />
+                  <Palette size={18} className="text-[#0F172A]" />
                   <span>Añadir Nuevo Color a "{selectedModelForColor.name}"</span>
                 </h3>
                 <p className="text-xs text-[var(--muted-foreground)]">
@@ -1377,7 +1377,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
             <form onSubmit={handleCreateNewColor} className="p-5 space-y-5 max-h-[80vh] overflow-y-auto">
               {/* Sección 1: Detalle del Color */}
               <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
-                <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
+                <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
                   1. Detalle del Nuevo Color
                 </h5>
                 <div className="flex gap-4 items-start">
@@ -1396,7 +1396,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                         value={newColorName}
                         onChange={e => setNewColorName(e.target.value)}
                         placeholder="Ej. Azul Marino / Negro-Rojo"
-                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                       />
                       <input
                         type="file"
@@ -1411,7 +1411,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
               {/* Sección 2: Series y Precios para este Color */}
               <div className="space-y-4">
-                <h5 className="text-xs font-bold text-[var(--primary)] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
+                <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
                   2. Series y Precios para este Color
                 </h5>
                 <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
@@ -1427,14 +1427,14 @@ export default function ModelosComponent({ online }: ModelosProps) {
                     return (
                       <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
                         isActive
-                          ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-sm"
+                          ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
                           : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
                       }`}>
                         {/* Toggle Header */}
                         <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
                           <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleNewColorSerie(s.id)}>
                             <div className={`w-10 h-5 rounded-full relative transition-colors ${
-                              isActive ? "bg-[var(--primary)]" : "bg-[var(--border)]"
+                              isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
                             }`}>
                               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
                                 isActive ? "translate-x-5" : "translate-x-0.5"
@@ -1537,7 +1537,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                         <button type="button" onClick={() => toggleTallaInNewColorSerie(s.id, t.id)}
                                           className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
                                             count > 0
-                                              ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
+                                              ? "bg-[#0F172A] text-white border-[#0F172A] shadow-sm"
                                               : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] opacity-60 hover:opacity-100"
                                           }`}>
                                           <span>T{t.numero}</span>
@@ -1550,7 +1550,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                         {count > 0 && (
                                           <button type="button" onClick={() => addTallaRepeatInNewColorSerie(s.id, t.id)}
                                             title={`Repetir talla ${t.numero} para sumar un par extra (media docena)`}
-                                            className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 rounded-md transition-colors">
+                                            className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-[#0F172A] bg-[#0F172A]/10 hover:bg-[#0F172A]/20 rounded-md transition-colors">
                                             +1
                                           </button>
                                         )}
@@ -1585,7 +1585,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
               )}
 
               <button type="submit" disabled={saving}
-                className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 size={16} className="animate-spin" />Añadiendo nuevo color...</> : <><Palette size={16} />Añadir Color al Modelo</>}
               </button>
             </form>
@@ -1678,7 +1678,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 </div>
               )}
               <button type="submit" disabled={saving}
-                className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><DollarSign size={16} />Actualizar Precios</>}
               </button>
             </form>
@@ -1729,7 +1729,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   Cancelar
                 </button>
                 <button type="submit" disabled={saving}
-                  className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--primary)] text-white hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+                  className="px-4 py-2.5 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                   <span>Crear Serie</span>
                 </button>
@@ -1782,7 +1782,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   Cancelar
                 </button>
                 <button type="submit" disabled={saving}
-                  className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--primary)] text-white hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+                  className="px-4 py-2.5 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Edit2 size={14} />}
                   <span>Guardar Cambios</span>
                 </button>
@@ -1828,7 +1828,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-all ${
                   confirmModal.danger
                     ? "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20"
-                    : "bg-[var(--primary)] hover:opacity-90 text-white"
+                    : "bg-[#0F172A] hover:bg-slate-800 text-white"
                 }`}>
                 {confirmModal.confirmText || "Confirmar"}
               </button>

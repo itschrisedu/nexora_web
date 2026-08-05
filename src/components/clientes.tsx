@@ -35,7 +35,7 @@ interface Cliente {
   activo: boolean;
 }
 
-const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors";
+const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
 
 // --- Validaciones Ecuador ---
 function validarCedula(cedula: string): boolean {
@@ -298,7 +298,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
               <RefreshCw size={16} />
             </button>
             <button onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
               <Plus size={16} /><span>Nuevo Cliente</span>
             </button>
           </div>
@@ -315,13 +315,13 @@ export default function ClientesComponent({ online }: ClientesProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
           <input type="text" placeholder="Buscar por nombre, cédula, RUC, teléfono o email..."
             value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors" />
+            className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors" />
         </div>
 
         {/* Tabla */}
         {loading ? (
           <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
-            <Loader2 className="animate-spin text-[var(--primary)] mb-3" size={36} />
+            <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
             <span className="text-sm">Cargando clientes...</span>
           </div>
         ) : filtered.length === 0 ? (
@@ -346,10 +346,10 @@ export default function ClientesComponent({ online }: ClientesProps) {
               <tbody className="divide-y divide-[var(--border)]">
                 {filtered.map(c => (
                   <tr key={c.id} onClick={() => setSelected(c)}
-                    className={`hover:bg-[var(--muted)]/20 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-[var(--primary)]/5" : ""}`}>
+                    className={`hover:bg-[var(--muted)]/20 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-[#0F172A]/5" : ""}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center text-xs font-bold shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-[#0F172A]/10 text-[#0F172A] flex items-center justify-center text-xs font-bold shrink-0">
                           {(c.nombre || "?").charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -375,7 +375,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={e => { e.stopPropagation(); setSelected(c); openEdit(c); }}
-                        className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 transition-colors">
+                        className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[#0F172A] hover:bg-[#0F172A]/10 transition-colors">
                         <Edit2 size={14} />
                       </button>
                     </td>
@@ -395,7 +395,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
         {selected ? (
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-5 sticky top-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center text-lg font-black">
+              <div className="w-12 h-12 rounded-2xl bg-[#0F172A]/10 text-[#0F172A] flex items-center justify-center text-lg font-black">
                 {(selected.nombre || "?").charAt(0).toUpperCase()}
               </div>
               <div>
@@ -453,7 +453,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] flex items-center gap-1.5">
                   <CreditCard size={13} /> Autorización de Crédito
                 </span>
-                {updatingLevel && <Loader2 size={12} className="animate-spin text-[var(--primary)]" />}
+                {updatingLevel && <Loader2 size={12} className="animate-spin text-[#0F172A]" />}
               </div>
 
               <div className="grid grid-cols-2 gap-1.5">
@@ -512,7 +512,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
             </div>
 
             <button onClick={() => { setSelected(selected); openEdit(selected); }}
-              className="w-full py-2.5 flex items-center justify-center gap-2 border border-[var(--primary)] text-[var(--primary)] rounded-xl text-xs font-semibold hover:bg-[var(--primary)]/10 transition-colors">
+              className="w-full py-2.5 flex items-center justify-center gap-2 border border-[#0F172A] text-[#0F172A] rounded-xl text-xs font-semibold hover:bg-[#0F172A]/10 transition-colors">
               <Edit2 size={14} /> Editar cliente
             </button>
           </div>
@@ -557,7 +557,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
                       onClick={() => { setTipoDoc(t); setDocErr(""); }}
                       className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
                         tipoDoc === t
-                          ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
+                          ? "bg-[#0F172A] text-white border-[#0F172A] shadow-sm"
                           : "bg-[var(--muted)]/40 text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]"
                       }`}
                     >
@@ -591,7 +591,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
                 </div>
               )}
               <button type="submit" disabled={saving}
-                className="w-full py-3 bg-[var(--primary)] text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><CheckCircle size={16} />{showCreate ? "Registrar Cliente" : "Guardar Cambios"}</>}
               </button>
             </form>

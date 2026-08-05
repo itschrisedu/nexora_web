@@ -38,7 +38,7 @@ interface Producto {
   tallas: Talla[];
 }
 
-const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors";
+const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
 
 function Lbl({ t, req }: { t: string; req?: boolean }) {
   return (
@@ -174,7 +174,7 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
       {/* KPIs rápidos */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Modelos", value: totalProductos, color: "text-[var(--primary)]" },
+          { label: "Modelos", value: totalProductos, color: "text-[#0F172A]" },
           { label: "Unidades totales", value: totalUnidades, color: "text-emerald-600" },
           { label: "Stock bajo", value: totalStockBajo, color: totalStockBajo > 0 ? "text-red-500" : "text-emerald-600" },
         ].map(k => (
@@ -196,13 +196,13 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
         <input type="text" placeholder="Buscar por código, nombre o marca..."
           value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] transition-colors" />
+          className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors" />
       </div>
 
       {/* Lista */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
-          <Loader2 className="animate-spin text-[var(--primary)] mb-3" size={36} />
+          <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
           <span className="text-sm">Cargando inventario...</span>
         </div>
       ) : filtered.length === 0 ? (
@@ -218,7 +218,7 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
             const bajo = stockBajo(p);
             return (
               <div key={p.id}
-                className={`bg-[var(--card)] border rounded-2xl p-4 hover:shadow-md transition-all cursor-pointer ${selected?.id === p.id ? "border-[var(--primary)]/50 shadow-md" : "border-[var(--border)]"}`}
+                className={`bg-[var(--card)] border rounded-2xl p-4 hover:shadow-md transition-all cursor-pointer ${selected?.id === p.id ? "border-[#0F172A]/50 shadow-md" : "border-[var(--border)]"}`}
                 onClick={() => setSelected(s => s?.id === p.id ? null : p)}>
                 <div className="flex items-start gap-4">
                   {/* Imagen */}
@@ -264,7 +264,7 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
                       <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
                         <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
                           <span>Costo: <strong>${Number(p.precioCosto).toFixed(2)}</strong></span>
-                          <span>Venta: <strong className="text-[var(--primary)]">${Number(p.precioVenta).toFixed(2)}</strong></span>
+                          <span>Venta: <strong className="text-[#0F172A]">${Number(p.precioVenta).toFixed(2)}</strong></span>
                           {p.material && <span>· {p.material}</span>}
                         </div>
                         {canMove && (

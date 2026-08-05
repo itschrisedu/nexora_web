@@ -211,7 +211,7 @@ export default function SriComponent() {
                   type="text"
                   value={config.nombre}
                   onChange={(e) => setConfig({ ...config, nombre: e.target.value })}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
                   required
                 />
               </div>
@@ -222,7 +222,7 @@ export default function SriComponent() {
                   type="text"
                   value={config.ruc}
                   onChange={(e) => setConfig({ ...config, ruc: e.target.value })}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
                   maxLength={13}
                   required
                 />
@@ -234,7 +234,7 @@ export default function SriComponent() {
                   type="text"
                   value={config.direccion}
                   onChange={(e) => setConfig({ ...config, direccion: e.target.value })}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
                   required
                 />
               </div>
@@ -246,7 +246,7 @@ export default function SriComponent() {
                     type="text"
                     value={config.sriEstablecimiento}
                     onChange={(e) => setConfig({ ...config, sriEstablecimiento: e.target.value })}
-                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] text-center font-mono focus:outline-none focus:border-[var(--primary)]"
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] text-center font-mono focus:outline-none focus:border-[#0F172A]"
                     maxLength={3}
                     required
                   />
@@ -257,7 +257,7 @@ export default function SriComponent() {
                     type="text"
                     value={config.sriPuntoEmision}
                     onChange={(e) => setConfig({ ...config, sriPuntoEmision: e.target.value })}
-                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] text-center font-mono focus:outline-none focus:border-[var(--primary)]"
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] text-center font-mono focus:outline-none focus:border-[#0F172A]"
                     maxLength={3}
                     required
                   />
@@ -269,7 +269,7 @@ export default function SriComponent() {
                 <select
                   value={config.sriAmbiente}
                   onChange={(e) => setConfig({ ...config, sriAmbiente: e.target.value })}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
                 >
                   <option value="1">1 - PRUEBAS (celcer.sri.gob.ec)</option>
                   <option value="2">2 - PRODUCCIÓN (cel.sri.gob.ec)</option>
@@ -279,95 +279,11 @@ export default function SriComponent() {
               {/* Personalización de Marca (Logo & Color) */}
               <div className="border-t border-[var(--border)] pt-4 mt-4 space-y-3">
                 <h3 className="text-sm font-semibold text-[var(--card-foreground)] flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[var(--primary)]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#0F172A]" />
                   Personalización de Marca & Color de Espacio
-                </h3>
-
-                {/* Subir Logo */}
-                <div>
-                  <label className="block text-[var(--muted-foreground)] mb-1">Logo Institucional (PNG / JPG / SVG)</label>
-                  <div className="flex items-center gap-3">
-                    {config.logoUrl ? (
-                      <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] p-1 flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={config.logoUrl} alt="Logo preview" className="max-w-full max-h-full object-contain" />
-                      </div>
-                    ) : (
-                      <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center text-[var(--muted-foreground)] text-xs font-bold flex-shrink-0">
-                        LOGO
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setConfig((prev) => ({ ...prev, logoUrl: reader.result as string }));
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="text-xs text-[var(--muted-foreground)] file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[var(--muted)] file:text-[var(--foreground)] hover:file:opacity-80"
-                    />
-                    {config.logoUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setConfig((prev) => ({ ...prev, logoUrl: "" }))}
-                        className="text-xs text-rose-500 hover:underline"
-                      >
-                        Quitar
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Color de Tema */}
-                <div>
-                  <label className="block text-[var(--muted-foreground)] mb-1.5">Color Principal de la Interfaz</label>
-                  <div className="flex items-center gap-2">
-                    {[
-                      { hex: "#0F172A", label: "Azul Profundo" },
-                      { hex: "#1d4ed8", label: "Azul Real" },
-                      { hex: "#10b981", label: "Esmeralda" },
-                      { hex: "#06b6d4", label: "Cian" },
-                      { hex: "#f43f5e", label: "Rosa" },
-                      { hex: "#B8860B", label: "Dorado" },
-                    ].map((c) => (
-                      <button
-                        key={c.hex}
-                        type="button"
-                        onClick={() => {
-                          setConfig((prev) => ({ ...prev, primaryColor: c.hex }));
-                          if (typeof document !== "undefined") {
-                            document.documentElement.style.setProperty("--primary", c.hex);
-                          }
-                        }}
-                        style={{ backgroundColor: c.hex }}
-                        className={`w-7 h-7 rounded-lg transition-transform hover:scale-110 flex items-center justify-center ${
-                          config.primaryColor === c.hex ? "ring-2 ring-amber-500 scale-110 shadow-md" : "opacity-80 hover:opacity-100"
-                        }`}
-                        title={c.label}
-                      />
-                    ))}
-                    {/* Custom Color Input */}
-                    <input
-                      type="color"
-                      value={config.primaryColor || "#0F172A"}
-                      onChange={(e) => {
-                        const hex = e.target.value;
-                        setConfig((prev) => ({ ...prev, primaryColor: hex }));
-                        if (typeof document !== "undefined") {
-                          document.documentElement.style.setProperty("--primary", hex);
-                        }
-                      }}
-                      className="w-8 h-8 rounded-lg border-0 bg-transparent cursor-pointer"
-                      title="Color Personalizado"
-                    />
-                  </div>
-                </div>
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 rounded-xl text-xs flex items-center justify-between">
+                  <span>🎨 La personalización de Marca, Logo corporativo y Paleta de colores ahora se gestionan en el nuevo módulo <strong>Personalización & Sistema</strong>.</span>
+                </div>               </h3>
               </div>
 
               <button
@@ -427,7 +343,7 @@ export default function SriComponent() {
                       placeholder="••••••••••••"
                       value={passwordP12}
                       onChange={(e) => setPasswordP12(e.target.value)}
-                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
                       required
                     />
                   </div>

@@ -197,7 +197,7 @@ export default function AuditoriaComponent() {
               placeholder="Filtrar por entidad o recurso..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+              className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2 text-xs text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
             />
             <Search size={14} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
           </form>

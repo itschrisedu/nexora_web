@@ -426,7 +426,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
           <p className="text-xs text-[var(--muted-foreground)] font-medium">Administra y da seguimiento a los pedidos de tus clientes</p>
         </div>
         <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
           <Plus size={16} /><span>Nuevo Pedido</span>
         </button>
       </div>
@@ -439,8 +439,8 @@ export default function ComercialComponent({ online, userRole, userPermissions }
             onClick={() => setFiltroEstado(estado)}
             className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
               filtroEstado === estado
-                ? 'bg-[var(--primary)] text-white border-transparent'
-                : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]'
+                ? 'bg-[#0F172A] text-white border-transparent'
+                : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
             }`}
           >
             {estado === 'TODOS' ? 'Todos' : ESTADO_CONFIG[estado].label}
@@ -451,7 +451,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       {/* Lista de Pedidos */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 text-[var(--muted-foreground)]">
-          <Loader2 className="animate-spin text-[var(--primary)] mb-2" size={32} />
+          <Loader2 className="animate-spin text-[#0F172A] mb-2" size={32} />
           <span className="text-sm">Cargando pedidos...</span>
         </div>
       ) : pedidosFiltrados.length === 0 ? (
@@ -485,10 +485,10 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     <Fragment key={p.id}>
                       <tr
                         onClick={() => setPedidoExpandidoId(isExpanded ? null : p.id)}
-                        className={`hover:bg-[var(--muted)]/30 transition-colors cursor-pointer ${isExpanded ? 'bg-[var(--primary)]/5' : ''}`}
+                        className={`hover:bg-[var(--muted)]/30 transition-colors cursor-pointer ${isExpanded ? 'bg-[#0F172A]/5' : ''}`}
                       >
                         <td className="px-6 py-4 font-bold flex items-center gap-2">
-                          {isExpanded ? <ChevronUp size={14} className="text-[var(--primary)]" /> : <ChevronDown size={14} className="text-[var(--muted-foreground)]" />}
+                          {isExpanded ? <ChevronUp size={14} className="text-[#0F172A]" /> : <ChevronDown size={14} className="text-[var(--muted-foreground)]" />}
                           #{p.numero || p.id.slice(0, 8).toUpperCase()}
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold text-[var(--foreground)]">
@@ -510,7 +510,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                           <div className="flex items-center justify-center gap-1.5">
                             {isUpdating ? (
                               <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
-                                <Loader2 size={12} className="animate-spin text-[var(--primary)]" /> Actualizando...
+                                <Loader2 size={12} className="animate-spin text-[#0F172A]" /> Actualizando...
                               </span>
                             ) : p.estado === 'PENDIENTE' ? (
                               <>
@@ -685,7 +685,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                   <div className="relative sm:col-span-2">
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Cliente *</label>
                     {clienteSeleccionado ? (
-                      <div className="flex items-center justify-between p-3 bg-[var(--primary)]/10 border border-[var(--primary)]/30 rounded-xl">
+                      <div className="flex items-center justify-between p-3 bg-[#0F172A]/10 border border-[#0F172A]/30 rounded-xl">
                         <div>
                           <div className="font-bold text-sm text-[var(--foreground)]">{clienteSeleccionado.nombre}</div>
                           {clienteSeleccionado.cedula && <div className="text-[10px] text-[var(--muted-foreground)]">C.I / RUC: {clienteSeleccionado.cedula}</div>}
@@ -718,7 +718,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                               if (listaClientes.length === 0) loadListaClientes();
                               setShowDropdownCliente(true);
                             }}
-                            className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)] pr-24"
+                            className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] pr-24"
                           />
                           {esperandoDebounce && (
                             <span className="absolute right-3 top-2.5 text-[10px] text-amber-600 flex items-center gap-1 font-semibold animate-pulse">
@@ -749,7 +749,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                     setClienteSeleccionado(c);
                                     setShowDropdownCliente(false);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--primary)]/10 transition-colors border-b border-[var(--border)] last:border-none flex justify-between items-center"
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex justify-between items-center"
                                 >
                                   <div>
                                     <span className="font-bold block text-[var(--foreground)]">{c.nombre}</span>
@@ -783,7 +783,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     <select
                       value={tipoPago}
                       onChange={(e) => setTipoPago(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]"
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
                     >
                       <option value="CONTADO">Contado</option>
                       <option value="CREDITO">Crédito</option>
@@ -795,7 +795,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     <select
                       value={canalEntrada}
                       onChange={(e) => setCanalEntrada(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]"
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
                     >
                       <option value="VENTA_DIRECTA">Venta Directa</option>
                       <option value="POS">POS Mostrador</option>
@@ -852,7 +852,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                             setShowDropdownModelo(true);
                           }}
                           onFocus={() => setShowDropdownModelo(true)}
-                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                         />
 
                         {showDropdownModelo && busquedaModelo.trim().length > 0 && (
@@ -873,7 +873,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   key={p.id}
                                   type="button"
                                   onClick={() => handleSeleccionarProducto(p)}
-                                  className="w-full text-left px-3 py-2.5 text-xs hover:bg-[var(--primary)]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center gap-3 font-bold text-[var(--foreground)]"
+                                  className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center gap-3 font-bold text-[var(--foreground)]"
                                 >
                                   {p.imageUrl ? (
                                     <img src={p.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
@@ -916,7 +916,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     <select
                       value={tipoVentaItem}
                       onChange={(e) => setTipoVentaItem(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                     >
                       <option value="SERIE_COMPLETA">📦 Venta por Serie Completa (Media Docena / Docena)</option>
                       <option value="TALLA_ESPECIFICA">👟 Venta por Talla Específica (Numeración)</option>
@@ -960,7 +960,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                           min="1"
                           value={cantidadSeries}
                           onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-24 px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-[var(--primary)] text-center"
+                          className="w-24 px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-[#0F172A] text-center"
                         />
                         <span className="text-xs font-bold text-emerald-600">
                           = { (subtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (cantidadSeries || 1) } pares en total
@@ -1003,7 +1003,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                 key={t.tallaId}
                                 className={`p-2.5 rounded-xl border flex flex-col justify-between gap-1.5 transition-all ${
                                   cantActual > 0
-                                    ? 'bg-[var(--primary)]/5 border-[var(--primary)]/40 shadow-sm'
+                                    ? 'bg-[#0F172A]/5 border-[#0F172A]/40 shadow-sm'
                                     : 'bg-[var(--card)] border-[var(--border)]'
                                 }`}
                               >
@@ -1025,7 +1025,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                     min="0"
                                     value={cantActual}
                                     onChange={(e) => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: Math.max(0, parseInt(e.target.value) || 0) })}
-                                    className="w-12 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[var(--primary)]"
+                                    className="w-12 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
                                   />
                                   <button
                                     type="button"
@@ -1073,7 +1073,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                       className={`w-full px-3 py-2 border rounded-xl text-xs font-bold focus:outline-none ${
                         !puedeCambiarPrecio
                           ? 'bg-[var(--muted)]/40 border-[var(--border)] text-[var(--muted-foreground)] cursor-not-allowed'
-                          : 'bg-[var(--card)] border-[var(--border)] focus:border-[var(--primary)] text-[var(--foreground)]'
+                          : 'bg-[var(--card)] border-[var(--border)] focus:border-[#0F172A] text-[var(--foreground)]'
                       }`}
                     />
                   </div>
@@ -1095,7 +1095,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                   type="button"
                   onClick={handleAgregarLinea}
                   disabled={!selectedProductId}
-                  className="w-full py-2.5 bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 hover:bg-[var(--primary)] hover:text-white transition-all font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 bg-[#0F172A]/10 text-[#0F172A] border border-[#0F172A]/20 hover:bg-[#0F172A] hover:text-white transition-all font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Plus size={14} /> {tipoVentaItem === 'SERIE_COMPLETA' ? 'Agregar Serie Completa al Pedido' : 'Agregar Numeración Seleccionada al Pedido'}
                 </button>
@@ -1215,7 +1215,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     type="button"
                     disabled={creatingOrder || lineasPedido.length === 0 || !clientId}
                     onClick={handleCrearPedidoOnline}
-                    className="px-5 py-2 bg-[var(--primary)] text-white font-bold text-xs rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5"
                   >
                     {creatingOrder ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                     {creatingOrder ? 'Creando Pedido...' : 'Guardar Pedido Completo'}

@@ -316,7 +316,7 @@ export default function PosComponent() {
             {productosFiltrados.slice(0, 20).map((prod) => (
               <div
                 key={prod.id}
-                className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl p-3 hover:border-[var(--primary)] transition-all"
+                className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl p-3 hover:border-[#0F172A] transition-all"
               >
                 <div className="flex justify-between items-start mb-2">
                   <div>

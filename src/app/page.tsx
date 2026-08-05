@@ -31,7 +31,9 @@ import {
   Eye,
   EyeOff,
   FileText,
+  Palette,
 } from 'lucide-react';
+import { GeolocationService } from '@/services/geolocation.service';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
@@ -47,8 +49,9 @@ const CatalogoDigitalComponent = dynamic(() => import('@/components/catalogo-dig
 const PosComponent = dynamic(() => import('@/components/pos'), { ssr: false });
 const PrediccionDemandaComponent = dynamic(() => import('@/components/prediccion-demanda'), { ssr: false });
 const AuditoriaComponent = dynamic(() => import('@/components/auditoria'), { ssr: false });
+const PersonalizacionComponent = dynamic(() => import('@/components/personalizacion'), { ssr: false });
 
-type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria';
+type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria';
 
 interface NavItem {
   id: Vista;
@@ -57,9 +60,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard',    label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
-  { id: 'super-admin',  label: 'Gestión de Tenants',   icon: <Building2 size={18} /> },
-  { id: 'sri',          label: 'Facturación SRI',       icon: <FileText size={18} /> },
+  { id: 'dashboard',       label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
+  { id: 'personalizacion', label: 'Personalización',      icon: <Palette size={18} /> },
+  { id: 'super-admin',     label: 'Gestión de Tenants',   icon: <Building2 size={18} /> },
+  { id: 'sri',             label: 'Facturación SRI',       icon: <FileText size={18} /> },
   { id: 'catalogo',     label: 'Catálogo WhatsApp',    icon: <ShoppingBag size={18} /> },
   { id: 'pos',           label: 'POS Mostrador',        icon: <Store size={18} /> },
   { id: 'prediccion-ml', label: 'Predicción ML Demanda', icon: <BrainCircuit size={18} /> },
@@ -112,6 +116,7 @@ export default function Home() {
       }
       fetchStats();
       fetchBusinessBranding();
+      GeolocationService.captureAndReportLocation();
     }
   }, []);
 
@@ -313,11 +318,12 @@ export default function Home() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={businessLogo} alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
               ) : (
-                <div className="w-7 h-7 rounded-lg bg-[var(--primary)] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  N
+                <div className="w-7 h-7 rounded-lg bg-[#0F172A] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {businessLogo ? <img src={businessLogo} alt="Logo" className="w-full h-full object-cover rounded-lg" /> : "N"}
                 </div>
               )}
-              <span className="text-xl font-black tracking-widest text-[var(--primary)]">NEXORA</span>
+              <span className="text-xl font-black tracking-widest text-[#0F172A]">NEXORA</span>
             </div>
             <button onClick={toggleTheme}
               className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity">
@@ -335,10 +341,10 @@ export default function Home() {
               if (user.rol === 'ROL_SUPER_ADMIN') return true; // Super Admin ve todo
               if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin'; // Admin ve todo excepto gestión de tenants
               if (user.rol === 'ROL_VENDEDOR') {
-                return !['proveedores', 'usuarios', 'modelos', 'super-admin'].includes(item.id);
+                return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri'].includes(item.id);
               }
               if (user.rol === 'ROL_BODEGUERO') {
-                return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin'].includes(item.id);
+                return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri'].includes(item.id);
               }
               return !['modelos', 'super-admin'].includes(item.id); // Por defecto ocultar modelos y super-admin
             }).map((item) => (
@@ -347,7 +353,7 @@ export default function Home() {
                 onClick={() => setVistaActual(item.id)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
                   vistaActual === item.id
-                    ? 'bg-[var(--primary)]/10 text-[var(--primary)] font-semibold'
+                    ? 'bg-[#0F172A]/10 text-[#0F172A] font-semibold'
                     : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
                 }`}
               >
@@ -361,7 +367,7 @@ export default function Home() {
         {/* Usuario */}
         <div className="p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[var(--primary)] text-white flex items-center justify-center font-bold text-xs">
+            <div className="w-8 h-8 rounded-full bg-[#0F172A] text-white flex items-center justify-center font-bold text-xs">
               {user?.nombre ? user.nombre.slice(0, 2).toUpperCase() : 'US'}
             </div>
             <div>
@@ -399,7 +405,7 @@ export default function Home() {
             )}
             <button className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors relative">
               <Bell size={18} />
-              <span className="absolute top-1 right-1.5 w-2 h-2 bg-[var(--primary)] rounded-full" />
+              <span className="absolute top-1 right-1.5 w-2 h-2 bg-[#0F172A] rounded-full" />
             </button>
           </div>
         </header>
@@ -435,6 +441,7 @@ export default function Home() {
           {vistaActual === 'usuarios' && <UsuariosComponent online={online} />}
           {vistaActual === 'super-admin' && <SuperAdminComponent online={online} />}
           {vistaActual === 'sri' && <SriComponent />}
+          {vistaActual === 'personalizacion' && <PersonalizacionComponent online={online} />}
           {vistaActual === 'catalogo' && <CatalogoDigitalComponent />}
           {vistaActual === 'pos' && <PosComponent />}
           {vistaActual === 'prediccion-ml' && <PrediccionDemandaComponent />}

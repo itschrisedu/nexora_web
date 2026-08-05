@@ -380,14 +380,14 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-[var(--muted-foreground)] font-medium flex items-center gap-2">
-            <Building2 size={18} className="text-[var(--primary)]" />
+            <Building2 size={18} className="text-[#0F172A]" />
             Crear, editar, activar/desactivar y administrar organizaciones o usuarios del sistema.
           </p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
           disabled={!online}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50"
         >
           <Plus size={16} />
           Nuevo Tenant
@@ -409,7 +409,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* Tenants Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="animate-spin text-[var(--primary)]" />
+          <Loader2 size={32} className="animate-spin text-[#0F172A]" />
         </div>
       ) : tenants.length === 0 ? (
         <div className="text-center py-20 text-[var(--muted-foreground)]">
@@ -591,7 +591,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
             <div className="p-6 border-b border-[var(--border)]">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Building2 size={20} className="text-[var(--primary)]" />
+                <Building2 size={20} className="text-[#0F172A]" />
                 Crear Nuevo Tenant
               </h2>
               <p className="text-xs text-[var(--muted-foreground)] mt-1">
@@ -609,7 +609,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newTenant.name}
                   onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
                   placeholder="Ej: Calzado Don Pepe"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
               <div>
@@ -622,7 +622,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newTenant.adminNombre}
                   onChange={(e) => setNewTenant({ ...newTenant, adminNombre: e.target.value })}
                   placeholder="Ej: Pedro Pérez"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
               <div>
@@ -635,7 +635,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newTenant.adminEmail}
                   onChange={(e) => setNewTenant({ ...newTenant, adminEmail: e.target.value })}
                   placeholder="admin@negocio.com"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
               <div>
@@ -648,7 +648,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newTenant.adminPassword}
                   onChange={(e) => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -662,7 +662,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="flex-1 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {createLoading && <Loader2 size={14} className="animate-spin" />}
                   {createLoading ? "Creando..." : "Crear Tenant"}
@@ -696,7 +696,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   required
                   value={editingTenant.name}
                   onChange={(e) => setEditingTenant({ ...editingTenant, name: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
               <div>
@@ -708,7 +708,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={editingTenant.ruc}
                   onChange={(e) => setEditingTenant({ ...editingTenant, ruc: e.target.value })}
                   placeholder="1792945281001"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
               <div>
@@ -720,7 +720,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={editingTenant.direccion}
                   onChange={(e) => setEditingTenant({ ...editingTenant, direccion: e.target.value })}
                   placeholder="Av. Amazonas N24-123"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
               <div>
@@ -732,7 +732,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={editingTenant.telefono}
                   onChange={(e) => setEditingTenant({ ...editingTenant, telefono: e.target.value })}
                   placeholder="0991234567"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)] transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -856,7 +856,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
             {loadingDetail ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 size={32} className="animate-spin text-[var(--primary)]" />
+                <Loader2 size={32} className="animate-spin text-[#0F172A]" />
               </div>
             ) : selectedTenantDetail ? (
               <>
@@ -961,7 +961,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                       </h3>
                       <button
                         onClick={() => setShowCreateUserModal(true)}
-                        className="px-3 py-1.5 bg-[var(--primary)] text-white rounded-lg text-xs font-bold hover:opacity-90 transition-all flex items-center gap-1.5"
+                        className="px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
                       >
                         <UserPlus size={14} /> Nuevo Usuario
                       </button>
@@ -1049,7 +1049,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
             <div className="p-6 border-b border-[var(--border)]">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <UserPlus size={20} className="text-[var(--primary)]" />
+                <UserPlus size={20} className="text-[#0F172A]" />
                 Agregar Usuario a {selectedTenantDetail.name}
               </h2>
             </div>
@@ -1064,7 +1064,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newUser.nombre}
                   onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })}
                   placeholder="Ej: Juan Pérez"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
               <div>
@@ -1077,7 +1077,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   placeholder="usuario@negocio.com"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
               <div>
@@ -1087,7 +1087,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <select
                   value={newUser.rol}
                   onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 >
                   <option value="ROL_ADMIN">Administrador de Tenant</option>
                   <option value="ROL_VENDEDOR">Vendedor</option>
@@ -1104,7 +1104,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -1118,7 +1118,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <button
                   type="submit"
                   disabled={createUserLoading}
-                  className="flex-1 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {createUserLoading && <Loader2 size={14} className="animate-spin" />}
                   {createUserLoading ? "Creando..." : "Crear Usuario"}
@@ -1149,7 +1149,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   required
                   value={editingUser.nombre}
                   onChange={(e) => setEditingUser({ ...editingUser, nombre: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
               <div>
@@ -1161,7 +1161,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   required
                   value={editingUser.email}
                   onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
               <div>
@@ -1171,7 +1171,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <select
                   value={editingUser.rol}
                   onChange={(e) => setEditingUser({ ...editingUser, rol: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 >
                   <option value="ROL_ADMIN">Administrador</option>
                   <option value="ROL_VENDEDOR">Vendedor</option>
@@ -1186,7 +1186,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <select
                   value={editingUser.activo ? "true" : "false"}
                   onChange={(e) => setEditingUser({ ...editingUser, activo: e.target.value === "true" })}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 >
                   <option value="true">Activo</option>
                   <option value="false">Inactivo</option>
@@ -1201,7 +1201,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={editingUser.password}
                   onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
                   placeholder="Dejar en blanco para mantener contraseña"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--primary)]"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
               <div className="flex gap-3 pt-2">

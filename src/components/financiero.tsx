@@ -127,8 +127,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
           <button key={e} onClick={() => setFiltro(e as any)}
             className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
               filtro === e
-                ? 'bg-[var(--primary)] text-white border-transparent'
-                : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]'
+                ? 'bg-[#0F172A] text-white border-transparent'
+                : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
             }`}>
             {e === 'TODOS' ? 'Todos' : getCobroConfig(e).label}
           </button>
@@ -140,7 +140,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         <div className="lg:col-span-2">
           {loading ? (
             <div className="flex flex-col items-center justify-center p-12 text-[var(--muted-foreground)]">
-              <Loader2 className="animate-spin text-[var(--primary)] mb-2" size={32} />
+              <Loader2 className="animate-spin text-[#0F172A] mb-2" size={32} />
               <span className="text-sm">Cargando cobros...</span>
             </div>
           ) : filtrados.length === 0 ? (
@@ -168,7 +168,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       return (
                         <tr key={cobro.id}
                           onClick={() => setSelectedCobro(cobro)}
-                          className={`hover:bg-[var(--muted)]/30 cursor-pointer transition-colors ${selectedCobro?.id === cobro.id ? 'bg-[var(--primary)]/5' : ''}`}>
+                          className={`hover:bg-[var(--muted)]/30 cursor-pointer transition-colors ${selectedCobro?.id === cobro.id ? 'bg-[#0F172A]/5' : ''}`}>
                           <td className="px-5 py-4 font-bold">{num}</td>
                           <td className="px-5 py-4 text-center">
                             <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-bold ${cfg.color}`}>{cfg.label}</span>
@@ -204,7 +204,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Monto del Abono ($)</label>
                 <input type="number" step="0.01" min="0.01" max={selectedCobro.saldoPendiente} placeholder="0.00" value={monto} onChange={(e) => setMonto(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--primary)]" />
+                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]" />
               </div>
               <button onClick={handleRegistrarAbono} disabled={savingAbono || !monto || !online}
                 className="w-full py-3 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50">
