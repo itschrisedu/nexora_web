@@ -306,11 +306,11 @@ export default function Home() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={businessLogo} alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
               ) : (
-                <div className="w-7 h-7 rounded-lg bg-[var(--primary)] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                <div className="w-7 h-7 rounded-lg bg-[#0F172A] dark:bg-slate-200 text-white dark:text-[#0F172A] font-bold text-xs flex items-center justify-center shadow-sm">
                   N
                 </div>
               )}
-              <span className="text-xl font-black tracking-widest text-[var(--primary)]">NEXORA</span>
+              <span className="text-xl font-black tracking-widest text-[#0F172A] dark:text-slate-100">NEXORA</span>
             </div>
             <button onClick={toggleTheme}
               className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity">
@@ -340,7 +340,7 @@ export default function Home() {
                 onClick={() => setVistaActual(item.id)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
                   vistaActual === item.id
-                    ? 'bg-[var(--primary)]/10 text-[var(--primary)] font-semibold'
+                    ? 'bg-[#0F172A]/10 text-[#0F172A] dark:bg-slate-200/10 dark:text-slate-200 font-semibold'
                     : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
                 }`}
               >
@@ -354,7 +354,7 @@ export default function Home() {
         {/* Usuario */}
         <div className="p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-bold text-xs">
+            <div className="w-8 h-8 rounded-full bg-[#0F172A] dark:bg-slate-200 flex items-center justify-center text-white dark:text-[#0F172A] font-bold text-xs">
               {user?.nombre ? user.nombre.slice(0, 2).toUpperCase() : 'US'}
             </div>
             <div>
@@ -422,7 +422,7 @@ export default function Home() {
           {vistaActual === 'inventario' && <InventarioComponent online={online} userRole={user?.rol} />}
           {vistaActual === 'modelos' && <ModelosComponent online={online} />}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
-          {vistaActual === 'comercial' && <ComercialComponent online={online} />}
+          {vistaActual === 'comercial' && <ComercialComponent online={online} userRole={user?.rol} userPermissions={user} />}
           {vistaActual === 'financiero' && <FinancieroComponent online={online} />}
           {vistaActual === 'proveedores' && <ProveedoresComponent online={online} userRole={user?.rol} />}
           {vistaActual === 'usuarios' && <UsuariosComponent online={online} />}

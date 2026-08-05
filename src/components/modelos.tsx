@@ -218,6 +218,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
   // Estado para el modal de añadir nuevo color a modelo existente
   const [showAddColorModal, setShowAddColorModal] = useState(false);
   const [selectedModelForColor, setSelectedModelForColor] = useState<ModeloAgrupado | null>(null);
+  const [supplierId, setSupplierId] = useState("");
+  const [listaProveedores, setListaProveedores] = useState<{ id: string; razonSocial: string; ruc?: string }[]>([]);
+
   const [newColorName, setNewColorName] = useState("");
   const [newColorFoto, setNewColorFoto] = useState<string | null>(null);
   const [newColorSerieIds, setNewColorSerieIds] = useState<string[]>([]);
@@ -252,6 +255,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
               });
             setSeries(filtradasYOrdenadas);
           }
+          const provs = await ApiService.get("/proveedores");
+          if (Array.isArray(provs)) setListaProveedores(provs);
         } catch {}
       }
     } catch (e: any) {
@@ -266,6 +271,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setName("");
     setBrand("");
     setMaterial("");
+    setSupplierId("");
     setColors([{ color: "", foto: null }]);
     setSerieIds([]);
     setSeriesPrices({});
@@ -671,6 +677,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         stockMinimo: 0,
         seriesPrices: seriesPricesMap,
         customTallas,
+        supplierId: supplierId || undefined,
       });
 
       setSuccess("Modelo y sus variantes creados exitosamente.");
@@ -993,7 +1000,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {products.filter(p => p.color === activeColor).map(p => {
                         const tallas = p.tallas || (p as any).stockPorTalla || [];
-                        const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad ?? t.stock ?? t.disponible ?? 0), 0);
+                        const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
 
                         return (
                           <div key={p.id} className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${
@@ -1096,6 +1103,16 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <div><Lbl t="Marca" req /><input type="text" value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej. Nike" className={INPUT} /></div>
                   <div><Lbl t="Material" /><input type="text" value={material} onChange={e => setMaterial(e.target.value)} placeholder="Ej. Cuero sintético y malla" className={INPUT} /></div>
+                </div>
+
+                <div>
+                  <Lbl t="Proveedor Asignado (para Órdenes de Compra Automáticas)" />
+                  <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className={INPUT}>
+                    <option value="">-- Sin Proveedor Asignado --</option>
+                    {listaProveedores.map(p => (
+                      <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

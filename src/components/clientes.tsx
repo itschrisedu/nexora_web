@@ -400,7 +400,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
               </div>
               <div>
                 <div className="font-bold text-sm">{selected.nombre} {selected.apellido || ""}</div>
-                <div className={`text-[10px] px-2 py-0.5 rounded-lg border inline-block mt-0.5 font-semibold ${nivelColor(selected.nivelCredito)}`}>
+                <div className={`text-[10px] px-2 py-0.5 rounded-lg border inline-block mt-0.5 font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>
                   {selected.nivelCredito?.replace("_", " ")}
                 </div>
               </div>

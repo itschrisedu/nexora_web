@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { ApiService } from '../services/api.service';
 import { db } from '../db/local-db';
 import { SyncService } from '../services/sync.service';
@@ -14,9 +14,16 @@ import {
   Truck,
   ArrowUpDown,
   X,
+  Lock,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
-interface ComercialProps { online: boolean; }
+interface ComercialProps {
+  online: boolean;
+  userRole?: string;
+  userPermissions?: { permiteCambiarPrecio?: boolean; rol?: string };
+}
 
 type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'EN_TRANSITO' | 'ENTREGADO' | 'CANCELADO';
 
@@ -30,6 +37,7 @@ interface Pedido {
   tipoPago: string;
   createdAt: string;
   prioridadScore?: number;
+  lines?: any[];
 }
 
 const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: React.ReactNode }> = {
@@ -40,11 +48,14 @@ const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: 
   CANCELADO:       { label: 'Cancelado',      color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',        icon: <XCircle size={12} /> },
 };
 
-export default function ComercialComponent({ online }: ComercialProps) {
+export default function ComercialComponent({ online, userRole, userPermissions }: ComercialProps) {
+  const puedeCambiarPrecio = userRole === 'ROL_ADMIN' || userPermissions?.permiteCambiarPrecio === true;
+
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<EstadoPedido | 'TODOS'>('TODOS');
+  const [pedidoExpandidoId, setPedidoExpandidoId] = useState<string | null>(null);
 
   // Formulario nuevo pedido
   const [clientId, setClientId] = useState('');
@@ -65,15 +76,30 @@ export default function ComercialComponent({ online }: ComercialProps) {
   // Catálogo de Productos y Líneas de Pedido
   const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
   const [lineasPedido, setLineasPedido] = useState<
-    { productId: string; modelName: string; color: string; serieNombre?: string; imageUrl?: string; tallaId: string; numeroTalla: number; cantidad: number; precioUnitario: number; tipoVenta: 'SERIE_COMPLETA' | 'TALLA_ESPECIFICA' }[]
+    {
+      productId: string;
+      modelName: string;
+      color: string;
+      serieNombre?: string;
+      imageUrl?: string;
+      tallaId: string;
+      numeroTalla: number;
+      cantidad: number;
+      precioUnitario: number;
+      tipoVenta: 'SERIE_COMPLETA' | 'TALLA_ESPECIFICA';
+      subtipoSerie?: 'MEDIA_DOCENA' | 'DOCENA';
+      cantidadSeries?: number;
+    }[]
   >([]);
 
   // Selección de Producto actual para agregar
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [selectedTallaId, setSelectedTallaId] = useState('');
-  const [cantidadItem, setCantidadItem] = useState(1);
   const [precioItem, setPrecioItem] = useState(0);
-  const [tipoVentaItem, setTipoVentaItem] = useState<'SERIE_COMPLETA' | 'TALLA_ESPECIFICA'>('TALLA_ESPECIFICA');
+  const [tipoVentaItem, setTipoVentaItem] = useState<'SERIE_COMPLETA' | 'TALLA_ESPECIFICA'>('SERIE_COMPLETA');
+  const [subtipoSerie, setSubtipoSerie] = useState<'MEDIA_DOCENA' | 'DOCENA'>('MEDIA_DOCENA');
+  const [cantidadSeries, setCantidadSeries] = useState(1);
+  const [tallaCantidadesMap, setTallaCantidadesMap] = useState<Record<string, number>>({});
+
   const [canalEntrada, setCanalEntrada] = useState<'VENTA_DIRECTA' | 'POS' | 'CATALOGO_DIGITAL'>('VENTA_DIRECTA');
   const [notasPedido, setNotasPedido] = useState('');
 
@@ -84,9 +110,6 @@ export default function ComercialComponent({ online }: ComercialProps) {
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
   const [productoSeleccionadoObj, setProductoSeleccionadoObj] = useState<any | null>(null);
 
-  // Precio sugerido con 30% ganancia, costo del producto y último precio al cliente
-  const [costoProdSeleccionado, setCostoProdSeleccionado] = useState(0);
-  const [precioSugerido30, setPrecioSugerido30] = useState(0);
   const [ultimoPrecioCliente, setUltimoPrecioCliente] = useState<number | null>(null);
   const [fechaUltimaVenta, setFechaUltimaVenta] = useState<string | null>(null);
 
@@ -195,35 +218,34 @@ export default function ComercialComponent({ online }: ComercialProps) {
       setProductoSeleccionadoObj(pObj);
       setShowDropdownModelo(false);
       setBusquedaModelo('');
-      const costo = pObj.costPrice || 0;
-      const sugerido = Math.round(costo * 1.30 * 100) / 100; // 30% ganancia
-      setCostoProdSeleccionado(costo);
-      setPrecioSugerido30(sugerido);
-      setPrecioItem(sugerido); // Pre-llenar con precio sugerido
-      if (pObj.tallas && pObj.tallas.length > 0) {
-        setSelectedTallaId(pObj.tallas[0].tallaId);
-      } else {
-        setSelectedTallaId('');
+      setPrecioItem(pObj.salePrice || 0); // Pre-llenar directamente con precio de venta del catálogo
+      
+      const initialMap: Record<string, number> = {};
+      if (pObj.tallas) {
+        pObj.tallas.forEach((t: any) => {
+          initialMap[t.tallaId] = 0;
+        });
       }
+      setTallaCantidadesMap(initialMap);
     } else {
       setSelectedProductId('');
       setProductoSeleccionadoObj(null);
-      setCostoProdSeleccionado(0);
-      setPrecioSugerido30(0);
       setPrecioItem(0);
+      setTallaCantidadesMap({});
     }
   };
 
-  const esPrecioMenorAlCosto = precioItem > 0 && costoProdSeleccionado > 0 && precioItem < costoProdSeleccionado;
-
   const handleAgregarLinea = () => {
-    if (!selectedProductId || cantidadItem <= 0 || precioItem <= 0) {
-      alert('Por favor selecciona un producto, cantidad y precio válidos.');
+    if (!selectedProductId || !productoSeleccionadoObj) {
+      alert('Por favor selecciona un producto.');
+      return;
+    }
+    if (precioItem <= 0) {
+      alert('El precio unitario debe ser mayor a 0.');
       return;
     }
 
-    const prodObj = catalogoProductos.find((p) => p.id === selectedProductId);
-    if (!prodObj) return;
+    const prodObj = productoSeleccionadoObj;
 
     if (tipoVentaItem === 'SERIE_COMPLETA') {
       if (!prodObj.tallas || prodObj.tallas.length === 0) {
@@ -231,7 +253,8 @@ export default function ComercialComponent({ online }: ComercialProps) {
         return;
       }
 
-      // Agregar automáticamente cada talla de la serie con la cantidad indicada
+      const factor = (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+
       const lineasSerie = prodObj.tallas.map((t: any) => ({
         productId: prodObj.id,
         modelName: prodObj.modelName,
@@ -240,47 +263,52 @@ export default function ComercialComponent({ online }: ComercialProps) {
         imageUrl: prodObj.imageUrl,
         tallaId: t.tallaId,
         numeroTalla: t.numero,
-        cantidad: Number(cantidadItem),
+        cantidad: factor,
         precioUnitario: Number(precioItem),
         tipoVenta: 'SERIE_COMPLETA' as const,
+        subtipoSerie,
+        cantidadSeries,
       }));
 
       setLineasPedido([...lineasPedido, ...lineasSerie]);
     } else {
-      // Venta por talla específica
-      if (!selectedTallaId) {
-        alert('Por favor selecciona una talla específica.');
+      // Venta por talla específica (Numeración)
+      const lineasNumeracion: any[] = [];
+      Object.entries(tallaCantidadesMap).forEach(([tallaId, qty]) => {
+        if (qty > 0) {
+          const tallaObj = prodObj.tallas.find((t: any) => t.tallaId === tallaId);
+          if (tallaObj) {
+            lineasNumeracion.push({
+              productId: prodObj.id,
+              modelName: prodObj.modelName,
+              color: prodObj.color,
+              serieNombre: prodObj.serieNombre,
+              imageUrl: prodObj.imageUrl,
+              tallaId: tallaObj.tallaId,
+              numeroTalla: tallaObj.numero,
+              cantidad: Number(qty),
+              precioUnitario: Number(precioItem),
+              tipoVenta: 'TALLA_ESPECIFICA' as const,
+            });
+          }
+        }
+      });
+
+      if (lineasNumeracion.length === 0) {
+        alert('Por favor asigna al menos una talla con cantidad mayor a 0.');
         return;
       }
 
-      const tallaObj = prodObj.tallas.find((t: any) => t.tallaId === selectedTallaId);
-      if (!tallaObj) return;
-
-      const nuevaLinea = {
-        productId: prodObj.id,
-        modelName: prodObj.modelName,
-        color: prodObj.color,
-        serieNombre: prodObj.serieNombre,
-        imageUrl: prodObj.imageUrl,
-        tallaId: tallaObj.tallaId,
-        numeroTalla: tallaObj.numero,
-        cantidad: Number(cantidadItem),
-        precioUnitario: Number(precioItem),
-        tipoVenta: 'TALLA_ESPECIFICA' as const,
-      };
-
-      setLineasPedido([...lineasPedido, nuevaLinea]);
+      setLineasPedido([...lineasPedido, ...lineasNumeracion]);
     }
 
     // Limpiar selección de producto
     setSelectedProductId('');
     setProductoSeleccionadoObj(null);
     setBusquedaModelo('');
-    setSelectedTallaId('');
-    setCantidadItem(1);
     setPrecioItem(0);
-    setCostoProdSeleccionado(0);
-    setPrecioSugerido30(0);
+    setTallaCantidadesMap({});
+    setCantidadSeries(1);
     setUltimoPrecioCliente(null);
   };
 
@@ -449,87 +477,169 @@ export default function ComercialComponent({ online }: ComercialProps) {
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {pedidosFiltrados.map((p) => {
-                  const cfg = ESTADO_CONFIG[p.estado];
+                  const cfg = ESTADO_CONFIG[p.estado] || { label: p.estado, color: 'bg-slate-500/10 text-slate-600', icon: <Clock size={12} /> };
                   const isUpdating = updatingId === p.id;
+                  const isExpanded = pedidoExpandidoId === p.id;
 
                   return (
-                    <tr key={p.id} className="hover:bg-[var(--muted)]/30 transition-colors cursor-default">
-                      <td className="px-6 py-4 font-bold">#{p.numero}</td>
-                      <td className="px-6 py-4 text-xs font-semibold text-[var(--foreground)]">
-                        {p.clienteNombre || (p.clientId ? p.clientId.slice(0, 8).toUpperCase() : 'Consumidor Final')}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>
-                          {cfg.icon}{cfg.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px] font-semibold">{p.tipoPago}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right font-extrabold">${Number(p.montoTotal).toFixed(2)}</td>
-                      <td className="px-6 py-4 text-right text-[10px] text-[var(--muted-foreground)]">
-                        {new Date(p.createdAt).toLocaleDateString('es-EC')}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {isUpdating ? (
-                            <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
-                              <Loader2 size={12} className="animate-spin text-[var(--primary)]" /> Actualizando...
-                            </span>
-                          ) : p.estado === 'PENDIENTE' ? (
-                            <>
+                    <Fragment key={p.id}>
+                      <tr
+                        onClick={() => setPedidoExpandidoId(isExpanded ? null : p.id)}
+                        className={`hover:bg-[var(--muted)]/30 transition-colors cursor-pointer ${isExpanded ? 'bg-[var(--primary)]/5' : ''}`}
+                      >
+                        <td className="px-6 py-4 font-bold flex items-center gap-2">
+                          {isExpanded ? <ChevronUp size={14} className="text-[var(--primary)]" /> : <ChevronDown size={14} className="text-[var(--muted-foreground)]" />}
+                          #{p.numero || p.id.slice(0, 8).toUpperCase()}
+                        </td>
+                        <td className="px-6 py-4 text-xs font-semibold text-[var(--foreground)]">
+                          {p.clienteNombre || (p.clientId ? p.clientId.slice(0, 8).toUpperCase() : 'Consumidor Final')}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>
+                            {cfg.icon}{cfg.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px] font-semibold">{p.tipoPago}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right font-extrabold text-emerald-600">${Number(p.montoTotal).toFixed(2)}</td>
+                        <td className="px-6 py-4 text-right text-[10px] text-[var(--muted-foreground)]">
+                          {new Date(p.createdAt).toLocaleDateString('es-EC')}
+                        </td>
+                        <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1.5">
+                            {isUpdating ? (
+                              <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+                                <Loader2 size={12} className="animate-spin text-[var(--primary)]" /> Actualizando...
+                              </span>
+                            ) : p.estado === 'PENDIENTE' ? (
+                              <>
+                                <button
+                                  onClick={() => handleCambiarEstado(p.id, 'EN_PREPARACION')}
+                                  title="Iniciar preparación en bodega"
+                                  className="px-2.5 py-1 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-600/20 flex items-center gap-1"
+                                >
+                                  <Package size={12} /> Preparar
+                                </button>
+                                <button
+                                  onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
+                                  title="Cancelar pedido"
+                                  className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
+                                >
+                                  <XCircle size={12} /> Cancelar
+                                </button>
+                              </>
+                            ) : p.estado === 'EN_PREPARACION' ? (
+                              <>
+                                <button
+                                  onClick={() => handleCambiarEstado(p.id, 'EN_TRANSITO')}
+                                  title="Marcar como enviado en tránsito"
+                                  className="px-2.5 py-1 bg-sky-600/10 text-sky-600 hover:bg-sky-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-sky-600/20 flex items-center gap-1"
+                                >
+                                  <Truck size={12} /> En Tránsito
+                                </button>
+                                <button
+                                  onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
+                                  title="Cancelar pedido"
+                                  className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
+                                >
+                                  <XCircle size={12} /> Cancelar
+                                </button>
+                              </>
+                            ) : p.estado === 'EN_TRANSITO' ? (
                               <button
-                                onClick={() => handleCambiarEstado(p.id, 'EN_PREPARACION')}
-                                title="Iniciar preparación en bodega"
-                                className="px-2.5 py-1 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-600/20 flex items-center gap-1"
+                                onClick={() => handleCambiarEstado(p.id, 'ENTREGADO')}
+                                title="Confirmar entrega al cliente"
+                                className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
                               >
-                                <Package size={12} /> Preparar
+                                <CheckCircle size={12} /> Entregar
                               </button>
-                              <button
-                                onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
-                                title="Cancelar pedido"
-                                className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
-                              >
-                                <XCircle size={12} /> Cancelar
-                              </button>
-                            </>
-                          ) : p.estado === 'EN_PREPARACION' ? (
-                            <>
-                              <button
-                                onClick={() => handleCambiarEstado(p.id, 'EN_TRANSITO')}
-                                title="Marcar como enviado en tránsito"
-                                className="px-2.5 py-1 bg-sky-600/10 text-sky-600 hover:bg-sky-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-sky-600/20 flex items-center gap-1"
-                              >
-                                <Truck size={12} /> En Tránsito
-                              </button>
-                              <button
-                                onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
-                                title="Cancelar pedido"
-                                className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
-                              >
-                                <XCircle size={12} /> Cancelar
-                              </button>
-                            </>
-                          ) : p.estado === 'EN_TRANSITO' ? (
-                            <button
-                              onClick={() => handleCambiarEstado(p.id, 'ENTREGADO')}
-                              title="Confirmar entrega al cliente"
-                              className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
-                            >
-                              <CheckCircle size={12} /> Entregar
-                            </button>
-                          ) : p.estado === 'ENTREGADO' ? (
-                            <span className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
-                              <CheckCircle size={12} /> Completado
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-medium text-rose-500 flex items-center gap-1">
-                              <XCircle size={12} /> Cancelado
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                            ) : p.estado === 'ENTREGADO' ? (
+                              <span className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+                                <CheckCircle size={12} /> Completado
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-medium text-rose-500 flex items-center gap-1">
+                                <XCircle size={12} /> Cancelado
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Fila expandible con detalle del pedido */}
+                      {isExpanded && (
+                        <tr className="bg-[var(--muted)]/20">
+                          <td colSpan={7} className="px-6 py-4">
+                            <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-3">
+                              <div className="flex justify-between items-center border-b border-[var(--border)] pb-2">
+                                <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider">
+                                  📦 Detalle de Artículos Solicitados — Pedido #{p.numero || p.id.slice(0, 8)}
+                                </span>
+                                <span className="text-xs font-bold text-[var(--muted-foreground)]">
+                                  Cliente: <strong className="text-[var(--foreground)]">{p.clienteNombre}</strong>
+                                </span>
+                              </div>
+
+                              {p.lines && p.lines.length > 0 ? (
+                                <div className="space-y-2">
+                                  {(() => {
+                                    // Agrupar por productId
+                                    const grupos: { [key: string]: any[] } = {};
+                                    p.lines.forEach((l: any) => {
+                                      const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+                                      if (!grupos[key]) grupos[key] = [];
+                                      grupos[key].push(l);
+                                    });
+
+                                    return Object.entries(grupos).map(([key, lineas]) => {
+                                      const item = lineas[0];
+                                      const totalPares = lineas.reduce((sum, l) => sum + l.cantidad, 0);
+                                      const subtotal = lineas.reduce((sum, l) => sum + l.subtotal, 0);
+
+                                      return (
+                                        <div key={key} className="p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl flex items-center justify-between gap-3">
+                                          <div className="flex items-center gap-3">
+                                            {item.imageUrl ? (
+                                              <img src={item.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                                            ) : (
+                                              <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center text-sm shrink-0">👟</div>
+                                            )}
+                                            <div>
+                                              <div className="font-bold text-xs text-[var(--foreground)]">
+                                                {item.modelName} ({item.color})
+                                              </div>
+                                              <div className="text-[10px] text-[var(--muted-foreground)]">
+                                                Serie: {item.serieNombre || 'Estándar'}
+                                              </div>
+                                              <div className="flex flex-wrap gap-1 mt-1">
+                                                {lineas.map((l, idx) => (
+                                                  <span key={idx} className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded text-[10px] font-bold">
+                                                    T{l.numeroTalla}: {l.cantidad}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="text-right">
+                                            <div className="text-xs font-bold">{totalPares} pares</div>
+                                            <div className="text-[10px] text-[var(--muted-foreground)]">${Number(item.precioUnitario).toFixed(2)} c/u</div>
+                                            <div className="text-xs font-black text-emerald-600">${subtotal.toFixed(2)}</div>
+                                          </div>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-[var(--muted-foreground)] italic">Cargando desglose de productos del pedido...</p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -724,8 +834,6 @@ export default function ComercialComponent({ online }: ComercialProps) {
                             setProductoSeleccionadoObj(null);
                             setSelectedProductId('');
                             setBusquedaModelo('');
-                            setCostoProdSeleccionado(0);
-                            setPrecioSugerido30(0);
                             setPrecioItem(0);
                           }}
                           className="text-xs font-semibold text-red-500 hover:underline"
@@ -810,88 +918,164 @@ export default function ComercialComponent({ online }: ComercialProps) {
                       onChange={(e) => setTipoVentaItem(e.target.value as any)}
                       className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
                     >
-                      <option value="TALLA_ESPECIFICA">👟 Venta por Talla Específica</option>
-                      <option value="SERIE_COMPLETA">📦 Venta por Serie Completa (Toda la curva)</option>
+                      <option value="SERIE_COMPLETA">📦 Venta por Serie Completa (Media Docena / Docena)</option>
+                      <option value="TALLA_ESPECIFICA">👟 Venta por Talla Específica (Numeración)</option>
                     </select>
                   </div>
 
-                  {tipoVentaItem === 'TALLA_ESPECIFICA' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Talla Disponible *</label>
-                      <select
-                        value={selectedTallaId}
-                        onChange={(e) => setSelectedTallaId(e.target.value)}
-                        disabled={!selectedProductId}
-                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)] disabled:opacity-50"
-                      >
-                        <option value="">-- Selecciona Talla --</option>
-                        {selectedProductId &&
-                          catalogoProductos
-                            .find((p) => p.id === selectedProductId)
-                            ?.tallas.map((t: any) => (
-                              <option key={t.tallaId} value={t.tallaId}>
-                                Talla #{t.numero} (Stock disponible: {t.cantidad})
-                              </option>
-                            ))}
-                      </select>
+                  {tipoVentaItem === 'SERIE_COMPLETA' ? (
+                    <div className="sm:col-span-2 space-y-3 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-emerald-700">Seleccionar Curva de Serie:</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSubtipoSerie('MEDIA_DOCENA')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                              subtipoSerie === 'MEDIA_DOCENA'
+                                ? 'bg-emerald-600 text-white border-transparent'
+                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                            }`}
+                          >
+                            ½ Media Docena (6 pares)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSubtipoSerie('DOCENA')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                              subtipoSerie === 'DOCENA'
+                                ? 'bg-emerald-600 text-white border-transparent'
+                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                            }`}
+                          >
+                            1 Docena Completa (12 pares)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <label className="text-xs font-semibold text-[var(--muted-foreground)] shrink-0">¿Cuántas {subtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}?:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={cantidadSeries}
+                          onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-24 px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-[var(--primary)] text-center"
+                        />
+                        <span className="text-xs font-bold text-emerald-600">
+                          = { (subtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (cantidadSeries || 1) } pares en total
+                        </span>
+                      </div>
+
+                      {/* Vista previa de chips de tallas de la serie */}
+                      {productoSeleccionadoObj && productoSeleccionadoObj.tallas && (
+                        <div className="pt-2 border-t border-emerald-500/20">
+                          <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] block mb-1.5">Distribución en esta serie:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {productoSeleccionadoObj.tallas.map((t: any) => {
+                              const factor = (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+                              return (
+                                <div key={t.tallaId} className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs flex items-center gap-1">
+                                  <span className="font-bold text-emerald-700">T{t.numero ?? t.nombre}:</span>
+                                  <span className="font-black text-emerald-800">{factor}</span>
+                                  <span className="text-[9px] text-[var(--muted-foreground)] ml-0.5">(St: {t.cantidad})</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Serie Completa Seleccionada</label>
-                      <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-700 font-semibold flex items-center justify-between">
-                        <span>📦 Se incluirán todas las tallas de la serie</span>
-                        {selectedProductId && (
-                          <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">
-                            {catalogoProductos.find((p) => p.id === selectedProductId)?.tallas?.length || 0} tallas
-                          </span>
-                        )}
-                      </div>
+                    /* Venta por Talla Específica (Numeración con Chips Interactivos) */
+                    <div className="sm:col-span-2 space-y-3 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                      <span className="text-xs font-bold text-[var(--foreground)] block">
+                        👟 Asigna la cantidad de pares por cada talla (Numeración):
+                      </span>
+                      {productoSeleccionadoObj && productoSeleccionadoObj.tallas ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {productoSeleccionadoObj.tallas.map((t: any) => {
+                            const cantActual = tallaCantidadesMap[t.tallaId] || 0;
+                            const stockBodega = t.cantidad || 0;
+                            const excedeStock = cantActual > stockBodega;
+                            return (
+                              <div
+                                key={t.tallaId}
+                                className={`p-2.5 rounded-xl border flex flex-col justify-between gap-1.5 transition-all ${
+                                  cantActual > 0
+                                    ? 'bg-[var(--primary)]/5 border-[var(--primary)]/40 shadow-sm'
+                                    : 'bg-[var(--card)] border-[var(--border)]'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-xs">Talla #{t.numero ?? t.nombre}</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)]">Stock: {stockBodega}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1 justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: Math.max(0, cantActual - 1) })}
+                                    className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)]"
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={cantActual}
+                                    onChange={(e) => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: Math.max(0, parseInt(e.target.value) || 0) })}
+                                    className="w-12 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[var(--primary)]"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: cantActual + 1 })}
+                                    className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)]"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+
+                                {excedeStock && cantActual > 0 && (
+                                  <span className="text-[9px] text-amber-600 font-semibold text-center leading-tight">
+                                    ⚠️ {stockBodega} Bodega + {cantActual - stockBodega} Proveedor
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[var(--muted-foreground)]">Selecciona un modelo arriba para cargar sus tallas.</p>
+                      )}
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Cantidad {tipoVentaItem === 'SERIE_COMPLETA' ? '(por cada talla de la serie)' : ''}</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={cantidadItem}
-                      onChange={(e) => setCantidadItem(parseInt(e.target.value) || 1)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[var(--primary)]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                      Precio Unitario ($)
-                      {precioSugerido30 > 0 && (
-                        <span className="ml-1 text-[10px] text-emerald-600 font-normal">
-                          Sugerido +30%: ${precioSugerido30.toFixed(2)}
+                  {/* Precio Unitario */}
+                  <div className="sm:col-span-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
+                        Precio Unitario de Venta ($)
+                      </label>
+                      {!puedeCambiarPrecio && (
+                        <span className="text-[10px] text-amber-600 font-bold flex items-center gap-1">
+                          <Lock size={10} /> Fijado por catálogo (Solo Admin puede modificar)
                         </span>
                       )}
-                    </label>
+                    </div>
                     <input
                       type="number"
                       step="0.01"
                       min="0.01"
+                      disabled={!puedeCambiarPrecio}
                       value={precioItem}
-                      placeholder={precioSugerido30 > 0 ? `$${precioSugerido30.toFixed(2)} (30% ganancia)` : '0.00'}
                       onChange={(e) => setPrecioItem(parseFloat(e.target.value) || 0)}
-                      className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none ${
-                        esPrecioMenorAlCosto
-                          ? 'bg-red-50 border-red-500 text-red-700 focus:border-red-600'
-                          : 'bg-[var(--card)] border-[var(--border)] focus:border-[var(--primary)]'
+                      className={`w-full px-3 py-2 border rounded-xl text-xs font-bold focus:outline-none ${
+                        !puedeCambiarPrecio
+                          ? 'bg-[var(--muted)]/40 border-[var(--border)] text-[var(--muted-foreground)] cursor-not-allowed'
+                          : 'bg-[var(--card)] border-[var(--border)] focus:border-[var(--primary)] text-[var(--foreground)]'
                       }`}
                     />
-                    {esPrecioMenorAlCosto && (
-                      <p className="mt-1 text-[10px] text-red-600 font-bold flex items-center gap-1">
-                        ⚠️ ¡ALERTA! El precio ${precioItem.toFixed(2)} es MENOR al costo de compra (${costoProdSeleccionado.toFixed(2)}). Estás perdiendo dinero.
-                      </p>
-                    )}
-                    {costoProdSeleccionado > 0 && !esPrecioMenorAlCosto && precioItem > 0 && (
-                      <p className="mt-1 text-[10px] text-emerald-600">
-                        ✅ Ganancia: ${(precioItem - costoProdSeleccionado).toFixed(2)} ({((precioItem - costoProdSeleccionado) / costoProdSeleccionado * 100).toFixed(1)}%)
-                      </p>
-                    )}
                   </div>
                 </div>
 
@@ -900,9 +1084,9 @@ export default function ComercialComponent({ online }: ComercialProps) {
                   <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-2">
                     <span className="text-blue-600 text-lg">💡</span>
                     <div className="text-[11px]">
-                      <span className="font-bold text-blue-700">Último precio a este cliente: </span>
+                      <span className="font-bold text-blue-700">Último precio pagado por este cliente: </span>
                       <span className="font-black text-blue-800">${ultimoPrecioCliente.toFixed(2)}</span>
-                      {fechaUltimaVenta && <span className="text-blue-600 ml-1">(vendido el {fechaUltimaVenta})</span>}
+                      {fechaUltimaVenta && <span className="text-blue-600 ml-1">(el {fechaUltimaVenta})</span>}
                     </div>
                   </div>
                 )}
@@ -910,65 +1094,98 @@ export default function ComercialComponent({ online }: ComercialProps) {
                 <button
                   type="button"
                   onClick={handleAgregarLinea}
-                  disabled={!selectedProductId || (tipoVentaItem === 'TALLA_ESPECIFICA' && !selectedTallaId)}
-                  className="w-full py-2 bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 hover:bg-[var(--primary)] hover:text-white transition-all font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled={!selectedProductId}
+                  className="w-full py-2.5 bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 hover:bg-[var(--primary)] hover:text-white transition-all font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Plus size={14} /> {tipoVentaItem === 'SERIE_COMPLETA' ? 'Agregar Serie Completa al Pedido' : 'Agregar Producto al Pedido'}
+                  <Plus size={14} /> {tipoVentaItem === 'SERIE_COMPLETA' ? 'Agregar Serie Completa al Pedido' : 'Agregar Numeración Seleccionada al Pedido'}
                 </button>
               </div>
 
-              {/* 3. TABLA DE PRODUCTOS EN EL PEDIDO */}
+              {/* 3. TABLA DE PRODUCTOS EN EL PEDIDO (Agrupado compacto por modelo en Serie Completa) */}
               {lineasPedido.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase">Productos en este pedido ({lineasPedido.length})</span>
-                    <span className="text-xs font-bold text-emerald-600">
+                    <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase">
+                      Resumen del Pedido ({lineasPedido.length} renglones de tallas)
+                    </span>
+                    <span className="text-xs font-extrabold text-emerald-600">
                       Total: ${lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0).toFixed(2)}
                     </span>
                   </div>
-                  <div className="border border-[var(--border)] rounded-xl overflow-hidden">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-[var(--muted)]/40 font-semibold uppercase text-[var(--muted-foreground)] text-[10px]">
-                        <tr>
-                          <th className="px-3 py-2">Modelo / Color</th>
-                          <th className="px-3 py-2">Talla</th>
-                          <th className="px-3 py-2 text-center">Cant.</th>
-                          <th className="px-3 py-2 text-right">Precio</th>
-                          <th className="px-3 py-2 text-right">Subtotal</th>
-                          <th className="px-3 py-2 text-center">Quitar</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--border)]">
-                        {lineasPedido.map((l, idx) => (
-                          <tr key={idx} className="hover:bg-[var(--muted)]/20">
-                            <td className="px-3 py-2 font-bold flex items-center gap-2">
-                              {l.imageUrl ? (
-                                <img src={l.imageUrl} alt="" className="w-7 h-7 object-cover rounded-md border border-[var(--border)] shrink-0" />
+
+                  <div className="space-y-2">
+                    {/* Render de ítems agrupados compactos */}
+                    {(() => {
+                      // Agrupar por productId y tipoVenta
+                      const grupos: { [key: string]: typeof lineasPedido } = {};
+                      lineasPedido.forEach((l) => {
+                        const key = `${l.productId}_${l.tipoVenta}`;
+                        if (!grupos[key]) grupos[key] = [];
+                        grupos[key].push(l);
+                      });
+
+                      return Object.entries(grupos).map(([key, lineas]) => {
+                        const primerItem = lineas[0];
+                        const totalPares = lineas.reduce((acc, l) => acc + l.cantidad, 0);
+                        const subtotalGrupo = lineas.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
+
+                        return (
+                          <div key={key} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {primerItem.imageUrl ? (
+                                <img src={primerItem.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] shrink-0" />
                               ) : (
-                                <div className="w-7 h-7 rounded-md bg-[var(--muted)]/50 flex items-center justify-center text-xs shrink-0">👟</div>
+                                <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">👟</div>
                               )}
-                              <div>
-                                <span className="block font-bold text-[var(--foreground)]">{l.modelName} ({l.color})</span>
-                                <span className="text-[10px] text-emerald-600 font-semibold block">Serie: {l.serieNombre || 'Serie Estándar'}</span>
+
+                              <div className="min-w-0">
+                                <div className="font-extrabold text-sm text-[var(--foreground)] truncate">
+                                  {primerItem.modelName}
+                                </div>
+                                <div className="text-xs text-[var(--muted-foreground)]">
+                                  {primerItem.color} · <span className="font-semibold text-emerald-600">Serie: {primerItem.serieNombre || 'Estándar'}</span>
+                                </div>
+
+                                {/* Chips de Tallas estilo Catálogo/Modelos T38: 2, T39: 2, T40: 4... */}
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {lineas.map((l, i) => (
+                                    <span key={i} className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-md text-[11px] font-bold">
+                                      T{l.numeroTalla}: {l.cantidad}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
-                            </td>
-                            <td className="px-3 py-2 font-medium text-[var(--muted-foreground)]">Talla #{l.numeroTalla}</td>
-                            <td className="px-3 py-2 text-center font-bold">{l.cantidad}</td>
-                            <td className="px-3 py-2 text-right">${l.precioUnitario.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-right font-bold text-emerald-600">${(l.cantidad * l.precioUnitario).toFixed(2)}</td>
-                            <td className="px-3 py-2 text-center">
+                            </div>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
+                              <div className="text-right">
+                                <div className="text-xs font-bold text-[var(--foreground)]">
+                                  {totalPares} pares ({primerItem.tipoVenta === 'SERIE_COMPLETA' ? (primerItem.subtipoSerie === 'MEDIA_DOCENA' ? '½ Docena' : '1 Docena') : 'Numeración'})
+                                </div>
+                                <div className="text-[11px] text-[var(--muted-foreground)]">
+                                  ${primerItem.precioUnitario.toFixed(2)} / par
+                                </div>
+                                <div className="text-sm font-extrabold text-emerald-600">
+                                  ${subtotalGrupo.toFixed(2)}
+                                </div>
+                              </div>
+
                               <button
                                 type="button"
-                                onClick={() => handleEliminarLinea(idx)}
-                                className="text-red-500 hover:text-red-700 p-1"
+                                onClick={() => {
+                                  // Eliminar todas las líneas de este grupo
+                                  setLineasPedido(lineasPedido.filter((l) => !(l.productId === primerItem.productId && l.tipoVenta === primerItem.tipoVenta)));
+                                }}
+                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors"
+                                title="Eliminar del pedido"
                               >
-                                <XCircle size={14} />
+                                <XCircle size={18} />
                               </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               )}
