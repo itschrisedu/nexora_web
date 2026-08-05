@@ -15,22 +15,56 @@ export class ApiService {
   private static handle401() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       window.location.href = '/'; // Redirigir al inicio/login
     }
   }
 
-  static async post(path: string, body: unknown) {
+  private static async tryRefreshToken(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return false;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: refreshToken }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.accessToken) {
+          localStorage.setItem('token', data.accessToken);
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Error intentando refrescar token:', e);
+    }
+    return false;
+  }
+
+  static async post(path: string, body: unknown): Promise<any> {
     const isPublic = PUBLIC_PATHS.includes(path);
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+    let res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
       headers: this.getHeaders(isPublic),
       body: JSON.stringify(body),
     });
 
     if (res.status === 401 && !isPublic) {
-      this.handle401();
-      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        res = await fetch(`${API_BASE_URL}${path}`, {
+          method: 'POST',
+          headers: this.getHeaders(isPublic),
+          body: JSON.stringify(body),
+        });
+      } else {
+        this.handle401();
+        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      }
     }
 
     if (!res.ok) {
@@ -41,16 +75,24 @@ export class ApiService {
     return res.json();
   }
 
-  static async get(path: string) {
+  static async get(path: string): Promise<any> {
     const isPublic = PUBLIC_PATHS.includes(path);
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+    let res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'GET',
       headers: this.getHeaders(isPublic),
     });
 
     if (res.status === 401 && !isPublic) {
-      this.handle401();
-      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        res = await fetch(`${API_BASE_URL}${path}`, {
+          method: 'GET',
+          headers: this.getHeaders(isPublic),
+        });
+      } else {
+        this.handle401();
+        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      }
     }
 
     if (!res.ok) {
@@ -61,16 +103,25 @@ export class ApiService {
     return res.json();
   }
 
-  static async patch(path: string, body: unknown) {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+  static async patch(path: string, body: unknown): Promise<any> {
+    let res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'PATCH',
       headers: this.getHeaders(),
       body: JSON.stringify(body),
     });
 
     if (res.status === 401) {
-      this.handle401();
-      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        res = await fetch(`${API_BASE_URL}${path}`, {
+          method: 'PATCH',
+          headers: this.getHeaders(),
+          body: JSON.stringify(body),
+        });
+      } else {
+        this.handle401();
+        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      }
     }
 
     if (!res.ok) {
@@ -78,21 +129,29 @@ export class ApiService {
       throw new Error(errorData.message || `Error en la petición: ${res.status}`);
     }
 
-    // Algunos endpoints PATCH devuelven 200 con cuerpo o 204 sin cuerpo
     const text = await res.text();
     return text ? JSON.parse(text) : {};
   }
 
-  static async delete(path: string, body?: unknown) {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+  static async delete(path: string, body?: unknown): Promise<any> {
+    let res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
 
     if (res.status === 401) {
-      this.handle401();
-      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        res = await fetch(`${API_BASE_URL}${path}`, {
+          method: 'DELETE',
+          headers: this.getHeaders(),
+          ...(body ? { body: JSON.stringify(body) } : {}),
+        });
+      } else {
+        this.handle401();
+        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      }
     }
 
     if (!res.ok) {
@@ -104,16 +163,25 @@ export class ApiService {
     return text ? JSON.parse(text) : {};
   }
 
-  static async put(path: string, body: unknown) {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+  static async put(path: string, body: unknown): Promise<any> {
+    let res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(body),
     });
 
     if (res.status === 401) {
-      this.handle401();
-      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        res = await fetch(`${API_BASE_URL}${path}`, {
+          method: 'PUT',
+          headers: this.getHeaders(),
+          body: JSON.stringify(body),
+        });
+      } else {
+        this.handle401();
+        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      }
     }
 
     if (!res.ok) {
@@ -124,22 +192,33 @@ export class ApiService {
     return res.json();
   }
 
-  static async postFormData(path: string, formData: FormData) {
+  static async postFormData(path: string, formData: FormData): Promise<any> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+    let res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
       headers,
       body: formData,
     });
 
     if (res.status === 401) {
-      this.handle401();
-      throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        const newToken = localStorage.getItem('token');
+        if (newToken) headers['Authorization'] = `Bearer ${newToken}`;
+        res = await fetch(`${API_BASE_URL}${path}`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+      } else {
+        this.handle401();
+        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+      }
     }
 
     if (!res.ok) {

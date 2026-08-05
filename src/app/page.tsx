@@ -157,6 +157,9 @@ export default function Home() {
       if (online) {
         const response = await ApiService.post('/auth/login', { email: username.trim(), password: password.trim() });
         localStorage.setItem('token', response.accessToken);
+        if (response.refreshToken) {
+          localStorage.setItem('refreshToken', response.refreshToken);
+        }
         localStorage.setItem('user', JSON.stringify(response.user));
         setUser(response.user);
       } else {
