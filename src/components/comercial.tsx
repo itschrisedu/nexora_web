@@ -253,22 +253,32 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         return;
       }
 
-      const factor = (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+      const getCurvaRatio = (talla: any, tallas: any[]) => {
+        if (talla.ratio && talla.ratio > 0) return talla.ratio;
+        if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
+        const positive = tallas.map((x: any) => x.cantidad || x.stock || 1).filter((q: number) => q > 0);
+        const minQ = positive.length > 0 ? Math.min(...positive) : 1;
+        return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
+      };
 
-      const lineasSerie = prodObj.tallas.map((t: any) => ({
-        productId: prodObj.id,
-        modelName: prodObj.modelName,
-        color: prodObj.color,
-        serieNombre: prodObj.serieNombre,
-        imageUrl: prodObj.imageUrl,
-        tallaId: t.tallaId,
-        numeroTalla: t.numero,
-        cantidad: factor,
-        precioUnitario: Number(precioItem),
-        tipoVenta: 'SERIE_COMPLETA' as const,
-        subtipoSerie,
-        cantidadSeries,
-      }));
+      const lineasSerie = prodObj.tallas.map((t: any) => {
+        const ratio = getCurvaRatio(t, prodObj.tallas);
+        const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+        return {
+          productId: prodObj.id,
+          modelName: prodObj.modelName,
+          color: prodObj.color,
+          serieNombre: prodObj.serieNombre,
+          imageUrl: prodObj.imageUrl,
+          tallaId: t.tallaId,
+          numeroTalla: t.numero,
+          cantidad: factor,
+          precioUnitario: Number(precioItem),
+          tipoVenta: 'SERIE_COMPLETA' as const,
+          subtipoSerie,
+          cantidadSeries,
+        };
+      });
 
       setLineasPedido([...lineasPedido, ...lineasSerie]);
     } else {
@@ -329,9 +339,10 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     setCreatingOrder(true);
     setErrorMsg('');
     try {
+      const canalMapeado = canalEntrada === 'CATALOGO_DIGITAL' ? 'CATALOGO' : 'MANUAL';
       await ApiService.post('/pedidos', {
         clientId,
-        canal: canalEntrada,
+        canal: canalMapeado,
         tipoPago,
         lineas: lineasPedido.map((l) => ({
           productId: l.productId,
@@ -987,32 +998,45 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                       {/* Vista previa de chips de tallas de la serie con formato de curva (ej. 1/38, 1/39, 2/40...) */}
                       {productoSeleccionadoObj && productoSeleccionadoObj.tallas && (
                         <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
-                          <div className="flex flex-wrap items-center justify-between gap-1">
-                            <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] block">
-                              Distribución de Curva ({subtipoSerie === 'MEDIA_DOCENA' ? 'Media Docena' : 'Docena Completa'}):
-                            </span>
-                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/20 font-mono">
-                              Serie: {productoSeleccionadoObj.tallas.map((t: any) => {
-                                const ratio = t.ratio || t.cantidadSerie || 1;
-                                const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
-                                return `${factor}/${t.numero ?? t.nombre}`;
-                              }).join(', ')}
-                            </span>
-                          </div>
+                          {(() => {
+                            const getCurvaRatio = (talla: any, tallas: any[]) => {
+                              if (talla.ratio && talla.ratio > 0) return talla.ratio;
+                              if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
+                              const positive = tallas.map((x: any) => x.cantidad || x.stock || 1).filter((q: number) => q > 0);
+                              const minQ = positive.length > 0 ? Math.min(...positive) : 1;
+                              return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
+                            };
 
-                          <div className="flex flex-wrap gap-1.5">
-                            {productoSeleccionadoObj.tallas.map((t: any) => {
-                              const ratio = t.ratio || t.cantidadSerie || 1;
-                              const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
-                              return (
-                                <div key={t.tallaId} className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs flex items-center gap-1">
-                                  <span className="font-bold text-emerald-700">T{t.numero ?? t.nombre}:</span>
-                                  <span className="font-black text-emerald-900 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">{factor}</span>
-                                  <span className="text-[9px] text-[var(--muted-foreground)] ml-0.5">(St: {t.cantidad})</span>
+                            return (
+                              <>
+                                <div className="flex flex-wrap items-center justify-between gap-1">
+                                  <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] block">
+                                    Distribución de Curva ({subtipoSerie === 'MEDIA_DOCENA' ? 'Media Docena' : 'Docena Completa'}):
+                                  </span>
+                                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/20 font-mono">
+                                    Serie: {productoSeleccionadoObj.tallas.map((t: any) => {
+                                      const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
+                                      const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+                                      return `${factor}/${t.numero ?? t.nombre}`;
+                                    }).join(', ')}
+                                  </span>
                                 </div>
-                              );
-                            })}
-                          </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                  {productoSeleccionadoObj.tallas.map((t: any) => {
+                                    const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
+                                    const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+                                    return (
+                                      <div key={t.tallaId} className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs flex items-center gap-1.5">
+                                        <span className="font-bold text-emerald-700">T{t.numero ?? t.nombre}:</span>
+                                        <span className="font-black text-emerald-900 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">{factor}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
