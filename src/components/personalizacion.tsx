@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ApiService } from "../services/api.service";
+import { uploadToCloudinary } from "../services/cloudinary.service";
 import {
   Palette, Upload, Clock, MapPin, RefreshCw, CheckCircle, AlertCircle,
   Loader2, Shield, User, Smartphone, Navigation, Sun, Moon, Lock
@@ -125,7 +126,16 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     setError("");
 
     try {
-      await ApiService.put("/configuracion/negocio", config);
+      let finalConfig = { ...config };
+      if (config.logoUrl && config.logoUrl.startsWith("data:image") && online) {
+        const cloudUrl = await uploadToCloudinary(config.logoUrl, 'nexora_logos');
+        if (cloudUrl) {
+          finalConfig.logoUrl = cloudUrl;
+          setConfig(prev => ({ ...prev, logoUrl: cloudUrl }));
+        }
+      }
+
+      await ApiService.put("/configuracion/negocio", finalConfig);
       setSuccess("Configuración de personalización guardada correctamente.");
       if (typeof document !== "undefined" && config.primaryColor) {
         document.documentElement.style.setProperty("--primary", config.primaryColor);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ApiService } from "../services/api.service";
+import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
   Plus, Search, Loader2, ImageIcon, Package, Edit2, Trash2, AlertTriangle,
   DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette
@@ -583,9 +584,14 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
     setSaving(true);
     try {
+      let finalImageUrl = newColorFoto || undefined;
+      if (newColorFoto && online) {
+        finalImageUrl = await uploadToCloudinary(newColorFoto, 'nexora_modelos');
+      }
+
       await ApiService.post(`/inventario/modelos/${selectedModelForColor.id}/colores`, {
         color: newColorName.trim(),
-        imageUrl: newColorFoto || undefined,
+        imageUrl: finalImageUrl,
         serieIds: newColorSerieIds,
         stockInicial: parseInt(newColorStockInicial) || 0,
         seriesPrices: seriesPricesMap,
@@ -661,6 +667,19 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
     setSaving(true);
     try {
+      const colorsWithImages = await Promise.all(
+        filteredColors.map(async c => {
+          let imgUrl = c.foto || undefined;
+          if (c.foto && online) {
+            imgUrl = await uploadToCloudinary(c.foto, 'nexora_modelos');
+          }
+          return {
+            color: c.color,
+            imageUrl: imgUrl,
+          };
+        })
+      );
+
       await ApiService.post("/inventario/modelos", {
         baseCode,
         name,
@@ -668,10 +687,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         material: material || undefined,
         costPrice: firstPrices.costPrice,
         salePrice: firstPrices.salePrice,
-        colors: filteredColors.map(c => ({
-          color: c.color,
-          imageUrl: c.foto || undefined
-        })),
+        colors: colorsWithImages,
         serieIds,
         stockInicial: parseInt(stockInicial) || 0,
         stockMinimo: 0,

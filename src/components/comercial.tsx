@@ -955,29 +955,60 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
                       <div className="flex items-center gap-3">
                         <label className="text-xs font-semibold text-[var(--muted-foreground)] shrink-0">¿Cuántas {subtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}?:</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={cantidadSeries}
-                          onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-24 px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-[#0F172A] text-center"
-                        />
-                        <span className="text-xs font-bold text-emerald-600">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setCantidadSeries(Math.max(1, (cantidadSeries || 1) - 1))}
+                            className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-sm"
+                            title="Reducir cantidad"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={cantidadSeries}
+                            onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCantidadSeries((cantidadSeries || 1) + 1)}
+                            className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-sm"
+                            title="Aumentar cantidad"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-600 ml-1">
                           = { (subtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (cantidadSeries || 1) } pares en total
                         </span>
                       </div>
 
-                      {/* Vista previa de chips de tallas de la serie */}
+                      {/* Vista previa de chips de tallas de la serie con formato de curva (ej. 1/38, 1/39, 2/40...) */}
                       {productoSeleccionadoObj && productoSeleccionadoObj.tallas && (
-                        <div className="pt-2 border-t border-emerald-500/20">
-                          <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] block mb-1.5">Distribución en esta serie:</span>
+                        <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
+                          <div className="flex flex-wrap items-center justify-between gap-1">
+                            <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] block">
+                              Distribución de Curva ({subtipoSerie === 'MEDIA_DOCENA' ? 'Media Docena' : 'Docena Completa'}):
+                            </span>
+                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/20 font-mono">
+                              Serie: {productoSeleccionadoObj.tallas.map((t: any) => {
+                                const ratio = t.ratio || t.cantidadSerie || 1;
+                                const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+                                return `${factor}/${t.numero ?? t.nombre}`;
+                              }).join(', ')}
+                            </span>
+                          </div>
+
                           <div className="flex flex-wrap gap-1.5">
                             {productoSeleccionadoObj.tallas.map((t: any) => {
-                              const factor = (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+                              const ratio = t.ratio || t.cantidadSerie || 1;
+                              const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
                               return (
                                 <div key={t.tallaId} className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs flex items-center gap-1">
                                   <span className="font-bold text-emerald-700">T{t.numero ?? t.nombre}:</span>
-                                  <span className="font-black text-emerald-800">{factor}</span>
+                                  <span className="font-black text-emerald-900 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">{factor}</span>
                                   <span className="text-[9px] text-[var(--muted-foreground)] ml-0.5">(St: {t.cantidad})</span>
                                 </div>
                               );
