@@ -25,11 +25,12 @@ interface ComercialProps {
   userPermissions?: { permiteCambiarPrecio?: boolean; rol?: string };
 }
 
-type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'EN_TRANSITO' | 'ENTREGADO' | 'CANCELADO';
+type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'ENTREGADO' | 'CANCELADO';
 
 interface Pedido {
   id: string;
-  numero: number;
+  numero?: number;
+  numeroCodigo?: string;
   clientId: string;
   clienteNombre?: string;
   montoTotal: number;
@@ -43,9 +44,8 @@ interface Pedido {
 const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: React.ReactNode }> = {
   PENDIENTE:       { label: 'Pendiente',      color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',     icon: <Clock size={12} /> },
   EN_PREPARACION:  { label: 'En Preparación', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',        icon: <Package size={12} /> },
-  EN_TRANSITO:     { label: 'En Tránsito',    color: 'bg-sky-500/10 text-sky-600 border-sky-500/20',  icon: <Truck size={12} /> },
   ENTREGADO:       { label: 'Entregado',      color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20', icon: <CheckCircle size={12} /> },
-  CANCELADO:       { label: 'Cancelado',      color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',        icon: <XCircle size={12} /> },
+  CANCELADO:       { label: 'Anulado',        color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',        icon: <XCircle size={12} /> },
 };
 
 export default function ComercialComponent({ online, userRole, userPermissions }: ComercialProps) {
@@ -376,12 +376,10 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       setUpdatingId(pedidoId);
       if (nuevoEstado === 'EN_PREPARACION') {
         await ApiService.post(`/pedidos/${pedidoId}/iniciar-preparacion`, {});
-      } else if (nuevoEstado === 'EN_TRANSITO') {
-        await ApiService.post(`/pedidos/${pedidoId}/marcar-en-transito`, {});
       } else if (nuevoEstado === 'ENTREGADO') {
         await ApiService.post(`/pedidos/${pedidoId}/confirmar-entrega`, {});
       } else if (nuevoEstado === 'CANCELADO') {
-        await ApiService.delete(`/pedidos/${pedidoId}`, { motivo: 'Cancelado por el usuario' });
+        await ApiService.delete(`/pedidos/${pedidoId}`, { motivo: 'Anulado por el usuario' });
       }
       await loadPedidos();
     } catch (err: any) {
@@ -416,6 +414,15 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     }
   };
 
+  const getNumeroPedido = (p: Pedido, index?: number) => {
+    if (p.numeroCodigo) return p.numeroCodigo;
+    if (p.numero) return `PED-${String(p.numero).padStart(4, '0')}`;
+    const sorted = [...pedidos].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const foundIdx = sorted.findIndex((item) => item.id === p.id);
+    const num = foundIdx >= 0 ? foundIdx + 1 : (typeof index === 'number' ? index + 1 : 1);
+    return `PED-${String(num).padStart(4, '0')}`;
+  };
+
   const pedidosFiltrados = filtroEstado === 'TODOS' ? pedidos : pedidos.filter((p) => p.estado === filtroEstado);
 
   return (
@@ -433,7 +440,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
       {/* Filtros de Estado */}
       <div className="flex flex-wrap gap-2">
-        {(['TODOS', 'PENDIENTE', 'EN_PREPARACION', 'EN_TRANSITO', 'ENTREGADO', 'CANCELADO'] as const).map((estado) => (
+        {(['TODOS', 'PENDIENTE', 'EN_PREPARACION', 'ENTREGADO', 'CANCELADO'] as const).map((estado) => (
           <button
             key={estado}
             onClick={() => setFiltroEstado(estado)}
@@ -476,7 +483,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {pedidosFiltrados.map((p) => {
+                {pedidosFiltrados.map((p, idx) => {
                   const cfg = ESTADO_CONFIG[p.estado] || { label: p.estado, color: 'bg-slate-500/10 text-slate-600', icon: <Clock size={12} /> };
                   const isUpdating = updatingId === p.id;
                   const isExpanded = pedidoExpandidoId === p.id;
@@ -489,7 +496,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                       >
                         <td className="px-6 py-4 font-bold flex items-center gap-2">
                           {isExpanded ? <ChevronUp size={14} className="text-[#0F172A]" /> : <ChevronDown size={14} className="text-[var(--muted-foreground)]" />}
-                          #{p.numero || p.id.slice(0, 8).toUpperCase()}
+                          #{getNumeroPedido(p, idx)}
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold text-[var(--foreground)]">
                           {p.clienteNombre || (p.clientId ? p.clientId.slice(0, 8).toUpperCase() : 'Consumidor Final')}
@@ -523,44 +530,36 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                 </button>
                                 <button
                                   onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
-                                  title="Cancelar pedido"
+                                  title="Anular pedido"
                                   className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
                                 >
-                                  <XCircle size={12} /> Cancelar
+                                  <XCircle size={12} /> Anular
                                 </button>
                               </>
                             ) : p.estado === 'EN_PREPARACION' ? (
                               <>
                                 <button
-                                  onClick={() => handleCambiarEstado(p.id, 'EN_TRANSITO')}
-                                  title="Marcar como enviado en tránsito"
-                                  className="px-2.5 py-1 bg-sky-600/10 text-sky-600 hover:bg-sky-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-sky-600/20 flex items-center gap-1"
+                                  onClick={() => handleCambiarEstado(p.id, 'ENTREGADO')}
+                                  title="Confirmar entrega al cliente"
+                                  className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
                                 >
-                                  <Truck size={12} /> En Tránsito
+                                  <CheckCircle size={12} /> Entregar
                                 </button>
                                 <button
                                   onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
-                                  title="Cancelar pedido"
+                                  title="Anular pedido"
                                   className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
                                 >
-                                  <XCircle size={12} /> Cancelar
+                                  <XCircle size={12} /> Anular
                                 </button>
                               </>
-                            ) : p.estado === 'EN_TRANSITO' ? (
-                              <button
-                                onClick={() => handleCambiarEstado(p.id, 'ENTREGADO')}
-                                title="Confirmar entrega al cliente"
-                                className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
-                              >
-                                <CheckCircle size={12} /> Entregar
-                              </button>
                             ) : p.estado === 'ENTREGADO' ? (
                               <span className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
                                 <CheckCircle size={12} /> Completado
                               </span>
                             ) : (
                               <span className="text-[11px] font-medium text-rose-500 flex items-center gap-1">
-                                <XCircle size={12} /> Cancelado
+                                <XCircle size={12} /> Anulado
                               </span>
                             )}
                           </div>
@@ -574,7 +573,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                             <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-3">
                               <div className="flex justify-between items-center border-b border-[var(--border)] pb-2">
                                 <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider">
-                                  📦 Detalle de Artículos Solicitados — Pedido #{p.numero || p.id.slice(0, 8)}
+                                  📦 Detalle de Artículos Solicitados — {getNumeroPedido(p, idx)}
                                 </span>
                                 <span className="text-xs font-bold text-[var(--muted-foreground)]">
                                   Cliente: <strong className="text-[var(--foreground)]">{p.clienteNombre}</strong>

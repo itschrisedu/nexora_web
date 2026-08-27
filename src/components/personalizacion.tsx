@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { ApiService } from "../services/api.service";
-import { uploadToCloudinary } from "../services/cloudinary.service";
+import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
   Palette, Upload, Clock, MapPin, RefreshCw, CheckCircle, AlertCircle,
-  Loader2, Shield, User, Smartphone, Navigation, Sun, Moon, Lock
+  Loader2, Shield, User, Smartphone, Navigation, Sun, Moon, Lock, Trash2
 } from "lucide-react";
 
 interface PersonalizacionProps {
@@ -227,11 +227,28 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   )}
                 </div>
                 <div className="space-y-2">
-                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
-                    <Upload size={14} />
-                    Subir Imagen
-                    <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
+                      <Upload size={14} />
+                      Subir Imagen
+                      <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                    </label>
+                    {config.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (config.logoUrl && config.logoUrl.includes("cloudinary.com")) {
+                            await deleteFromCloudinary(config.logoUrl);
+                          }
+                          setConfig(prev => ({ ...prev, logoUrl: "" }));
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-xl text-xs font-bold transition-all border border-rose-500/20"
+                        title="Eliminar logo actual"
+                      >
+                        <Trash2 size={14} /> Quitar
+                      </button>
+                    )}
+                  </div>
                   <p className="text-[11px] text-[var(--muted-foreground)]">
                     Recomendado: Formato PNG o SVG transparente (Máx. 2MB).
                   </p>
