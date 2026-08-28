@@ -986,34 +986,74 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                   <div className="relative sm:col-span-2">
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Modelo / Producto * (Buscar por Nombre o Color)</label>
                     {productoSeleccionadoObj ? (
-                      <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl gap-3">
                         <div className="flex items-center gap-3">
                           {productoSeleccionadoObj.imageUrl ? (
-                            <img src={productoSeleccionadoObj.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                            <img src={productoSeleccionadoObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] shrink-0" />
                           ) : (
-                            <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-base shrink-0">👟</div>
+                            <div className="w-12 h-12 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">👟</div>
                           )}
                           <div>
-                            <div className="font-bold text-sm text-[var(--foreground)]">
+                            <div className="font-extrabold text-sm text-[var(--foreground)]">
                               {productoSeleccionadoObj.modelName} — {productoSeleccionadoObj.color}
                             </div>
-                            <div className="text-[11px] font-semibold text-emerald-600">
+                            <div className="text-[11px] font-semibold text-emerald-700">
                               Serie: {productoSeleccionadoObj.serieNombre || 'Serie Estándar'}
                             </div>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProductoSeleccionadoObj(null);
-                            setSelectedProductId('');
-                            setBusquedaModelo('');
-                            setPrecioItem(0);
-                          }}
-                          className="text-xs font-semibold text-red-500 hover:underline"
-                        >
-                          Cambiar
-                        </button>
+
+                        {/* Resumen de Stock Disponible a un ladito */}
+                        {(() => {
+                          const totalPares = (productoSeleccionadoObj.tallas || []).reduce(
+                            (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
+                            0
+                          );
+                          const mediasDocenas = Math.floor(totalPares / 6);
+                          const docenas = Math.floor(totalPares / 12);
+
+                          return (
+                            <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-2 sm:pt-0 border-emerald-500/20">
+                              <div className="text-left sm:text-right">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                                  Stock Disponible en Bodega:
+                                </span>
+                                <div className="flex items-center sm:justify-end gap-1.5 mt-0.5">
+                                  {totalPares > 0 ? (
+                                    <>
+                                      <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-md text-xs font-black">
+                                        {totalPares} pares
+                                      </span>
+                                      <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-800 rounded text-[10px] font-bold">
+                                        ½ {mediasDocenas} doc.
+                                      </span>
+                                      <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-800 rounded text-[10px] font-bold">
+                                        1 {docenas} doc.
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-md text-xs font-bold">
+                                      🔴 Sin Stock (Bajo Pedido)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProductoSeleccionadoObj(null);
+                                  setSelectedProductId('');
+                                  setBusquedaModelo('');
+                                  setPrecioItem(0);
+                                }}
+                                className="text-xs font-bold text-red-500 hover:underline shrink-0"
+                              >
+                                Cambiar
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div className="relative">
@@ -1042,29 +1082,53 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   (p.code && p.code.toLowerCase().includes(q))
                                 );
                               })
-                              .map((p) => (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  onClick={() => handleSeleccionarProducto(p)}
-                                  className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center gap-3 font-bold text-[var(--foreground)]"
-                                >
-                                  {p.imageUrl ? (
-                                    <img src={p.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
-                                  ) : (
-                                    <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">👟</div>
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <span className="block font-bold text-[var(--foreground)] truncate">{p.modelName}</span>
-                                    <div className="flex items-center gap-2 text-[10px] mt-0.5">
-                                      <span className="text-[var(--muted-foreground)] font-medium">Color: <strong className="text-[var(--foreground)]">{p.color}</strong></span>
-                                      <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                        Serie: {p.serieNombre || 'Estándar'}
-                                      </span>
+                              .map((p) => {
+                                const totalPares = (p.tallas || []).reduce(
+                                  (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
+                                  0
+                                );
+                                const docenas = Math.floor(totalPares / 12);
+                                const mediasDocenas = Math.floor(totalPares / 6);
+
+                                return (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => handleSeleccionarProducto(p)}
+                                    className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)]"
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      {p.imageUrl ? (
+                                        <img src={p.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">👟</div>
+                                      )}
+                                      <div className="min-w-0">
+                                        <span className="block font-bold text-[var(--foreground)] truncate">{p.modelName}</span>
+                                        <div className="flex items-center gap-2 text-[10px] mt-0.5">
+                                          <span className="text-[var(--muted-foreground)] font-medium">Color: <strong className="text-[var(--foreground)]">{p.color}</strong></span>
+                                          <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                            Serie: {p.serieNombre || 'Estándar'}
+                                          </span>
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                </button>
-                              ))}
+
+                                    <div className="text-right shrink-0">
+                                      {totalPares > 0 ? (
+                                        <>
+                                          <span className="text-xs font-black text-emerald-600 block">{totalPares} pares</span>
+                                          <span className="text-[9px] text-[var(--muted-foreground)] block">
+                                            ({docenas} doc. / {mediasDocenas} ½ doc.)
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <span className="text-[10px] font-bold text-rose-500">0 pares</span>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             {catalogoProductos.filter((p) => {
                               const q = busquedaModelo.toLowerCase().trim();
                               if (!q) return false;
@@ -1098,66 +1162,108 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                   </div>
 
                   {tipoVentaItem === 'SERIE_COMPLETA' ? (
-                    <div className="sm:col-span-2 space-y-3 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-emerald-700">Seleccionar Curva de Serie:</span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setSubtipoSerie('MEDIA_DOCENA')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                              subtipoSerie === 'MEDIA_DOCENA'
-                                ? 'bg-emerald-600 text-white border-transparent'
-                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
-                            }`}
-                          >
-                            ½ Media Docena (6 pares)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSubtipoSerie('DOCENA')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                              subtipoSerie === 'DOCENA'
-                                ? 'bg-emerald-600 text-white border-transparent'
-                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
-                            }`}
-                          >
-                            1 Docena Completa (12 pares)
-                          </button>
-                        </div>
-                      </div>
+                    <div className="sm:col-span-2 space-y-3 p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                      {(() => {
+                        const totalPares = (productoSeleccionadoObj?.tallas || []).reduce(
+                          (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
+                          0
+                        );
+                        const mediasDocenasStock = Math.floor(totalPares / 6);
+                        const docenasStock = Math.floor(totalPares / 12);
+                        const stockActualSerie = subtipoSerie === 'MEDIA_DOCENA' ? mediasDocenasStock : docenasStock;
+                        const hayFaltante = cantidadSeries > stockActualSerie;
 
-                      <div className="flex items-center gap-3">
-                        <label className="text-xs font-semibold text-[var(--muted-foreground)] shrink-0">¿Cuántas {subtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}?:</label>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setCantidadSeries(Math.max(1, (cantidadSeries || 1) - 1))}
-                            className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-sm"
-                            title="Reducir cantidad"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            min="1"
-                            value={cantidadSeries}
-                            onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setCantidadSeries((cantidadSeries || 1) + 1)}
-                            className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-sm"
-                            title="Aumentar cantidad"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="text-xs font-bold text-emerald-600 ml-1">
-                          = { (subtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (cantidadSeries || 1) } pares en total
-                        </span>
-                      </div>
+                        return (
+                          <>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                                <span>Seleccionar Curva de Serie:</span>
+                              </span>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSubtipoSerie('MEDIA_DOCENA')}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                    subtipoSerie === 'MEDIA_DOCENA'
+                                      ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                                      : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                                  }`}
+                                >
+                                  <span>½ Media Docena (6 pares)</span>
+                                  <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                    subtipoSerie === 'MEDIA_DOCENA' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-700'
+                                  }`}>
+                                    Stock: {mediasDocenasStock}
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSubtipoSerie('DOCENA')}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                    subtipoSerie === 'DOCENA'
+                                      ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                                      : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                                  }`}
+                                >
+                                  <span>1 Docena (12 pares)</span>
+                                  <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                    subtipoSerie === 'DOCENA' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-700'
+                                  }`}>
+                                    Stock: {docenasStock}
+                                  </span>
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs font-semibold text-[var(--muted-foreground)] shrink-0">
+                                  ¿Cuántas {subtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}?:
+                                </label>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCantidadSeries(Math.max(1, (cantidadSeries || 1) - 1))}
+                                    className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-sm"
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={cantidadSeries}
+                                    onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
+                                    className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setCantidadSeries((cantidadSeries || 1) + 1)}
+                                    className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-sm"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                <span className="text-xs font-black text-emerald-700 ml-1">
+                                  = { (subtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (cantidadSeries || 1) } pares
+                                </span>
+                              </div>
+
+                              {/* Alerta de Stock Disponible para la Serie */}
+                              <div className="text-left sm:text-right">
+                                {hayFaltante ? (
+                                  <span className="text-[11px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg inline-block">
+                                    ⚠️ Stock: {stockActualSerie} disp. (+{cantidadSeries - stockActualSerie} bajo pedido)
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-500/15 border border-emerald-500/25 px-2.5 py-1 rounded-lg inline-block">
+                                    🟢 Stock suficiente ({stockActualSerie} disponibles)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
 
                       {/* Vista previa de chips de tallas de la serie con formato de curva (ej. 1/38, 1/39, 2/40...) */}
                       {productoSeleccionadoObj && productoSeleccionadoObj.tallas && (
@@ -1190,10 +1296,12 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   {productoSeleccionadoObj.tallas.map((t: any) => {
                                     const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
                                     const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+                                    const stockTalla = t.cantidad ?? t.stock ?? 0;
                                     return (
                                       <div key={t.tallaId} className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs flex items-center gap-1.5">
                                         <span className="font-bold text-emerald-700">T{t.numero ?? t.nombre}:</span>
-                                        <span className="font-black text-emerald-900 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">{factor}</span>
+                                        <span className="font-black text-emerald-900 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">{factor} pares</span>
+                                        <span className="text-[9px] text-[var(--muted-foreground)] font-semibold">(Stock: {stockTalla})</span>
                                       </div>
                                     );
                                   })}
@@ -1205,16 +1313,22 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                       )}
                     </div>
                   ) : (
-                    /* Venta por Talla Específica (Numeración con Chips Interactivos) */
-                    <div className="sm:col-span-2 space-y-3 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
-                      <span className="text-xs font-bold text-[var(--foreground)] block">
-                        👟 Asigna la cantidad de pares por cada talla (Numeración):
-                      </span>
+                    /* Venta por Talla Específica (Numeración con Chips Interactivos y Stock de Pares) */
+                    <div className="sm:col-span-2 space-y-3 p-3.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[var(--foreground)] block">
+                          👟 Asigna la cantidad de pares por cada talla:
+                        </span>
+                        <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                          Se indica el stock de pares disponibles por número
+                        </span>
+                      </div>
+
                       {productoSeleccionadoObj && productoSeleccionadoObj.tallas ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                           {productoSeleccionadoObj.tallas.map((t: any) => {
                             const cantActual = tallaCantidadesMap[t.tallaId] || 0;
-                            const stockBodega = t.cantidad || 0;
+                            const stockBodega = t.cantidad ?? t.stock ?? 0;
                             const excedeStock = cantActual > stockBodega;
                             return (
                               <div
@@ -1226,15 +1340,23 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                 }`}
                               >
                                 <div className="flex items-center justify-between">
-                                  <span className="font-bold text-xs">Talla #{t.numero ?? t.nombre}</span>
-                                  <span className="text-[10px] text-[var(--muted-foreground)]">Stock: {stockBodega}</span>
+                                  <span className="font-black text-xs">Talla #{t.numero ?? t.nombre}</span>
+                                  {stockBodega > 0 ? (
+                                    <span className="px-1.5 py-0.2 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded text-[9px] font-bold">
+                                      {stockBodega} {stockBodega === 1 ? 'par' : 'pares'}
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.2 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded text-[9px] font-bold">
+                                      0 pares
+                                    </span>
+                                  )}
                                 </div>
 
-                                <div className="flex items-center gap-1 justify-center">
+                                <div className="flex items-center gap-1 justify-center py-0.5">
                                   <button
                                     type="button"
                                     onClick={() => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: Math.max(0, cantActual - 1) })}
-                                    className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)]"
+                                    className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                                   >
                                     -
                                   </button>
@@ -1248,7 +1370,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   <button
                                     type="button"
                                     onClick={() => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: cantActual + 1 })}
-                                    className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)]"
+                                    className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                                   >
                                     +
                                   </button>
@@ -1256,7 +1378,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
                                 {excedeStock && cantActual > 0 && (
                                   <span className="text-[9px] text-amber-600 font-semibold text-center leading-tight">
-                                    ⚠️ {stockBodega} Bodega + {cantActual - stockBodega} Proveedor
+                                    ⚠️ {stockBodega} Bodega + {cantActual - stockBodega} Pedido
                                   </span>
                                 )}
                               </div>

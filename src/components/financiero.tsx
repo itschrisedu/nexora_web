@@ -110,8 +110,10 @@ interface ClienteHistorial {
   cobros: any[];
   movimientos: {
     id: string;
+    pedidoId?: string;
     tipo: 'COMPRA_PEDIDO' | 'ABONO';
     titulo: string;
+    numeroCodigo?: string;
     descripcion: string;
     monto: number;
     metodo?: string;
@@ -141,10 +143,11 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const [filtro, setFiltro] = useState<EstadoCobro | 'TODOS'>('TODOS');
   const [busqueda, setBusqueda] = useState('');
 
-  // Cliente o Cobro seleccionado para el panel lateral
+  // Cliente o Cobro seleccionado para el modal de cuenta corriente
   const [clienteSeleccionadoId, setClienteSeleccionadoId] = useState<string | null>(null);
   const [cobroSeleccionadoId, setCobroSeleccionadoId] = useState<string | null>(null);
   const [clienteExpandidoId, setClienteExpandidoId] = useState<string | null>(null);
+  const [showCuentaModal, setShowCuentaModal] = useState(false);
 
   // Formulario Abono
   const [montoAbono, setMontoAbono] = useState('');
@@ -163,6 +166,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const [historialCliente, setHistorialCliente] = useState<ClienteHistorial | null>(null);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [filtroHistorial, setFiltroHistorial] = useState<'TODOS' | 'COMPRAS' | 'ABONOS'>('TODOS');
+  const [pedidoHistorialExpandidoId, setPedidoHistorialExpandidoId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCobros();
@@ -262,6 +266,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     const cobroConDeuda = c.cobros.find((item) => Number(item.saldoPendiente) > 0) || c.cobros[0];
     setCobroSeleccionadoId(cobroConDeuda?.id || null);
     setMontoAbono('');
+    setNotasAbono('');
+    setShowCuentaModal(true);
   };
 
   const handleRegistrarAbono = async () => {
@@ -459,10 +465,10 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         </div>
       </div>
 
-      {/* Grid Principal: Tabla + Panel Detalle/Abono */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Grid Principal: Tabla completa */}
+      <div className="space-y-4">
         {/* Tabla de Clientes o Facturas */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="space-y-4">
           {loading ? (
             <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
               <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
@@ -492,6 +498,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                         <th className="px-5 py-4 text-right">Total Facturado</th>
                         <th className="px-5 py-4 text-right">Saldo Deudor Total</th>
                         <th className="px-5 py-4 text-right">Próx. Vencimiento</th>
+                        <th className="px-5 py-4 text-center">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
@@ -568,12 +575,26 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                   ? new Date(cliente.proximoVencimiento).toLocaleDateString('es-EC')
                                   : 'Al día / Contado'}
                               </td>
+
+                              <td className="px-5 py-4 text-center">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSeleccionarCliente(cliente);
+                                  }}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 mx-auto"
+                                >
+                                  <DollarSign size={13} />
+                                  <span>Gestionar Cobro</span>
+                                </button>
+                              </td>
                             </tr>
 
                             {/* Desglose Expandible de Notas/Facturas del Cliente */}
                             {isExpanded && (
                               <tr className="bg-[var(--muted)]/20">
-                                <td colSpan={6} className="px-6 py-4">
+                                <td colSpan={7} className="px-6 py-4">
                                   <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3">
                                     <div className="flex justify-between items-center border-b border-[var(--border)] pb-2">
                                       <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
@@ -645,6 +666,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                                   e.stopPropagation();
                                                   setClienteSeleccionadoId(cliente.clientId);
                                                   setCobroSeleccionadoId(cobroItem.id);
+                                                  setShowCuentaModal(true);
                                                 }}
                                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
                                                   isCobroActive
@@ -709,6 +731,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                             onClick={() => {
                               setClienteSeleccionadoId(cobro.clientId);
                               setCobroSeleccionadoId(cobro.id);
+                              setMontoAbono('');
+                              setNotasAbono('');
+                              setShowCuentaModal(true);
                             }}
                             className={`hover:bg-[var(--muted)]/30 cursor-pointer transition-colors ${
                               isSelected ? 'bg-[#0F172A]/5 border-l-4 border-l-[#0F172A]' : ''
@@ -771,111 +796,198 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
             )
           )}
         </div>
+      </div>
 
-        {/* ══════════════════════════════════════════════════════════════ */}
-        {/* PANEL LATERAL: GESTIÓN DE ABONOS Y ESTADO DEL CLIENTE         */}
-        {/* ══════════════════════════════════════════════════════════════ */}
-        <div className="space-y-4">
-          <h4 className="font-bold text-xs text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1.5">
-            <CreditCard size={14} />
-            <span>Gestión de Abonos & Cuenta Corriente</span>
-          </h4>
-
-          {carteraSeleccionada ? (
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
-              {/* Resumen del Cliente */}
-              <div className="space-y-2 pb-3 border-b border-[var(--border)]">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Cuenta del Cliente
-                  </span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getCobroConfig(carteraSeleccionada.estadoGlobal).color}`}>
-                    {getCobroConfig(carteraSeleccionada.estadoGlobal).label}
-                  </span>
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* MODAL: GESTIÓN DE ABONOS & CUENTA CORRIENTE DEL CLIENTE       */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {showCuentaModal && carteraSeleccionada && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowCuentaModal(false)}
+        >
+          <div
+            className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ── Header del Modal ── */}
+            <div className="p-5 border-b border-[var(--border)] bg-gradient-to-r from-[#0F172A] to-[#1e293b]">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10">
+                    <CreditCard size={20} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-white">Gestión de Cobros</h3>
+                    <p className="text-[11px] text-slate-300 mt-0.5">Cuenta corriente y registro de abonos</p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => setShowCuentaModal(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-                <div className="p-3 bg-[var(--muted)]/30 rounded-xl border border-[var(--border)] space-y-1">
-                  <div className="text-xs font-black text-[var(--foreground)] flex items-center gap-1.5">
-                    <User size={13} className="text-[#0F172A]" />
-                    <span>{carteraSeleccionada.clienteNombre}</span>
-                    <span className="px-1.5 py-0.2 bg-[#0F172A]/10 text-[#0F172A] rounded text-[10px] font-bold">
+              {/* Info del Cliente en el Header */}
+              <div className="mt-4 p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <User size={14} className="text-emerald-400" />
+                    <span className="font-black text-sm text-white">{carteraSeleccionada.clienteNombre}</span>
+                    <span className="px-1.5 py-0.5 bg-emerald-400/20 text-emerald-300 rounded text-[10px] font-bold border border-emerald-400/20">
                       {carteraSeleccionada.clienteNivel}
                     </span>
                   </div>
-                  <div className="text-[10px] text-[var(--muted-foreground)] flex justify-between">
-                    <span>Cédula: <strong>{carteraSeleccionada.clienteCedula}</strong></span>
-                    <span>Tel: <strong>{carteraSeleccionada.clienteTelefono}</strong></span>
-                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    carteraSeleccionada.estadoGlobal === 'SALDADO' || carteraSeleccionada.estadoGlobal === 'PAGADO'
+                      ? 'bg-emerald-400/20 text-emerald-300'
+                      : carteraSeleccionada.estadoGlobal === 'VENCIDO'
+                      ? 'bg-red-400/20 text-red-300'
+                      : 'bg-amber-400/20 text-amber-300'
+                  }`}>
+                    {getCobroConfig(carteraSeleccionada.estadoGlobal).label}
+                  </span>
                 </div>
+                <div className="text-[10px] text-slate-400 flex justify-between mt-1.5">
+                  <span>Cédula: <strong className="text-slate-200">{carteraSeleccionada.clienteCedula}</strong></span>
+                  <span>Tel: <strong className="text-slate-200">{carteraSeleccionada.clienteTelefono}</strong></span>
+                </div>
+              </div>
+            </div>
 
-                {/* Saldos Totales del Cliente */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="p-2.5 bg-slate-500/5 rounded-xl border border-[var(--border)]">
-                    <span className="text-[10px] text-[var(--muted-foreground)] block">Total Facturado:</span>
-                    <span className="text-xs font-extrabold text-[var(--foreground)]">
-                      ${carteraSeleccionada.montoTotalFacturado.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="p-2.5 bg-red-500/5 rounded-xl border border-red-500/20">
-                    <span className="text-[10px] text-red-600 block font-semibold">Saldo Deudor Total:</span>
-                    <span className="text-xs font-black text-red-500">
-                      ${carteraSeleccionada.saldoTotalPendiente.toFixed(2)}
-                    </span>
-                  </div>
+            {/* ── Body del Modal (scrollable) ── */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Saldos Totales */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-slate-500/5 rounded-xl border border-[var(--border)]">
+                  <span className="text-[10px] text-[var(--muted-foreground)] block font-medium">Total Facturado:</span>
+                  <span className="text-sm font-extrabold text-[var(--foreground)]">
+                    ${carteraSeleccionada.montoTotalFacturado.toFixed(2)}
+                  </span>
+                </div>
+                <div className="p-3 bg-red-500/5 rounded-xl border border-red-500/20">
+                  <span className="text-[10px] text-red-600 block font-semibold">Saldo Deudor Total:</span>
+                  <span className="text-sm font-black text-red-500">
+                    ${carteraSeleccionada.saldoTotalPendiente.toFixed(2)}
+                  </span>
                 </div>
               </div>
 
-              {/* Nota / Cobro Activo para Abonar */}
+              {/* Selector de Nota/Cobro a Abonar */}
+              {carteraSeleccionada.cobros.length > 1 && (
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">
+                    Seleccionar Nota para Abonar
+                  </span>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {carteraSeleccionada.cobros.map((cobroItem) => {
+                      const cCfg = getCobroConfig(cobroItem.estado);
+                      const numNota = cobroItem.saleNote?.numero
+                        ? `NOTA #${String(cobroItem.saleNote.numero).padStart(4, '0')}`
+                        : cobroItem.numeroCobro || `#${cobroItem.id.slice(0, 8).toUpperCase()}`;
+                      const montoOrig = Number(cobroItem.montoOriginal ?? cobroItem.montoTotal ?? 0);
+                      const isActive = cobroSeleccionadoId === cobroItem.id;
+
+                      return (
+                        <button
+                          key={cobroItem.id}
+                          type="button"
+                          onClick={() => setCobroSeleccionadoId(cobroItem.id)}
+                          className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-left transition-all ${
+                            isActive
+                              ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs ring-1 ring-[#0F172A]/10'
+                              : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <FileText size={14} className={isActive ? 'text-[#0F172A]' : 'text-[var(--muted-foreground)]'} />
+                            <div>
+                              <div className="font-bold text-[11px] text-[var(--foreground)] flex items-center gap-1.5">
+                                <span>{numNota}</span>
+                                <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${cCfg.color}`}>{cCfg.label}</span>
+                              </div>
+                              <div className="text-[10px] text-[var(--muted-foreground)]">
+                                {cobroItem.tipo || 'Crédito'} — {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-[10px] text-[var(--muted-foreground)]">${montoOrig.toFixed(2)}</div>
+                            <div className={`text-[11px] font-black ${Number(cobroItem.saldoPendiente) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                              ${Number(cobroItem.saldoPendiente).toFixed(2)}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Nota / Cobro Activo Seleccionado */}
               {cobroSeleccionado && (
-                <div className="p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-1">
+                <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-emerald-800">
-                      Abonar a: {cobroSeleccionado.saleNote?.numero ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}` : `#${cobroSeleccionado.id.slice(0, 8).toUpperCase()}`}
-                    </span>
-                    <span className="text-xs font-black text-red-500">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-emerald-500/10 rounded-lg">
+                        <FileText size={14} className="text-emerald-600" />
+                      </div>
+                      <span className="font-bold text-emerald-800">
+                        Abonar a: {cobroSeleccionado.saleNote?.numero ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}` : `#${cobroSeleccionado.id.slice(0, 8).toUpperCase()}`}
+                      </span>
+                    </div>
+                    <span className="text-sm font-black text-red-500">
                       Saldo: ${Number(cobroSeleccionado.saldoPendiente).toFixed(2)}
                     </span>
                   </div>
-                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                  <div className="text-[10px] text-[var(--muted-foreground)] mt-1 ml-9">
                     Monto Original: ${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)} ({cobroSeleccionado.tipo || 'Crédito'})
                   </div>
                 </div>
               )}
 
-              {/* Últimos Abonos Realizados al Cobro Seleccionado */}
+              {/* Últimos Abonos Realizados */}
               <div className="space-y-2">
-                <span className="text-[11px] font-bold text-[var(--foreground)] block">
+                <span className="text-[11px] font-bold text-[var(--foreground)] block flex items-center gap-1.5">
+                  <ArrowDownRight size={12} className="text-emerald-600" />
                   Abonos registrados a esta nota:
                 </span>
                 {cobroSeleccionado?.abonos && cobroSeleccionado.abonos.length > 0 ? (
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                     {cobroSeleccionado.abonos.map((a) => (
                       <div
                         key={a.id}
-                        className="p-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs"
+                        className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs"
                       >
                         <div>
                           <span className="font-extrabold text-emerald-600">${Number(a.monto).toFixed(2)}</span>
-                          <span className="text-[10px] text-[var(--muted-foreground)] ml-2 font-semibold">
-                            ({a.metodo})
+                          <span className="text-[10px] text-[var(--muted-foreground)] ml-2 font-semibold px-1.5 py-0.5 bg-emerald-500/10 rounded">
+                            {a.metodo}
                           </span>
-                          {a.notas && <p className="text-[9px] text-[var(--muted-foreground)] italic">{a.notas}</p>}
+                          {a.notas && <p className="text-[9px] text-[var(--muted-foreground)] italic mt-0.5">{a.notas}</p>}
                         </div>
-                        <span className="text-[10px] text-[var(--muted-foreground)]">
+                        <span className="text-[10px] text-[var(--muted-foreground)] shrink-0">
                           {new Date(a.createdAt).toLocaleDateString('es-EC')}
                         </span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[11px] text-[var(--muted-foreground)] italic">No registra abonos previos en esta nota.</p>
+                  <p className="text-[11px] text-[var(--muted-foreground)] italic p-3 bg-[var(--muted)]/10 rounded-xl border border-dashed border-[var(--border)]">
+                    No registra abonos previos en esta nota.
+                  </p>
                 )}
               </div>
 
               {/* Formulario para Registrar Nuevo Abono */}
               {cobroSeleccionado && Number(cobroSeleccionado.saldoPendiente) > 0 && (
-                <div className="space-y-3 pt-2 border-t border-[var(--border)]">
-                  <span className="text-xs font-bold text-[var(--foreground)] block">Registrar Abono</span>
+                <div className="space-y-3 pt-3 border-t border-[var(--border)]">
+                  <span className="text-xs font-bold text-[var(--foreground)] block flex items-center gap-1.5">
+                    <ArrowUpRight size={13} className="text-emerald-600" />
+                    Registrar Abono
+                  </span>
 
                   {/* Monto */}
                   <div>
@@ -890,7 +1002,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       placeholder="0.00"
                       value={montoAbono}
                       onChange={(e) => setMontoAbono(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-emerald-600 focus:outline-none focus:border-[#0F172A]"
+                      className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-emerald-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                     />
                   </div>
 
@@ -902,7 +1014,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     <select
                       value={metodoAbono}
                       onChange={(e) => setMetodoAbono(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                      className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] transition-all"
                     >
                       <option value="EFECTIVO">💵 Efectivo</option>
                       <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
@@ -911,7 +1023,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     </select>
                   </div>
 
-                  {/* Referencia / Comprobante: Solo visible si NO es efectivo (ej. Transferencia, Depósito, Cheque) */}
+                  {/* Referencia / Comprobante — solo si NO es EFECTIVO */}
                   {metodoAbono !== 'EFECTIVO' && (
                     <div>
                       <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1">
@@ -922,7 +1034,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                         placeholder="Ej. Transf #12948 Banco Pichincha"
                         value={notasAbono}
                         onChange={(e) => setNotasAbono(e.target.value)}
-                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] transition-all"
                       />
                     </div>
                   )}
@@ -930,44 +1042,50 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   <button
                     onClick={handleRegistrarAbono}
                     disabled={savingAbono || !montoAbono || !online}
-                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    className="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
                     {savingAbono ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                     <span>{savingAbono ? 'Guardando...' : 'Confirmar Abono'}</span>
                   </button>
                 </div>
               )}
+            </div>
 
-              {/* Botón Ver Historial Completo del Cliente */}
-              <div className="pt-2 border-t border-[var(--border)] space-y-2">
-                <button
-                  onClick={() => handleAbrirHistorial(carteraSeleccionada.clientId)}
-                  className="w-full py-2 bg-[#0F172A]/10 hover:bg-[#0F172A]/20 text-[#0F172A] font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-[#0F172A]/20"
-                >
-                  <History size={14} />
-                  <span>Ver Historial Completo del Cliente</span>
-                </button>
+            {/* ── Footer del Modal ── */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setShowCuentaModal(false);
+                  handleAbrirHistorial(carteraSeleccionada.clientId);
+                }}
+                className="w-full py-2.5 bg-[#0F172A]/10 hover:bg-[#0F172A]/20 text-[#0F172A] font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-[#0F172A]/20"
+              >
+                <History size={14} />
+                <span>Ver Historial Completo del Cliente</span>
+              </button>
 
+              <div className="flex gap-2">
                 <button
-                  onClick={() => setShowDevolucionModal(true)}
-                  className="w-full py-1.5 text-rose-500 hover:bg-rose-500/10 font-semibold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1"
+                  onClick={() => {
+                    setShowCuentaModal(false);
+                    setShowDevolucionModal(true);
+                  }}
+                  className="flex-1 py-2 text-rose-500 hover:bg-rose-500/10 font-semibold text-[11px] rounded-xl transition-colors flex items-center justify-center gap-1 border border-rose-500/20"
                 >
                   <AlertTriangle size={12} />
-                  <span>Registrar Devolución de Mercadería</span>
+                  <span>Registrar Devolución</span>
+                </button>
+                <button
+                  onClick={() => setShowCuentaModal(false)}
+                  className="flex-1 py-2 bg-[var(--muted)] text-[var(--foreground)] font-semibold text-[11px] rounded-xl transition-colors hover:bg-[var(--muted)]/80 border border-[var(--border)]"
+                >
+                  Cerrar
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="p-8 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] border-dashed rounded-2xl text-xs space-y-2">
-              <CreditCard size={32} className="mx-auto text-[var(--muted-foreground)]/40" />
-              <p className="font-bold">Selecciona un cliente de la tabla</p>
-              <p className="text-[11px]">
-                Podrás consultar todas sus compras y registrar abonos de contado, cheque o transferencia.
-              </p>
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════ */}
       {/* MODAL: HISTORIAL COMPLETO DE CLIENTE (Compras, Abonos, Pagos) */}
@@ -1079,43 +1197,149 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       })
                       .map((m) => {
                         const isAbono = m.tipo === 'ABONO';
+                        const isPedido = m.tipo === 'COMPRA_PEDIDO';
+                        const isExpanded = isPedido && (pedidoHistorialExpandidoId === m.id);
+                        const lineas = m.detalles?.lineas || [];
+
                         return (
                           <div
                             key={m.id}
-                            className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-xl flex items-start justify-between gap-3 shadow-xs"
+                            className={`p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-xl transition-all shadow-xs ${
+                              isPedido ? 'cursor-pointer hover:border-[#0F172A]/40' : ''
+                            } ${isExpanded ? 'ring-2 ring-[#0F172A]/10 border-[#0F172A]/30' : ''}`}
+                            onClick={() => {
+                              if (isPedido) {
+                                setPedidoHistorialExpandidoId(isExpanded ? null : m.id);
+                              }
+                            }}
                           >
-                            <div className="flex items-start gap-3">
-                              <div
-                                className={`p-2 rounded-xl mt-0.5 ${
-                                  isAbono ? 'bg-emerald-500/10 text-emerald-600' : 'bg-blue-500/10 text-blue-600'
-                                }`}
-                              >
-                                {isAbono ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
-                              </div>
-                              <div className="space-y-0.5">
-                                <div className="font-bold text-xs text-[var(--foreground)]">{m.titulo}</div>
-                                <div className="text-[11px] text-[var(--muted-foreground)]">{m.descripcion}</div>
-                                <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5 mt-1">
-                                  <Calendar size={11} />
-                                  <span>{new Date(m.fecha).toLocaleString('es-EC')}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3">
+                                {isPedido ? (
+                                  <div className="p-2 rounded-xl mt-0.5 bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                  </div>
+                                ) : (
+                                  <div className="p-2 rounded-xl mt-0.5 bg-emerald-500/10 text-emerald-600">
+                                    <ArrowDownRight size={16} />
+                                  </div>
+                                )}
+
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-xs text-[var(--foreground)]">{m.titulo}</span>
+                                    <span className="font-semibold text-xs text-[var(--muted-foreground)]">
+                                      {historialCliente.cliente.nombre}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-[var(--muted-foreground)]">{m.descripcion}</div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5 mt-1">
+                                    <Calendar size={11} />
+                                    <span>{new Date(m.fecha).toLocaleString('es-EC')}</span>
+                                  </div>
                                 </div>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <div
+                                  className={`text-xs font-black ${
+                                    isAbono ? 'text-emerald-600' : 'text-blue-600'
+                                  }`}
+                                >
+                                  {isAbono ? `+ $${m.monto.toFixed(2)}` : `$${m.monto.toFixed(2)}`}
+                                </div>
+                                {m.metodo && (
+                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-1">
+                                    {m.metodo}
+                                  </span>
+                                )}
                               </div>
                             </div>
 
-                            <div className="text-right shrink-0">
-                              <div
-                                className={`text-xs font-black ${
-                                  isAbono ? 'text-emerald-600' : 'text-blue-600'
-                                }`}
-                              >
-                                {isAbono ? `+ $${m.monto.toFixed(2)}` : `$${m.monto.toFixed(2)}`}
+                            {/* Desglose Expandible de Artículos Solicitados */}
+                            {isExpanded && (
+                              <div className="mt-3.5 pt-3 border-t border-[var(--border)] space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
+                                    📦 DETALLE DE ARTÍCULOS SOLICITADOS — {m.numeroCodigo || m.titulo}
+                                  </span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                                    {lineas.length} {lineas.length === 1 ? 'ítem' : 'ítems'}
+                                  </span>
+                                </div>
+
+                                {lineas.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {(() => {
+                                      // Agrupar líneas por producto
+                                      const grupos: { [key: string]: any[] } = {};
+                                      lineas.forEach((l: any) => {
+                                        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+                                        if (!grupos[key]) grupos[key] = [];
+                                        grupos[key].push(l);
+                                      });
+
+                                      return Object.entries(grupos).map(([key, items]) => {
+                                        const item = items[0];
+                                        const totalPares = items.reduce((s: number, it: any) => s + it.cantidad, 0);
+
+                                        return (
+                                          <div
+                                            key={key}
+                                            className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between gap-3"
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              {item.imageUrl ? (
+                                                <img
+                                                  src={item.imageUrl}
+                                                  alt=""
+                                                  className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] shrink-0"
+                                                />
+                                              ) : (
+                                                <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-base shrink-0">
+                                                  👟
+                                                </div>
+                                              )}
+                                              <div>
+                                                <div className="font-extrabold text-xs text-[var(--foreground)]">
+                                                  {item.modelName} ({item.color})
+                                                </div>
+                                                <div className="text-[10px] text-[var(--muted-foreground)] font-medium">
+                                                  Serie: {item.serieNombre || 'Estándar'}
+                                                </div>
+                                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                  {items.map((l: any, idx: number) => (
+                                                    <span
+                                                      key={idx}
+                                                      className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-md text-[10px] font-bold"
+                                                    >
+                                                      T{l.numeroTalla}: {l.cantidad}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="text-right shrink-0">
+                                              <span className="text-xs font-black text-emerald-600 block">
+                                                {totalPares} {totalPares === 1 ? 'par' : 'pares'}
+                                              </span>
+                                              <span className="text-[10px] text-[var(--muted-foreground)] font-semibold block">
+                                                ${(totalPares * Number(item.precioUnitario || 0)).toFixed(2)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        );
+                                      });
+                                    })()}
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-[var(--muted-foreground)] italic text-center py-2">
+                                    No hay detalle de artículos registrado para este pedido.
+                                  </p>
+                                )}
                               </div>
-                              {m.metodo && (
-                                <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-1">
-                                  {m.metodo}
-                                </span>
-                              )}
-                            </div>
+                            )}
                           </div>
                         );
                       })}
