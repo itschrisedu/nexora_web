@@ -19,6 +19,8 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
+import { useToast } from './ui/toast';
+
 interface ComercialProps {
   online: boolean;
   userRole?: string;
@@ -49,6 +51,7 @@ const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: 
 };
 
 export default function ComercialComponent({ online, userRole, userPermissions }: ComercialProps) {
+  const { showToast } = useToast();
   const puedeCambiarPrecio = userRole === 'ROL_ADMIN' || userPermissions?.permiteCambiarPrecio === true;
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -237,11 +240,11 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
   const handleAgregarLinea = () => {
     if (!selectedProductId || !productoSeleccionadoObj) {
-      alert('Por favor selecciona un producto.');
+      showToast('Por favor selecciona un producto.', 'warning');
       return;
     }
     if (precioItem <= 0) {
-      alert('El precio unitario debe ser mayor a 0.');
+      showToast('El precio unitario debe ser mayor a 0.', 'warning');
       return;
     }
 
@@ -249,7 +252,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
     if (tipoVentaItem === 'SERIE_COMPLETA') {
       if (!prodObj.tallas || prodObj.tallas.length === 0) {
-        alert('Este modelo no tiene tallas asociadas en la serie.');
+        showToast('Este modelo no tiene tallas asociadas en la serie.', 'warning');
         return;
       }
 
@@ -305,7 +308,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       });
 
       if (lineasNumeracion.length === 0) {
-        alert('Por favor asigna al menos una talla con cantidad mayor a 0.');
+        showToast('Por favor asigna al menos una talla con cantidad mayor a 0.', 'warning');
         return;
       }
 
@@ -353,27 +356,43 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         notas: notasPedido || undefined,
       });
 
-      alert('¡Pedido creado exitosamente!');
+      showToast('¡Pedido creado exitosamente!', 'success');
       setShowModal(false);
       // Resetear estado
       setClientId('');
       setClienteSeleccionado(null);
       setLineasPedido([]);
       setNotasPedido('');
+      setBusquedaCliente('');
       await loadPedidos();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al crear el pedido.');
+      console.error('Error al crear pedido:', err);
+      const msg = err.message || 'Error al guardar el pedido. Verifica el stock o el límite de crédito.';
+      setErrorMsg(msg);
+      showToast(msg, 'warning', 5000);
     } finally {
       setCreatingOrder(false);
     }
   };
 
   const loadPedidos = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       if (online) {
         const data = await ApiService.get('/pedidos');
-        setPedidos(Array.isArray(data) ? data : []);
+        setPedidos(data || []);
+      } else {
+        const local = await db.pedidosOffline.toArray();
+        setPedidos(
+          local.map((p: any) => ({
+            id: p.id || String(p.idLocal),
+            clientId: p.clientId,
+            montoTotal: p.total || 0,
+            estado: 'PENDIENTE' as const,
+            tipoPago: p.tipoPago || 'CONTADO',
+            createdAt: new Date(p.createdAt).toISOString(),
+          }))
+        );
       }
     } catch (err) {
       console.error('Error al cargar pedidos:', err);
@@ -392,9 +411,10 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       } else if (nuevoEstado === 'CANCELADO') {
         await ApiService.delete(`/pedidos/${pedidoId}`, { motivo: 'Anulado por el usuario' });
       }
+      showToast('Estado del pedido actualizado correctamente', 'success');
       await loadPedidos();
     } catch (err: any) {
-      alert(err.message || 'Error al actualizar el estado del pedido.');
+      showToast(err.message || 'Error al actualizar el estado del pedido.', 'error');
     } finally {
       setUpdatingId(null);
     }
@@ -417,7 +437,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       setClientId('');
       setClienteSeleccionado(null);
       setBusquedaCliente('');
-      alert('Pedido guardado localmente. Se sincronizará cuando haya conexión a internet.');
+      showToast('Pedido guardado localmente. Se sincronización cuando haya conexión.', 'info');
     } catch (err) {
       setErrorMsg('Error al guardar offline.');
     } finally {

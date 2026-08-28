@@ -15,6 +15,7 @@ import {
   Minus,
   CheckCircle2,
 } from "lucide-react";
+import { useToast } from "./ui/toast";
 
 interface ItemPrediccion {
   modelo: string;
@@ -42,6 +43,7 @@ interface EstadoModelo {
 }
 
 export default function PrediccionDemandaComponent() {
+  const { showToast } = useToast();
   const [horizonte, setHorizonte] = useState<number>(30);
   const [prediccion, setPrediccion] = useState<RespuestaPrediccion | null>(null);
   const [estadoModelo, setEstadoModelo] = useState<EstadoModelo | null>(null);
@@ -85,10 +87,11 @@ export default function PrediccionDemandaComponent() {
     setReentrenando(true);
     try {
       await ApiService.post("/ml/reentrenar", {});
+      showToast("Modelo IA reentrenado exitosamente", "success");
       await cargarEstadoModelo();
       await cargarPrediccion(horizonte);
     } catch (err: any) {
-      alert("No se pudo reentrenar el modelo: " + (err.message || "Error de conexión"));
+      showToast("No se pudo reentrenar el modelo: " + (err.message || "Error de conexión"), "error");
     } finally {
       setReentrenando(false);
     }

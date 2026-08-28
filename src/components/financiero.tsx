@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ApiService } from '../services/api.service';
 import { DollarSign, CheckCircle, Clock, AlertTriangle, Loader2 } from 'lucide-react';
+import { useToast } from './ui/toast';
 
 interface FinancieroProps { online: boolean; }
 
@@ -33,6 +34,7 @@ function getCobroConfig(estado?: string) {
 }
 
 export default function FinancieroComponent({ online }: FinancieroProps) {
+  const { showToast } = useToast();
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [loading, setLoading] = useState(false);
   const [filtro, setFiltro] = useState<EstadoCobro | 'TODOS'>('TODOS');
@@ -66,12 +68,12 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     setSavingAbono(true);
     try {
       await ApiService.post(`/financiero/cobros/${selectedCobro.id}/abono`, { monto: parseFloat(monto), metodo: 'EFECTIVO' });
-      alert('Abono registrado exitosamente.');
+      showToast('Abono registrado exitosamente.', 'success');
       setSelectedCobro(null);
       setMonto('');
       loadCobros();
     } catch (err: any) {
-      alert(err.message || 'Error al registrar abono.');
+      showToast(err.message || 'Error al registrar abono.', 'error');
     } finally {
       setSavingAbono(false);
     }
@@ -93,14 +95,14 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
           },
         ],
       });
-      alert('Devolución de cliente registrada exitosamente.');
+      showToast('Devolución de cliente registrada exitosamente.', 'success');
       setShowDevolucionModal(false);
       setSelectedCobro(null);
       setMotivoDevolucion('');
       setMontoDevolucion('');
       loadCobros();
     } catch (err: any) {
-      alert(err.message || 'Error al registrar devolución.');
+      showToast(err.message || 'Error al registrar devolución.', 'error');
     } finally {
       setSavingDevolucion(false);
     }

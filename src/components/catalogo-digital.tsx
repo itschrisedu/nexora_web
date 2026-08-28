@@ -18,6 +18,7 @@ import {
   MapPin,
   MessageSquare,
 } from "lucide-react";
+import { useToast } from "./ui/toast";
 
 interface TiendaInfo {
   tenantId: string;
@@ -69,6 +70,7 @@ interface ItemCarrito {
 }
 
 export default function CatalogoDigitalComponent() {
+  const { showToast } = useToast();
   const [tienda, setTienda] = useState<TiendaInfo | null>(null);
   const [modelos, setModelos] = useState<ModeloCalzado[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,12 +125,12 @@ export default function CatalogoDigitalComponent() {
 
   const handleAgregarAlCarrito = () => {
     if (!modeloSeleccionado || !varianteSeleccionada || !tallaSeleccionada) {
-      alert("Por favor seleccione un modelo, variante y talla.");
+      showToast("Por favor seleccione un modelo, variante y talla.", "warning");
       return;
     }
 
     if (tallaSeleccionada.cantidad < cantidadPares) {
-      alert(`Solo hay ${tallaSeleccionada.cantidad} pares disponibles en talla ${tallaSeleccionada.numero}.`);
+      showToast(`Solo hay ${tallaSeleccionada.cantidad} pares disponibles en talla ${tallaSeleccionada.numero}.`, "warning");
       return;
     }
 
@@ -158,6 +160,7 @@ export default function CatalogoDigitalComponent() {
       ]);
     }
 
+    showToast("Producto agregado al carrito", "success");
     setModeloSeleccionado(null);
     setIsCartOpen(true);
   };
@@ -220,11 +223,12 @@ export default function CatalogoDigitalComponent() {
 
       // 4. Abrir WhatsApp y limpiar estado
       window.open(urlWA, "_blank");
+      showToast("Pedido enviado por WhatsApp", "success");
       setPedidoExitoso(true);
       setCarrito([]);
       setIsCartOpen(false);
     } catch (err: any) {
-      alert("Error al procesar el pedido: " + err.message);
+      showToast("Error al procesar el pedido: " + err.message, "error");
     } finally {
       setEnviandoPedido(false);
     }

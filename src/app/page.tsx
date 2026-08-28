@@ -34,6 +34,7 @@ import {
   Palette,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
+import { ToastProvider } from '@/components/ui/toast';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
@@ -77,7 +78,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'usuarios',     label: 'Vendedores & Personal', icon: <User size={18} /> },
 ];
 
-export default function Home() {
+function MainApp() {
   const [online, setOnline] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -535,5 +536,13 @@ function KpiCard({ title, value, subtitle, subtitleColor = 'text-[var(--muted-fo
         <div className={`text-[10px] font-semibold mt-1 ${subtitleColor}`}>{subtitle}</div>
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <ToastProvider>
+      <MainApp />
+    </ToastProvider>
   );
 }

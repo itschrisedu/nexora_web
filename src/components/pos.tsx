@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ApiService } from "@/services/api.service";
+import { useToast } from "./ui/toast";
 import {
   Store,
   DollarSign,
@@ -23,27 +24,25 @@ import {
 
 interface CajaEstado {
   abierta: boolean;
-  caja: {
-    id: string;
-    montoInicial: number;
-    ventasEfectivo: number;
-    ventasTarjeta: number;
-    ventasTransferencia: number;
-    totalVentas: number;
-    montoEsperadoEfectivo: number;
-    fechaApertura: string;
-  } | null;
+  sesionId?: string;
+  montoInicial?: number;
+  totalVentas?: number;
+  totalEfectivo?: number;
+  totalTarjeta?: number;
+  totalTransferencia?: number;
+  montoEsperadoEfectivo?: number;
+  fechaApertura?: string;
 }
 
 interface ProductoBusqueda {
   id: string;
-  code: string;
-  color: string;
-  imageUrl?: string;
-  salePrice: number;
+  baseCode: string;
   modelName: string;
-  serieId: string;
+  color: string;
+  salePrice: number;
   serieNombre: string;
+  serieId: string;
+  imageUrl?: string;
   tallas: { tallaId: string; numero: number; cantidad: number }[];
 }
 
@@ -59,20 +58,22 @@ interface ItemVenta {
 }
 
 export default function PosComponent() {
-  const [cajaEstado, setCajaEstado] = useState<CajaEstado>({ abierta: false, caja: null });
+  const { showToast } = useToast();
+  const [caja, setCaja] = useState<CajaEstado>({ abierta: false });
+  const [loadingCaja, setLoadingCaja] = useState(true);
   const [montoApertura, setMontoApertura] = useState("0");
-  const [loadingCaja, setLoadingCaja] = useState(false);
+  const [modalAperturaOpen, setModalAperturaOpen] = useState(false);
 
-  // Productos & Venta
+  // Venta POS
   const [productos, setProductos] = useState<ProductoBusqueda[]>([]);
-  const [searchProduct, setSearchProduct] = useState("");
+  const [busqueda, setBusqueda] = useState("");
   const [itemsVenta, setItemsVenta] = useState<ItemVenta[]>([]);
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TARJETA" | "TRANSFERENCIA">("EFECTIVO");
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [ventaExitosa, setVentaExitosa] = useState(false);
 
-  // Cierre de Caja
-  const [showCierre, setShowCierre] = useState(false);
+  // Cierre de caja
+  const [modalCierreOpen, setModalCierreOpen] = useState(false);
   const [montoRealEfectivo, setMontoRealEfectivo] = useState("");
   const [notasCierre, setNotasCierre] = useState("");
   const [resultadoCierre, setResultadoCierre] = useState<any>(null);
@@ -84,47 +85,36 @@ export default function PosComponent() {
 
   const cargarEstadoCaja = async () => {
     try {
-      const data = await ApiService.get("/pos/caja/estado");
-      setCajaEstado(data);
-    } catch (err: any) {
+      setLoadingCaja(true);
+      const res = await ApiService.get("/pos/caja/estado");
+      setCaja(res);
+    } catch (err) {
       console.error("Error al cargar estado de caja:", err);
+    } finally {
+      setLoadingCaja(false);
     }
   };
 
   const cargarProductos = async () => {
     try {
-      const data = await ApiService.get("/catalogo/productos");
-      const flat: ProductoBusqueda[] = [];
-      (data || []).forEach((modelo: any) => {
-        modelo.variantes.forEach((v: any) => {
-          flat.push({
-            id: v.id,
-            code: v.code,
-            color: v.color,
-            imageUrl: v.imageUrl,
-            salePrice: v.salePrice,
-            modelName: modelo.name,
-            serieId: v.serieId,
-            serieNombre: v.serieNombre,
-            tallas: v.tallas,
-          });
-        });
-      });
-      setProductos(flat);
-    } catch (err: any) {
-      console.error("Error al cargar productos:", err);
+      const res = await ApiService.get("/pos/productos-disponibles");
+      setProductos(res);
+    } catch (err) {
+      console.error("Error al cargar productos POS:", err);
     }
   };
 
-  const handleAbrirCaja = async () => {
+  const handleAbrirCaja = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
       setLoadingCaja(true);
       await ApiService.post("/pos/caja/abrir", {
         montoInicial: parseFloat(montoApertura) || 0,
       });
+      showToast("Caja abierta exitosamente", "success");
       await cargarEstadoCaja();
     } catch (err: any) {
-      alert("Error al abrir caja: " + err.message);
+      showToast("Error al abrir caja: " + err.message, "error");
     } finally {
       setLoadingCaja(false);
     }
@@ -178,13 +168,14 @@ export default function PosComponent() {
           precioUnitario: i.precioUnitario,
         })),
       });
+      showToast("Venta registrada exitosamente", "success");
       setVentaExitosa(true);
       setItemsVenta([]);
       await cargarEstadoCaja();
       await cargarProductos();
       setTimeout(() => setVentaExitosa(false), 3000);
     } catch (err: any) {
-      alert("Error en la venta: " + err.message);
+      showToast("Error en la venta: " + err.message, "error");
     } finally {
       setProcesandoVenta(false);
     }
@@ -198,10 +189,11 @@ export default function PosComponent() {
         montoRealEfectivo: parseFloat(montoRealEfectivo) || 0,
         notas: notasCierre,
       });
+      showToast("Caja cerrada exitosamente", "info");
       setResultadoCierre(resultado);
       await cargarEstadoCaja();
     } catch (err: any) {
-      alert("Error al cerrar caja: " + err.message);
+      showToast("Error al cerrar caja: " + err.message, "error");
     } finally {
       setLoadingCaja(false);
     }
@@ -209,12 +201,12 @@ export default function PosComponent() {
 
   const productosFiltrados = productos.filter(
     (p) =>
-      p.modelName.toLowerCase().includes(searchProduct.toLowerCase()) ||
-      p.code.toLowerCase().includes(searchProduct.toLowerCase())
+      p.modelName.toLowerCase().includes(busqueda.toLowerCase()) ||
+      p.baseCode?.toLowerCase().includes(busqueda.toLowerCase())
   );
 
   // ─── Vista: Caja Cerrada ──────────────────
-  if (!cajaEstado.abierta) {
+  if (!caja.abierta) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-3xl p-10 max-w-md w-full text-center space-y-6">
@@ -261,7 +253,7 @@ export default function PosComponent() {
             </div>
             <div>
               <p className="text-xs text-[var(--muted-foreground)] font-medium">
-                Caja abierta desde {new Date(cajaEstado.caja!.fechaApertura).toLocaleTimeString("es-EC")}
+                Caja abierta desde {caja.fechaApertura ? new Date(caja.fechaApertura).toLocaleTimeString("es-EC") : 'Turno actual'}
               </p>
             </div>
           </div>
@@ -269,22 +261,22 @@ export default function PosComponent() {
           <div className="flex gap-3 flex-wrap">
             <div className="px-4 py-2 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)] text-center">
               <span className="text-[10px] text-[var(--muted-foreground)] uppercase block font-semibold">Efectivo</span>
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${cajaEstado.caja!.ventasEfectivo.toFixed(2)}</span>
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${(caja.totalEfectivo || 0).toFixed(2)}</span>
             </div>
             <div className="px-4 py-2 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)] text-center">
               <span className="text-[10px] text-[var(--muted-foreground)] uppercase block font-semibold">Tarjeta</span>
-              <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400">${cajaEstado.caja!.ventasTarjeta.toFixed(2)}</span>
+              <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400">${(caja.totalTarjeta || 0).toFixed(2)}</span>
             </div>
             <div className="px-4 py-2 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)] text-center">
               <span className="text-[10px] text-[var(--muted-foreground)] uppercase block font-semibold">Transfer.</span>
-              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">${cajaEstado.caja!.ventasTransferencia.toFixed(2)}</span>
+              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">${(caja.totalTransferencia || 0).toFixed(2)}</span>
             </div>
             <div className="px-4 py-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-center">
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase block font-semibold">Total Turno</span>
-              <span className="text-sm font-bold text-[var(--card-foreground)]">${cajaEstado.caja!.totalVentas.toFixed(2)}</span>
+              <span className="text-sm font-bold text-[var(--card-foreground)]">${(caja.totalVentas || 0).toFixed(2)}</span>
             </div>
             <button
-              onClick={() => { setShowCierre(true); setResultadoCierre(null); }}
+              onClick={() => { setModalCierreOpen(true); setResultadoCierre(null); }}
               className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-xl border border-rose-500/20 flex items-center gap-1.5 transition-all"
             >
               <Calculator size={14} /> Arqueo & Cierre
@@ -307,8 +299,8 @@ export default function PosComponent() {
           <input
             type="text"
             placeholder="🔍 Buscar calzado por nombre o código..."
-            value={searchProduct}
-            onChange={(e) => setSearchProduct(e.target.value)}
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
             className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-emerald-500"
           />
 
@@ -322,7 +314,7 @@ export default function PosComponent() {
                   <div>
                     <h4 className="font-bold text-sm text-[var(--card-foreground)]">{prod.modelName}</h4>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      {prod.color} | {prod.serieNombre} | <span className="font-mono">{prod.code}</span>
+                      {prod.color} | {prod.serieNombre} | <span className="font-mono">{prod.baseCode}</span>
                     </p>
                   </div>
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">${prod.salePrice.toFixed(2)}</span>
@@ -455,11 +447,11 @@ export default function PosComponent() {
       </div>
 
       {/* Modal de Cierre de Caja */}
-      {showCierre && (
+      {modalCierreOpen && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-5 relative">
             <button
-              onClick={() => setShowCierre(false)}
+              onClick={() => setModalCierreOpen(false)}
               className="absolute top-4 right-4 text-slate-500 hover:text-slate-200"
             >
               <X size={20} />
@@ -518,7 +510,7 @@ export default function PosComponent() {
                 )}
 
                 <button
-                  onClick={() => { setShowCierre(false); setResultadoCierre(null); }}
+                  onClick={() => { setModalCierreOpen(false); setResultadoCierre(null); }}
                   className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl transition-all"
                 >
                   Cerrar
@@ -529,16 +521,16 @@ export default function PosComponent() {
                 <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Monto Inicial:</span>
-                    <span className="font-mono text-slate-200">${cajaEstado.caja!.montoInicial.toFixed(2)}</span>
+                    <span className="font-mono text-slate-200">${(caja.montoInicial || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Ventas Efectivo:</span>
-                    <span className="font-mono text-emerald-400">${cajaEstado.caja!.ventasEfectivo.toFixed(2)}</span>
+                    <span className="font-mono text-emerald-400">${(caja.totalEfectivo || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-800 pt-2">
                     <span className="text-white font-semibold">Efectivo Esperado:</span>
                     <span className="font-mono font-bold text-white">
-                      ${cajaEstado.caja!.montoEsperadoEfectivo.toFixed(2)}
+                      ${(caja.montoEsperadoEfectivo || 0).toFixed(2)}
                     </span>
                   </div>
                 </div>

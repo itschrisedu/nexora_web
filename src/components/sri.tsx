@@ -16,6 +16,8 @@ import {
   KeyRound,
 } from "lucide-react";
 
+import { useToast } from "./ui/toast";
+
 interface FacturaSRI {
   id: string;
   numeroComprobante: string;
@@ -27,6 +29,7 @@ interface FacturaSRI {
 }
 
 export default function SriComponent() {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<"config" | "facturas">("config");
 
   // Configuración Emisor
@@ -141,9 +144,10 @@ export default function SriComponent() {
   const handleConsultarEstado = async (facturaId: string) => {
     try {
       await ApiService.post(`/sri/consultar/${facturaId}`, {});
+      showToast("Estado de factura actualizado", "info");
       loadFacturas();
     } catch (err: any) {
-      alert("Error al consultar estado SRI: " + (err.message || "Error de conexión"));
+      showToast("Error al consultar estado SRI: " + (err.message || "Error de conexión"), "error");
     }
   };
 
