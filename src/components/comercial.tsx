@@ -67,6 +67,8 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   const [savingOffline, setSavingOffline] = useState(false);
 
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editingOrderNumero, setEditingOrderNumero] = useState<string>('');
 
   // Búsqueda de clientes con Debounce de 3 segundos
   const [listaClientes, setListaClientes] = useState<{ id: string; nombre: string; cedula?: string; telefono?: string }[]>([]);
@@ -329,6 +331,40 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     setLineasPedido(lineasPedido.filter((_, i) => i !== index));
   };
 
+  const handleAbrirEditarPedido = (p: Pedido) => {
+    setEditingOrderId(p.id);
+    setEditingOrderNumero(getNumeroPedido(p));
+    setClientId(p.clientId);
+    setClienteSeleccionado({
+      id: p.clientId,
+      nombre: p.clienteNombre || 'Cliente seleccionado',
+    });
+    setTipoPago(p.tipoPago || 'CONTADO');
+    setNotasPedido((p as any).notas || '');
+
+    if (p.lines && p.lines.length > 0) {
+      setLineasPedido(
+        p.lines.map((l: any) => ({
+          productId: l.productId,
+          modelName: l.modelName || 'Modelo',
+          color: l.color || '',
+          serieNombre: l.serieNombre || 'Serie',
+          imageUrl: l.imageUrl || '',
+          tallaId: l.tallaId,
+          numeroTalla: l.numeroTalla || l.tallaNumero || 38,
+          cantidad: l.cantidad,
+          precioUnitario: Number(l.precioUnitario),
+          tipoVenta: l.tipoVenta || 'SERIE_COMPLETA',
+          subtipoSerie: l.subtipoSerie || 'MEDIA_DOCENA',
+        }))
+      );
+    } else {
+      setLineasPedido([]);
+    }
+    setErrorMsg('');
+    setShowModal(true);
+  };
+
   const handleCrearPedidoOnline = async () => {
     if (!clientId) {
       setErrorMsg('Debes seleccionar un cliente.');
@@ -343,7 +379,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     setErrorMsg('');
     try {
       const canalMapeado = canalEntrada === 'CATALOGO_DIGITAL' ? 'CATALOGO' : 'MANUAL';
-      await ApiService.post('/pedidos', {
+      const payload = {
         clientId,
         canal: canalMapeado,
         tipoPago,
@@ -354,11 +390,20 @@ export default function ComercialComponent({ online, userRole, userPermissions }
           tipoVenta: l.tipoVenta,
         })),
         notas: notasPedido || undefined,
-      });
+      };
 
-      showToast('¡Pedido creado exitosamente!', 'success');
+      if (editingOrderId) {
+        await ApiService.put(`/pedidos/${editingOrderId}`, payload);
+        showToast('¡Pedido actualizado exitosamente!', 'success');
+      } else {
+        await ApiService.post('/pedidos', payload);
+        showToast('¡Pedido creado exitosamente!', 'success');
+      }
+
       setShowModal(false);
       // Resetear estado
+      setEditingOrderId(null);
+      setEditingOrderNumero('');
       setClientId('');
       setClienteSeleccionado(null);
       setLineasPedido([]);
@@ -366,7 +411,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       setBusquedaCliente('');
       await loadPedidos();
     } catch (err: any) {
-      console.error('Error al crear pedido:', err);
+      console.error('Error al guardar pedido:', err);
       const msg = err.message || 'Error al guardar el pedido. Verifica el stock o el límite de crédito.';
       setErrorMsg(msg);
       showToast(msg, 'warning', 5000);
@@ -553,6 +598,13 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                             ) : p.estado === 'PENDIENTE' ? (
                               <>
                                 <button
+                                  onClick={() => handleAbrirEditarPedido(p)}
+                                  title="Editar este pedido (agregar o quitar modelos/tallas)"
+                                  className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1"
+                                >
+                                  ✏️ Editar
+                                </button>
+                                <button
                                   onClick={() => handleCambiarEstado(p.id, 'EN_PREPARACION')}
                                   title="Iniciar preparación en bodega"
                                   className="px-2.5 py-1 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-600/20 flex items-center gap-1"
@@ -569,6 +621,13 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                               </>
                             ) : p.estado === 'EN_PREPARACION' ? (
                               <>
+                                <button
+                                  onClick={() => handleAbrirEditarPedido(p)}
+                                  title="Editar este pedido (agregar o quitar modelos/tallas)"
+                                  className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1"
+                                >
+                                  ✏️ Editar
+                                </button>
                                 <button
                                   onClick={() => handleCambiarEstado(p.id, 'ENTREGADO')}
                                   title="Confirmar entrega al cliente"
@@ -606,9 +665,19 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                 <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider">
                                   📦 Detalle de Artículos Solicitados — {getNumeroPedido(p, idx)}
                                 </span>
-                                <span className="text-xs font-bold text-[var(--muted-foreground)]">
-                                  Cliente: <strong className="text-[var(--foreground)]">{p.clienteNombre}</strong>
-                                </span>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs font-bold text-[var(--muted-foreground)]">
+                                    Cliente: <strong className="text-[var(--foreground)]">{p.clienteNombre}</strong>
+                                  </span>
+                                  {(p.estado === 'PENDIENTE' || p.estado === 'EN_PREPARACION') && (
+                                    <button
+                                      onClick={() => handleAbrirEditarPedido(p)}
+                                      className="px-3 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold transition-all border border-amber-500/20 flex items-center gap-1.5 shadow-sm"
+                                    >
+                                      ✏️ Editar Pedido
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               {p.lines && p.lines.length > 0 ? (
@@ -684,12 +753,27 @@ export default function ComercialComponent({ online, userRole, userPermissions }
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/20">
               <div>
-                <h3 className="font-extrabold text-base">Crear Nuevo Pedido Completo</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">Selecciona el cliente, tipo de pago y añade los productos con sus tallas</p>
+                <h3 className="font-extrabold text-base flex items-center gap-2">
+                  {editingOrderId ? (
+                    <>
+                      <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-md text-xs font-bold">EDICIÓN</span>
+                      Editar Pedido #{editingOrderNumero || 'Pedido'}
+                    </>
+                  ) : (
+                    'Crear Nuevo Pedido Completo'
+                  )}
+                </h3>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {editingOrderId
+                    ? 'Agrega nuevos modelos/tallas, incrementa cantidades o elimina ítems de este pedido'
+                    : 'Selecciona el cliente, tipo de pago y añade los productos con sus tallas'}
+                </p>
               </div>
               <button
                 onClick={() => {
                   setShowModal(false);
+                  setEditingOrderId(null);
+                  setEditingOrderNumero('');
                   setLineasPedido([]);
                   setClienteSeleccionado(null);
                   setClientId('');
@@ -1292,7 +1376,9 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5"
                   >
                     {creatingOrder ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                    {creatingOrder ? 'Creando Pedido...' : 'Guardar Pedido Completo'}
+                    {creatingOrder
+                      ? (editingOrderId ? 'Guardando Cambios...' : 'Creando Pedido...')
+                      : (editingOrderId ? 'Guardar Cambios del Pedido' : 'Guardar Pedido Completo')}
                   </button>
                 ) : (
                   <button
