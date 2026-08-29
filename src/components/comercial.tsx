@@ -17,6 +17,7 @@ import {
   Lock,
   ChevronDown,
   ChevronUp,
+  MessageCircle,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -156,11 +157,74 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     fetchUltimoPrecio();
   }, [clientId, selectedProductId, online]);
 
+  const [businessConfig, setBusinessConfig] = useState<any | null>(null);
+
   useEffect(() => {
     loadPedidos();
     loadListaClientes();
     cargarCatalogo();
+    loadBusinessConfig();
   }, [online]);
+
+  const loadBusinessConfig = async () => {
+    try {
+      if (online) {
+        const b = await ApiService.get('/configuracion/negocio');
+        if (b && b.nombre) setBusinessConfig(b);
+      }
+    } catch (e) {
+      console.warn('No se pudo cargar businessConfig en comercial:', e);
+    }
+  };
+
+  const handleEnviarConfirmacionWhatsApp = (p: Pedido, clienteTel?: string) => {
+    const cliente = listaClientes.find((c) => c.id === p.clientId);
+    const telefono = clienteTel || cliente?.telefono;
+    if (!telefono) {
+      showToast('El cliente no tiene número de teléfono registrado.', 'warning');
+      return;
+    }
+
+    const numPedido = p.numeroCodigo || (p.numero ? `#${String(p.numero).padStart(4, '0')}` : `#${p.id.slice(0, 6).toUpperCase()}`);
+    const fecha = new Date(p.createdAt || new Date()).toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+    const clienteNombre = p.clienteNombre || cliente?.nombre || 'Estimado/a Cliente';
+    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+
+    let desgloseTexto = '';
+    if (p.lines && p.lines.length > 0) {
+      // Agrupar por producto
+      const grupos: { [key: string]: any[] } = {};
+      p.lines.forEach((l: any) => {
+        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+        if (!grupos[key]) grupos[key] = [];
+        grupos[key].push(l);
+      });
+
+      Object.entries(grupos).forEach(([_, lineas]) => {
+        const item = lineas[0];
+        const totalPares = lineas.reduce((sum, l) => sum + l.cantidad, 0);
+        const subtotal = lineas.reduce((sum, l) => sum + (l.subtotal ?? (l.cantidad * Number(l.precioUnitario || 0))), 0);
+
+        let formato = `${totalPares} pares`;
+        if (totalPares === 6) formato = 'Media Docena';
+        else if (totalPares === 12) formato = '1 Docena';
+
+        desgloseTexto += `\n• ${formato} - ${item.modelName || 'Calzado'} (${item.color || ''} / ${item.serieNombre || 'Serie'}) x $${Number(item.precioUnitario).toFixed(2)} = $${subtotal.toFixed(2)}`;
+      });
+    }
+
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!`;
+
+    let numLimpio = telefono.replace(/\D/g, '');
+    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    }
+
+    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank');
+  };
 
   const cargarCatalogo = async () => {
     try {
@@ -408,8 +472,26 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         await ApiService.put(`/pedidos/${editingOrderId}`, payload);
         showToast('¡Pedido actualizado exitosamente!', 'success');
       } else {
-        await ApiService.post('/pedidos', payload);
+        const res = await ApiService.post('/pedidos', payload);
         showToast('¡Pedido creado exitosamente!', 'success');
+
+        // Si el cliente tiene teléfono registrado, abrir confirmación por WhatsApp
+        const clienteInfo = listaClientes.find((c) => c.id === clientId);
+        if (clienteInfo?.telefono) {
+          const nuevoPedidoObj: Pedido = {
+            id: res?.id || 'NUEVO',
+            numero: res?.numero,
+            numeroCodigo: res?.numeroCodigo,
+            clientId,
+            clienteNombre: clienteInfo.nombre,
+            montoTotal: lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0),
+            estado: 'PENDIENTE',
+            tipoPago,
+            createdAt: new Date().toISOString(),
+            lines: lineasPedido.map((l) => ({ ...l, subtotal: l.cantidad * l.precioUnitario })),
+          };
+          handleEnviarConfirmacionWhatsApp(nuevoPedidoObj, clienteInfo.telefono);
+        }
       }
 
       setShowModal(false);
@@ -449,7 +531,8 @@ export default function ComercialComponent({ online, userRole, userPermissions }
             montoTotal: p.total || 0,
             estado: 'PENDIENTE' as const,
             tipoPago: p.tipoPago || 'CONTADO',
-            createdAt: new Date(p.createdAt).toISOString(),
+            createdAt: p.createdAt || new Date().toISOString(),
+            lines: p.lineas || [],
           }))
         );
       }
@@ -460,92 +543,140 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     }
   };
 
-  const handleCambiarEstado = async (pedidoId: string, nuevoEstado: string) => {
+  const handleCambiarEstado = async (id: string, nuevoEstado: EstadoPedido) => {
+    setUpdatingId(id);
     try {
-      setUpdatingId(pedidoId);
-      if (nuevoEstado === 'EN_PREPARACION') {
-        await ApiService.post(`/pedidos/${pedidoId}/iniciar-preparacion`, {});
-      } else if (nuevoEstado === 'ENTREGADO') {
-        await ApiService.post(`/pedidos/${pedidoId}/confirmar-entrega`, {});
-      } else if (nuevoEstado === 'CANCELADO') {
-        await ApiService.delete(`/pedidos/${pedidoId}`, { motivo: 'Anulado por el usuario' });
+      if (online) {
+        await ApiService.put(`/pedidos/${id}/estado`, { estado: nuevoEstado });
+        showToast(`Pedido actualizado a ${ESTADO_CONFIG[nuevoEstado]?.label || nuevoEstado}`, 'success');
+        await loadPedidos();
+      } else {
+        showToast('Debes estar online para actualizar el estado del pedido.', 'warning');
       }
-      showToast('Estado del pedido actualizado correctamente', 'success');
-      await loadPedidos();
     } catch (err: any) {
-      showToast(err.message || 'Error al actualizar el estado del pedido.', 'error');
+      showToast(err.message || 'Error al cambiar estado', 'error');
     } finally {
       setUpdatingId(null);
     }
   };
 
   const handleGuardarOffline = async () => {
-    if (!clientId) { setErrorMsg('El ID del cliente es obligatorio.'); return; }
+    if (!clientId || lineasPedido.length === 0) {
+      setErrorMsg('Selecciona un cliente y agrega al menos un producto.');
+      return;
+    }
     setSavingOffline(true);
     try {
-      const offlineOrder = {
+      const totalOffline = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
+      await db.pedidosOffline.add({
         clientId,
-        lineas: [],
         tipoPago,
-        total: 0,
+        lineas: lineasPedido.map((l) => ({
+          productId: l.productId,
+          serieId: l.serieNombre || 'default',
+          tallaId: l.tallaId,
+          cantidad: l.cantidad,
+          precioUnitario: l.precioUnitario,
+          tipoVenta: l.tipoVenta,
+        })),
+        total: totalOffline,
         createdAt: Date.now(),
-        estadoSync: 'PENDIENTE' as const,
-      };
-      await db.pedidosOffline.add(offlineOrder);
+        estadoSync: 'PENDIENTE',
+      });
+
+      showToast('Pedido guardado localmente (Offline). Se sincronizará al volver la conexión.', 'info');
       setShowModal(false);
       setClientId('');
       setClienteSeleccionado(null);
-      setBusquedaCliente('');
-      showToast('Pedido guardado localmente. Se sincronización cuando haya conexión.', 'info');
-    } catch (err) {
-      setErrorMsg('Error al guardar offline.');
+      setLineasPedido([]);
+      await loadPedidos();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al guardar offline');
     } finally {
       setSavingOffline(false);
     }
   };
 
+  const pedidosFiltrados = pedidos.filter((p) => {
+    if (filtroEstado === 'TODOS') return true;
+    return p.estado === filtroEstado;
+  });
+
   const getNumeroPedido = (p: Pedido, index?: number) => {
     if (p.numeroCodigo) return p.numeroCodigo;
-    if (p.numero) return `PED-${String(p.numero).padStart(4, '0')}`;
-    const sorted = [...pedidos].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    const foundIdx = sorted.findIndex((item) => item.id === p.id);
-    const num = foundIdx >= 0 ? foundIdx + 1 : (typeof index === 'number' ? index + 1 : 1);
-    return `PED-${String(num).padStart(4, '0')}`;
+    if (p.numero !== undefined && p.numero !== null) return String(p.numero).padStart(4, '0');
+    if (index !== undefined) return String(index + 1).padStart(4, '0');
+    return (p.id || '').slice(0, 6).toUpperCase();
   };
-
-  const pedidosFiltrados = filtroEstado === 'TODOS' ? pedidos : pedidos.filter((p) => p.estado === filtroEstado);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-xs text-[var(--muted-foreground)] font-medium">Administra y da seguimiento a los pedidos de tus clientes</p>
+          <h2 className="font-extrabold text-xl tracking-tight text-[var(--foreground)]">
+            Gestión de Pedidos
+          </h2>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium">
+            Control de flujo operativo, estados de preparación y entrega
+          </p>
         </div>
-        <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
-          <Plus size={16} /><span>Nuevo Pedido</span>
+
+        <button
+          onClick={() => {
+            setEditingOrderId(null);
+            setEditingOrderNumero('');
+            setClientId('');
+            setClienteSeleccionado(null);
+            setLineasPedido([]);
+            setNotasPedido('');
+            setMetodoPagoContado('EFECTIVO');
+            setReferenciaComprobante('');
+            setErrorMsg('');
+            setShowModal(true);
+          }}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm shrink-0"
+        >
+          <Plus size={16} />
+          <span>Nuevo Pedido</span>
         </button>
       </div>
 
       {/* Filtros de Estado */}
-      <div className="flex flex-wrap gap-2">
-        {(['TODOS', 'PENDIENTE', 'EN_PREPARACION', 'ENTREGADO', 'CANCELADO'] as const).map((estado) => (
-          <button
-            key={estado}
-            onClick={() => setFiltroEstado(estado)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-              filtroEstado === estado
-                ? 'bg-[#0F172A] text-white border-transparent'
-                : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
-            }`}
-          >
-            {estado === 'TODOS' ? 'Todos' : ESTADO_CONFIG[estado].label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => setFiltroEstado('TODOS')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            filtroEstado === 'TODOS'
+              ? 'bg-[#0F172A] text-white shadow-xs'
+              : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+        >
+          Todos ({pedidos.length})
+        </button>
+        {(['PENDIENTE', 'EN_PREPARACION', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
+          const cfg = ESTADO_CONFIG[st];
+          const count = pedidos.filter((p) => p.estado === st).length;
+          const active = filtroEstado === st;
+          return (
+            <button
+              key={st}
+              onClick={() => setFiltroEstado(st)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                active
+                  ? `${cfg.color} shadow-xs font-black`
+                  : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              {cfg.icon}
+              <span>{cfg.label}</span>
+              <span className="text-[10px] opacity-75">({count})</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Lista de Pedidos */}
+      {/* Tabla de Pedidos */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 text-[var(--muted-foreground)]">
           <Loader2 className="animate-spin text-[#0F172A] mb-2" size={32} />
@@ -553,9 +684,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         </div>
       ) : pedidosFiltrados.length === 0 ? (
         <div className="p-12 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
-          {online
-            ? 'No hay pedidos registrados con este estado.'
-            : 'Sin conexión. Los pedidos se cargan desde el servidor.'}
+          No hay pedidos registrados con este estado.
         </div>
       ) : (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
@@ -613,21 +742,18 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                               <>
                                 <button
                                   onClick={() => handleAbrirEditarPedido(p)}
-                                  title="Editar este pedido (agregar o quitar modelos/tallas)"
                                   className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1"
                                 >
                                   ✏️ Editar
                                 </button>
                                 <button
                                   onClick={() => handleCambiarEstado(p.id, 'EN_PREPARACION')}
-                                  title="Iniciar preparación en bodega"
                                   className="px-2.5 py-1 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-600/20 flex items-center gap-1"
                                 >
                                   <Package size={12} /> Preparar
                                 </button>
                                 <button
                                   onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
-                                  title="Anular pedido"
                                   className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
                                 >
                                   <XCircle size={12} /> Anular
@@ -637,34 +763,25 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                               <>
                                 <button
                                   onClick={() => handleAbrirEditarPedido(p)}
-                                  title="Editar este pedido (agregar o quitar modelos/tallas)"
                                   className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1"
                                 >
                                   ✏️ Editar
                                 </button>
                                 <button
                                   onClick={() => handleCambiarEstado(p.id, 'ENTREGADO')}
-                                  title="Confirmar entrega al cliente"
                                   className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
                                 >
                                   <CheckCircle size={12} /> Entregar
                                 </button>
                                 <button
                                   onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
-                                  title="Anular pedido"
                                   className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
                                 >
                                   <XCircle size={12} /> Anular
                                 </button>
                               </>
-                            ) : p.estado === 'ENTREGADO' ? (
-                              <span className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
-                                <CheckCircle size={12} /> Completado
-                              </span>
                             ) : (
-                              <span className="text-[11px] font-medium text-rose-500 flex items-center gap-1">
-                                <XCircle size={12} /> Anulado
-                              </span>
+                              <span className="text-[11px] font-medium text-[var(--muted-foreground)]">Cerrado</span>
                             )}
                           </div>
                         </td>
@@ -675,18 +792,26 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                         <tr className="bg-[var(--muted)]/20">
                           <td colSpan={7} className="px-6 py-4">
                             <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-3">
-                              <div className="flex justify-between items-center border-b border-[var(--border)] pb-2">
+                              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--border)] pb-2">
                                 <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider">
                                   📦 Detalle de Artículos Solicitados — {getNumeroPedido(p, idx)}
                                 </span>
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <span className="text-xs font-bold text-[var(--muted-foreground)]">
                                     Cliente: <strong className="text-[var(--foreground)]">{p.clienteNombre}</strong>
                                   </span>
+                                  <button
+                                    onClick={() => handleEnviarConfirmacionWhatsApp(p)}
+                                    className="px-3 py-1 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-bold transition-all border border-emerald-500/20 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                                    title="Enviar mensaje de confirmación de pedido al WhatsApp del cliente"
+                                  >
+                                    <MessageCircle size={13} />
+                                    <span>Confirmar por WhatsApp</span>
+                                  </button>
                                   {(p.estado === 'PENDIENTE' || p.estado === 'EN_PREPARACION') && (
                                     <button
                                       onClick={() => handleAbrirEditarPedido(p)}
-                                      className="px-3 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold transition-all border border-amber-500/20 flex items-center gap-1.5 shadow-sm"
+                                      className="px-3 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold transition-all border border-amber-500/20 flex items-center gap-1.5 shadow-sm cursor-pointer"
                                     >
                                       ✏️ Editar Pedido
                                     </button>

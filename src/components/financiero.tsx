@@ -356,6 +356,108 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     setShowCuentaModal(true);
   };
 
+  const handleEnviarWhatsAppTexto = (telefono: string, mensaje: string) => {
+    let numLimpio = telefono.replace(/\D/g, '');
+    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    }
+    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleEnviarEstadoCuentaWhatsApp = (
+    cartera: ClienteCartera,
+    abonoInfoParam?: { monto: number; metodo: string; fecha?: string }
+  ) => {
+    if (!cartera.clienteTelefono) {
+      showToast('El cliente no tiene teléfono registrado.', 'warning');
+      return;
+    }
+
+    const hoyStr = new Date().toISOString().split('T')[0];
+    const hoyLegible = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+
+    // 1. Obtener el último abono (ya sea el recién ingresado o el último registrado en el historial)
+    let ultimoAbono = abonoInfoParam;
+    if (!ultimoAbono) {
+      const todosAbonos: any[] = [];
+      cartera.cobros.forEach((c) => {
+        if (c.abonos && Array.isArray(c.abonos)) {
+          c.abonos.forEach((a) => {
+            todosAbonos.push({
+              monto: Number(a.monto),
+              metodo: a.metodo,
+              fecha: a.createdAt ? new Date(a.createdAt).toLocaleDateString('es-EC') : hoyLegible,
+              createdAt: a.createdAt,
+            });
+          });
+        }
+      });
+      todosAbonos.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      if (todosAbonos.length > 0) {
+        ultimoAbono = todosAbonos[0];
+      }
+    }
+
+    // 2. Revisar si hay compras / notas entregadas hoy
+    const cobrosDeHoy = cartera.cobros.filter((c) => c.createdAt && c.createdAt.startsWith(hoyStr));
+    const montoComprasHoy = cobrosDeHoy.reduce((sum, c) => sum + Number(c.montoOriginal || c.montoTotal || 0), 0);
+
+    // 3. Saldo actual que queda debiendo
+    let saldoActual = cartera.saldoTotalPendiente;
+    if (abonoInfoParam) {
+      // Si se acaba de registrar en este instante, el saldo final es el que queda tras este abono
+      saldoActual = Math.max(0, cartera.saldoTotalPendiente - abonoInfoParam.monto);
+    }
+
+    const montoAbono = ultimoAbono ? ultimoAbono.monto : 0;
+
+    // 4. Saldo anterior: lo que debía ANTES de esta entrega y de este abono
+    let saldoAnterior = saldoActual + montoAbono - montoComprasHoy;
+    if (saldoAnterior < 0) saldoAnterior = 0;
+
+    const subtotalConCompra = saldoAnterior + montoComprasHoy;
+
+    let msg = `Estimado/a *${cartera.clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Le compartimos el comprobante de su movimiento actual:\n\n*Fecha:* ${hoyLegible}\n`;
+
+    // Si había saldo anterior antes de este movimiento
+    if (saldoAnterior > 0) {
+      msg += `\n*Saldo Anterior:* $${saldoAnterior.toFixed(2)}`;
+    }
+
+    // Si hubo entrega de calzado en este movimiento
+    if (montoComprasHoy > 0) {
+      msg += `\n\n*Entrega de Calzado:*`;
+      cobrosDeHoy.forEach((c) => {
+        const num = c.saleNote?.numero ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}` : (c.numeroCobro || 'Nota');
+        const monto = Number(c.montoOriginal || c.montoTotal || 0);
+        msg += `\n• ${num} - Valor: $${monto.toFixed(2)}`;
+      });
+      if (saldoAnterior > 0) {
+        msg += `\n*Total a la fecha:* $${subtotalConCompra.toFixed(2)}`;
+      }
+    }
+
+    // Si hubo abono en este movimiento
+    if (ultimoAbono && montoAbono > 0) {
+      msg += `\n\n*Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono.metodo})`;
+    }
+
+    // Saldo Final
+    msg += `\n\n━━━━━━━━━━━━━━━━━━━━━`;
+    if (saldoActual > 0) {
+      msg += `\n*SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*`;
+    } else {
+      msg += `\n*SALDO PENDIENTE ACTUAL: $0.00 (CUENTA SALDADA)*`;
+    }
+    msg += `\n━━━━━━━━━━━━━━━━━━━━━\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+
+    handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
+  };
+
   const handleRegistrarAbono = async () => {
     if (!cobroSeleccionado || !montoAbono) {
       showToast('Selecciona un cobro e ingresa el monto.', 'warning');
@@ -379,6 +481,16 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         notas: notasAbono.trim() || undefined,
       });
       showToast(`¡Abono de $${valor.toFixed(2)} registrado exitosamente vía ${metodoAbono}!`, 'success');
+
+      // Si el cliente tiene teléfono registrado, enviar comprobante de abono + estado de cuenta por WhatsApp
+      if (carteraSeleccionada?.clienteTelefono) {
+        handleEnviarEstadoCuentaWhatsApp(carteraSeleccionada, {
+          monto: valor,
+          metodo: metodoAbono,
+          fecha: new Date().toLocaleString('es-EC'),
+        });
+      }
+
       setMontoAbono('');
       setNotasAbono('');
       await loadCobros();
@@ -1404,18 +1516,28 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   setShowCuentaModal(false);
                   handleAbrirFacturacion(carteraSeleccionada, cobroSeleccionado || undefined);
                 }}
-                className="w-full py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <FileCheck size={14} />
                 <span>Emitir Factura Electrónica SRI</span>
               </button>
+
+              {carteraSeleccionada.clienteTelefono && (
+                <button
+                  onClick={() => handleEnviarEstadoCuentaWhatsApp(carteraSeleccionada)}
+                  className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer"
+                >
+                  <MessageCircle size={14} />
+                  <span>Enviar Estado de Cuenta por WhatsApp</span>
+                </button>
+              )}
 
               <button
                 onClick={() => {
                   setShowCuentaModal(false);
                   handleAbrirHistorial(carteraSeleccionada.clientId);
                 }}
-                className="w-full py-2 bg-[#0F172A]/10 hover:bg-[#0F172A]/20 text-[#0F172A] font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-[#0F172A]/20"
+                className="w-full py-2 bg-[#0F172A]/10 hover:bg-[#0F172A]/20 text-[#0F172A] font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-[#0F172A]/20 cursor-pointer"
               >
                 <History size={14} />
                 <span>Ver Historial Completo del Cliente</span>
