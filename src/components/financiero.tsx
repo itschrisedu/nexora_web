@@ -182,10 +182,17 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const [devolucionProductoId, setDevolucionProductoId] = useState('');
   const [devolucionTallaId, setDevolucionTallaId] = useState('');
   const [devolucionSubtipoSerie, setDevolucionSubtipoSerie] = useState<'MEDIA_DOCENA' | 'DOCENA_COMPLETA'>('MEDIA_DOCENA');
-  const [devolucionCantidadPares, setDevolucionCantidadPares] = useState<number>(1);
+  const [devolucionCantidadParesInput, setDevolucionCantidadParesInput] = useState<string>('1');
+  const [devolucionCantidadSeries, setDevolucionCantidadSeries] = useState<number>(1);
   const [devolucionPrecioUnitario, setDevolucionPrecioUnitario] = useState<number>(0);
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [savingDevolucion, setSavingDevolucion] = useState(false);
+
+  // Modelos comprados por el cliente para devolución
+  const [productosVendidosCliente, setProductosVendidosCliente] = useState<any[]>([]);
+  const [loadingProductosVendidos, setLoadingProductosVendidos] = useState(false);
+  const [busquedaModeloDevolucion, setBusquedaModeloDevolucion] = useState('');
+  const [productoSeleccionadoDevolucionObj, setProductoSeleccionadoDevolucionObj] = useState<any | null>(null);
 
   // Catálogo y clientes raw para cédulas y devoluciones
   const [clientesRaw, setClientesRaw] = useState<any[]>([]);
@@ -601,33 +608,127 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     }
   };
 
+  const handleAbrirDevolucion = async (cartera: ClienteCartera) => {
+    setClienteSeleccionadoId(cartera.clientId);
+    setShowDevolucionModal(true);
+    setLoadingProductosVendidos(true);
+    setBusquedaModeloDevolucion('');
+    setProductoSeleccionadoDevolucionObj(null);
+    setDevolucionProductoId('');
+    setDevolucionTallaId('');
+    setDevolucionPrecioUnitario(0);
+    setDevolucionCantidadParesInput('1');
+    setDevolucionCantidadSeries(1);
+    setMotivoDevolucion('');
+
+    // Preasignar nota por defecto (la nota más antigua con deuda)
+    const notaMasAntigua = [...cartera.cobros]
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .find((c) => Number(c.saldoPendiente) > 0) || cartera.cobros[0];
+    setDevolucionCobroId(notaMasAntigua?.id || '');
+
+    try {
+      // Cargar historial para extraer exactamente los modelos que este cliente compró y su precio de venta real
+      const dataHistorial = await ApiService.get(`/financiero/cliente/${cartera.clientId}/historial`);
+      const productosMap = new Map<string, any>();
+
+      if (dataHistorial && Array.isArray(dataHistorial.movimientos)) {
+        dataHistorial.movimientos.forEach((m: any) => {
+          if (m.detalles && Array.isArray(m.detalles.lineas)) {
+            // Buscar cobro asociado a este movimiento
+            const cobroAsociado = cartera.cobros.find((c) =>
+              ((c.saleNote as any)?.orderId && m.pedidoId && (c.saleNote as any).orderId === m.pedidoId) ||
+              (c.saleNote?.numero && m.titulo && m.titulo.includes(String(c.saleNote.numero))) ||
+              (c.id === m.id)
+            ) || notaMasAntigua;
+
+            const notaTexto = cobroAsociado?.saleNote?.numero
+              ? `Nota #${String(cobroAsociado.saleNote.numero).padStart(4, '0')}`
+              : (m.numeroCodigo || 'Nota de Venta');
+
+            m.detalles.lineas.forEach((l: any) => {
+              const prodId = l.productId;
+              if (prodId && !productosMap.has(prodId)) {
+                const catProd = catalogoProductos.find((p) => p.id === prodId);
+                productosMap.set(prodId, {
+                  id: prodId,
+                  modelName: l.modelName || catProd?.modelName || 'Calzado',
+                  color: l.color || catProd?.color || '',
+                  imageUrl: l.imageUrl || catProd?.imageUrl || null,
+                  serieNombre: l.serieNombre || catProd?.serieNombre || 'Estándar',
+                  precioUnitario: Number(l.precioUnitario || catProd?.salePrice || 0),
+                  tallas: catProd?.tallas || [{ id: l.tallaId || 'default', numeroTalla: l.numeroTalla || 38, stock: l.cantidad || 1, quantity: l.cantidad || 1 }],
+                  paresComprados: l.cantidad || 0,
+                  tipoVentaComprado: l.tipoVenta || 'GENERAL',
+                  cobroId: cobroAsociado?.id,
+                  notaCodigo: notaTexto,
+                });
+              } else if (prodId) {
+                const existing = productosMap.get(prodId);
+                existing.paresComprados += (l.cantidad || 0);
+              }
+            });
+          }
+        });
+      }
+
+      const lista = Array.from(productosMap.values());
+      const finalList = lista.length > 0 ? lista : catalogoProductos;
+      setProductosVendidosCliente(finalList);
+
+      if (finalList.length > 0) {
+        handleSeleccionarProductoDevolucion(finalList[0]);
+      }
+    } catch (err) {
+      console.warn('Error al cargar productos vendidos del cliente:', err);
+      setProductosVendidosCliente(catalogoProductos);
+      if (catalogoProductos.length > 0) {
+        handleSeleccionarProductoDevolucion(catalogoProductos[0]);
+      }
+    } finally {
+      setLoadingProductosVendidos(false);
+    }
+  };
+
+  const handleSeleccionarProductoDevolucion = (prod: any) => {
+    setProductoSeleccionadoDevolucionObj(prod);
+    setDevolucionProductoId(prod.id);
+    setDevolucionPrecioUnitario(Number(prod.precioUnitario || prod.salePrice || 0));
+    if (prod.cobroId) {
+      setDevolucionCobroId(prod.cobroId);
+    }
+    if (prod.tallas && prod.tallas.length > 0) {
+      setDevolucionTallaId(prod.tallas[0].id || String(prod.tallas[0].numeroTalla || prod.tallas[0].numero || ''));
+    }
+  };
+
   const handleRegistrarDevolucion = async () => {
     if (!carteraSeleccionada) return;
 
-    const totalPares = devolucionTipo === 'SERIE_COMPLETA'
-      ? (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12)
-      : Number(devolucionCantidadPares || 1);
+    const pares = devolucionTipo === 'SERIE_COMPLETA'
+      ? (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * Math.max(1, devolucionCantidadSeries || 1)
+      : Math.max(1, parseInt(devolucionCantidadParesInput) || 1);
 
     const precio = Number(devolucionPrecioUnitario || 0);
-    const totalMonto = totalPares * precio;
+    const totalMonto = pares * precio;
 
     if (totalMonto <= 0) {
-      showToast('Ingresa un precio unitario válido para calcular el valor de la devolución.', 'warning');
+      showToast('Ingresa un precio y cantidad válidos para calcular la devolución.', 'warning');
       return;
     }
 
     setSavingDevolucion(true);
     try {
       const selectedCobro = carteraSeleccionada.cobros.find((c) => c.id === devolucionCobroId);
-      const prod = catalogoProductos.find((p) => p.id === devolucionProductoId);
+      const prod = productoSeleccionadoDevolucionObj || catalogoProductos.find((p) => p.id === devolucionProductoId);
 
       const linesPayload: any[] = [];
       if (devolucionTipo === 'SERIE_COMPLETA' && prod?.tallas && prod.tallas.length > 0) {
         const tallas = prod.tallas;
-        const porTalla = Math.floor(totalPares / tallas.length) || 1;
+        const porTalla = Math.floor(pares / tallas.length) || 1;
         let acumulado = 0;
         tallas.forEach((t: any, idx: number) => {
-          const cant = idx === tallas.length - 1 ? (totalPares - acumulado) : porTalla;
+          const cant = idx === tallas.length - 1 ? (pares - acumulado) : porTalla;
           acumulado += cant;
           if (cant > 0) {
             linesPayload.push({
@@ -640,9 +741,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         });
       } else {
         linesPayload.push({
-          productId: devolucionProductoId || 'sin-especificar',
+          productId: devolucionProductoId || prod?.id || 'sin-especificar',
           tallaId: devolucionTallaId || 'sin-especificar',
-          cantidad: totalPares,
+          cantidad: pares,
           precioUnitario: precio,
         });
       }
@@ -657,7 +758,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
       });
 
       showToast(
-        `¡Devolución de $${totalMonto.toFixed(2)} procesada exitosamente! (${devolucionDestino === 'BAJA_POR_FALLA' ? 'Baja/merma por falla' : 'Reingreso a stock en bodega'})`,
+        `¡Devolución de ${pares} pares ($${totalMonto.toFixed(2)}) procesada exitosamente!`,
         'success'
       );
       setShowDevolucionModal(false);
@@ -1715,9 +1816,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                 <button
                   onClick={() => {
                     setShowCuentaModal(false);
-                    setShowDevolucionModal(true);
+                    handleAbrirDevolucion(carteraSeleccionada);
                   }}
-                  className="flex-1 py-2 text-rose-500 hover:bg-rose-500/10 font-semibold text-[11px] rounded-xl transition-colors flex items-center justify-center gap-1 border border-rose-500/20"
+                  className="flex-1 py-2 text-rose-500 hover:bg-rose-500/10 font-semibold text-[11px] rounded-xl transition-colors flex items-center justify-center gap-1 border border-rose-500/20 cursor-pointer"
                 >
                   <AlertTriangle size={12} />
                   <span>Registrar Devolución</span>
@@ -2016,16 +2117,16 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
       {/* Modal Devolución de Cliente Mejorado */}
       {showDevolucionModal && carteraSeleccionada && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in">
             {/* Header del Modal */}
-            <div className="p-4 border-b border-[var(--border)] bg-gradient-to-r from-rose-950 to-slate-900 text-white flex items-center justify-between">
+            <div className="p-4 border-b border-[var(--border)] bg-gradient-to-r from-rose-950 via-slate-900 to-[#0F172A] text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-rose-500/20 rounded-xl border border-rose-500/30 text-rose-400">
                   <AlertTriangle size={18} />
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-white">Registro de Devolución de Calzado</h3>
-                  <p className="text-[11px] text-slate-300">Cliente: <strong className="text-white">{carteraSeleccionada.clienteNombre}</strong></p>
+                  <p className="text-[11px] text-slate-300">Cliente: <strong className="text-white">{carteraSeleccionada.clienteNombre}</strong> (C.I: {carteraSeleccionada.clienteCedula})</p>
                 </div>
               </div>
               <button
@@ -2038,47 +2139,100 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
             {/* Formulario */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
-              {/* 1. Selector de Nota / Venta Afectada */}
-              <div>
-                <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1">
-                  1. Seleccionar Nota de Venta / Cobro Afectado
-                </label>
-                <select
-                  value={devolucionCobroId}
-                  onChange={(e) => {
-                    setDevolucionCobroId(e.target.value);
-                    const cob = carteraSeleccionada.cobros.find((c) => c.id === e.target.value);
-                    if (cob?.montoTotal && !devolucionPrecioUnitario) {
-                      setDevolucionPrecioUnitario(Number(cob.montoTotal) > 0 ? 10 : 0);
-                    }
-                  }}
-                  className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl font-semibold text-xs focus:outline-none focus:border-[#0F172A]"
-                >
-                  <option value="">-- Cobro general del cliente (Última deuda) --</option>
-                  {carteraSeleccionada.cobros.map((c) => {
-                    const num = c.saleNote?.numero
-                      ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}`
-                      : c.numeroCobro || `#${c.id.slice(0, 8).toUpperCase()}`;
-                    return (
-                      <option key={c.id} value={c.id}>
-                        {num} — Monto: ${Number(c.montoOriginal ?? c.montoTotal ?? 0).toFixed(2)} (Saldo: ${Number(c.saldoPendiente).toFixed(2)})
-                      </option>
-                    );
-                  })}
-                </select>
+              {/* 1. Selector de Modelos VENDIDOS A ESTE CLIENTE */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-[var(--foreground)]">
+                    1. Modelo de Calzado a Devolver (Comprado por el Cliente) *
+                  </label>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    {productosVendidosCliente.length} modelos comprados
+                  </span>
+                </div>
+
+                {/* Buscador de modelos vendidos */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar entre los modelos comprados por el cliente..."
+                    value={busquedaModeloDevolucion}
+                    onChange={(e) => setBusquedaModeloDevolucion(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                  {busquedaModeloDevolucion && (
+                    <button
+                      onClick={() => setBusquedaModeloDevolucion('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Lista seleccionable de modelos vendidos */}
+                {loadingProductosVendidos ? (
+                  <div className="p-4 text-center text-xs text-[var(--muted-foreground)] flex items-center justify-center gap-2">
+                    <Loader2 size={14} className="animate-spin text-[#0F172A]" />
+                    <span>Cargando productos comprados por el cliente...</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                    {productosVendidosCliente
+                      .filter((p) => {
+                        const q = busquedaModeloDevolucion.toLowerCase().trim();
+                        if (!q) return true;
+                        return (
+                          (p.modelName && p.modelName.toLowerCase().includes(q)) ||
+                          (p.color && p.color.toLowerCase().includes(q)) ||
+                          (p.serieNombre && p.serieNombre.toLowerCase().includes(q))
+                        );
+                      })
+                      .map((p) => {
+                        const isSelected = productoSeleccionadoDevolucionObj?.id === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleSeleccionarProductoDevolucion(p)}
+                            className={`p-2 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-500/10 border-emerald-500/50 shadow-xs ring-2 ring-emerald-500/20'
+                                : 'bg-[var(--card)] border-[var(--border)] hover:border-[#0F172A]/40'
+                            }`}
+                          >
+                            {p.imageUrl ? (
+                              <img src={p.imageUrl} alt="" className="w-9 h-9 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-[var(--muted)] flex items-center justify-center text-sm shrink-0">👟</div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-[11px] text-[var(--foreground)] block truncate">{p.modelName}</span>
+                              <div className="text-[10px] text-[var(--muted-foreground)] truncate">
+                                Color: <strong className="text-[var(--foreground)]">{p.color}</strong> • {p.serieNombre}
+                              </div>
+                              <div className="text-[10px] text-emerald-600 font-extrabold mt-0.5">
+                                Precio Venta: ${Number(p.precioUnitario || p.salePrice || 0).toFixed(2)}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
 
-              {/* 2. Modalidad de Devolución */}
+              {/* 3. Modalidad de Devolución */}
               <div>
                 <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1.5">
-                  2. Modalidad de Devolución
+                  3. Modalidad de Devolución
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setDevolucionTipo('TALLA_ESPECIFICA');
-                      setDevolucionCantidadPares(1);
+                      setDevolucionCantidadParesInput('1');
                     }}
                     className={`p-2.5 rounded-xl border text-left font-bold transition-all cursor-pointer ${
                       devolucionTipo === 'TALLA_ESPECIFICA'
@@ -2088,9 +2242,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <span>👟</span>
-                      <span>Por Talla / Pares</span>
+                      <span>Por Talla Específica</span>
                     </div>
-                    <span className="text-[10px] font-normal opacity-80 block">Devolución de pares específicos</span>
+                    <span className="text-[10px] font-normal opacity-80 block">Devolución de pares por numeración</span>
                   </button>
 
                   <button
@@ -2098,6 +2252,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     onClick={() => {
                       setDevolucionTipo('SERIE_COMPLETA');
                       setDevolucionSubtipoSerie('MEDIA_DOCENA');
+                      setDevolucionCantidadSeries(1);
                     }}
                     className={`p-2.5 rounded-xl border text-left font-bold transition-all cursor-pointer ${
                       devolucionTipo === 'SERIE_COMPLETA'
@@ -2107,12 +2262,205 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <span>📦</span>
-                      <span>Serie Completa</span>
+                      <span>Por Serie Completa</span>
                     </div>
-                    <span className="text-[10px] font-normal opacity-80 block">Docena (12) o Media Docena (6)</span>
+                    <span className="text-[10px] font-normal opacity-80 block">Curva completa (6 o 12 pares)</span>
                   </button>
                 </div>
               </div>
+
+              {/* 4. Configuración de Tallas / Curva y Cantidades */}
+              {devolucionTipo === 'SERIE_COMPLETA' ? (
+                <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-emerald-800">Curva de Serie:</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDevolucionSubtipoSerie('MEDIA_DOCENA')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                          devolucionSubtipoSerie === 'MEDIA_DOCENA'
+                            ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                        }`}
+                      >
+                        <span>½ Media Docena (6 pares)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDevolucionSubtipoSerie('DOCENA_COMPLETA')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                          devolucionSubtipoSerie === 'DOCENA_COMPLETA'
+                            ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                        }`}
+                      >
+                        <span>1 Docena Completa (12 pares)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-emerald-500/20">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-[var(--muted-foreground)] shrink-0">
+                        ¿Cuántas {devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}?:
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setDevolucionCantidadSeries(Math.max(1, (devolucionCantidadSeries || 1) - 1))}
+                          className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-xs cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          value={devolucionCantidadSeries || ''}
+                          onChange={(e) => setDevolucionCantidadSeries(e.target.value === '' ? 0 : Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setDevolucionCantidadSeries((devolucionCantidadSeries || 1) + 1)}
+                          className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-xs cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span className="text-xs font-black text-emerald-700 ml-1">
+                        = { (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (devolucionCantidadSeries || 1) } pares
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-semibold text-[var(--muted-foreground)]">Precio Venta/Par:</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={devolucionPrecioUnitario || ''}
+                          onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
+                          className="w-20 pl-5 pr-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-right"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vista de curva del modelo */}
+                  {productoSeleccionadoDevolucionObj?.tallas && productoSeleccionadoDevolucionObj.tallas.length > 0 && (
+                    <div className="pt-2 border-t border-emerald-500/20">
+                      <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] block mb-1">
+                        Curva de Tallas Distribuidas ({productoSeleccionadoDevolucionObj.serieNombre || 'Serie'}):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {productoSeleccionadoDevolucionObj.tallas.map((t: any) => (
+                          <span
+                            key={t.id || t.numeroTalla}
+                            className="px-2 py-0.5 bg-emerald-500/10 text-emerald-800 rounded-md border border-emerald-500/20 text-[10px] font-bold"
+                          >
+                            T{t.numeroTalla || t.numero}: {t.stock || 1} par
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-3">
+                  {/* Selector de Tallas con Chips */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
+                      Seleccionar Talla a Devolver:
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(productoSeleccionadoDevolucionObj?.tallas || [
+                        { id: 't38', numeroTalla: 38 },
+                        { id: 't39', numeroTalla: 39 },
+                        { id: 't40', numeroTalla: 40 },
+                        { id: 't41', numeroTalla: 41 },
+                        { id: 't42', numeroTalla: 42 },
+                      ]).map((t: any) => {
+                        const tallaVal = t.id || String(t.numeroTalla || t.numero);
+                        const isTallaSelected = (devolucionTallaId === tallaVal || devolucionTallaId === String(t.numeroTalla));
+                        return (
+                          <button
+                            key={t.id || t.numeroTalla}
+                            type="button"
+                            onClick={() => setDevolucionTallaId(tallaVal)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              isTallaSelected
+                                ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
+                                : 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:border-[#0F172A]'
+                            }`}
+                          >
+                            Talla {t.numeroTalla || t.numero}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
+                    {/* Número de pares con botones +/- y campo libre */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
+                        Número de Pares:
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = Math.max(1, (parseInt(devolucionCantidadParesInput) || 1) - 1);
+                            setDevolucionCantidadParesInput(String(val));
+                          }}
+                          className="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-sm hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={devolucionCantidadParesInput}
+                          onChange={(e) => setDevolucionCantidadParesInput(e.target.value)}
+                          className="w-20 h-8 text-center font-black text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = (parseInt(devolucionCantidadParesInput) || 0) + 1;
+                            setDevolucionCantidadParesInput(String(val));
+                          }}
+                          className="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-sm hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Precio Unitario de Venta */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
+                        Precio Unitario de Venta ($):
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={devolucionPrecioUnitario || ''}
+                          onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
+                          className="w-full pl-6 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-emerald-600 focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 3. Destino del Calzado / Clasificación del Stock */}
               <div>
@@ -2154,152 +2502,31 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                 </div>
               </div>
 
-              {/* 4. Modelo de Calzado y Cantidades */}
-              <div className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                    Modelo de Calzado Devuelto
-                  </label>
-                  <select
-                    value={devolucionProductoId}
-                    onChange={(e) => {
-                      setDevolucionProductoId(e.target.value);
-                      const prod = catalogoProductos.find((p) => p.id === e.target.value);
-                      if (prod?.salePrice) {
-                        setDevolucionPrecioUnitario(Number(prod.salePrice));
-                      }
-                      if (prod?.tallas && prod.tallas.length > 0) {
-                        setDevolucionTallaId(prod.tallas[0].id);
-                      }
-                    }}
-                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold"
-                  >
-                    <option value="">-- Seleccionar modelo del catálogo --</option>
-                    {catalogoProductos.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.modelName} ({p.color}) — {p.serieNombre || 'Serie'} (${Number(p.salePrice).toFixed(2)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {devolucionTipo === 'SERIE_COMPLETA' ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
-                        Formato de Serie
-                      </label>
-                      <select
-                        value={devolucionSubtipoSerie}
-                        onChange={(e) => setDevolucionSubtipoSerie(e.target.value as any)}
-                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
-                      >
-                        <option value="MEDIA_DOCENA">Media Docena (6 Pares)</option>
-                        <option value="DOCENA_COMPLETA">1 Docena Completa (12 Pares)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
-                        Precio Unit. por Par ($)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={devolucionPrecioUnitario}
-                        onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
-                        Talla
-                      </label>
-                      {(() => {
-                        const prod = catalogoProductos.find((p) => p.id === devolucionProductoId);
-                        if (prod?.tallas && prod.tallas.length > 0) {
-                          return (
-                            <select
-                              value={devolucionTallaId}
-                              onChange={(e) => setDevolucionTallaId(e.target.value)}
-                              className="w-full px-2.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
-                            >
-                              {prod.tallas.map((t: any) => (
-                                <option key={t.id} value={t.id}>
-                                  Talla {t.numeroTalla} (Stock: {t.quantity})
-                                </option>
-                              ))}
-                            </select>
-                          );
-                        }
-                        return (
-                          <input
-                            type="text"
-                            placeholder="Ej. Talla 38"
-                            value={devolucionTallaId}
-                            onChange={(e) => setDevolucionTallaId(e.target.value)}
-                            className="w-full px-2.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
-                          />
-                        );
-                      })()}
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
-                        N° Pares
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={devolucionCantidadPares}
-                        onChange={(e) => setDevolucionCantidadPares(parseInt(e.target.value) || 1)}
-                        className="w-full px-2.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
-                        Precio Unit. ($)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={devolucionPrecioUnitario}
-                        onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
-                        className="w-full px-2.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 5. Motivo / Detalle */}
+              {/* 4. Motivo / Detalle */}
               <div>
                 <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1">
-                  5. Motivo o Detalle de la Devolución
+                  4. Motivo o Detalle de la Devolución
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Falla en costura lateral izquierda, cambio de color por cliente..."
+                  placeholder="Ej. Falla en costura lateral, cambio de modelo solicitado por cliente..."
                   value={motivoDevolucion}
                   onChange={(e) => setMotivoDevolucion(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold"
                 />
               </div>
 
-              {/* Resumen del Impacto */}
+              {/* Resumen del Impacto y Total a Descontar */}
               {(() => {
                 const totalPares = devolucionTipo === 'SERIE_COMPLETA'
-                  ? (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12)
-                  : Number(devolucionCantidadPares || 1);
+                  ? (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * Math.max(1, devolucionCantidadSeries || 1)
+                  : Math.max(1, parseInt(devolucionCantidadParesInput) || 1);
                 const totalMonto = totalPares * Number(devolucionPrecioUnitario || 0);
 
                 return (
                   <div className="p-3.5 bg-slate-900 text-white rounded-xl space-y-1.5 shadow-sm">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-300">Pares a Devolver:</span>
+                      <span className="text-slate-300">Total Pares a Devolver:</span>
                       <strong className="text-white">{totalPares} pares ({devolucionTipo === 'SERIE_COMPLETA' ? 'Serie Completa' : 'Por Talla'})</strong>
                     </div>
                     <div className="flex justify-between items-center text-xs">
@@ -2308,8 +2535,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                         {devolucionDestino === 'BAJA_POR_FALLA' ? '⚠️ Merma / Baja por Falla' : '📦 Reingreso a Bodega'}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center text-sm pt-1 border-t border-white/10">
-                      <span className="font-bold text-rose-400">Total a Descontar de la Deuda:</span>
+                    <div className="flex justify-between items-center text-sm pt-1.5 border-t border-white/10">
+                      <span className="font-bold text-rose-400">Total a Descontar de la Deuda del Cliente:</span>
                       <span className="font-black text-rose-400 text-base">
                         -${totalMonto.toFixed(2)}
                       </span>
