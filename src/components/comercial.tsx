@@ -101,6 +101,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   // Selección de Producto actual para agregar
   const [selectedProductId, setSelectedProductId] = useState('');
   const [precioItem, setPrecioItem] = useState(0);
+  const [precioItemInput, setPrecioItemInput] = useState('');
   const [tipoVentaItem, setTipoVentaItem] = useState<'SERIE_COMPLETA' | 'TALLA_ESPECIFICA'>('SERIE_COMPLETA');
   const [subtipoSerie, setSubtipoSerie] = useState<'MEDIA_DOCENA' | 'DOCENA'>('MEDIA_DOCENA');
   const [cantidadSeries, setCantidadSeries] = useState(1);
@@ -147,8 +148,14 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       }
       try {
         const data = await ApiService.get(`/pedidos/ultimo-precio?clientId=${clientId}&productId=${selectedProductId}`);
-        setUltimoPrecioCliente(data.precioAnterior || null);
+        const precioAnterior = data.precioAnterior ? Number(data.precioAnterior) : null;
+        setUltimoPrecioCliente(precioAnterior);
         setFechaUltimaVenta(data.fechaUltimaVenta ? new Date(data.fechaUltimaVenta).toLocaleDateString('es-EC') : null);
+        // Auto-aplicar el último precio del cliente como precio por defecto
+        if (precioAnterior && precioAnterior > 0) {
+          setPrecioItem(precioAnterior);
+          setPrecioItemInput(String(precioAnterior));
+        }
       } catch {
         setUltimoPrecioCliente(null);
         setFechaUltimaVenta(null);
@@ -289,7 +296,13 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       setProductoSeleccionadoObj(pObj);
       setShowDropdownModelo(false);
       setBusquedaModelo('');
-      setPrecioItem(pObj.salePrice || 0); // Pre-llenar directamente con precio de venta del catálogo
+      // Usar salePrice del catálogo como precio base siempre
+      const precioCatalogo = Number(pObj.salePrice) || Number(pObj.costPrice) || 0;
+      setPrecioItem(precioCatalogo);
+      setPrecioItemInput(precioCatalogo > 0 ? String(precioCatalogo) : '');
+      // Resetear último precio del cliente para que el useEffect lo consulte y auto-aplique
+      setUltimoPrecioCliente(null);
+      setFechaUltimaVenta(null);
       
       const initialMap: Record<string, number> = {};
       if (pObj.tallas) {
@@ -302,6 +315,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       setSelectedProductId('');
       setProductoSeleccionadoObj(null);
       setPrecioItem(0);
+      setPrecioItemInput('');
       setTallaCantidadesMap({});
     }
   };
@@ -388,6 +402,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     setProductoSeleccionadoObj(null);
     setBusquedaModelo('');
     setPrecioItem(0);
+    setPrecioItemInput('');
     setTallaCantidadesMap({});
     setCantidadSeries(1);
     setUltimoPrecioCliente(null);
@@ -1171,6 +1186,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   setSelectedProductId('');
                                   setBusquedaModelo('');
                                   setPrecioItem(0);
+                                  setPrecioItemInput('');
                                 }}
                                 className="text-xs font-bold text-red-500 hover:underline shrink-0"
                               >
@@ -1532,9 +1548,15 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                       type="number"
                       step="0.01"
                       min="0.01"
+                      placeholder="0.00"
                       disabled={!puedeCambiarPrecio}
-                      value={precioItem}
-                      onChange={(e) => setPrecioItem(parseFloat(e.target.value) || 0)}
+                      value={precioItemInput}
+                      onChange={(e) => {
+                        const valStr = e.target.value;
+                        setPrecioItemInput(valStr);
+                        const parsed = parseFloat(valStr);
+                        setPrecioItem(isNaN(parsed) ? 0 : parsed);
+                      }}
                       className={`w-full px-3 py-2 border rounded-xl text-xs font-bold focus:outline-none ${
                         !puedeCambiarPrecio
                           ? 'bg-[var(--muted)]/40 border-[var(--border)] text-[var(--muted-foreground)] cursor-not-allowed'
@@ -1546,12 +1568,12 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
                 {/* Información de último precio al cliente */}
                 {ultimoPrecioCliente !== null && selectedProductId && clientId && (
-                  <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-2">
-                    <span className="text-blue-600 text-lg">💡</span>
+                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2">
+                    <span className="text-emerald-600 text-lg">✅</span>
                     <div className="text-[11px]">
-                      <span className="font-bold text-blue-700">Último precio pagado por este cliente: </span>
-                      <span className="font-black text-blue-800">${ultimoPrecioCliente.toFixed(2)}</span>
-                      {fechaUltimaVenta && <span className="text-blue-600 ml-1">(el {fechaUltimaVenta})</span>}
+                      <span className="font-bold text-emerald-700">Precio auto-aplicado del historial del cliente: </span>
+                      <span className="font-black text-emerald-800">${ultimoPrecioCliente.toFixed(2)}</span>
+                      {fechaUltimaVenta && <span className="text-emerald-600 ml-1">(ultima compra: {fechaUltimaVenta})</span>}
                     </div>
                   </div>
                 )}
