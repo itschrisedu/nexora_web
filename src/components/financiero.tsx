@@ -174,11 +174,22 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const [notasAbono, setNotasAbono] = useState('');
   const [savingAbono, setSavingAbono] = useState(false);
 
-  // Modal Devolución
+  // Modal Devolución Mejorado
   const [showDevolucionModal, setShowDevolucionModal] = useState(false);
+  const [devolucionCobroId, setDevolucionCobroId] = useState('');
+  const [devolucionTipo, setDevolucionTipo] = useState<'SERIE_COMPLETA' | 'TALLA_ESPECIFICA'>('TALLA_ESPECIFICA');
+  const [devolucionDestino, setDevolucionDestino] = useState<'REINGRESO_INVENTARIO' | 'BAJA_POR_FALLA'>('REINGRESO_INVENTARIO');
+  const [devolucionProductoId, setDevolucionProductoId] = useState('');
+  const [devolucionTallaId, setDevolucionTallaId] = useState('');
+  const [devolucionSubtipoSerie, setDevolucionSubtipoSerie] = useState<'MEDIA_DOCENA' | 'DOCENA_COMPLETA'>('MEDIA_DOCENA');
+  const [devolucionCantidadPares, setDevolucionCantidadPares] = useState<number>(1);
+  const [devolucionPrecioUnitario, setDevolucionPrecioUnitario] = useState<number>(0);
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
-  const [montoDevolucion, setMontoDevolucion] = useState('');
   const [savingDevolucion, setSavingDevolucion] = useState(false);
+
+  // Catálogo y clientes raw para cédulas y devoluciones
+  const [clientesRaw, setClientesRaw] = useState<any[]>([]);
+  const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
 
   // Modal Historial Completo del Cliente
   const [showHistorialModal, setShowHistorialModal] = useState(false);
@@ -257,9 +268,32 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     setLoading(true);
     try {
       if (online) {
-        const data = await ApiService.get('/financiero/cobros');
-        const list = Array.isArray(data) ? data : [];
+        const [dataCobros, dataClientes, dataCatalogo] = await Promise.all([
+          ApiService.get('/financiero/cobros'),
+          ApiService.get('/clientes'),
+          ApiService.get('/catalogo/productos'),
+        ]);
+        const list = Array.isArray(dataCobros) ? dataCobros : [];
         setCobros(list);
+        if (Array.isArray(dataClientes)) setClientesRaw(dataClientes);
+
+        const flat: any[] = [];
+        (dataCatalogo || []).forEach((modelo: any) => {
+          (modelo.variantes || []).forEach((v: any) => {
+            flat.push({
+              id: v.id,
+              code: v.code,
+              color: v.color,
+              imageUrl: v.imageUrl,
+              costPrice: Number(v.costPrice || 0),
+              salePrice: Number(v.salePrice || 0),
+              modelName: modelo.name,
+              serieNombre: v.serieNombre,
+              tallas: v.tallas || [],
+            });
+          });
+        });
+        setCatalogoProductos(flat);
       }
     } catch (err) {
       console.error('Error al cargar cobros:', err);
@@ -283,6 +317,23 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
       const primerCobro = listaCobros[0];
       const cobroConEmail = listaCobros.find((c) => c.clienteEmail) || primerCobro;
       const cobroConDireccion = listaCobros.find((c) => c.clienteDireccion) || primerCobro;
+
+      const clienteDb = clientesRaw.find((c) => c.id === clientId);
+      const cedulaResuelta =
+        clienteDb?.cedula ||
+        clienteDb?.ruc ||
+        primerCobro.clienteCedula ||
+        listaCobros.find((c) => c.clienteCedula && c.clienteCedula !== '—')?.clienteCedula ||
+        '—';
+      const telefonoResuelto =
+        clienteDb?.telefono ||
+        primerCobro.clienteTelefono ||
+        listaCobros.find((c) => c.clienteTelefono && c.clienteTelefono !== '—')?.clienteTelefono ||
+        '—';
+      const nombreResuelto =
+        clienteDb && (clienteDb.nombre || clienteDb.apellido)
+          ? `${clienteDb.nombre || ''} ${clienteDb.apellido || ''}`.trim()
+          : primerCobro.clienteNombre || 'Cliente sin registrar';
 
       const montoTotalFacturado = listaCobros.reduce(
         (sum, c) => sum + Number(c.montoOriginal ?? c.montoTotal ?? 0),
@@ -322,12 +373,12 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
       resultado.push({
         clientId,
-        clienteNombre: primerCobro.clienteNombre || 'Cliente sin registrar',
-        clienteCedula: primerCobro.clienteCedula || '—',
-        clienteTelefono: primerCobro.clienteTelefono || '—',
-        clienteEmail: cobroConEmail?.clienteEmail || '',
-        clienteDireccion: cobroConDireccion?.clienteDireccion || '',
-        clienteNivel: primerCobro.clienteNivel || '—',
+        clienteNombre: nombreResuelto,
+        clienteCedula: cedulaResuelta,
+        clienteTelefono: telefonoResuelto,
+        clienteEmail: clienteDb?.email || cobroConEmail?.clienteEmail || '',
+        clienteDireccion: clienteDb?.direccion || cobroConDireccion?.clienteDireccion || '',
+        clienteNivel: clienteDb?.nivelCredito || primerCobro.clienteNivel || '—',
         montoTotalFacturado,
         saldoTotalPendiente,
         totalAbonado,
@@ -343,14 +394,27 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     return resultado.sort((a, b) => b.saldoTotalPendiente - a.saldoTotalPendiente);
   })();
 
-  // ── Selección activa ──────────────────────────
+  const [acordeonNotasAbierto, setAcordeonNotasAbierto] = useState(false);
+
+  // ── Selección activa (FIFO: La nota más antigua con deuda por defecto) ──────────
   const carteraSeleccionada = clientesCartera.find((c) => c.clientId === clienteSeleccionadoId) || (clientesCartera.length > 0 ? clientesCartera[0] : null);
-  const cobroSeleccionado = cobros.find((c) => c.id === cobroSeleccionadoId) || (carteraSeleccionada?.cobros.find((c) => Number(c.saldoPendiente) > 0) || carteraSeleccionada?.cobros[0] || null);
+  
+  const cobrosOrdenadosPorAntiguedad = carteraSeleccionada?.cobros
+    ? [...carteraSeleccionada.cobros].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    : [];
+  const notaMasAntiguaPendiente = cobrosOrdenadosPorAntiguedad.find((c) => Number(c.saldoPendiente) > 0) || cobrosOrdenadosPorAntiguedad[0];
+  const cobroSeleccionado = cobros.find((c) => c.id === cobroSeleccionadoId) || notaMasAntiguaPendiente || null;
 
   const handleSeleccionarCliente = (c: ClienteCartera) => {
     setClienteSeleccionadoId(c.clientId);
-    const cobroConDeuda = c.cobros.find((item) => Number(item.saldoPendiente) > 0) || c.cobros[0];
-    setCobroSeleccionadoId(cobroConDeuda?.id || null);
+    // Ordenar cobros por fecha ascendente (de la más antigua a la más reciente)
+    const cobrosPorAntiguedad = [...c.cobros].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    // Seleccionar automáticamente la nota MÁS ANTIGUA que tenga saldo pendiente
+    const notaMasAntiguaConDeuda = cobrosPorAntiguedad.find((item) => Number(item.saldoPendiente) > 0) || cobrosPorAntiguedad[0];
+    setCobroSeleccionadoId(notaMasAntiguaConDeuda?.id || null);
+    setAcordeonNotasAbierto(false);
     setMontoAbono('');
     setNotasAbono('');
     setShowCuentaModal(true);
@@ -459,8 +523,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   };
 
   const handleRegistrarAbono = async () => {
-    if (!cobroSeleccionado || !montoAbono) {
-      showToast('Selecciona un cobro e ingresa el monto.', 'warning');
+    if (!carteraSeleccionada || !montoAbono) {
+      showToast('Ingresa el monto del abono.', 'warning');
       return;
     }
     const valor = parseFloat(montoAbono);
@@ -468,18 +532,40 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
       showToast('Ingresa un monto válido mayor a $0.00', 'warning');
       return;
     }
-    if (valor > Number(cobroSeleccionado.saldoPendiente)) {
-      showToast(`El monto no puede superar el saldo pendiente de esta nota ($${Number(cobroSeleccionado.saldoPendiente).toFixed(2)})`, 'warning');
+    if (valor > Number(carteraSeleccionada.saldoTotalPendiente)) {
+      showToast(`El monto no puede superar el saldo total adeudado por el cliente ($${Number(carteraSeleccionada.saldoTotalPendiente).toFixed(2)})`, 'warning');
       return;
     }
 
     setSavingAbono(true);
     try {
-      await ApiService.post(`/financiero/cobros/${cobroSeleccionado.id}/abono`, {
-        monto: valor,
-        metodo: metodoAbono,
-        notas: notasAbono.trim() || undefined,
-      });
+      // 1. Obtener notas con deuda ordenadas por antigüedad (FIFO: la más antigua primero)
+      const notasPendientes = [...carteraSeleccionada.cobros]
+        .filter((c) => Number(c.saldoPendiente) > 0)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      if (notasPendientes.length === 0 && cobroSeleccionado) {
+        await ApiService.post(`/financiero/cobros/${cobroSeleccionado.id}/abono`, {
+          monto: valor,
+          metodo: metodoAbono,
+          notas: notasAbono.trim() || undefined,
+        });
+      } else {
+        // Distribuir en cascada FIFO a la nota más antigua y excedentes a las siguientes
+        let restante = valor;
+        for (const n of notasPendientes) {
+          if (restante <= 0) break;
+          const saldoNota = Number(n.saldoPendiente);
+          const montoParaEstaNota = Math.min(saldoNota, restante);
+          await ApiService.post(`/financiero/cobros/${n.id}/abono`, {
+            monto: montoParaEstaNota,
+            metodo: metodoAbono,
+            notas: notasAbono.trim() || undefined,
+          });
+          restante -= montoParaEstaNota;
+        }
+      }
+
       showToast(`¡Abono de $${valor.toFixed(2)} registrado exitosamente vía ${metodoAbono}!`, 'success');
 
       // Si el cliente tiene teléfono registrado, enviar comprobante de abono + estado de cuenta por WhatsApp
@@ -516,26 +602,69 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   };
 
   const handleRegistrarDevolucion = async () => {
-    if (!carteraSeleccionada || !montoDevolucion || !motivoDevolucion) return;
+    if (!carteraSeleccionada) return;
+
+    const totalPares = devolucionTipo === 'SERIE_COMPLETA'
+      ? (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12)
+      : Number(devolucionCantidadPares || 1);
+
+    const precio = Number(devolucionPrecioUnitario || 0);
+    const totalMonto = totalPares * precio;
+
+    if (totalMonto <= 0) {
+      showToast('Ingresa un precio unitario válido para calcular el valor de la devolución.', 'warning');
+      return;
+    }
+
     setSavingDevolucion(true);
     try {
+      const selectedCobro = carteraSeleccionada.cobros.find((c) => c.id === devolucionCobroId);
+      const prod = catalogoProductos.find((p) => p.id === devolucionProductoId);
+
+      const linesPayload: any[] = [];
+      if (devolucionTipo === 'SERIE_COMPLETA' && prod?.tallas && prod.tallas.length > 0) {
+        const tallas = prod.tallas;
+        const porTalla = Math.floor(totalPares / tallas.length) || 1;
+        let acumulado = 0;
+        tallas.forEach((t: any, idx: number) => {
+          const cant = idx === tallas.length - 1 ? (totalPares - acumulado) : porTalla;
+          acumulado += cant;
+          if (cant > 0) {
+            linesPayload.push({
+              productId: prod.id,
+              tallaId: t.id,
+              cantidad: cant,
+              precioUnitario: precio,
+            });
+          }
+        });
+      } else {
+        linesPayload.push({
+          productId: devolucionProductoId || 'sin-especificar',
+          tallaId: devolucionTallaId || 'sin-especificar',
+          cantidad: totalPares,
+          precioUnitario: precio,
+        });
+      }
+
       await ApiService.post('/devoluciones/cliente', {
         clientId: carteraSeleccionada.clientId,
-        motivo: motivoDevolucion,
-        lines: [
-          {
-            productId: 'sin-especificar',
-            tallaId: 'sin-especificar',
-            cantidad: 1,
-            precioUnitario: parseFloat(montoDevolucion),
-          },
-        ],
+        saleNoteId: selectedCobro?.saleNote?.id || undefined,
+        motivo: motivoDevolucion.trim() || (devolucionDestino === 'BAJA_POR_FALLA' ? 'Defecto de Fábrica / Falla de Calzado' : 'Devolución Comercial / Cambio'),
+        tipoDevolucion: devolucionTipo,
+        destinoStock: devolucionDestino,
+        lines: linesPayload,
       });
-      showToast('Devolución de cliente registrada exitosamente.', 'success');
+
+      showToast(
+        `¡Devolución de $${totalMonto.toFixed(2)} procesada exitosamente! (${devolucionDestino === 'BAJA_POR_FALLA' ? 'Baja/merma por falla' : 'Reingreso a stock en bodega'})`,
+        'success'
+      );
       setShowDevolucionModal(false);
       setMotivoDevolucion('');
-      setMontoDevolucion('');
-      loadCobros();
+      setDevolucionProductoId('');
+      setDevolucionPrecioUnitario(0);
+      await loadCobros();
     } catch (err: any) {
       showToast(err.message || 'Error al registrar devolución.', 'error');
     } finally {
@@ -1322,87 +1451,126 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                 </div>
               </div>
 
-              {/* Selector de Nota/Cobro a Abonar */}
-              {carteraSeleccionada.cobros.length > 1 && (
-                <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">
-                    Seleccionar Nota para Abonar
-                  </span>
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                    {carteraSeleccionada.cobros.map((cobroItem) => {
-                      const cCfg = getCobroConfig(cobroItem.estado);
-                      const numNota = cobroItem.saleNote?.numero
-                        ? `NOTA #${String(cobroItem.saleNote.numero).padStart(4, '0')}`
-                        : cobroItem.numeroCobro || `#${cobroItem.id.slice(0, 8).toUpperCase()}`;
-                      const montoOrig = Number(cobroItem.montoOriginal ?? cobroItem.montoTotal ?? 0);
-                      const isActive = cobroSeleccionadoId === cobroItem.id;
-
-                      return (
-                        <button
-                          key={cobroItem.id}
-                          type="button"
-                          onClick={() => setCobroSeleccionadoId(cobroItem.id)}
-                          className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-left transition-all ${
-                            isActive
-                              ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs ring-1 ring-[#0F172A]/10'
-                              : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <FileText size={14} className={isActive ? 'text-[#0F172A]' : 'text-[var(--muted-foreground)]'} />
-                            <div>
-                              <div className="font-bold text-[11px] text-[var(--foreground)] flex items-center gap-1.5">
-                                <span>{numNota}</span>
-                                <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${cCfg.color}`}>{cCfg.label}</span>
-                              </div>
-                              <div className="text-[10px] text-[var(--muted-foreground)]">
-                                {cobroItem.tipo || 'Crédito'} — {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-[10px] text-[var(--muted-foreground)]">${montoOrig.toFixed(2)}</div>
-                            <div className={`text-[11px] font-black ${Number(cobroItem.saldoPendiente) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                              ${Number(cobroItem.saldoPendiente).toFixed(2)}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Nota / Cobro Activo Seleccionado */}
+              {/* Componente Unificado de Nota Activa y Selector Acordeón */}
               {cobroSeleccionado && (
-                <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-emerald-500/10 rounded-lg">
-                        <FileText size={14} className="text-emerald-600" />
+                <div className="border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--card)] shadow-xs">
+                  {/* Tarjeta Principal de la Nota Activa (Auto-seleccionada) */}
+                  <div className="p-3.5 bg-emerald-500/5 border-b border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl border border-emerald-500/20 shrink-0">
+                        <FileText size={16} />
                       </div>
-                      <span className="font-bold text-emerald-800">
-                        Abonar a: {cobroSeleccionado.saleNote?.numero ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}` : `#${cobroSeleccionado.id.slice(0, 8).toUpperCase()}`}
-                      </span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-xs text-[var(--foreground)]">
+                            {cobroSeleccionado.saleNote?.numero
+                              ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+                              : `#${cobroSeleccionado.id.slice(0, 8).toUpperCase()}`}
+                          </span>
+                          <span className="px-2 py-0.2 bg-emerald-500/20 text-emerald-700 rounded text-[9px] font-bold">
+                            Nota Más Antigua (Prioridad FIFO)
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                          Monto Original: <strong>${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)}</strong> ({cobroSeleccionado.tipo || 'Crédito'})
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-sm font-black text-red-500">
-                      Saldo: ${Number(cobroSeleccionado.saldoPendiente).toFixed(2)}
-                    </span>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <div className="text-right mr-1">
+                        <span className="text-[9px] text-[var(--muted-foreground)] block font-semibold uppercase">Saldo:</span>
+                        <span className="text-sm font-black text-red-500">
+                          ${Number(cobroSeleccionado.saldoPendiente).toFixed(2)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCuentaModal(false);
+                          handleAbrirFacturacion(carteraSeleccionada, cobroSeleccionado);
+                        }}
+                        className="px-2.5 py-1 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] font-bold rounded-lg transition-colors border border-[#0F172A]/20 flex items-center gap-1 text-[10px] cursor-pointer"
+                        title="Emitir factura electrónica para esta nota"
+                      >
+                        <Receipt size={11} />
+                        <span>Facturar</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] ml-8">
-                    <span>Monto Original: ${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)} ({cobroSeleccionado.tipo || 'Crédito'})</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCuentaModal(false);
-                        handleAbrirFacturacion(carteraSeleccionada, cobroSeleccionado);
-                      }}
-                      className="px-2 py-0.5 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] font-bold rounded-lg transition-colors border border-[#0F172A]/20 flex items-center gap-1"
-                    >
-                      <Receipt size={11} />
-                      <span>Facturar Esta Nota</span>
-                    </button>
-                  </div>
+
+                  {/* Toggle para cambiar a otra nota si el cliente tiene más de 1 nota */}
+                  {carteraSeleccionada.cobros.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setAcordeonNotasAbierto(!acordeonNotasAbierto)}
+                        className="w-full px-3.5 py-2 flex items-center justify-between bg-[var(--muted)]/20 hover:bg-[var(--muted)]/40 text-left transition-colors cursor-pointer"
+                      >
+                        <span className="text-[11px] font-bold text-[var(--muted-foreground)] flex items-center gap-1.5">
+                          <Layers size={12} />
+                          <span>{acordeonNotasAbierto ? 'Ocultar lista de notas' : `Cambiar nota (${carteraSeleccionada.cobros.length} notas disponibles)`}</span>
+                        </span>
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A]">
+                          <span>{acordeonNotasAbierto ? 'Cerrar' : 'Ver todas'}</span>
+                          {acordeonNotasAbierto ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        </div>
+                      </button>
+
+                      {acordeonNotasAbierto && (
+                        <div className="p-2.5 space-y-1.5 border-t border-[var(--border)] max-h-44 overflow-y-auto pr-1 bg-[var(--card)] animate-in fade-in">
+                          {carteraSeleccionada.cobros.map((cobroItem) => {
+                            const cCfg = getCobroConfig(cobroItem.estado);
+                            const numNota = cobroItem.saleNote?.numero
+                              ? `NOTA #${String(cobroItem.saleNote.numero).padStart(4, '0')}`
+                              : cobroItem.numeroCobro || `#${cobroItem.id.slice(0, 8).toUpperCase()}`;
+                            const montoOrig = Number(cobroItem.montoOriginal ?? cobroItem.montoTotal ?? 0);
+                            const isActive = cobroSeleccionadoId === cobroItem.id;
+
+                            return (
+                              <button
+                                key={cobroItem.id}
+                                type="button"
+                                onClick={() => {
+                                  setCobroSeleccionadoId(cobroItem.id);
+                                  setAcordeonNotasAbierto(false);
+                                }}
+                                className={`w-full p-2 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                                  isActive
+                                    ? 'bg-emerald-500/10 border-emerald-500/50 shadow-xs ring-1 ring-emerald-500/20'
+                                    : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FileText size={13} className={isActive ? 'text-emerald-600' : 'text-[var(--muted-foreground)]'} />
+                                  <div>
+                                    <div className="font-bold text-[11px] text-[var(--foreground)] flex items-center gap-1.5">
+                                      <span>{numNota}</span>
+                                      <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold ${cCfg.color}`}>{cCfg.label}</span>
+                                      {isActive && (
+                                        <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[8px] font-extrabold uppercase">
+                                          Activa
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[9px] text-[var(--muted-foreground)]">
+                                      {cobroItem.tipo || 'Crédito'} — {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="text-[9px] text-[var(--muted-foreground)]">${montoOrig.toFixed(2)}</div>
+                                  <div className={`text-[10px] font-black ${Number(cobroItem.saldoPendiente) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                    ${Number(cobroItem.saldoPendiente).toFixed(2)}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1845,68 +2013,329 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         </div>
       )}
 
-      {/* Modal Devolución de Cliente */}
+      {/* Modal Devolución de Cliente Mejorado */}
       {showDevolucionModal && carteraSeleccionada && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-              <h3 className="font-bold text-sm text-rose-500 flex items-center gap-2">
-                <AlertTriangle size={16} />
-                Devolución de Cliente — {carteraSeleccionada.clienteNombre}
-              </h3>
-              <button onClick={() => setShowDevolucionModal(false)} className="text-[var(--muted-foreground)] text-sm">
-                ✕
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in">
+            {/* Header del Modal */}
+            <div className="p-4 border-b border-[var(--border)] bg-gradient-to-r from-rose-950 to-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-rose-500/20 rounded-xl border border-rose-500/30 text-rose-400">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-white">Registro de Devolución de Calzado</h3>
+                  <p className="text-[11px] text-slate-300">Cliente: <strong className="text-white">{carteraSeleccionada.clienteNombre}</strong></p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDevolucionModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={16} />
               </button>
             </div>
 
-            <div className="space-y-3">
+            {/* Formulario */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+              {/* 1. Selector de Nota / Venta Afectada */}
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                  Motivo de Devolución
+                <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1">
+                  1. Seleccionar Nota de Venta / Cobro Afectado
+                </label>
+                <select
+                  value={devolucionCobroId}
+                  onChange={(e) => {
+                    setDevolucionCobroId(e.target.value);
+                    const cob = carteraSeleccionada.cobros.find((c) => c.id === e.target.value);
+                    if (cob?.montoTotal && !devolucionPrecioUnitario) {
+                      setDevolucionPrecioUnitario(Number(cob.montoTotal) > 0 ? 10 : 0);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl font-semibold text-xs focus:outline-none focus:border-[#0F172A]"
+                >
+                  <option value="">-- Cobro general del cliente (Última deuda) --</option>
+                  {carteraSeleccionada.cobros.map((c) => {
+                    const num = c.saleNote?.numero
+                      ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}`
+                      : c.numeroCobro || `#${c.id.slice(0, 8).toUpperCase()}`;
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {num} — Monto: ${Number(c.montoOriginal ?? c.montoTotal ?? 0).toFixed(2)} (Saldo: ${Number(c.saldoPendiente).toFixed(2)})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* 2. Modalidad de Devolución */}
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1.5">
+                  2. Modalidad de Devolución
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDevolucionTipo('TALLA_ESPECIFICA');
+                      setDevolucionCantidadPares(1);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left font-bold transition-all cursor-pointer ${
+                      devolucionTipo === 'TALLA_ESPECIFICA'
+                        ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span>👟</span>
+                      <span>Por Talla / Pares</span>
+                    </div>
+                    <span className="text-[10px] font-normal opacity-80 block">Devolución de pares específicos</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDevolucionTipo('SERIE_COMPLETA');
+                      setDevolucionSubtipoSerie('MEDIA_DOCENA');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left font-bold transition-all cursor-pointer ${
+                      devolucionTipo === 'SERIE_COMPLETA'
+                        ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span>📦</span>
+                      <span>Serie Completa</span>
+                    </div>
+                    <span className="text-[10px] font-normal opacity-80 block">Docena (12) o Media Docena (6)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Destino del Calzado / Clasificación del Stock */}
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1.5">
+                  3. Destino del Calzado (Impacto en Stock)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDevolucionDestino('REINGRESO_INVENTARIO')}
+                    className={`p-2.5 rounded-xl border text-left font-bold transition-all cursor-pointer ${
+                      devolucionDestino === 'REINGRESO_INVENTARIO'
+                        ? 'bg-emerald-600 text-white border-transparent shadow-xs ring-2 ring-emerald-500/20'
+                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-emerald-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span>🔄</span>
+                      <span>Reingreso a Bodega</span>
+                    </div>
+                    <span className="text-[10px] font-normal opacity-80 block">Buen estado. Vuelve al stock vendible</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDevolucionDestino('BAJA_POR_FALLA')}
+                    className={`p-2.5 rounded-xl border text-left font-bold transition-all cursor-pointer ${
+                      devolucionDestino === 'BAJA_POR_FALLA'
+                        ? 'bg-rose-600 text-white border-transparent shadow-xs ring-2 ring-rose-500/20'
+                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-rose-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span>⚠️</span>
+                      <span>Baja por Falla / Merma</span>
+                    </div>
+                    <span className="text-[10px] font-normal opacity-80 block">Calzado defectuoso. No suma a venta</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Modelo de Calzado y Cantidades */}
+              <div className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
+                    Modelo de Calzado Devuelto
+                  </label>
+                  <select
+                    value={devolucionProductoId}
+                    onChange={(e) => {
+                      setDevolucionProductoId(e.target.value);
+                      const prod = catalogoProductos.find((p) => p.id === e.target.value);
+                      if (prod?.salePrice) {
+                        setDevolucionPrecioUnitario(Number(prod.salePrice));
+                      }
+                      if (prod?.tallas && prod.tallas.length > 0) {
+                        setDevolucionTallaId(prod.tallas[0].id);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold"
+                  >
+                    <option value="">-- Seleccionar modelo del catálogo --</option>
+                    {catalogoProductos.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.modelName} ({p.color}) — {p.serieNombre || 'Serie'} (${Number(p.salePrice).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {devolucionTipo === 'SERIE_COMPLETA' ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
+                        Formato de Serie
+                      </label>
+                      <select
+                        value={devolucionSubtipoSerie}
+                        onChange={(e) => setDevolucionSubtipoSerie(e.target.value as any)}
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
+                      >
+                        <option value="MEDIA_DOCENA">Media Docena (6 Pares)</option>
+                        <option value="DOCENA_COMPLETA">1 Docena Completa (12 Pares)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
+                        Precio Unit. por Par ($)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={devolucionPrecioUnitario}
+                        onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
+                        Talla
+                      </label>
+                      {(() => {
+                        const prod = catalogoProductos.find((p) => p.id === devolucionProductoId);
+                        if (prod?.tallas && prod.tallas.length > 0) {
+                          return (
+                            <select
+                              value={devolucionTallaId}
+                              onChange={(e) => setDevolucionTallaId(e.target.value)}
+                              className="w-full px-2.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
+                            >
+                              {prod.tallas.map((t: any) => (
+                                <option key={t.id} value={t.id}>
+                                  Talla {t.numeroTalla} (Stock: {t.quantity})
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        }
+                        return (
+                          <input
+                            type="text"
+                            placeholder="Ej. Talla 38"
+                            value={devolucionTallaId}
+                            onChange={(e) => setDevolucionTallaId(e.target.value)}
+                            className="w-full px-2.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
+                          />
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
+                        N° Pares
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={devolucionCantidadPares}
+                        onChange={(e) => setDevolucionCantidadPares(parseInt(e.target.value) || 1)}
+                        className="w-full px-2.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
+                        Precio Unit. ($)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={devolucionPrecioUnitario}
+                        onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 5. Motivo / Detalle */}
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1">
+                  5. Motivo o Detalle de la Devolución
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Talla incorrecta, producto defectuoso..."
+                  placeholder="Ej. Falla en costura lateral izquierda, cambio de color por cliente..."
                   value={motivoDevolucion}
                   onChange={(e) => setMotivoDevolucion(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs"
+                  className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                  Monto a Devolver ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max={carteraSeleccionada.saldoTotalPendiente}
-                  placeholder="0.00"
-                  value={montoDevolucion}
-                  onChange={(e) => setMontoDevolucion(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold text-rose-500"
-                />
-              </div>
+              {/* Resumen del Impacto */}
+              {(() => {
+                const totalPares = devolucionTipo === 'SERIE_COMPLETA'
+                  ? (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12)
+                  : Number(devolucionCantidadPares || 1);
+                const totalMonto = totalPares * Number(devolucionPrecioUnitario || 0);
 
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-[11px]">
-                💡 La devolución descontará el monto del saldo pendiente del cliente y registrará el ajuste contable.
-              </div>
+                return (
+                  <div className="p-3.5 bg-slate-900 text-white rounded-xl space-y-1.5 shadow-sm">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-300">Pares a Devolver:</span>
+                      <strong className="text-white">{totalPares} pares ({devolucionTipo === 'SERIE_COMPLETA' ? 'Serie Completa' : 'Por Talla'})</strong>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-300">Destino de Stock:</span>
+                      <span className={`px-2 py-0.2 rounded text-[10px] font-extrabold ${devolucionDestino === 'BAJA_POR_FALLA' ? 'bg-rose-500/30 text-rose-300' : 'bg-emerald-500/30 text-emerald-300'}`}>
+                        {devolucionDestino === 'BAJA_POR_FALLA' ? '⚠️ Merma / Baja por Falla' : '📦 Reingreso a Bodega'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm pt-1 border-t border-white/10">
+                      <span className="font-bold text-rose-400">Total a Descontar de la Deuda:</span>
+                      <span className="font-black text-rose-400 text-base">
+                        -${totalMonto.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
-            <div className="flex gap-3 pt-2">
+            {/* Footer */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex gap-2">
               <button
+                type="button"
                 onClick={() => setShowDevolucionModal(false)}
-                className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
+                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-xs font-bold hover:bg-[var(--muted)] transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={handleRegistrarDevolucion}
-                disabled={savingDevolucion || !montoDevolucion || !motivoDevolucion}
-                className="flex-1 py-2 bg-rose-500 text-white rounded-xl text-xs font-bold hover:bg-rose-600 disabled:opacity-50"
+                disabled={savingDevolucion}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
-                {savingDevolucion ? 'Guardando...' : 'Confirmar Devolución'}
+                {savingDevolucion ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                <span>{savingDevolucion ? 'Procesando...' : 'Procesar Devolución'}</span>
               </button>
             </div>
           </div>
