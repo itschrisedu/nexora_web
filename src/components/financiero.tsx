@@ -26,8 +26,23 @@ import {
   Layers,
   ListFilter,
   Users,
+  ShieldCheck,
+  Send,
+  Download,
+  ExternalLink,
+  Sparkles,
+  Check,
+  FileCheck,
+  Eye,
+  Settings2,
+  MessageCircle,
+  Printer,
+  Share2,
+  Mail,
+  MapPin,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
+import { compartirFacturaPdf, generarFacturaPdfDoc } from '../services/pdf-factura.service';
 
 interface FinancieroProps {
   online: boolean;
@@ -50,6 +65,8 @@ interface Cobro {
   clienteNombre?: string;
   clienteCedula?: string;
   clienteTelefono?: string;
+  clienteEmail?: string;
+  clienteDireccion?: string;
   clienteNivel?: string;
   montoOriginal?: number;
   montoTotal?: number;
@@ -74,6 +91,8 @@ interface ClienteCartera {
   clienteNombre: string;
   clienteCedula: string;
   clienteTelefono: string;
+  clienteEmail?: string;
+  clienteDireccion?: string;
   clienteNivel: string;
   montoTotalFacturado: number;
   saldoTotalPendiente: number;
@@ -168,9 +187,71 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const [filtroHistorial, setFiltroHistorial] = useState<'TODOS' | 'COMPRAS' | 'ABONOS'>('TODOS');
   const [pedidoHistorialExpandidoId, setPedidoHistorialExpandidoId] = useState<string | null>(null);
 
+  // Modal Facturación SRI
+  const [showFacturaModal, setShowFacturaModal] = useState(false);
+  const [tabFactura, setTabFactura] = useState<'CONFIGURAR' | 'PREVISUALIZAR'>('CONFIGURAR');
+  const [facturaCliente, setFacturaCliente] = useState<{
+    clientId: string;
+    saleNoteId?: string;
+    nombre: string;
+    cedula: string;
+    telefono: string;
+    direccion: string;
+    email: string;
+    tipoIdentificacion: string;
+    formaPago: string;
+    detalles: {
+      codigoProducto: string;
+      descripcion: string;
+      cantidad: number;
+      precioUnitario: number;
+      descuento: number;
+      tarifaIva: number;
+      codigoIva: string;
+    }[];
+    notasSeleccionadas: string[];
+  } | null>(null);
+  const [emittingFactura, setEmittingFactura] = useState(false);
+  const [facturaResultado, setFacturaResultado] = useState<{
+    success: boolean;
+    numeroComprobante: string;
+    claveAcceso?: string;
+    estadoSri: string;
+    errorMensaje?: string;
+    xmlUrl?: string;
+    ridePdfUrl?: string;
+  } | null>(null);
+
+  // Configuración del Emisor (Dueño del Negocio / RUC)
+  const [businessConfig, setBusinessConfig] = useState<{
+    nombre: string;
+    ruc: string;
+    direccion: string;
+    telefono?: string;
+    email?: string;
+    sriAmbiente?: string;
+    sriEstablecimiento?: string;
+    sriPuntoEmision?: string;
+    sriObligadoContabilidad?: boolean;
+  } | null>(null);
+
   useEffect(() => {
     loadCobros();
+    loadBusinessConfig();
   }, [online]);
+
+  const loadBusinessConfig = async () => {
+    try {
+      if (online) {
+        const bData = await ApiService.get('/configuracion/negocio');
+        if (bData && bData.nombre) {
+          setBusinessConfig(bData);
+        }
+      }
+    } catch (err) {
+      console.warn('No se pudo obtener la configuración del negocio:', err);
+    }
+  };
 
   const loadCobros = async () => {
     setLoading(true);
@@ -200,6 +281,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
     map.forEach((listaCobros, clientId) => {
       const primerCobro = listaCobros[0];
+      const cobroConEmail = listaCobros.find((c) => c.clienteEmail) || primerCobro;
+      const cobroConDireccion = listaCobros.find((c) => c.clienteDireccion) || primerCobro;
+
       const montoTotalFacturado = listaCobros.reduce(
         (sum, c) => sum + Number(c.montoOriginal ?? c.montoTotal ?? 0),
         0,
@@ -241,6 +325,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         clienteNombre: primerCobro.clienteNombre || 'Cliente sin registrar',
         clienteCedula: primerCobro.clienteCedula || '—',
         clienteTelefono: primerCobro.clienteTelefono || '—',
+        clienteEmail: cobroConEmail?.clienteEmail || '',
+        clienteDireccion: cobroConDireccion?.clienteDireccion || '',
         clienteNivel: primerCobro.clienteNivel || '—',
         montoTotalFacturado,
         saldoTotalPendiente,
@@ -342,6 +428,240 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
       showToast(err.message || 'Error al registrar devolución.', 'error');
     } finally {
       setSavingDevolucion(false);
+    }
+  };
+
+  // ── Agrupación de líneas por modelo para la factura ─────
+  const agruparLineasParaFactura = (notas: Cobro[]) => {
+    const agrupados: {
+      codigoProducto: string;
+      descripcion: string;
+      cantidad: number;
+      precioUnitario: number;
+      descuento: number;
+      tarifaIva: number;
+      codigoIva: string;
+    }[] = [];
+
+    notas.forEach((c) => {
+      const numNota = c.saleNote?.numero
+        ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}`
+        : `#${c.id.slice(0, 6).toUpperCase()}`;
+      const lineas = c.saleNote?.lines;
+
+      if (lineas && lineas.length > 0) {
+        // Agrupar líneas por nombre+serie dentro de la misma nota
+        const grupoMap = new Map<string, { nombre: string; serie: string; cantidad: number; totalPrecio: number; productId: string }>();
+
+        lineas.forEach((l: any) => {
+          const key = `${(l.nombre || 'Calzado').toLowerCase()}_${(l.serie || 'sin-serie').toLowerCase()}`;
+          if (!grupoMap.has(key)) {
+            grupoMap.set(key, {
+              nombre: l.nombre || 'Calzado de Cuero',
+              serie: l.serie || '',
+              cantidad: 0,
+              totalPrecio: 0,
+              productId: l.productId || 'CALZ-01',
+            });
+          }
+          const g = grupoMap.get(key)!;
+          g.cantidad += Number(l.cantidad) || 1;
+          g.totalPrecio += (Number(l.cantidad) || 1) * Number(l.precioUnitario || 0);
+        });
+
+        grupoMap.forEach((g) => {
+          let descripcion = '';
+          if (g.cantidad === 12) {
+            descripcion = `1 Docena - ${g.nombre}`;
+          } else if (g.cantidad === 6) {
+            descripcion = `Media Docena - ${g.nombre}`;
+          } else {
+            descripcion = `${g.cantidad} ${g.cantidad === 1 ? 'Par' : 'Pares'} - ${g.nombre}`;
+          }
+          if (g.serie) descripcion += ` (${g.serie})`;
+          descripcion += ` [${numNota}]`;
+
+          const precioUnitarioGrupo = g.cantidad > 0 ? g.totalPrecio / g.cantidad : 0;
+
+          agrupados.push({
+            codigoProducto: g.productId.slice(0, 8).toUpperCase(),
+            descripcion,
+            cantidad: g.cantidad,
+            precioUnitario: Number(precioUnitarioGrupo.toFixed(2)),
+            descuento: 0,
+            tarifaIva: 15,
+            codigoIva: '4',
+          });
+        });
+      } else {
+        const monto = Number(c.montoOriginal ?? c.montoTotal ?? 0);
+        agrupados.push({
+          codigoProducto: `VENTA-${c.id.slice(0, 6).toUpperCase()}`,
+          descripcion: `Calzado de Cuero Cevallos Artesanal — ${numNota}`,
+          cantidad: 1,
+          precioUnitario: monto,
+          descuento: 0,
+          tarifaIva: 15,
+          codigoIva: '4',
+        });
+      }
+    });
+
+    return agrupados;
+  };
+
+  // ── Enviar por WhatsApp ─────────────
+  const handleEnviarWhatsApp = (telefono: string, mensaje: string) => {
+    let numLimpio = telefono.replace(/\D/g, '');
+    // Conversión Ecuador: 09XXXXXXXX → 5939XXXXXXXX
+    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    }
+    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank');
+  };
+
+  // ── Facturación Electrónica SRI ─────────────
+  const handleAbrirFacturacion = async (cliente: ClienteCartera, cobroItem?: Cobro) => {
+    setFacturaResultado(null);
+    setTabFactura('CONFIGURAR');
+    const cedulaLimpia = cliente.clienteCedula !== '—' ? cliente.clienteCedula.trim() : '';
+    let tipoId = '05'; // Cédula por defecto
+    if (cedulaLimpia.length === 13) tipoId = '04'; // RUC
+    else if (cedulaLimpia === '9999999999999' || !cedulaLimpia) tipoId = '07'; // Consumidor Final
+
+    // Seleccionar notas a facturar
+    const notasParaFacturar = cobroItem ? [cobroItem] : cliente.cobros;
+    // Usar agrupación concisa
+    const detalles = agruparLineasParaFactura(notasParaFacturar);
+
+    // Datos reales del cliente desde la BD
+    const direccionReal = cliente.clienteDireccion || 'Cevallos, Tungurahua';
+    const emailReal = cliente.clienteEmail || '';
+
+    setFacturaCliente({
+      clientId: cliente.clientId,
+      saleNoteId: cobroItem?.saleNote?.id || undefined,
+      nombre: cliente.clienteNombre,
+      cedula: cedulaLimpia || (tipoId === '07' ? '9999999999999' : ''),
+      telefono: cliente.clienteTelefono !== '—' ? cliente.clienteTelefono : '',
+      direccion: direccionReal,
+      email: emailReal,
+      tipoIdentificacion: tipoId,
+      formaPago: '01', // 01=Efectivo por defecto
+      detalles,
+      notasSeleccionadas: notasParaFacturar.map((n) => n.id),
+    });
+
+    setShowFacturaModal(true);
+  };
+
+  const handleToggleNotaFacturar = (cobroItem: Cobro) => {
+    if (!facturaCliente || !carteraSeleccionada) return;
+
+    const yaSeleccionada = facturaCliente.notasSeleccionadas.includes(cobroItem.id);
+    const nuevasNotasIds = yaSeleccionada
+      ? facturaCliente.notasSeleccionadas.filter((id) => id !== cobroItem.id)
+      : [...facturaCliente.notasSeleccionadas, cobroItem.id];
+
+    if (nuevasNotasIds.length === 0) {
+      showToast('Debes mantener al menos una nota seleccionada para facturar.', 'warning');
+      return;
+    }
+
+    const notasActualizadas = carteraSeleccionada.cobros.filter((c) => nuevasNotasIds.includes(c.id));
+    const nuevosDetalles = agruparLineasParaFactura(notasActualizadas);
+
+    setFacturaCliente({
+      ...facturaCliente,
+      detalles: nuevosDetalles,
+      notasSeleccionadas: nuevasNotasIds,
+    });
+  };
+
+  const handleEmitirFacturaSRI = async () => {
+    if (!facturaCliente) return;
+
+    if (!facturaCliente.cedula && facturaCliente.tipoIdentificacion !== '07') {
+      showToast('Ingresa la Cédula o RUC del comprador.', 'warning');
+      return;
+    }
+    if (!facturaCliente.nombre.trim()) {
+      showToast('Ingresa la Razón Social o Nombre del comprador.', 'warning');
+      return;
+    }
+    if (facturaCliente.detalles.length === 0) {
+      showToast('Debes incluir al menos un ítem a facturar.', 'warning');
+      return;
+    }
+
+    const subtotal = facturaCliente.detalles.reduce(
+      (sum, d) => sum + d.cantidad * d.precioUnitario - (d.descuento || 0),
+      0,
+    );
+    const iva = facturaCliente.detalles.reduce(
+      (sum, d) => sum + ((d.cantidad * d.precioUnitario - (d.descuento || 0)) * d.tarifaIva) / 100,
+      0,
+    );
+    const totalConImpuestos = subtotal + iva;
+
+    setEmittingFactura(true);
+    setFacturaResultado(null);
+    try {
+      const payload = {
+        saleNoteId: facturaCliente.saleNoteId,
+        fecha: new Date(),
+        comprador: {
+          tipoIdentificacion: facturaCliente.tipoIdentificacion,
+          identificacion: facturaCliente.tipoIdentificacion === '07' ? '9999999999999' : facturaCliente.cedula.trim(),
+          razonSocial: facturaCliente.nombre.trim(),
+          direccion: facturaCliente.direccion.trim() || 'Cevallos, Tungurahua',
+          email: facturaCliente.email.trim() || 'facturas@cliente.com',
+          telefono: facturaCliente.telefono.trim() || '0999999999',
+        },
+        detalles: facturaCliente.detalles.map((d) => ({
+          codigoProducto: d.codigoProducto,
+          descripcion: d.descripcion,
+          cantidad: d.cantidad,
+          precioUnitario: d.precioUnitario,
+          descuento: d.descuento || 0,
+          codigoIva: d.codigoIva || '4',
+          tarifaIva: d.tarifaIva || 15,
+        })),
+        formaPago: facturaCliente.formaPago || '01',
+        totalConImpuestos: Number(totalConImpuestos.toFixed(2)),
+      };
+
+      const res = await ApiService.post('/facturacion-sri/emitir', payload);
+      const esAutorizado = res.estadoSri === 'AUTORIZADO';
+
+      setFacturaResultado({
+        success: esAutorizado,
+        numeroComprobante: res.numeroComprobante || '001-001-00000000X',
+        claveAcceso: res.claveAcceso,
+        estadoSri: res.estadoSri || 'PENDIENTE',
+        xmlUrl: res.xmlUrl,
+        ridePdfUrl: res.ridePdfUrl,
+        errorMensaje: res.errorMensaje,
+      });
+
+      if (esAutorizado) {
+        showToast(`¡Factura ${res.numeroComprobante} AUTORIZADA por el SRI!`, 'success');
+      } else {
+        showToast(`Factura registrada con estado: ${res.estadoSri}`, 'info');
+      }
+    } catch (err: any) {
+      setFacturaResultado({
+        success: false,
+        numeroComprobante: 'ERROR',
+        estadoSri: 'RECHAZADO',
+        errorMensaje: err.message || 'Error al comunicarse con el SRI.',
+      });
+      showToast(err.message || 'Error al emitir factura al SRI', 'error');
+    } finally {
+      setEmittingFactura(false);
     }
   };
 
@@ -660,22 +980,37 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                                 </div>
                                               </div>
 
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setClienteSeleccionadoId(cliente.clientId);
-                                                  setCobroSeleccionadoId(cobroItem.id);
-                                                  setShowCuentaModal(true);
-                                                }}
-                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                                                  isCobroActive
-                                                    ? 'bg-[#0F172A] text-white'
-                                                    : 'bg-[var(--muted)] text-[var(--foreground)] hover:bg-[#0F172A] hover:text-white'
-                                                }`}
-                                              >
-                                                {Number(cobroItem.saldoPendiente) > 0 ? 'Abonar Esta Nota' : 'Ver Detalles'}
-                                              </button>
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAbrirFacturacion(cliente, cobroItem);
+                                                  }}
+                                                  className="px-2.5 py-1.5 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] text-xs font-bold rounded-xl transition-all border border-[#0F172A]/20 flex items-center gap-1"
+                                                  title="Emitir factura electrónica SRI para esta nota"
+                                                >
+                                                  <Receipt size={13} />
+                                                  <span>Facturar SRI</span>
+                                                </button>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setClienteSeleccionadoId(cliente.clientId);
+                                                    setCobroSeleccionadoId(cobroItem.id);
+                                                    setShowCuentaModal(true);
+                                                  }}
+                                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                                                    isCobroActive
+                                                      ? 'bg-[#0F172A] text-white'
+                                                      : 'bg-[var(--muted)] text-[var(--foreground)] hover:bg-[#0F172A] hover:text-white'
+                                                  }`}
+                                                >
+                                                  {Number(cobroItem.saldoPendiente) > 0 ? 'Abonar Esta Nota' : 'Ver Detalles'}
+                                                </button>
+                                              </div>
                                             </div>
                                           </div>
                                         );
@@ -928,7 +1263,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
               {/* Nota / Cobro Activo Seleccionado */}
               {cobroSeleccionado && (
-                <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-emerald-500/10 rounded-lg">
@@ -942,8 +1277,19 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       Saldo: ${Number(cobroSeleccionado.saldoPendiente).toFixed(2)}
                     </span>
                   </div>
-                  <div className="text-[10px] text-[var(--muted-foreground)] mt-1 ml-9">
-                    Monto Original: ${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)} ({cobroSeleccionado.tipo || 'Crédito'})
+                  <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] ml-8">
+                    <span>Monto Original: ${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)} ({cobroSeleccionado.tipo || 'Crédito'})</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCuentaModal(false);
+                        handleAbrirFacturacion(carteraSeleccionada, cobroSeleccionado);
+                      }}
+                      className="px-2 py-0.5 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] font-bold rounded-lg transition-colors border border-[#0F172A]/20 flex items-center gap-1"
+                    >
+                      <Receipt size={11} />
+                      <span>Facturar Esta Nota</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -1016,10 +1362,10 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       onChange={(e) => setMetodoAbono(e.target.value)}
                       className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] transition-all"
                     >
-                      <option value="EFECTIVO">💵 Efectivo</option>
-                      <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
-                      <option value="DEPOSITO">📥 Depósito Bancario</option>
-                      <option value="CHEQUE">📝 Cheque</option>
+                      <option value="EFECTIVO">Efectivo</option>
+                      <option value="TRANSFERENCIA">Transferencia Bancaria</option>
+                      <option value="DEPOSITO">Depósito Bancario</option>
+                      <option value="CHEQUE">Cheque</option>
                     </select>
                   </div>
 
@@ -1056,9 +1402,20 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
               <button
                 onClick={() => {
                   setShowCuentaModal(false);
+                  handleAbrirFacturacion(carteraSeleccionada, cobroSeleccionado || undefined);
+                }}
+                className="w-full py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <FileCheck size={14} />
+                <span>Emitir Factura Electrónica SRI</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowCuentaModal(false);
                   handleAbrirHistorial(carteraSeleccionada.clientId);
                 }}
-                className="w-full py-2.5 bg-[#0F172A]/10 hover:bg-[#0F172A]/20 text-[#0F172A] font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-[#0F172A]/20"
+                className="w-full py-2 bg-[#0F172A]/10 hover:bg-[#0F172A]/20 text-[#0F172A] font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-[#0F172A]/20"
               >
                 <History size={14} />
                 <span>Ver Historial Completo del Cliente</span>
@@ -1433,6 +1790,674 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
           </div>
         </div>
       )}
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* MODAL: FACTURACIÓN ELECTRÓNICA SRI                            */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {showFacturaModal && facturaCliente && carteraSeleccionada && (() => {
+        const subtotalCalc = facturaCliente.detalles.reduce(
+          (sum, d) => sum + d.cantidad * d.precioUnitario - (d.descuento || 0), 0
+        );
+        const ivaCalc = facturaCliente.detalles.reduce(
+          (sum, d) => sum + ((d.cantidad * d.precioUnitario - (d.descuento || 0)) * d.tarifaIva) / 100, 0
+        );
+        const totalCalc = subtotalCalc + ivaCalc;
+
+        const armarDatosPdf = () => ({
+          emisor: {
+            nombre: businessConfig?.nombre || 'CALZADO ARTESANAL CEVALLOS',
+            ruc: businessConfig?.ruc || '1804884664001',
+            direccion: businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador',
+            telefono: businessConfig?.telefono,
+            email: businessConfig?.email,
+            obligadoContabilidad: businessConfig?.sriObligadoContabilidad,
+            ambiente: businessConfig?.sriAmbiente,
+            establecimiento: businessConfig?.sriEstablecimiento,
+            puntoEmision: businessConfig?.sriPuntoEmision,
+          },
+          comprobante: {
+            numero: facturaResultado?.numeroComprobante || `${businessConfig?.sriEstablecimiento || '001'}-${businessConfig?.sriPuntoEmision || '001'}-000000001`,
+            fecha: new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' }),
+            claveAcceso: facturaResultado?.claveAcceso,
+            formaPago: facturaCliente.formaPago,
+          },
+          comprador: {
+            nombre: facturaCliente.nombre,
+            cedula: facturaCliente.cedula,
+            direccion: facturaCliente.direccion,
+            telefono: facturaCliente.telefono,
+            email: facturaCliente.email,
+          },
+          detalles: facturaCliente.detalles.map((d) => ({
+            descripcion: d.descripcion,
+            cantidad: d.cantidad,
+            precioUnitario: d.precioUnitario,
+            descuento: d.descuento || 0,
+            tarifaIva: d.tarifaIva || 15,
+            subtotal: d.cantidad * d.precioUnitario - (d.descuento || 0),
+          })),
+          totales: {
+            subtotal15: subtotalCalc,
+            subtotal0: 0,
+            descuento: 0,
+            iva15: ivaCalc,
+            total: totalCalc,
+          },
+        });
+
+        return (
+        <div
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowFacturaModal(false)}
+        >
+          <div
+            className="bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del Modal */}
+            <div className="p-5 border-b border-[var(--border)] bg-gradient-to-r from-[#0F172A] to-[#1e293b]">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 text-emerald-400">
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-extrabold text-base text-white">Facturación Electrónica SRI</h3>
+                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded text-[10px] font-bold border border-emerald-500/30">
+                        Comprobante Digital
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Emisión y autorización directa de factura con firma electrónica
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowFacturaModal(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Pestañas */}
+              <div className="flex gap-1 mt-4">
+                <button
+                  onClick={() => setTabFactura('CONFIGURAR')}
+                  className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    tabFactura === 'CONFIGURAR'
+                      ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
+                      : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                  }`}
+                >
+                  <Settings2 size={13} />
+                  <span>Configurar Datos</span>
+                </button>
+                <button
+                  onClick={() => setTabFactura('PREVISUALIZAR')}
+                  className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    tabFactura === 'PREVISUALIZAR'
+                      ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
+                      : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                  }`}
+                >
+                  <Eye size={13} />
+                  <span>Vista Previa PDF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Body scrollable */}
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+
+              {/* Resultado de la Emisión (si ya se emitió) */}
+              {facturaResultado && (
+                <div
+                  className={`p-4 rounded-2xl border space-y-2.5 ${
+                    facturaResultado.success
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {facturaResultado.success ? (
+                        <CheckCircle size={18} className="text-emerald-600" />
+                      ) : (
+                        <AlertTriangle size={18} className="text-rose-600" />
+                      )}
+                      <span className="font-black text-sm">
+                        {facturaResultado.success
+                          ? `Factura Autorizada por el SRI: ${facturaResultado.numeroComprobante}`
+                          : `Emisión de Factura: ${facturaResultado.estadoSri}`}
+                      </span>
+                    </div>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold ${
+                        facturaResultado.success
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-rose-600 text-white'
+                      }`}
+                    >
+                      {facturaResultado.estadoSri}
+                    </span>
+                  </div>
+
+                  {facturaResultado.claveAcceso && (
+                    <div className="p-2.5 bg-black/20 rounded-xl text-[11px] font-mono break-all text-slate-200">
+                      <span className="text-slate-400 block font-sans text-[10px] font-bold">
+                        Clave de Acceso SRI (49 dígitos):
+                      </span>
+                      {facturaResultado.claveAcceso}
+                    </div>
+                  )}
+
+                  {facturaResultado.errorMensaje && (
+                    <p className="text-xs text-rose-600 font-medium">
+                      {facturaResultado.errorMensaje}
+                    </p>
+                  )}
+
+                  {facturaResultado.success && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          const doc = generarFacturaPdfDoc(armarDatosPdf());
+                          doc.save(`Factura_${facturaResultado.numeroComprobante || 'SRI'}.pdf`);
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <Download size={13} />
+                        <span>Descargar Factura PDF</span>
+                      </button>
+                      {facturaResultado.xmlUrl && (
+                        <a
+                          href={facturaResultado.xmlUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-slate-700"
+                        >
+                          <ExternalLink size={13} />
+                          <span>Ver XML Firmado</span>
+                        </a>
+                      )}
+                      {/* Botón WhatsApp directo con archivo PDF */}
+                      {facturaCliente.telefono && (
+                        <button
+                          onClick={async () => {
+                            const res = await compartirFacturaPdf(armarDatosPdf(), facturaCliente.telefono);
+                            if (res.metodo === 'WEB_SHARE') {
+                              showToast('Factura PDF compartida exitosamente.', 'success');
+                            } else {
+                              showToast('Se descargó el PDF y se abrió el chat de WhatsApp.', 'info');
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <MessageCircle size={13} />
+                          <span>Enviar Factura PDF por WhatsApp</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ═══ PESTAÑA: CONFIGURAR DATOS ═══ */}
+              {tabFactura === 'CONFIGURAR' && (
+                <div className="space-y-5">
+                  {/* 1. Datos del Comprador */}
+                  <div className="p-4 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                      <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
+                        <User size={14} className="text-[#0F172A]" />
+                        <span>1. Datos del Comprador (Cliente)</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
+                        Nivel: {carteraSeleccionada.clienteNivel}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1">
+                          Tipo Identificación *
+                        </label>
+                        <select
+                          value={facturaCliente.tipoIdentificacion}
+                          onChange={(e) =>
+                            setFacturaCliente({
+                              ...facturaCliente,
+                              tipoIdentificacion: e.target.value,
+                              cedula: e.target.value === '07' ? '9999999999999' : facturaCliente.cedula,
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        >
+                          <option value="05">Cédula de Identidad (10 dígitos)</option>
+                          <option value="04">RUC (13 dígitos)</option>
+                          <option value="07">Consumidor Final</option>
+                          <option value="06">Pasaporte</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1">
+                          Número Cédula / RUC *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej. 1804884664"
+                          value={facturaCliente.cedula}
+                          onChange={(e) =>
+                            setFacturaCliente({ ...facturaCliente, cedula: e.target.value })
+                          }
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1">
+                          Razón Social / Nombres *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Nombre del cliente"
+                          value={facturaCliente.nombre}
+                          onChange={(e) =>
+                            setFacturaCliente({ ...facturaCliente, nombre: e.target.value })
+                          }
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1 flex items-center gap-1">
+                          <MapPin size={11} />
+                          Dirección del Comprador
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Dirección del cliente"
+                          value={facturaCliente.direccion}
+                          onChange={(e) =>
+                            setFacturaCliente({ ...facturaCliente, direccion: e.target.value })
+                          }
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1 flex items-center gap-1">
+                          <Mail size={11} />
+                          Email (Para envío de Factura PDF/XML)
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="correo@ejemplo.com"
+                          value={facturaCliente.email}
+                          onChange={(e) =>
+                            setFacturaCliente({ ...facturaCliente, email: e.target.value })
+                          }
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Selector de Notas / Compras a Facturar */}
+                  <div className="p-4 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                      <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
+                        <Receipt size={14} className="text-[#0F172A]" />
+                        <span>2. Seleccionar Notas de Venta a Facturar</span>
+                      </span>
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                        {facturaCliente.notasSeleccionadas.length} de {carteraSeleccionada.cobros.length} notas seleccionadas
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                      {carteraSeleccionada.cobros.map((c) => {
+                        const numNota = c.saleNote?.numero
+                          ? `NOTA #${String(c.saleNote.numero).padStart(4, '0')}`
+                          : c.numeroCobro || `#${c.id.slice(0, 8).toUpperCase()}`;
+                        const monto = Number(c.montoOriginal ?? c.montoTotal ?? 0);
+                        const isChecked = facturaCliente.notasSeleccionadas.includes(c.id);
+
+                        return (
+                          <label
+                            key={c.id}
+                            onClick={() => handleToggleNotaFacturar(c)}
+                            className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                              isChecked
+                                ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs'
+                                : 'bg-[var(--card)] border-[var(--border)] opacity-60 hover:opacity-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                className="w-4 h-4 rounded text-[#0F172A] accent-[#0F172A] focus:ring-0 cursor-pointer"
+                              />
+                              <div>
+                                <div className="font-bold text-xs text-[var(--foreground)]">{numNota}</div>
+                                <div className="text-[10px] text-[var(--muted-foreground)]">
+                                  {new Date(c.createdAt).toLocaleDateString('es-EC')} ({c.tipo || 'Crédito'})
+                                </div>
+                              </div>
+                            </div>
+                            <span className="font-black text-xs text-[var(--foreground)]">
+                              ${monto.toFixed(2)}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 3. Detalle de Ítems Agrupados */}
+                  <div className="space-y-3">
+                    <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider block flex items-center gap-1.5">
+                      <FileText size={14} className="text-[#0F172A]" />
+                      <span>3. Detalle de Productos a Facturar</span>
+                    </span>
+
+                    <div className="border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                          <tr>
+                            <th className="px-4 py-2.5">Descripción</th>
+                            <th className="px-4 py-2.5 text-center">Cant.</th>
+                            <th className="px-4 py-2.5 text-right">P. Unit.</th>
+                            <th className="px-4 py-2.5 text-center">IVA</th>
+                            <th className="px-4 py-2.5 text-right">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {facturaCliente.detalles.map((d, index) => {
+                            const sub = d.cantidad * d.precioUnitario - (d.descuento || 0);
+                            return (
+                              <tr key={index} className="hover:bg-[var(--muted)]/20">
+                                <td className="px-4 py-2.5 font-semibold text-[var(--foreground)]">
+                                  {d.descripcion}
+                                </td>
+                                <td className="px-4 py-2.5 text-center font-bold">{d.cantidad}</td>
+                                <td className="px-4 py-2.5 text-right font-semibold">
+                                  ${d.precioUnitario.toFixed(2)}
+                                </td>
+                                <td className="px-4 py-2.5 text-center">
+                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold">
+                                    {d.tarifaIva}%
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-black text-emerald-600">
+                                  ${sub.toFixed(2)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* 4. Forma de Pago y Resumen Tributario */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div className="p-4 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-2">
+                      <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)]">
+                        Forma de Pago SRI *
+                      </label>
+                      <select
+                        value={facturaCliente.formaPago}
+                        onChange={(e) =>
+                          setFacturaCliente({ ...facturaCliente, formaPago: e.target.value })
+                        }
+                        className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                      >
+                        <option value="01">01 - Sin utilización del sistema financiero (Efectivo)</option>
+                        <option value="20">20 - Otros con utilización del sistema financiero (Transferencia / Depósito)</option>
+                        <option value="16">16 - Tarjeta de Débito</option>
+                        <option value="19">19 - Tarjeta de Crédito</option>
+                      </select>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Código oficial del catálogo de formas de pago del SRI Ecuador.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-1.5 shadow-xs">
+                      <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
+                        <span>Subtotal Base 0%:</span>
+                        <span className="font-semibold">$0.00</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
+                        <span>Subtotal Base 15%:</span>
+                        <span className="font-semibold">${subtotalCalc.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
+                        <span>IVA (15%):</span>
+                        <span className="font-semibold text-emerald-600">${ivaCalc.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-black border-t border-[var(--border)] pt-2 text-[var(--foreground)]">
+                        <span>TOTAL FACTURA SRI:</span>
+                        <span className="text-base text-emerald-600">${totalCalc.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ PESTAÑA: VISTA PREVIA PDF ═══ */}
+              {tabFactura === 'PREVISUALIZAR' && (
+                <div className="space-y-0" id="seccion-factura-pdf">
+                  {/* Comprobante PDF Oficial */}
+                  <div className="border-2 border-[var(--border)] rounded-2xl overflow-hidden bg-white dark:bg-slate-50 text-slate-900 shadow-lg">
+                    {/* Encabezado con Datos del Dueño del Negocio / RUC Emisor */}
+                    <div className="p-5 border-b-2 border-slate-300">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Datos del Emisor (Dueño del Negocio) */}
+                        <div className="space-y-1">
+                          <h4 className="font-black text-sm text-slate-900 uppercase">
+                            {businessConfig?.nombre || 'CALZADO ARTESANAL CEVALLOS'}
+                          </h4>
+                          <p className="text-[10px] text-slate-600 leading-tight">
+                            {businessConfig?.email ? `Email: ${businessConfig.email}` : 'Comercialización y Distribución de Calzado'}
+                          </p>
+                          <p className="text-[10px] text-slate-700 font-bold">
+                            RUC: {businessConfig?.ruc || '1804884664001'}
+                          </p>
+                          <p className="text-[10px] text-slate-600">
+                            Matriz: {businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador'}
+                          </p>
+                          <p className="text-[10px] text-slate-600">
+                            Obligado a llevar Contabilidad: {businessConfig?.sriObligadoContabilidad ? 'SI' : 'NO'}
+                          </p>
+                        </div>
+                        {/* Datos del Comprobante */}
+                        <div className="text-right space-y-1">
+                          <div className="inline-block px-3 py-1.5 border-2 border-slate-900 rounded-lg">
+                            <p className="font-black text-xs text-slate-900 uppercase">Factura</p>
+                            <p className="text-[10px] text-slate-700 font-bold">
+                              No. {businessConfig?.sriEstablecimiento || '001'}-{businessConfig?.sriPuntoEmision || '001'}-000000001
+                            </p>
+                          </div>
+                          <p className="text-[10px] text-slate-600 mt-2">
+                            Fecha de Emisión: {new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                          <p className="text-[10px] text-slate-700 font-mono font-bold">
+                            Ambiente: {businessConfig?.sriAmbiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Datos del Comprador */}
+                    <div className="px-5 py-3 border-b border-slate-200 bg-slate-50">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                        <div className="flex gap-1 text-[10px]">
+                          <span className="font-bold text-slate-700">Razón Social:</span>
+                          <span className="text-slate-900 font-semibold">{facturaCliente.nombre}</span>
+                        </div>
+                        <div className="flex gap-1 text-[10px]">
+                          <span className="font-bold text-slate-700">Identificación:</span>
+                          <span className="text-slate-900 font-semibold">{facturaCliente.cedula}</span>
+                        </div>
+                        <div className="flex gap-1 text-[10px]">
+                          <span className="font-bold text-slate-700">Dirección:</span>
+                          <span className="text-slate-900">{facturaCliente.direccion || 'No registrada'}</span>
+                        </div>
+                        <div className="flex gap-1 text-[10px]">
+                          <span className="font-bold text-slate-700">Email:</span>
+                          <span className="text-slate-900">{facturaCliente.email || 'No registrado'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabla de Detalle */}
+                    <div className="px-5 py-3">
+                      <table className="w-full text-[10px]">
+                        <thead>
+                          <tr className="border-b-2 border-slate-300 text-slate-700 font-black uppercase">
+                            <th className="py-1.5 text-left">Descripción</th>
+                            <th className="py-1.5 text-center w-14">Cant.</th>
+                            <th className="py-1.5 text-right w-20">P. Unit.</th>
+                            <th className="py-1.5 text-right w-16">Desc.</th>
+                            <th className="py-1.5 text-right w-20">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {facturaCliente.detalles.map((d, idx) => {
+                            const sub = d.cantidad * d.precioUnitario - (d.descuento || 0);
+                            return (
+                              <tr key={idx} className="border-b border-slate-200">
+                                <td className="py-1.5 text-left font-semibold text-slate-900">{d.descripcion}</td>
+                                <td className="py-1.5 text-center font-bold">{d.cantidad}</td>
+                                <td className="py-1.5 text-right">${d.precioUnitario.toFixed(2)}</td>
+                                <td className="py-1.5 text-right">${(d.descuento || 0).toFixed(2)}</td>
+                                <td className="py-1.5 text-right font-bold">${sub.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Totales PDF */}
+                    <div className="px-5 py-3 border-t-2 border-slate-300 bg-slate-50">
+                      <div className="flex justify-end">
+                        <div className="w-64 space-y-1">
+                          <div className="flex justify-between text-[10px] text-slate-700">
+                            <span>SUBTOTAL 15%:</span>
+                            <span className="font-bold">${subtotalCalc.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-slate-700">
+                            <span>SUBTOTAL 0%:</span>
+                            <span className="font-bold">$0.00</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-slate-700">
+                            <span>DESCUENTO:</span>
+                            <span className="font-bold">$0.00</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-slate-700">
+                            <span>IVA 15%:</span>
+                            <span className="font-bold">${ivaCalc.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs font-black text-slate-900 border-t-2 border-slate-400 pt-1.5">
+                            <span>VALOR TOTAL:</span>
+                            <span>${totalCalc.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Información adicional PDF */}
+                    <div className="px-5 py-3 border-t border-slate-200 text-[9px] text-slate-500 space-y-0.5">
+                      <p>Forma de Pago: {facturaCliente.formaPago === '01' ? 'Sin utilización del sistema financiero (Efectivo)' : facturaCliente.formaPago === '20' ? 'Otros con utilización del sistema financiero' : facturaCliente.formaPago === '16' ? 'Tarjeta de Débito' : 'Tarjeta de Crédito'} — Plazo: 30 días</p>
+                      <p>Este documento es una previsualización PDF de la factura electrónica a emitirse ante el SRI.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer con Acciones */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => setShowFacturaModal(false)}
+                  className="flex-1 sm:flex-none px-5 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                >
+                  Cerrar
+                </button>
+                {/* Botón Imprimir / Guardar PDF */}
+                {tabFactura === 'PREVISUALIZAR' && (
+                  <button
+                    onClick={() => {
+                      const doc = generarFacturaPdfDoc(armarDatosPdf());
+                      doc.save(`Factura_${armarDatosPdf().comprobante.numero}.pdf`);
+                      showToast('Archivo PDF generado y descargado.', 'success');
+                    }}
+                    className="flex-1 sm:flex-none px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-bold hover:bg-[var(--muted)] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Download size={14} />
+                    <span>Guardar PDF</span>
+                  </button>
+                )}
+                {/* Botón Compartir PDF directamente a WhatsApp */}
+                {facturaCliente.telefono && tabFactura === 'PREVISUALIZAR' && !facturaResultado && (
+                  <button
+                    onClick={async () => {
+                      const res = await compartirFacturaPdf(armarDatosPdf(), facturaCliente.telefono);
+                      if (res.metodo === 'WEB_SHARE') {
+                        showToast('Factura PDF enviada a WhatsApp.', 'success');
+                      } else {
+                        showToast('Se descargó el PDF y se abrió el chat de WhatsApp.', 'info');
+                      }
+                    }}
+                    className="flex-1 sm:flex-none px-4 py-2.5 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <MessageCircle size={14} />
+                    <span>Enviar Factura PDF por WhatsApp</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {tabFactura === 'CONFIGURAR' && (
+                  <button
+                    onClick={() => setTabFactura('PREVISUALIZAR')}
+                    className="flex-1 sm:flex-none px-5 py-2.5 border border-[#0F172A]/30 bg-[#0F172A]/5 hover:bg-[#0F172A]/10 text-[#0F172A] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye size={14} />
+                    <span>Ver Previsualización PDF</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleEmitirFacturaSRI}
+                  disabled={emittingFactura || !online}
+                  className="flex-1 sm:flex-none px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {emittingFactura ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Firmando y Emitiendo al SRI...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileCheck size={16} />
+                      <span>Emitir Factura Electrónica SRI</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
     </div>
   );
 }

@@ -310,13 +310,13 @@ function MainApp() {
   // SHELL PRINCIPAL: Sidebar + Vista Activa
   // ══════════════════════════════════════════
   return (
-    <div className="min-h-screen flex bg-[var(--background)] text-[var(--foreground)]">
+    <div className="h-screen max-h-screen w-full flex overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
 
       {/* ─── SIDEBAR ─── */}
-      <aside className="w-64 border-r border-[var(--border)] bg-[var(--card)] flex flex-col justify-between shrink-0">
-        <div>
-          {/* Logo + Toggle tema */}
-          <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+      <aside className="w-64 h-full max-h-screen border-r border-[var(--border)] bg-[var(--card)] flex flex-col justify-between shrink-0 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Logo + Toggle tema (Fijo arriba) */}
+          <div className="shrink-0 p-6 border-b border-[var(--border)] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               {businessLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -335,8 +335,8 @@ function MainApp() {
             </button>
           </div>
 
-          {/* Navegación */}
-          <nav className="p-4 space-y-1">
+          {/* Navegación (Scroll vertical independiente únicamente en el área de items) */}
+          <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
             <div className="px-3 py-2 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
               Módulos Operativos
             </div>
@@ -368,8 +368,8 @@ function MainApp() {
           </nav>
         </div>
 
-        {/* Usuario */}
-        <div className="p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
+        {/* Usuario (Fijo abajo) */}
+        <div className="shrink-0 p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-[#0F172A] text-white flex items-center justify-center font-bold text-xs">
               {user?.nombre ? user.nombre.slice(0, 2).toUpperCase() : 'US'}
@@ -388,10 +388,10 @@ function MainApp() {
       </aside>
 
       {/* ─── CONTENIDO PRINCIPAL ─── */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col h-full max-h-screen overflow-hidden min-w-0">
 
-        {/* Navbar superior */}
-        <header className="h-16 border-b border-[var(--border)] bg-white dark:bg-slate-900 px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+        {/* Navbar superior (Fijo arriba) */}
+        <header className="h-16 shrink-0 border-b border-[var(--border)] bg-white dark:bg-slate-900 px-8 flex items-center justify-between z-30 shadow-sm">
           <h1 className="text-xl font-black text-[#0F172A] dark:text-white tracking-tight">
             {NAV_ITEMS.find((n) => n.id === vistaActual)?.label ?? 'Panel de Control'}
           </h1>
@@ -414,8 +414,8 @@ function MainApp() {
           </div>
         </header>
 
-        {/* ─── VISTA ACTIVA ─── */}
-        <section className="flex-1 p-8 overflow-y-auto space-y-8">
+        {/* ─── VISTA ACTIVA (Scroll vertical independiente únicamente en el contenido) ─── */}
+        <section className="flex-1 min-h-0 overflow-y-auto p-8 space-y-8">
           {/* Alerta de datos offline pendientes */}
           {stats.pendingSyncCount > 0 && (
             <div className="p-4 border border-yellow-500/20 bg-yellow-500/5 text-yellow-600 rounded-xl flex items-center justify-between">
