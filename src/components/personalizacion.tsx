@@ -5,8 +5,16 @@ import { ApiService } from "../services/api.service";
 import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
   Palette, Upload, Clock, MapPin, RefreshCw, CheckCircle, AlertCircle,
-  Loader2, Shield, User, Smartphone, Navigation, Sun, Moon, Lock, Trash2
+  Loader2, Shield, User, Smartphone, Navigation, Sun, Moon, Lock, Trash2, Building2, DollarSign
 } from "lucide-react";
+
+interface CreditLevelConfigItem {
+  id?: string;
+  nivel: string;
+  comprasRequeridas: number;
+  limiteDolares: number;
+  plazoDias: number;
+}
 
 interface PersonalizacionProps {
   online: boolean;
@@ -23,6 +31,14 @@ interface BusinessConfig {
   horaInicioOperativa?: string;
   horaFinOperativa?: string;
   duracionSesionHoras?: number;
+  sriAmbiente?: string;
+  sriEstablecimiento?: string;
+  sriPuntoEmision?: string;
+  sriObligadoContabilidad?: boolean;
+  creditMontoMaximoInicial?: number;
+  creditPlazoMaximoDias?: number;
+  creditScoreMinimo?: number;
+  creditTasaMoraPct?: number;
 }
 
 interface VendedorUbicacion {
@@ -63,7 +79,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     horaInicioOperativa: "08:00",
     horaFinOperativa: "19:00",
     duracionSesionHoras: 24,
+    sriAmbiente: "1",
+    sriEstablecimiento: "001",
+    sriPuntoEmision: "001",
+    sriObligadoContabilidad: false,
+    creditMontoMaximoInicial: 200,
+    creditPlazoMaximoDias: 30,
+    creditScoreMinimo: 60,
+    creditTasaMoraPct: 2.5,
   });
+
+  const [nivelesCredito, setNivelesCredito] = useState<CreditLevelConfigItem[]>([
+    { nivel: "NIVEL_1", comprasRequeridas: 10, limiteDolares: 300, plazoDias: 15 },
+    { nivel: "NIVEL_2", comprasRequeridas: 15, limiteDolares: 700, plazoDias: 30 },
+    { nivel: "NIVEL_3", comprasRequeridas: 25, limiteDolares: 1500, plazoDias: 30 },
+    { nivel: "NIVEL_4", comprasRequeridas: 40, limiteDolares: 3000, plazoDias: 45 },
+  ]);
 
   const [vendedores, setVendedores] = useState<VendedorUbicacion[]>([]);
   const [loadingVendedores, setLoadingVendedores] = useState(false);
@@ -77,7 +108,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     setLoading(true);
     try {
       if (online) {
-        const data = await ApiService.get("/configuracion/negocio");
+        const [data, nivelesData] = await Promise.all([
+          ApiService.get("/configuracion/negocio"),
+          ApiService.get("/configuracion/niveles-credito").catch(() => null),
+        ]);
+
         if (data) {
           setConfig({
             nombre: data.nombre || "",
@@ -90,11 +125,26 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             horaInicioOperativa: data.horaInicioOperativa || "08:00",
             horaFinOperativa: data.horaFinOperativa || "19:00",
             duracionSesionHoras: data.duracionSesionHoras || 24,
+            sriAmbiente: data.sriAmbiente || "1",
+            sriEstablecimiento: data.sriEstablecimiento || "001",
+            sriPuntoEmision: data.sriPuntoEmision || "001",
+            sriObligadoContabilidad: data.sriObligadoContabilidad || false,
+            creditMontoMaximoInicial: data.creditMontoMaximoInicial ?? 200,
+            creditPlazoMaximoDias: data.creditPlazoMaximoDias ?? 30,
+            creditScoreMinimo: data.creditScoreMinimo ?? 60,
+            creditTasaMoraPct: data.creditTasaMoraPct ?? 2.5,
           });
 
           if (data.primaryColor && typeof document !== "undefined") {
             document.documentElement.style.setProperty("--primary", data.primaryColor);
           }
+        }
+
+        if (Array.isArray(nivelesData) && nivelesData.length > 0) {
+          setNivelesCredito(nivelesData.map(n => ({
+            ...n,
+            limiteDolares: Number(n.limiteDolares),
+          })));
         }
       }
     } catch (err: any) {
@@ -135,13 +185,17 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         }
       }
 
-      await ApiService.put("/configuracion/negocio", finalConfig);
-      setSuccess("Configuración de personalización guardada correctamente.");
+      await Promise.all([
+        ApiService.put("/configuracion/negocio", finalConfig),
+        ApiService.put("/configuracion/niveles-credito", { niveles: nivelesCredito }),
+      ]);
+
+      setSuccess("Configuración global y escala de niveles crediticios guardados correctamente.");
       if (typeof document !== "undefined" && config.primaryColor) {
         document.documentElement.style.setProperty("--primary", config.primaryColor);
       }
     } catch (err: any) {
-      setError(err.message || "Error al guardar la personalización.");
+      setError(err.message || "Error al guardar la configuración.");
     } finally {
       setSaving(false);
     }
@@ -173,10 +227,10 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         <div>
           <h1 className="text-2xl font-black tracking-tight text-[var(--foreground)] flex items-center gap-2">
             <Palette className="text-[#0F172A]" size={26} />
-            Personalización & Sistema
+            Centro de Configuración Global ⚙️
           </h1>
           <p className="text-xs text-[var(--muted-foreground)] mt-1">
-            Gestiona la identidad de tu marca, horarios operativos de sesión y seguimiento GPS de personal.
+            Parámetros comerciales del negocio, datos fiscales SRI, personalización visual y gobernanza del sistema.
           </p>
         </div>
         <button
@@ -204,11 +258,91 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* SECCIÓN 1: IDENTIDAD Y MARCA */}
+        {/* SECCIÓN 1: DATOS COMERCIALES DEL NEGOCIO */}
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
+          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+            <Building2 className="text-[#0F172A]" size={20} />
+            <h2 className="text-base font-bold text-[var(--foreground)]">1. Datos Comerciales del Establecimiento</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Nombre Comercial / Razón Social <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={config.nombre}
+                onChange={(e) => setConfig(prev => ({ ...prev, nombre: e.target.value }))}
+                placeholder="Ej. Calzados Cevallos S.A."
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                RUC del Comercio <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={config.ruc}
+                onChange={(e) => setConfig(prev => ({ ...prev, ruc: e.target.value }))}
+                placeholder="Ej. 1890123456001"
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Dirección Matriz <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={config.direccion}
+                onChange={(e) => setConfig(prev => ({ ...prev, direccion: e.target.value }))}
+                placeholder="Ej. Av. 13 de Mayo y Gonzales Suárez, Cevallos"
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                  Teléfono
+                </label>
+                <input
+                  type="text"
+                  value={config.telefono || ""}
+                  onChange={(e) => setConfig(prev => ({ ...prev, telefono: e.target.value }))}
+                  placeholder="Ej. 0991234567"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  value={config.email || ""}
+                  onChange={(e) => setConfig(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="contacto@calzadocevallos.com"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SECCIÓN 2: IDENTIDAD Y MARCA */}
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
             <Palette className="text-[#0F172A]" size={20} />
-            <h2 className="text-base font-bold text-[var(--foreground)]">1. Identidad Visual y Marca</h2>
+            <h2 className="text-base font-bold text-[var(--foreground)]">2. Identidad Visual & Personalización (Branding)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -290,7 +424,228 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </div>
         </div>
 
-        {/* SECCIÓN 2: HORARIOS OPERATIVOS DE SESIÓN */}
+        {/* SECCIÓN 3: PARAMETROS FISCALES SRI */}
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
+          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+            <Shield className="text-[#0F172A]" size={20} />
+            <div>
+              <h2 className="text-base font-bold text-[var(--foreground)]">3. Parámetros Fiscales & Facturación SRI</h2>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Datos de emisión de comprobantes electrónicos autorizados por el SRI Ecuador.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Ambiente SRI
+              </label>
+              <select
+                value={config.sriAmbiente || "1"}
+                onChange={(e) => setConfig(prev => ({ ...prev, sriAmbiente: e.target.value }))}
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              >
+                <option value="1">1 - Pruebas / Homologación</option>
+                <option value="2">2 - Producción Real</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Establecimiento
+              </label>
+              <input
+                type="text"
+                maxLength={3}
+                value={config.sriEstablecimiento || "001"}
+                onChange={(e) => setConfig(prev => ({ ...prev, sriEstablecimiento: e.target.value }))}
+                placeholder="001"
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold text-center font-mono focus:outline-none focus:border-[#0F172A]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Punto de Emisión
+              </label>
+              <input
+                type="text"
+                maxLength={3}
+                value={config.sriPuntoEmision || "001"}
+                onChange={(e) => setConfig(prev => ({ ...prev, sriPuntoEmision: e.target.value }))}
+                placeholder="001"
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold text-center font-mono focus:outline-none focus:border-[#0F172A]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Obligado Contabilidad
+              </label>
+              <select
+                value={config.sriObligadoContabilidad ? "SI" : "NO"}
+                onChange={(e) => setConfig(prev => ({ ...prev, sriObligadoContabilidad: e.target.value === "SI" }))}
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              >
+                <option value="NO">NO</option>
+                <option value="SI">SÍ</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* SECCIÓN 4: PARÁMETROS DEL SCORING CREDITICIO */}
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
+          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+            <DollarSign className="text-[#0F172A]" size={20} />
+            <div>
+              <h2 className="text-base font-bold text-[var(--foreground)]">4. Parámetros del Scoring Crediticio Progresivo 💳</h2>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Define las políticas de crédito directo, cupos máximos iniciales y plazos permitidos para clientes.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Cupo Crédito Inicial ($)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="10"
+                value={config.creditMontoMaximoInicial ?? 200}
+                onChange={(e) => setConfig(prev => ({ ...prev, creditMontoMaximoInicial: parseFloat(e.target.value) || 0 }))}
+                placeholder="200"
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold text-center font-mono focus:outline-none focus:border-[#0F172A]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Plazo Máximo Pago (Días)
+              </label>
+              <select
+                value={config.creditPlazoMaximoDias ?? 30}
+                onChange={(e) => setConfig(prev => ({ ...prev, creditPlazoMaximoDias: parseInt(e.target.value) || 30 }))}
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              >
+                <option value={15}>15 Días (Quincenal)</option>
+                <option value={30}>30 Días (Mensual)</option>
+                <option value={60}>60 Días (Bimensual)</option>
+                <option value={90}>90 Días (Trimestral)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Score Mínimo Aprobación
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={config.creditScoreMinimo ?? 60}
+                onChange={(e) => setConfig(prev => ({ ...prev, creditScoreMinimo: parseInt(e.target.value) || 0 }))}
+                placeholder="60"
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold text-center font-mono focus:outline-none focus:border-[#0F172A]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Recargo por Mora (% Mensual)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={config.creditTasaMoraPct ?? 2.5}
+                onChange={(e) => setConfig(prev => ({ ...prev, creditTasaMoraPct: parseFloat(e.target.value) || 0 }))}
+                placeholder="2.5"
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold text-center font-mono focus:outline-none focus:border-[#0F172A]"
+              />
+            </div>
+          </div>
+
+          {/* TABLA EDITABLE DE ESCALA DE NIVELES DE CRÉDITO */}
+          <div className="border-t border-[var(--border)] pt-4 space-y-3">
+            <h3 className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+              Escala de Niveles de Crédito Directo y Topes Asignados por la Sucursal
+            </h3>
+            <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3">Nivel Crediticio</th>
+                    <th className="p-3 text-center">Compras Requeridas (Pares)</th>
+                    <th className="p-3 text-center">Cupo Límite Tope ($ USD)</th>
+                    <th className="p-3 text-center">Plazo Máximo (Días)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {nivelesCredito.map((lvl, index) => {
+                    const labelNivel = lvl.nivel === "NIVEL_1" ? "Nivel 1 (Inicial)" : lvl.nivel === "NIVEL_2" ? "Nivel 2 (Bronce)" : lvl.nivel === "NIVEL_3" ? "Nivel 3 (Plata)" : "Nivel 4 (Oro / VIP)";
+                    const badgeColor = lvl.nivel === "NIVEL_1" ? "bg-slate-500/10 text-slate-600 border-slate-500/20" : lvl.nivel === "NIVEL_2" ? "bg-amber-500/10 text-amber-700 border-amber-500/20" : lvl.nivel === "NIVEL_3" ? "bg-slate-300/30 text-slate-700 border-slate-400/30" : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+                    return (
+                      <tr key={lvl.nivel} className="hover:bg-[var(--muted)]/20">
+                        <td className="p-3">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${badgeColor}`}>
+                            {labelNivel}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            value={lvl.comprasRequeridas}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, comprasRequeridas: val } : item));
+                            }}
+                            className="w-24 px-2 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-[#0F172A]"
+                          />
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="inline-flex items-center gap-1">
+                            <span className="font-bold text-slate-400">$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="50"
+                              value={lvl.limiteDolares}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, limiteDolares: val } : item));
+                              }}
+                              className="w-28 px-2 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-[#0F172A]"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <input
+                            type="number"
+                            min="1"
+                            value={lvl.plazoDias}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, plazoDias: val } : item));
+                            }}
+                            className="w-24 px-2 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-[#0F172A]"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* SECCIÓN 5: HORARIOS OPERATIVOS DE SESIÓN */}
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
             <Clock className="text-[#0F172A]" size={20} />

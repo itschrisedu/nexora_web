@@ -33,6 +33,8 @@ import {
   FileText,
   Palette,
   Loader2,
+  MapPin,
+  Settings,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import { ToastProvider } from '@/components/ui/toast';
@@ -52,8 +54,9 @@ const PosComponent = dynamic(() => import('@/components/pos'), { ssr: false });
 const PrediccionDemandaComponent = dynamic(() => import('@/components/prediccion-demanda'), { ssr: false });
 const AuditoriaComponent = dynamic(() => import('@/components/auditoria'), { ssr: false });
 const PersonalizacionComponent = dynamic(() => import('@/components/personalizacion'), { ssr: false });
+const UbicacionesComponent = dynamic(() => import('@/components/ubicaciones'), { ssr: false });
 
-type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria';
+type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
 
 interface NavItem {
   id: Vista;
@@ -63,8 +66,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',       label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
-  { id: 'personalizacion', label: 'Personalización',      icon: <Palette size={18} /> },
   { id: 'super-admin',     label: 'Gestión de Tenants',   icon: <Building2 size={18} /> },
+  { id: 'ubicaciones',     label: 'Rastreo GPS Personal', icon: <MapPin size={18} /> },
   { id: 'sri',             label: 'Facturación SRI',       icon: <FileText size={18} /> },
   { id: 'catalogo',     label: 'Catálogo WhatsApp',    icon: <ShoppingBag size={18} /> },
   { id: 'pos',           label: 'POS Mostrador',        icon: <Store size={18} /> },
@@ -362,14 +365,14 @@ function MainApp() {
             {NAV_ITEMS.filter((item) => {
               if (!user) return item.id !== 'super-admin';
               if (user.rol === 'ROL_SUPER_ADMIN') {
-                return ['dashboard', 'super-admin', 'auditoria'].includes(item.id);
+                return ['dashboard', 'super-admin', 'auditoria', 'ubicaciones'].includes(item.id);
               }
               if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin'; // Admin ve todo excepto gestión de tenants
               if (user.rol === 'ROL_VENDEDOR') {
-                return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri'].includes(item.id);
+                return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
               }
               if (user.rol === 'ROL_BODEGUERO') {
-                return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri'].includes(item.id);
+                return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
               }
               return !['modelos', 'super-admin'].includes(item.id); // Por defecto ocultar modelos y super-admin
             }).map((item) => (
@@ -396,15 +399,30 @@ function MainApp() {
               {user?.nombre ? user.nombre.slice(0, 2).toUpperCase() : 'US'}
             </div>
             <div>
-              <div className="text-xs font-semibold truncate max-w-[120px]">{user?.nombre || 'Usuario'}</div>
+              <div className="text-xs font-semibold truncate max-w-[100px]">{user?.nombre || 'Usuario'}</div>
               <div className="text-[10px] text-[var(--muted-foreground)]">
                 {user?.rol === 'ROL_SUPER_ADMIN' ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? 'Administrador' : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
               </div>
             </div>
           </div>
-          <button onClick={handleLogout} className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Cerrar sesión">
-            <LogOut size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            {(user?.rol === 'ROL_ADMIN' || user?.rol === 'ROL_SUPER_ADMIN') && (
+              <button
+                onClick={() => setVistaActual('personalizacion')}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  vistaActual === 'personalizacion'
+                    ? 'bg-[#0F172A] text-amber-400'
+                    : 'text-[var(--muted-foreground)] hover:text-[#0F172A] hover:bg-[var(--muted)]'
+                }`}
+                title="Configuración Global ⚙️"
+              >
+                <Settings size={16} />
+              </button>
+            )}
+            <button onClick={handleLogout} className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Cerrar sesión">
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -477,6 +495,7 @@ function MainApp() {
           {vistaActual === 'pos' && <PosComponent />}
           {vistaActual === 'prediccion-ml' && <PrediccionDemandaComponent />}
           {vistaActual === 'auditoria' && <AuditoriaComponent />}
+          {vistaActual === 'ubicaciones' && <UbicacionesComponent online={online} />}
         </section>
       </main>
     </div>
