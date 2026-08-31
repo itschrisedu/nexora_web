@@ -65,6 +65,11 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
   const [movError, setMovError] = useState("");
   const [movSaving, setMovSaving] = useState(false);
 
+  // Multiformato (Pares Sueltos vs Serie Completa)
+  const [ingresoFormato, setIngresoFormato] = useState<"suelto" | "serie">("suelto");
+  const [serieMultiplicador, setSerieMultiplicador] = useState<number>(1);
+  const [loteCantidades, setLoteCantidades] = useState<Record<string, number>>({});
+
   const isAdmin = !userRole || userRole === "ROL_ADMIN";
   const isBodeguero = userRole === "ROL_BODEGUERO";
   const canMove = isAdmin || isBodeguero;
@@ -96,32 +101,83 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
   const openMovimiento = (p: Producto, tipo: "entrada" | "salida") => {
     setMovProd(p);
     setMovType(tipo);
+    setIngresoFormato("suelto");
     setMovTallaId(p.tallas?.[0]?.id || "");
     setMovCantidad("1");
     setMovMotivo("");
     setMovError("");
+    setSerieMultiplicador(1);
+
+    const initialLote: Record<string, number> = {};
+    if (p.tallas && p.tallas.length > 0) {
+      const paresPorTallaDefault = Math.max(1, Math.floor(12 / p.tallas.length));
+      p.tallas.forEach((t) => {
+        initialLote[t.id] = paresPorTallaDefault;
+      });
+    }
+    setLoteCantidades(initialLote);
     setShowMovModal(true);
+  };
+
+  const aplicarPresetSerie = (mult: number) => {
+    setSerieMultiplicador(mult);
+    if (!movProd || !movProd.tallas || movProd.tallas.length === 0) return;
+    const paresPorTalla = Math.max(1, Math.round((12 * mult) / movProd.tallas.length));
+    const newLote: Record<string, number> = {};
+    movProd.tallas.forEach((t) => {
+      newLote[t.id] = paresPorTalla;
+    });
+    setLoteCantidades(newLote);
   };
 
   const handleMovimiento = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!movProd) return;
     setMovError("");
-    if (!movTallaId || !movCantidad || !movMotivo) {
-      setMovError("Completa todos los campos.");
+
+    if (!movMotivo.trim()) {
+      setMovError("Ingresa el motivo del movimiento.");
       return;
     }
+
     setMovSaving(true);
     try {
-      const endpoint = movType === "entrada"
-        ? `/inventario/productos/${movProd.id}/entrada`
-        : `/inventario/productos/${movProd.id}/salida`;
-      await ApiService.post(endpoint, {
-        tallaId: movTallaId,
-        cantidad: parseInt(movCantidad),
-        motivo: movMotivo,
-      });
-      setSuccess(`${movType === "entrada" ? "Entrada" : "Salida"} de stock registrada correctamente.`);
+      if (movType === "entrada" && ingresoFormato === "serie") {
+        const items = Object.entries(loteCantidades)
+          .map(([tallaId, cant]) => ({ tallaId, cantidad: Number(cant) || 0 }))
+          .filter((i) => i.cantidad > 0);
+
+        if (items.length === 0) {
+          setMovError("Ingresa al menos 1 par en alguna talla de la serie.");
+          setMovSaving(false);
+          return;
+        }
+
+        await ApiService.post(`/inventario/productos/${movProd.id}/entrada-lote`, {
+          items,
+          motivo: movMotivo.trim(),
+        });
+
+        const totalPares = items.reduce((s, i) => s + i.cantidad, 0);
+        setSuccess(`Entrada por Serie Completa (${totalPares} pares) registrada correctamente.`);
+      } else {
+        if (!movTallaId || !movCantidad || parseInt(movCantidad) <= 0) {
+          setMovError("Selecciona una talla y una cantidad mayor a cero.");
+          setMovSaving(false);
+          return;
+        }
+        const endpoint =
+          movType === "entrada"
+            ? `/inventario/productos/${movProd.id}/entrada`
+            : `/inventario/productos/${movProd.id}/salida`;
+        await ApiService.post(endpoint, {
+          tallaId: movTallaId,
+          cantidad: parseInt(movCantidad),
+          motivo: movMotivo.trim(),
+        });
+        setSuccess(`${movType === "entrada" ? "Entrada" : "Salida"} de stock registrada correctamente.`);
+      }
+
       setShowMovModal(false);
       setMovProd(null);
       loadProducts();
@@ -149,132 +205,99 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
     });
   };
 
-  const filtered = products.filter(p =>
-    p.nombre?.toLowerCase().includes(search.toLowerCase()) ||
-    p.codigo?.toLowerCase().includes(search.toLowerCase()) ||
-    p.marca?.toLowerCase().includes(search.toLowerCase())
-  );
+  const totalParesLote = Object.values(loteCantidades).reduce((sum, val) => sum + (Number(val) || 0), 0);
 
-  const totalProductos = products.length;
-  const totalStockBajo = products.filter(stockBajo).length;
-  const totalUnidades = products.reduce((s, p) => s + stockTotal(p), 0);
+  const filteredProducts = products.filter(p => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      p.nombre.toLowerCase().includes(q) ||
+      p.codigo.toLowerCase().includes(q) ||
+      p.marca.toLowerCase().includes(q) ||
+      p.modelo.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[var(--muted-foreground)] font-medium">Consulta el stock actual y registra movimientos de entrada/salida</p>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium">Control físico de existencias por modelo y talla en tiempo real</p>
         </div>
-        <button onClick={loadProducts} className="flex items-center gap-2 p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors self-start">
-          <RefreshCw size={16} />
-        </button>
-      </div>
-
-      {/* KPIs rápidos */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Modelos", value: totalProductos, color: "text-[#0F172A]" },
-          { label: "Unidades totales", value: totalUnidades, color: "text-emerald-600" },
-          { label: "Stock bajo", value: totalStockBajo, color: totalStockBajo > 0 ? "text-red-500" : "text-emerald-600" },
-        ].map(k => (
-          <div key={k.label} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 text-center">
-            <div className={`text-2xl font-black ${k.color}`}>{k.value}</div>
-            <div className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider mt-1">{k.label}</div>
+        <div className="flex items-center gap-3">
+          <button onClick={loadProducts} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </button>
+          <div className="relative w-full sm:w-64">
+            <Search size={16} className="absolute left-3 top-3 text-[var(--muted-foreground)]" />
+            <input type="text" placeholder="Buscar calzado..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]" />
           </div>
-        ))}
+        </div>
       </div>
 
       {success && (
         <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-sm rounded-xl">
-          <CheckCircle size={16} /> {success}
+          <CheckCircle size={16} /> <span>{success}</span>
         </div>
       )}
 
-      {/* Buscador */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
-        <input type="text" placeholder="Buscar por código, nombre o marca..."
-          value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors" />
-      </div>
-
-      {/* Lista */}
+      {/* Grid de Productos */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
-          <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
+        <div className="flex flex-col items-center justify-center p-12 text-[var(--muted-foreground)]">
+          <Loader2 className="animate-spin text-[#0F172A] mb-2" size={32} />
           <span className="text-sm">Cargando inventario...</span>
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-16 bg-[var(--card)] border border-[var(--border)] border-dashed rounded-2xl text-[var(--muted-foreground)]">
-          <Package size={48} className="mb-4 opacity-30" />
-          <p className="font-semibold">Sin productos en inventario</p>
-          <p className="text-xs mt-1">Ve a "Catálogo de Modelos" para agregar nuevos productos.</p>
+      ) : filteredProducts.length === 0 ? (
+        <div className="p-12 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
+          No se encontraron productos en el inventario.
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map(p => {
-            const st = stockTotal(p);
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredProducts.map((p) => {
+            const total = stockTotal(p);
             const bajo = stockBajo(p);
             return (
-              <div key={p.id}
-                className={`bg-[var(--card)] border rounded-2xl p-4 hover:shadow-md transition-all cursor-pointer ${selected?.id === p.id ? "border-[#0F172A]/50 shadow-md" : "border-[var(--border)]"}`}
-                onClick={() => setSelected(s => s?.id === p.id ? null : p)}>
+              <div key={p.id} onClick={() => setSelected(selected?.id === p.id ? null : p)}
+                className={`bg-[var(--card)] border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer ${selected?.id === p.id ? "border-[#0F172A] ring-1 ring-[#0F172A]" : "border-[var(--border)]"}`}>
                 <div className="flex items-start gap-4">
-                  {/* Imagen */}
-                  <div className="w-14 h-14 rounded-xl bg-[var(--muted)]/40 flex items-center justify-center shrink-0 overflow-hidden">
-                    {p.fotoUrl
-                      ? <img src={p.fotoUrl} alt={p.nombre} className="w-full h-full object-cover" />
-                      : <ImageIcon size={20} className="text-[var(--muted-foreground)] opacity-40" />}
+                  <div className="w-16 h-16 rounded-xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0">
+                    {p.fotoUrl ? <img src={p.fotoUrl} alt={p.nombre} className="w-full h-full object-cover" /> : <ImageIcon size={24} className="text-[var(--muted-foreground)] opacity-40" />}
                   </div>
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <div className="font-bold text-sm">{p.nombre}</div>
-                        <div className="text-xs text-[var(--muted-foreground)]">{p.marca} · {p.modelo} · <span className="font-mono text-[10px]">{p.codigo}</span></div>
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">{p.marca} · {p.modelo}</span>
+                        <h4 className="font-bold text-sm truncate text-[var(--foreground)]">{p.nombre}</h4>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className={`text-lg font-black ${bajo ? "text-red-500" : "text-emerald-600"}`}>{st}</div>
-                        <div className="text-[10px] text-[var(--muted-foreground)]">unidades</div>
-                      </div>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${total === 0 ? "bg-red-500/10 text-red-500" : bajo ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"}`}>
+                        {total} pares
+                      </span>
                     </div>
-
-                    {/* Tallas */}
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {Array.isArray(p.tallas) && p.tallas.map((t, idx) => {
-                        const st = t.stock ?? t.cantidad ?? 0;
-                        const min = t.stockMinimo ?? 0;
-                        const num = t.numero ?? t.nombre ?? "—";
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {(p.tallas || []).map((t, idx) => {
+                        const st = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+                        const min = t.stockMinimo || 0;
+                        const num = t.nombre || t.numero;
                         return (
-                          <span key={t.id || idx}
-                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
-                              st === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
-                              : min > 0 && st <= min ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                              : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                            }`}>
+                          <span key={t.id || idx} className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${st === 0 ? "bg-red-500/10 text-red-500 border-red-500/20" : min > 0 && st <= min ? "bg-amber-500/10 text-amber-600 border-amber-500/20" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"}`}>
                             T{num}: {st}
                           </span>
                         );
                       })}
                     </div>
-
-                    {/* Alertas y acciones */}
                     {selected?.id === p.id && (
                       <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
                         <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
                           <span>Costo: <strong>${Number(p.precioCosto).toFixed(2)}</strong></span>
                           <span>Venta: <strong className="text-[#0F172A]">${Number(p.precioVenta).toFixed(2)}</strong></span>
-                          {p.material && <span>· {p.material}</span>}
                         </div>
                         {canMove && (
                           <div className="flex items-center gap-2">
-                            <button onClick={e => { e.stopPropagation(); openMovimiento(p, "entrada"); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl text-xs font-semibold hover:bg-emerald-500/20 transition-colors">
+                            <button onClick={(e) => { e.stopPropagation(); openMovimiento(p, "entrada"); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl text-xs font-semibold hover:bg-emerald-500/20 transition-colors">
                               <TrendingUp size={13} /> Entrada
                             </button>
-                            <button onClick={e => { e.stopPropagation(); openMovimiento(p, "salida"); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-xs font-semibold hover:bg-red-500/20 transition-colors">
+                            <button onClick={(e) => { e.stopPropagation(); openMovimiento(p, "salida"); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-xs font-semibold hover:bg-red-500/20 transition-colors">
                               <TrendingDown size={13} /> Salida
                             </button>
                           </div>
@@ -283,71 +306,90 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
                     )}
                   </div>
                 </div>
-
-                {bajo && (
-                  <div className="mt-2 flex items-center gap-1.5 text-[10px] text-amber-600 font-semibold">
-                    <AlertTriangle size={11} /> Algunas tallas están por debajo del stock mínimo
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* MODAL MOVIMIENTO */}
+      {/* MODAL MOVIMIENTO MULTIFORMATO */}
       {showMovModal && movProd && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl">
             <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  {movType === "entrada"
-                    ? <TrendingUp size={16} className="text-emerald-600" />
-                    : <TrendingDown size={16} className="text-red-500" />}
-                  <h3 className="font-bold text-base">
-                    {movType === "entrada" ? "Entrada de Stock" : "Salida de Stock"}
-                  </h3>
+                  {movType === "entrada" ? <TrendingUp size={18} className="text-emerald-600" /> : <TrendingDown size={18} className="text-red-500" />}
+                  <h3 className="font-bold text-base">{movType === "entrada" ? "Ingreso de Mercadería" : "Salida de Stock"}</h3>
                 </div>
-                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{movProd.nombre} · {movProd.codigo}</p>
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{movProd.nombre} · {movProd.codigo} {movProd.serie?.nombre ? `(${movProd.serie.nombre})` : ""}</p>
               </div>
               <button onClick={() => setShowMovModal(false)} className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleMovimiento} className="p-5 space-y-4">
+              {movType === "entrada" && (
+                <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
+                  <button type="button" onClick={() => setIngresoFormato("suelto")} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${ingresoFormato === "suelto" ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>👟 Pares Sueltos</button>
+                  <button type="button" onClick={() => setIngresoFormato("serie")} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${ingresoFormato === "serie" ? "bg-emerald-600 text-white shadow-sm" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>📦 Serie Completa</button>
+                </div>
+              )}
+              {(movType === "salida" || ingresoFormato === "suelto") && (
+                <>
+                  <div>
+                    <Lbl t="Talla Seleccionada" req />
+                    <select value={movTallaId} onChange={(e) => setMovTallaId(e.target.value)} className={INPUT}>
+                      <option value="">Seleccionar talla...</option>
+                      {movProd.tallas?.map((t) => <option key={t.id} value={t.id}>Talla {t.nombre || t.numero} (stock: {t.stock})</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Lbl t="Cantidad de Pares" req />
+                    <input type="number" min="1" value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} className={INPUT} />
+                  </div>
+                </>
+              )}
+              {movType === "entrada" && ingresoFormato === "serie" && (
+                <div className="space-y-4">
+                  <div>
+                    <Lbl t="Multiplicador de Serie" />
+                    <div className="grid grid-cols-3 gap-2">
+                      {[0.5, 1, 2].map(m => (
+                        <button key={m} type="button" onClick={() => aplicarPresetSerie(m)} className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${serieMultiplicador === m ? "bg-emerald-500/10 border-emerald-500 text-emerald-600" : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"}`}>
+                          {m === 0.5 ? "½ Docena (6p)" : m === 1 ? "1 Docena (12p)" : "2 Docenas (24p)"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Lbl t="Desglose por Talla" />
+                      <span className="text-xs font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Total: {totalParesLote} pares</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto space-y-2 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                      {movProd.tallas?.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between gap-3 text-xs">
+                          <span className="font-bold text-[var(--foreground)] w-20">Talla {t.nombre || t.numero}</span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">Stock: {t.stock}</span>
+                          <input type="number" min="0" value={loteCantidades[t.id] ?? 0} onChange={(e) => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, parseInt(e.target.value) || 0)})} className="w-16 px-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-center font-bold text-xs" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div>
-                <Lbl t="Talla" req />
-                <select value={movTallaId} onChange={e => setMovTallaId(e.target.value)} className={INPUT}>
-                  <option value="">Seleccionar talla...</option>
-                  {movProd.tallas?.map(t => (
-                    <option key={t.id} value={t.id}>Talla {t.nombre} (stock actual: {t.stock})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Lbl t="Cantidad" req />
-                <input type="number" min="1" value={movCantidad} onChange={e => setMovCantidad(e.target.value)} className={INPUT} />
-              </div>
-              <div>
-                <Lbl t="Motivo" req />
-                <input type="text" value={movMotivo} onChange={e => setMovMotivo(e.target.value)}
-                  placeholder={movType === "entrada" ? "Ej. Recepción de pedido proveedor" : "Ej. Venta directa, ajuste de inventario"}
-                  className={INPUT} />
+                <Lbl t="Motivo / Documento" req />
+                <input type="text" value={movMotivo} onChange={(e) => setMovMotivo(e.target.value)} placeholder={movType === "entrada" ? "Ej. Factura Proveedor N° 001" : "Ej. Ajuste de inventario"} className={INPUT} />
               </div>
               {movError && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
                   <AlertCircle size={14} /> {movError}
                 </div>
               )}
-              <button type="submit" disabled={movSaving}
-                className={`w-full py-3 text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 ${
-                  movType === "entrada" ? "bg-emerald-600" : "bg-red-500"
-                }`}>
-                {movSaving ? <><Loader2 size={16} className="animate-spin" />Registrando...</>
-                  : movType === "entrada"
-                  ? <><TrendingUp size={16} />Registrar Entrada</>
-                  : <><TrendingDown size={16} />Registrar Salida</>}
+              <button type="submit" disabled={movSaving} className={`w-full py-3 text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 ${movType === "entrada" ? "bg-emerald-600" : "bg-red-500"}`}>
+                {movSaving ? <><Loader2 size={16} className="animate-spin" /> Registrando...</> : movType === "entrada" ? <><TrendingUp size={16} /> Registrar Entrada ({ingresoFormato === "serie" ? `${totalParesLote} pares` : "Pares sueltos"})</> : <><TrendingDown size={16} /> Registrar Salida</>}
               </button>
             </form>
           </div>
