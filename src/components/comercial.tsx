@@ -92,7 +92,8 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       numeroTalla: number;
       cantidad: number;
       precioUnitario: number;
-      tipoVenta: 'SERIE_COMPLETA' | 'TALLA_ESPECIFICA';
+      tipoVenta: 'SERIE_COMPLETA' | 'TALLA_ESPECIFICA' | 'SERIE_ESPECIAL';
+      esPedidoEspecial?: boolean;
       subtipoSerie?: 'MEDIA_DOCENA' | 'DOCENA';
       cantidadSeries?: number;
     }[]
@@ -102,10 +103,23 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   const [selectedProductId, setSelectedProductId] = useState('');
   const [precioItem, setPrecioItem] = useState(0);
   const [precioItemInput, setPrecioItemInput] = useState('');
-  const [tipoVentaItem, setTipoVentaItem] = useState<'SERIE_COMPLETA' | 'TALLA_ESPECIFICA'>('SERIE_COMPLETA');
+  const [tipoVentaItem, setTipoVentaItem] = useState<'SERIE_COMPLETA' | 'TALLA_ESPECIFICA' | 'SERIE_ESPECIAL'>('SERIE_COMPLETA');
   const [subtipoSerie, setSubtipoSerie] = useState<'MEDIA_DOCENA' | 'DOCENA'>('MEDIA_DOCENA');
   const [cantidadSeries, setCantidadSeries] = useState(1);
   const [tallaCantidadesMap, setTallaCantidadesMap] = useState<Record<string, number>>({});
+
+  // Series Disponibles para Pedidos Especiales
+  const [listaSeriesDisponibles, setListaSeriesDisponibles] = useState<any[]>([]);
+  const [serieEspecialId, setSerieEspecialId] = useState<string>('');
+
+  // Modal para Generar Orden a Proveedor desde Pedido Especial
+  const [showSupplierOrderModal, setShowSupplierOrderModal] = useState(false);
+  const [supplierOrderProductData, setSupplierOrderProductData] = useState<any>(null);
+  const [listaProveedores, setListaProveedores] = useState<any[]>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState('');
+  const [supplierOrderCost, setSupplierOrderCost] = useState('');
+  const [supplierOrderQuantity, setSupplierOrderQuantity] = useState(1);
+  const [savingSupplierOrder, setSavingSupplierOrder] = useState(false);
 
   const [canalEntrada, setCanalEntrada] = useState<'VENTA_DIRECTA' | 'POS' | 'CATALOGO_DIGITAL'>('VENTA_DIRECTA');
   const [metodoPagoContado, setMetodoPagoContado] = useState<'EFECTIVO' | 'TRANSFERENCIA' | 'DEPOSITO' | 'CHEQUE'>('EFECTIVO');
@@ -171,7 +185,75 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     loadListaClientes();
     cargarCatalogo();
     loadBusinessConfig();
+    loadSeriesConfig();
+    loadListaProveedores();
   }, [online]);
+
+  const loadSeriesConfig = async () => {
+    try {
+      if (online) {
+        const srs = await ApiService.get('/configuracion/series');
+        if (Array.isArray(srs)) {
+          setListaSeriesDisponibles(srs);
+          if (srs.length > 0) setSerieEspecialId(srs[0].id);
+        }
+      }
+    } catch (e) {
+      console.warn('Error cargando series:', e);
+    }
+  };
+
+  const loadListaProveedores = async () => {
+    try {
+      if (online) {
+        const prvs = await ApiService.get('/proveedores');
+        if (Array.isArray(prvs)) {
+          setListaProveedores(prvs);
+          if (prvs.length > 0) setSelectedSupplierId(prvs[0].id);
+        }
+      }
+    } catch (e) {
+      console.warn('Error cargando proveedores:', e);
+    }
+  };
+
+  const handleAbrirOrdenProveedor = (item: any) => {
+    setSupplierOrderProductData(item);
+    setSupplierOrderQuantity(item.totalPares || 12);
+    setSupplierOrderCost(String(item.costPrice || (Number(item.precioUnitario) * 0.6).toFixed(2) || '15.00'));
+    if (listaProveedores.length > 0 && !selectedSupplierId) {
+      setSelectedSupplierId(listaProveedores[0].id);
+    }
+    setShowSupplierOrderModal(true);
+  };
+
+  const handleCrearOrdenProveedor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSupplierId) {
+      showToast('Selecciona un proveedor para emitir la orden.', 'warning');
+      return;
+    }
+    setSavingSupplierOrder(true);
+    try {
+      await ApiService.post('/proveedores/ordenes-compra', {
+        supplierId: selectedSupplierId,
+        lines: [
+          {
+            productId: supplierOrderProductData.productId || (supplierOrderProductData as any).id,
+            cantidadPedida: Number(supplierOrderQuantity) || 1,
+            precioCosto: parseFloat(supplierOrderCost) || 10,
+          },
+        ],
+      });
+      showToast('¡Orden de compra generada exitosamente para el proveedor!', 'success');
+      setShowSupplierOrderModal(false);
+      setSupplierOrderProductData(null);
+    } catch (err: any) {
+      showToast(err.message || 'Error al crear orden de compra', 'error');
+    } finally {
+      setSavingSupplierOrder(false);
+    }
+  };
 
   const loadBusinessConfig = async () => {
     try {
@@ -366,6 +448,43 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       });
 
       setLineasPedido([...lineasPedido, ...lineasSerie]);
+    } else if (tipoVentaItem === 'SERIE_ESPECIAL') {
+      const serieSeleccionada = listaSeriesDisponibles.find((s) => s.id === serieEspecialId);
+      const tallasSerie = serieSeleccionada?.tallas && serieSeleccionada.tallas.length > 0
+        ? serieSeleccionada.tallas
+        : [
+            { id: 't-esp-38', numero: 38 },
+            { id: 't-esp-39', numero: 39 },
+            { id: 't-esp-40', numero: 40 },
+            { id: 't-esp-41', numero: 41 },
+            { id: 't-esp-42', numero: 42 },
+            { id: 't-esp-43', numero: 43 },
+          ];
+
+      const nombreSerieClean = serieSeleccionada?.nombre
+        ? serieSeleccionada.nombre.replace(/_/g, ' ')
+        : 'Serie Especial';
+
+      const lineasSerieEspecial = tallasSerie.map((t: any) => {
+        const factor = (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+        return {
+          productId: prodObj.id,
+          modelName: prodObj.modelName,
+          color: prodObj.color,
+          serieNombre: `${nombreSerieClean} (${tallasSerie[0]?.numero}-${tallasSerie[tallasSerie.length - 1]?.numero}) [Bajo Pedido]`,
+          imageUrl: prodObj.imageUrl,
+          tallaId: t.id || t.tallaId || `t-${t.numero}`,
+          numeroTalla: t.numero,
+          cantidad: factor,
+          precioUnitario: Number(precioItem),
+          tipoVenta: 'SERIE_ESPECIAL' as const,
+          esPedidoEspecial: true,
+          subtipoSerie,
+          cantidadSeries,
+        };
+      });
+
+      setLineasPedido([...lineasPedido, ...lineasSerieEspecial]);
     } else {
       // Venta por talla específica (Numeración)
       const lineasNumeracion: any[] = [];
@@ -859,8 +978,15 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                               <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center text-sm shrink-0">👟</div>
                                             )}
                                             <div>
-                                              <div className="font-bold text-xs text-[var(--foreground)]">
-                                                {item.modelName} ({item.color})
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-bold text-xs text-[var(--foreground)]">
+                                                  {item.modelName} ({item.color})
+                                                </span>
+                                                {(item.serieNombre?.includes('[Bajo Pedido]') || item.tipoVenta === 'SERIE_ESPECIAL' || item.esPedidoEspecial) && (
+                                                  <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 border border-purple-500/20 rounded text-[9px] font-black">
+                                                    ⭐ Bajo Pedido / Fabricación
+                                                  </span>
+                                                )}
                                               </div>
                                               <div className="text-[10px] text-[var(--muted-foreground)]">
                                                 Serie: {item.serieNombre || 'Estándar'}
@@ -879,6 +1005,17 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                             <div className="text-xs font-bold">{totalPares} pares</div>
                                             <div className="text-[10px] text-[var(--muted-foreground)]">${Number(item.precioUnitario).toFixed(2)} c/u</div>
                                             <div className="text-xs font-black text-emerald-600">${subtotal.toFixed(2)}</div>
+                                            {online && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleAbrirOrdenProveedor({ ...item, totalPares })}
+                                                className="mt-1.5 px-2.5 py-1 bg-purple-600/10 hover:bg-purple-600 text-purple-700 hover:text-white rounded-lg text-[10px] font-bold border border-purple-500/25 flex items-center gap-1 transition-all ml-auto"
+                                                title="Generar orden de compra a proveedor para este modelo/serie"
+                                              >
+                                                <Truck size={11} />
+                                                <span>Pedir a Proveedor</span>
+                                              </button>
+                                            )}
                                           </div>
                                         </div>
                                       );
@@ -1299,6 +1436,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     >
                       <option value="SERIE_COMPLETA">📦 Venta por Serie Completa (Media Docena / Docena)</option>
                       <option value="TALLA_ESPECIFICA">👟 Venta por Talla Específica (Numeración)</option>
+                      <option value="SERIE_ESPECIAL">⭐ Pedido Especial / Otra Serie (Bajo Pedido para Proveedor)</option>
                     </select>
                   </div>
 
@@ -1406,7 +1544,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                         );
                       })()}
 
-                      {/* Vista previa de chips de tallas de la serie con formato de curva (ej. 1/38, 1/39, 2/40...) */}
+                      {/* Vista previa de chips de tallas de la serie con formato de curva */}
                       {productoSeleccionadoObj && productoSeleccionadoObj.tallas && (
                         <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
                           {(() => {
@@ -1452,6 +1590,113 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                           })()}
                         </div>
                       )}
+                    </div>
+                  ) : tipoVentaItem === 'SERIE_ESPECIAL' ? (
+                    /* Pedido Especial de Serie No Existente en Stock / Fabricación Proveedor */
+                    <div className="sm:col-span-2 space-y-3 p-3.5 bg-purple-500/5 border border-purple-500/25 rounded-xl">
+                      <div className="flex items-center justify-between gap-2 border-b border-purple-500/20 pb-2">
+                        <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                          <span>⭐ Solicitar Otra Serie (Bajo Pedido a Proveedor)</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-purple-700 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
+                          Para Fabricación / Compra
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                            Seleccionar Serie a Pedir *
+                          </label>
+                          <select
+                            value={serieEspecialId}
+                            onChange={(e) => setSerieEspecialId(e.target.value)}
+                            className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
+                          >
+                            {listaSeriesDisponibles.map((s) => {
+                              const tallasInfo = s.tallas && s.tallas.length > 0
+                                ? `(${s.tallas[0].numero}-${s.tallas[s.tallas.length - 1].numero})`
+                                : '';
+                              return (
+                                <option key={s.id} value={s.id}>
+                                  {s.nombre.replace(/_/g, ' ')} {tallasInfo}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                            Curva de Serie
+                          </label>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSubtipoSerie('MEDIA_DOCENA')}
+                              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border text-center ${
+                                subtipoSerie === 'MEDIA_DOCENA'
+                                  ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                                  : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
+                              }`}
+                            >
+                              ½ Media Docena (6)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSubtipoSerie('DOCENA')}
+                              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border text-center ${
+                                subtipoSerie === 'DOCENA'
+                                  ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                                  : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
+                              }`}
+                            >
+                              1 Docena (12)
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-semibold text-[var(--muted-foreground)]">
+                            Cantidad de {subtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}:
+                          </label>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setCantidadSeries(Math.max(1, (cantidadSeries || 1) - 1))}
+                              className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              value={cantidadSeries}
+                              onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setCantidadSeries((cantidadSeries || 1) + 1)}
+                              className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-purple-800">
+                          Total: {(subtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (cantidadSeries || 1)} pares especiales
+                        </span>
+                      </div>
+
+                      <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-lg text-[11px] text-purple-900 flex items-center gap-2">
+                        <span>ℹ️</span>
+                        <span>
+                          Este artículo se registrará con la etiqueta <strong>[Bajo Pedido]</strong> y podrá enviarse directamente a un proveedor para su fabricación.
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     /* Venta por Talla Específica (Numeración con Chips Interactivos y Stock de Pares) */
@@ -1721,6 +1966,126 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL GENERAR ORDEN A PROVEEDOR ── */}
+      {showSupplierOrderModal && supplierOrderProductData && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between bg-purple-500/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-700 flex items-center justify-center">
+                  <Truck size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[var(--foreground)]">Orden de Fabricación / Compra</h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">Emitir pedido a proveedor</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowSupplierOrderModal(false);
+                  setSupplierOrderProductData(null);
+                }}
+                className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCrearOrdenProveedor} className="p-5 space-y-4">
+              <div className="p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-1">
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">Artículo Solicitado</span>
+                <p className="text-xs font-black text-[var(--foreground)]">
+                  {supplierOrderProductData.modelName} ({supplierOrderProductData.color})
+                </p>
+                <p className="text-[11px] text-purple-700 font-semibold">
+                  Serie: {supplierOrderProductData.serieNombre || 'Especial'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                  Proveedor Asignado *
+                </label>
+                <select
+                  value={selectedSupplierId}
+                  onChange={(e) => setSelectedSupplierId(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
+                  required
+                >
+                  {listaProveedores.map((prv) => (
+                    <option key={prv.id} value={prv.id}>
+                      {prv.razonSocial || prv.nombre} {prv.ruc ? `(RUC: ${prv.ruc})` : ''}
+                    </option>
+                  ))}
+                  {listaProveedores.length === 0 && (
+                    <option value="">No hay proveedores registrados</option>
+                  )}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                    Cantidad Total (Pares) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={supplierOrderQuantity}
+                    onChange={(e) => setSupplierOrderQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                    Costo Estimado c/u ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={supplierOrderCost}
+                    onChange={(e) => setSupplierOrderCost(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center justify-between text-xs">
+                <span className="text-[var(--muted-foreground)]">Total Orden Compra:</span>
+                <span className="font-black text-purple-800 text-sm">
+                  ${((supplierOrderQuantity || 0) * (parseFloat(supplierOrderCost) || 0)).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSupplierOrderModal(false);
+                    setSupplierOrderProductData(null);
+                  }}
+                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSupplierOrder || !selectedSupplierId}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {savingSupplierOrder ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+                  <span>Enviar Orden</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

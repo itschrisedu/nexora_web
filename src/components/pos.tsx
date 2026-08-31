@@ -20,6 +20,7 @@ import {
   Calculator,
   TrendingUp,
   AlertTriangle,
+  Printer,
 } from "lucide-react";
 
 interface CajaEstado {
@@ -72,6 +73,13 @@ export default function PosComponent() {
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [ventaExitosa, setVentaExitosa] = useState(false);
 
+  // Calculadora de Vuelto & Ticket
+  const [pagaCon, setPagaCon] = useState("");
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [ultimoTicket, setUltimoTicket] = useState<any>(null);
+  const [negocioInfo, setNegocioInfo] = useState<any>(null);
+  const [anchoTicket, setAnchoTicket] = useState<"58mm" | "80mm">("80mm");
+
   // Cierre de caja
   const [modalCierreOpen, setModalCierreOpen] = useState(false);
   const [montoRealEfectivo, setMontoRealEfectivo] = useState("");
@@ -81,7 +89,15 @@ export default function PosComponent() {
   useEffect(() => {
     cargarEstadoCaja();
     cargarProductos();
+    cargarNegocioInfo();
   }, []);
+
+  const cargarNegocioInfo = async () => {
+    try {
+      const res = await ApiService.get("/configuracion/negocio");
+      setNegocioInfo(res);
+    } catch {}
+  };
 
   const cargarEstadoCaja = async () => {
     try {
@@ -170,7 +186,22 @@ export default function PosComponent() {
       });
       showToast("Venta registrada exitosamente", "success");
       setVentaExitosa(true);
+
+      // Generar ticket térmico
+      const ticketData = {
+        fecha: new Date().toLocaleString("es-EC"),
+        items: [...itemsVenta],
+        total: totalVenta,
+        metodoPago,
+        pagaCon: metodoPago === "EFECTIVO" ? (parseFloat(pagaCon) || totalVenta) : totalVenta,
+        vuelto: metodoPago === "EFECTIVO" ? Math.max(0, (parseFloat(pagaCon) || totalVenta) - totalVenta) : 0,
+        negocio: negocioInfo || { nombre: "NEXORA CALZADO", ruc: "1800000000001", direccion: "Cevallos, Tungurahua" },
+      };
+      setUltimoTicket(ticketData);
+      setTicketModalOpen(true);
+
       setItemsVenta([]);
+      setPagaCon("");
       await cargarEstadoCaja();
       await cargarProductos();
       setTimeout(() => setVentaExitosa(false), 3000);
@@ -415,23 +446,66 @@ export default function PosComponent() {
               {/* Método de Pago */}
               <div className="flex gap-2">
                 {[
-                  { id: "EFECTIVO" as const, icon: <Banknote size={14} />, color: "emerald" },
-                  { id: "TARJETA" as const, icon: <CreditCard size={14} />, color: "cyan" },
-                  { id: "TRANSFERENCIA" as const, icon: <ArrowRightLeft size={14} />, color: "sky" },
+                  { id: "EFECTIVO" as const, icon: <Banknote size={14} />, label: "Efectivo" },
+                  { id: "TARJETA" as const, icon: <CreditCard size={14} />, label: "Tarjeta" },
+                  { id: "TRANSFERENCIA" as const, icon: <ArrowRightLeft size={14} />, label: "Transf." },
                 ].map((m) => (
                   <button
                     key={m.id}
                     onClick={() => setMetodoPago(m.id)}
                     className={`flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 border transition-all ${
                       metodoPago === m.id
-                        ? `bg-${m.color}-500/20 text-${m.color}-400 border-${m.color}-500/40`
-                        : "bg-slate-900 text-slate-400 border-slate-800"
+                        ? "bg-emerald-600 text-white border-transparent shadow-sm"
+                        : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500"
                     }`}
                   >
-                    {m.icon} {m.id}
+                    {m.icon} {m.label}
                   </button>
                 ))}
               </div>
+
+              {/* Calculadora de Vuelto para Efectivo */}
+              {metodoPago === "EFECTIVO" && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-emerald-800 uppercase">Paga con ($):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder={totalVenta.toFixed(2)}
+                      value={pagaCon}
+                      onChange={(e) => setPagaCon(e.target.value)}
+                      className="w-24 px-2 py-1 bg-[var(--card)] border border-emerald-500/30 rounded-lg text-right font-black text-sm text-[var(--foreground)] focus:outline-none focus:border-emerald-600"
+                    />
+                  </div>
+
+                  {/* Botones rápidos de billetes */}
+                  <div className="flex gap-1 justify-end">
+                    {[totalVenta, 10, 20, 50, 100]
+                      .filter((val, i, arr) => val >= totalVenta && arr.indexOf(val) === i)
+                      .slice(0, 4)
+                      .map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setPagaCon(String(val))}
+                          className="px-2 py-0.5 bg-[var(--card)] hover:bg-emerald-600 hover:text-white border border-[var(--border)] rounded text-[10px] font-bold transition-colors"
+                        >
+                          ${val.toFixed(0)}
+                        </button>
+                      ))}
+                  </div>
+
+                  {pagaCon && parseFloat(pagaCon) >= totalVenta && (
+                    <div className="flex justify-between items-center pt-1 border-t border-emerald-500/20 font-bold">
+                      <span className="text-emerald-700">Vuelto a entregar:</span>
+                      <span className="text-emerald-700 text-sm font-black">
+                        ${(parseFloat(pagaCon) - totalVenta).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button
                 onClick={handleRegistrarVenta}
@@ -439,7 +513,7 @@ export default function PosComponent() {
                 className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2"
               >
                 <DollarSign size={18} />
-                {procesandoVenta ? "Procesando..." : "Cobrar Venta"}
+                {procesandoVenta ? "Procesando..." : "Cobrar Venta & Emitir Ticket"}
               </button>
             </div>
           )}
@@ -457,14 +531,19 @@ export default function PosComponent() {
               <X size={20} />
             </button>
 
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Calculator className="text-amber-400" size={22} />
-              Arqueo y Cierre de Caja
-            </h2>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center">
+                <Calculator className="text-rose-400" size={22} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-white">Arqueo y Cierre de Turno</h3>
+                <p className="text-xs text-slate-400">Verifique el efectivo antes de cerrar</p>
+              </div>
+            </div>
 
             {resultadoCierre ? (
               <div className="space-y-4">
-                <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-sm">
+                <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Monto Inicial:</span>
                     <span className="text-slate-200 font-mono">${resultadoCierre.montoInicial.toFixed(2)}</span>
@@ -571,6 +650,112 @@ export default function PosComponent() {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL TICKET TÉRMICO (58mm / 80mm) ── */}
+      {ticketModalOpen && ultimoTicket && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white text-slate-900 rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 bg-slate-100 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Printer size={18} className="text-slate-700" />
+                <span className="font-bold text-xs uppercase tracking-wider text-slate-700">Comprobante de Venta POS</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex bg-slate-200 rounded-lg p-0.5 text-[10px] font-bold">
+                  <button
+                    onClick={() => setAnchoTicket("58mm")}
+                    className={`px-2 py-0.5 rounded ${anchoTicket === "58mm" ? "bg-white shadow-xs" : ""}`}
+                  >
+                    58mm
+                  </button>
+                  <button
+                    onClick={() => setAnchoTicket("80mm")}
+                    className={`px-2 py-0.5 rounded ${anchoTicket === "80mm" ? "bg-white shadow-xs" : ""}`}
+                  >
+                    80mm
+                  </button>
+                </div>
+                <button
+                  onClick={() => setTicketModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-500 hover:bg-slate-200"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Cuerpo del Ticket Térmico */}
+            <div className="p-5 font-mono text-xs overflow-y-auto space-y-3 bg-white" id="ticket-pos-print">
+              <div className="text-center space-y-0.5 border-b border-dashed pb-3">
+                <h2 className="font-black text-sm">{ultimoTicket.negocio?.nombre || "NEXORA CALZADO"}</h2>
+                <p className="text-[10px] text-slate-600">RUC: {ultimoTicket.negocio?.ruc || "1800000000001"}</p>
+                <p className="text-[10px] text-slate-600">{ultimoTicket.negocio?.direccion || "Cevallos, Tungurahua"}</p>
+                <p className="text-[10px] text-slate-500 pt-1">{ultimoTicket.fecha}</p>
+              </div>
+
+              <div className="space-y-1 border-b border-dashed pb-3">
+                <div className="flex justify-between font-bold text-[11px] pb-1">
+                  <span>CANT / ARTÍCULO</span>
+                  <span>TOTAL</span>
+                </div>
+                {ultimoTicket.items.map((it: any, i: number) => (
+                  <div key={i} className="flex justify-between items-start text-[11px]">
+                    <div className="max-w-[70%]">
+                      <span>{it.cantidad}x {it.nombre}</span>
+                      <span className="text-[9px] text-slate-500 block">Talla: {it.tallaNumero} (${it.precioUnitario.toFixed(2)})</span>
+                    </div>
+                    <span className="font-bold">${(it.cantidad * it.precioUnitario).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-1 border-b border-dashed pb-3 text-xs">
+                <div className="flex justify-between font-black text-sm">
+                  <span>TOTAL:</span>
+                  <span>${ultimoTicket.total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600 text-[11px]">
+                  <span>Forma de Pago:</span>
+                  <span>{ultimoTicket.metodoPago}</span>
+                </div>
+                {ultimoTicket.metodoPago === "EFECTIVO" && (
+                  <>
+                    <div className="flex justify-between text-slate-600 text-[11px]">
+                      <span>Paga con:</span>
+                      <span>${ultimoTicket.pagaCon.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-slate-800 text-[11px]">
+                      <span>Vuelto:</span>
+                      <span>${ultimoTicket.vuelto.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="text-center text-[10px] text-slate-500 pt-1 space-y-0.5">
+                <p>¡Gracias por su compra!</p>
+                <p>NEXORA · Sistema de Gestión de Calzado</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-100 border-t flex gap-2">
+              <button
+                onClick={() => setTicketModalOpen(false)}
+                className="flex-1 py-2 border rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Printer size={14} />
+                <span>Imprimir Ticket</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
