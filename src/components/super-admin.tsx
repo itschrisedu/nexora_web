@@ -390,7 +390,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
           className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50"
         >
           <Plus size={16} />
-          Nuevo Tenant
+          Nueva Empresa / Local
         </button>
       </div>
 
@@ -414,8 +414,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       ) : tenants.length === 0 ? (
         <div className="text-center py-20 text-[var(--muted-foreground)]">
           <Building2 size={48} className="mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-semibold">No hay tenants registrados</p>
-          <p className="text-sm">Crea el primer tenant para comenzar.</p>
+          <p className="text-lg font-semibold">No hay empresas o locales registrados</p>
+          <p className="text-sm">Crea la primera empresa o local para comenzar.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -665,7 +665,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {createLoading && <Loader2 size={14} className="animate-spin" />}
-                  {createLoading ? "Creando..." : "Crear Tenant"}
+                  {createLoading ? "Creando..." : "Crear Empresa"}
                 </button>
               </div>
             </form>
@@ -673,14 +673,14 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       )}
 
-      {/* ═══ MODAL: EDITAR TENANT Y DATOS DE NEGOCIO ═══ */}
+      {/* ═══ MODAL: EDITAR EMPRESA / LOCAL ═══ */}
       {showEditTenantModal && editingTenant && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
             <div className="p-6 border-b border-[var(--border)]">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Pencil size={20} className="text-amber-500" />
-                Editar Tenant & Negocio
+                Editar Empresa / Local
               </h2>
               <p className="text-xs text-[var(--muted-foreground)] mt-1">
                 Modifica el nombre y datos de facturación/configuración de la organización.

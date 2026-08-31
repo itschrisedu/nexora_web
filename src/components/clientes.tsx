@@ -71,11 +71,11 @@ function Lbl({ t, req }: { t: string; req?: boolean }) {
 }
 
 function nivelColor(nivel: string) {
-  if (nivel === "PREMIUM") return "bg-amber-500/10 text-amber-600 border-amber-500/20";
-  if (nivel === "BUENO") return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-  if (nivel === "REGULAR") return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-  if (nivel === "RIESGO") return "bg-red-500/10 text-red-500 border-red-500/20";
-  return "bg-slate-500/10 text-slate-500 border-slate-500/20";
+  if (nivel === "NIVEL_4") return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+  if (nivel === "NIVEL_3") return "bg-purple-500/10 text-purple-700 border-purple-500/20";
+  if (nivel === "NIVEL_2") return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20";
+  if (nivel === "NIVEL_1") return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+  return "bg-rose-500/10 text-rose-500 border-rose-500/20";
 }
 
 function scoreColor(s: number) {
@@ -501,12 +501,25 @@ export default function ClientesComponent({ online }: ClientesProps) {
                   disabled={updatingLevel}
                   onClick={() => handleAjustarNivel(selected.id, "NIVEL_3")}
                   className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all ${
-                    selected.nivelCredito === "NIVEL_3" || selected.nivelCredito === "NIVEL_4"
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                      : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-emerald-500/10 hover:text-emerald-600"
+                    selected.nivelCredito === "NIVEL_3"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                      : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-purple-500/10 hover:text-purple-600"
                   }`}
                 >
-                  Nivel 3+
+                  Nivel 3
+                </button>
+
+                <button
+                  type="button"
+                  disabled={updatingLevel}
+                  onClick={() => handleAjustarNivel(selected.id, "NIVEL_4")}
+                  className={`col-span-2 py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all ${
+                    selected.nivelCredito === "NIVEL_4"
+                      ? "bg-yellow-600 text-white border-yellow-600 shadow-sm"
+                      : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-yellow-500/10 hover:text-yellow-600"
+                  }`}
+                >
+                  Nivel 4 (Oro / VIP)
                 </button>
               </div>
             </div>

@@ -1568,8 +1568,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                               ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
                               : `#${cobroSeleccionado.id.slice(0, 8).toUpperCase()}`}
                           </span>
-                          <span className="px-2 py-0.2 bg-emerald-500/20 text-emerald-700 rounded text-[9px] font-bold">
-                            Nota Más Antigua (Prioridad FIFO)
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 rounded text-[9px] font-bold">
+                            Nota Más Antigua (Por orden de llegada)
                           </span>
                         </div>
                         <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">

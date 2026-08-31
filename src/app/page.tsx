@@ -66,7 +66,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',       label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
-  { id: 'super-admin',     label: 'Gestión de Tenants',   icon: <Building2 size={18} /> },
+  { id: 'super-admin',     label: 'Gestión de Empresas',  icon: <Building2 size={18} /> },
   { id: 'ubicaciones',     label: 'Rastreo GPS Personal', icon: <MapPin size={18} /> },
   { id: 'sri',             label: 'Facturación SRI',       icon: <FileText size={18} /> },
   { id: 'catalogo',     label: 'Catálogo WhatsApp',    icon: <ShoppingBag size={18} /> },
@@ -79,7 +79,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'comercial',    label: 'Pedidos',               icon: <CreditCard size={18} /> },
   { id: 'financiero',   label: 'Cobros & Finanzas',    icon: <DollarSign size={18} /> },
   { id: 'proveedores',  label: 'Proveedores',           icon: <Truck size={18} /> },
-  { id: 'usuarios',     label: 'Vendedores & Personal', icon: <User size={18} /> },
+  { id: 'usuarios',     label: 'Sucursales & Personal', icon: <Store size={18} /> },
 ];
 
 function MainApp() {

@@ -69,12 +69,18 @@ export default function AuditoriaComponent() {
       if (search.trim()) query += `&search=${encodeURIComponent(search.trim())}`;
 
       const res = await ApiService.get(query);
-      if (res && res.data) {
+      if (res && Array.isArray(res.logs)) {
+        setLogs(res.logs);
+        setTotalLogs(res.total ?? res.logs.length);
+      } else if (res && Array.isArray(res.data)) {
         setLogs(res.data);
-        setTotalLogs(res.total || 0);
+        setTotalLogs(res.total ?? res.data.length);
       } else if (Array.isArray(res)) {
         setLogs(res);
         setTotalLogs(res.length);
+      } else {
+        setLogs([]);
+        setTotalLogs(0);
       }
     } catch (e) {
       console.warn("Error cargando bitácora de auditoría:", e);

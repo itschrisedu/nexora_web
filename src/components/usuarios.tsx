@@ -2,10 +2,31 @@
 
 import { useState, useEffect } from 'react';
 import { ApiService } from '../services/api.service';
-import { User, Plus, Loader2, ShieldCheck, UserCheck, UserMinus, AlertTriangle, X, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  User, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
+  RefreshCw, CheckCircle, AlertCircle, Building2, Store,
+  Users, KeyRound, Search, Share2, Edit2, MapPin
+} from 'lucide-react';
 
 interface UsuariosProps {
   online: boolean;
+}
+
+interface SucursalItem {
+  id: string;
+  name: string;
+  active: boolean;
+  isMatriz: boolean;
+  isCurrent: boolean;
+  direccion: string;
+  telefono: string;
+  email: string;
+  stats: {
+    usuarios: number;
+    pedidos: number;
+    modelos: number;
+  };
+  createdAt: string;
 }
 
 interface UserListItem {
@@ -18,14 +39,46 @@ interface UserListItem {
   createdAt: string;
 }
 
+interface StockInterItem {
+  sucursalId: string;
+  sucursalNombre: string;
+  modeloId: string;
+  modeloNombre: string;
+  codigo: string;
+  color: string;
+  precioVenta: number;
+  stockTotal: number;
+  tallasDisponibles: { talla: number; cantidad: number }[];
+}
+
 export default function UsuariosComponent({ online }: UsuariosProps) {
-  const [users, setUsers] = useState<UserListItem[]>([]);
+  const [tabActiva, setTabActiva] = useState<'sucursales' | 'personal' | 'stock-inter'>('sucursales');
+
   const [loading, setLoading] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Formulario Nuevo Usuario
+  // ─── SUCURSALES ───
+  const [sucursales, setSucursales] = useState<SucursalItem[]>([]);
+  const [showAddSucursalModal, setShowAddSucursalModal] = useState(false);
+  const [creatingSucursal, setCreatingSucursal] = useState(false);
+  const [newSucursal, setNewSucursal] = useState({
+    name: '',
+    direccion: '',
+    telefono: '',
+    email: '',
+    adminNombre: '',
+    adminEmail: '',
+    adminPassword: '',
+  });
+
+  // ─── PERSONAL ───
+  const [users, setUsers] = useState<UserListItem[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
+
+  // Formulario Nuevo Colaborador
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,21 +86,81 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [permiteCambiarPrecio, setPermiteCambiarPrecio] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Modal Reset Password
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [resettingUser, setResettingUser] = useState<UserListItem | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // ─── STOCK INTER-SUCURSAL ───
+  const [searchStockQuery, setSearchStockQuery] = useState('');
+  const [stockResultados, setStockResultados] = useState<StockInterItem[]>([]);
+  const [loadingStock, setLoadingStock] = useState(false);
+
   useEffect(() => {
     if (online) {
-      loadUsers();
+      loadAll();
     }
   }, [online]);
 
-  const loadUsers = async () => {
+  const loadAll = async () => {
     setLoading(true);
     try {
-      const data = await ApiService.get('/auth/usuarios');
-      setUsers(data);
-    } catch (err) {
-      console.error('Error al cargar personal:', err);
+      await Promise.all([loadSucursales(), loadUsers()]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSucursales = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/sucursales');
+      if (Array.isArray(data)) {
+        setSucursales(data);
+      }
+    } catch (err) {
+      console.error('Error cargando sucursales:', err);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/personal');
+      if (Array.isArray(data)) {
+        setUsers(data);
+      } else {
+        const fallback = await ApiService.get('/auth/usuarios');
+        setUsers(Array.isArray(fallback) ? fallback : []);
+      }
+    } catch (err) {
+      console.error('Error al cargar personal:', err);
+    }
+  };
+
+  const handleCreateSucursal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingSucursal(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await ApiService.post('/configuracion/sucursales', newSucursal);
+      setSuccessMsg(`Sucursal "${newSucursal.name}" creada exitosamente.`);
+      setShowAddSucursalModal(false);
+      setNewSucursal({
+        name: '',
+        direccion: '',
+        telefono: '',
+        email: '',
+        adminNombre: '',
+        adminEmail: '',
+        adminPassword: '',
+      });
+      await loadSucursales();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al crear la sucursal.');
+    } finally {
+      setCreatingSucursal(false);
     }
   };
 
@@ -71,9 +184,13 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         permiteCambiarPrecio,
       });
 
-      setSuccessMsg('Usuario registrado con éxito.');
+      setSuccessMsg('Colaborador registrado con éxito.');
       setShowAddModal(false);
-      resetForm();
+      setNombre('');
+      setEmail('');
+      setPassword('');
+      setRol('ROL_VENDEDOR');
+      setPermiteCambiarPrecio(false);
       loadUsers();
 
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -84,184 +201,340 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     }
   };
 
-  const handleToggleActive = async (id: string) => {
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      await ApiService.put(`/configuracion/personal/${editingUser.id}`, {
+        nombre: editingUser.nombre,
+        email: editingUser.email,
+        rol: editingUser.rol,
+        activo: editingUser.activo,
+        permiteCambiarPrecio: editingUser.permiteCambiarPrecio,
+      });
+
+      setSuccessMsg(`Colaborador "${editingUser.nombre}" actualizado.`);
+      setShowEditModal(false);
+      setEditingUser(null);
+      loadUsers();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al actualizar colaborador.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActive = async (user: UserListItem) => {
     setErrorMsg('');
     try {
-      await ApiService.patch(`/auth/usuarios/${id}/toggle`, {});
+      await ApiService.put(`/configuracion/personal/${user.id}`, {
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+        activo: !user.activo,
+        permiteCambiarPrecio: user.permiteCambiarPrecio,
+      });
       loadUsers();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al cambiar estado del usuario.');
+      setErrorMsg(err.message || 'Error al cambiar estado.');
     }
   };
 
-  const handleTogglePermisoPrecio = async (id: string) => {
+  const handleTogglePermisoPrecio = async (user: UserListItem) => {
     setErrorMsg('');
     try {
-      await ApiService.patch(`/auth/usuarios/${id}/toggle-permiso-precio`, {});
+      await ApiService.put(`/configuracion/personal/${user.id}`, {
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+        activo: user.activo,
+        permiteCambiarPrecio: !user.permiteCambiarPrecio,
+      });
       loadUsers();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al cambiar permiso de precio.');
+      setErrorMsg(err.message || 'Error al modificar permisos de precio.');
     }
   };
 
-  const resetForm = () => {
-    setNombre('');
-    setEmail('');
-    setPassword('');
-    setRol('ROL_VENDEDOR');
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resettingUser) return;
+    setSavingPassword(true);
     setErrorMsg('');
-  };
+    setSuccessMsg('');
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'ROL_ADMIN':
-        return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
-      case 'ROL_VENDEDOR':
-        return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-      case 'ROL_BODEGUERO':
-        return 'bg-sky-500/10 text-sky-500 border-sky-500/20';
-      default:
-        return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+    try {
+      await ApiService.post(`/configuracion/personal/${resettingUser.id}/reset-password`, {
+        password: newPassword,
+      });
+
+      setSuccessMsg(`Contraseña restablecida exitosamente para ${resettingUser.nombre}.`);
+      setShowResetPasswordModal(false);
+      setResettingUser(null);
+      setNewPassword('');
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al restablecer contraseña.');
+    } finally {
+      setSavingPassword(false);
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'ROL_ADMIN':
-        return 'Administrador';
-      case 'ROL_VENDEDOR':
-        return 'Vendedor';
-      case 'ROL_BODEGUERO':
-        return 'Bodeguero';
-      default:
-        return role;
+  const handleSearchStockInter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchStockQuery.trim()) return;
+    setLoadingStock(true);
+    try {
+      const data = await ApiService.get(`/configuracion/stock-inter-sucursal?search=${encodeURIComponent(searchStockQuery.trim())}`);
+      setStockResultados(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error('Error buscando stock inter-sucursal:', err);
+    } finally {
+      setLoadingStock(false);
     }
   };
-
-  if (!online) {
-    return (
-      <div className="p-8 text-center bg-card border border-border border-dashed rounded-2xl flex flex-col items-center justify-center space-y-4">
-        <AlertTriangle className="text-amber-500" size={48} />
-        <h3 className="text-lg font-bold">Módulo fuera de línea</h3>
-        <p className="text-sm text-muted-foreground max-w-md">
-          La gestión de personal y vendedores requiere una conexión activa con el servidor central para validar las credenciales y crear cuentas de forma segura.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <p className="text-xs text-[var(--muted-foreground)] font-medium">Control de acceso y asignación de roles operativos de Nexora</p>
+      {/* Alertas */}
+      {errorMsg && (
+        <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-2xl flex items-center gap-3 text-xs font-semibold">
+          <AlertCircle size={16} /> {errorMsg}
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={loadUsers} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
-            <RefreshCw size={16} />
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-          >
-            <Plus size={16} />
-            <span>Registrar Personal</span>
-          </button>
+      )}
+      {successMsg && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-2xl flex items-center gap-3 text-xs font-semibold">
+          <CheckCircle size={16} /> {successMsg}
         </div>
+      )}
+
+      {/* Pestañas Superiores */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] pb-3">
+        <button
+          type="button"
+          onClick={() => setTabActiva('sucursales')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            tabActiva === 'sucursales'
+              ? 'bg-[#0F172A] text-white shadow-sm'
+              : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+        >
+          <Store size={15} /> Sucursales & Puntos de Venta ({sucursales.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTabActiva('personal')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            tabActiva === 'personal'
+              ? 'bg-[#0F172A] text-white shadow-sm'
+              : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+        >
+          <Users size={15} /> Equipo de Trabajo & Permisos ({users.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTabActiva('stock-inter')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            tabActiva === 'stock-inter'
+              ? 'bg-[#0F172A] text-white shadow-sm'
+              : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+        >
+          <Share2 size={15} /> Consulta de Stock Inter-Sucursal
+        </button>
       </div>
 
-      {successMsg && (
-        <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-sm rounded-xl">
-          <CheckCircle size={16} />
-          <span>{successMsg}</span>
+      {/* ═══ TAB 1: SUCURSALES ═══ */}
+      {tabActiva === 'sucursales' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[var(--foreground)]">Sucursales del Negocio</h2>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Organiza tus puntos de venta. Los inventarios y colaboradores están aislados por sucursal.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAddSucursalModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+            >
+              <Plus size={15} /> Nueva Sucursal
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="animate-spin text-[#0F172A]" size={28} />
+            </div>
+          ) : sucursales.length === 0 ? (
+            <div className="p-8 text-center bg-[var(--card)] border border-dashed border-[var(--border)] rounded-2xl text-xs text-[var(--muted-foreground)]">
+              No hay sucursales registradas para esta empresa.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sucursales.map((sucursal) => (
+                <div
+                  key={sucursal.id}
+                  className={`bg-[var(--card)] border rounded-2xl p-5 space-y-4 shadow-sm transition-all ${
+                    sucursal.isCurrent ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-[var(--border)]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
+                        sucursal.isMatriz ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' : 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+                      }`}>
+                        {sucursal.isMatriz ? 'M' : 'S'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm">{sucursal.name}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            sucursal.isMatriz ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                          }`}>
+                            {sucursal.isMatriz ? 'Matriz Principal' : 'Sucursal'}
+                          </span>
+                          {sucursal.isCurrent && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full">
+                              Sesión Actual
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 text-xs text-[var(--muted-foreground)]">
+                    <div className="flex items-center gap-1.5"><MapPin size={13} />{sucursal.direccion}</div>
+                    {sucursal.telefono && <div>Tel: {sucursal.telefono}</div>}
+                    {sucursal.email && <div>Email: {sucursal.email}</div>}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[var(--border)] text-center text-xs">
+                    <div className="p-2 bg-[var(--muted)]/30 rounded-xl">
+                      <div className="text-[10px] text-[var(--muted-foreground)]">Colaboradores</div>
+                      <div className="font-bold text-sm font-mono">{sucursal.stats.usuarios}</div>
+                    </div>
+                    <div className="p-2 bg-[var(--muted)]/30 rounded-xl">
+                      <div className="text-[10px] text-[var(--muted-foreground)]">Modelos</div>
+                      <div className="font-bold text-sm font-mono">{sucursal.stats.modelos}</div>
+                    </div>
+                    <div className="p-2 bg-[var(--muted)]/30 rounded-xl">
+                      <div className="text-[10px] text-[var(--muted-foreground)]">Pedidos</div>
+                      <div className="font-bold text-sm font-mono">{sucursal.stats.pedidos}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {errorMsg && !showAddModal && (
-        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl">
-          <AlertCircle size={16} />
-          <span>{errorMsg}</span>
-        </div>
-      )}
+      {/* ═══ TAB 2: PERSONAL Y PERMISOS ═══ */}
+      {tabActiva === 'personal' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[var(--foreground)]">Colaboradores y Permisos</h2>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Gestiona roles, accesos y reseteo de claves del personal del local comercial.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadUsers}
+                className="p-2 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors"
+                title="Refrescar Lista"
+              >
+                <RefreshCw size={15} />
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+              >
+                <Plus size={15} /> Nuevo Colaborador
+              </button>
+            </div>
+          </div>
 
-      {/* Listado de personal */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
-          <Loader2 className="animate-spin text-primary mb-2" size={32} />
-          <span className="text-sm">Cargando personal...</span>
-        </div>
-      ) : users.length === 0 ? (
-        <div className="p-12 text-center text-muted-foreground bg-card border border-border rounded-2xl">
-          No se encontraron usuarios registrados.
-        </div>
-      ) : (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="overflow-x-auto border border-[var(--border)] rounded-2xl bg-[var(--card)] shadow-sm">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-4">Nombre</th>
-                  <th className="px-6 py-4">Correo Electrónico</th>
-                  <th className="px-6 py-4">Rol Asignado</th>
-                  <th className="px-6 py-4 text-center">Permiso Precios</th>
-                  <th className="px-6 py-4 text-center">Estado</th>
-                  <th className="px-6 py-4 text-right">Acciones</th>
+                  <th className="p-3.5">Colaborador</th>
+                  <th className="p-3.5">Rol Asignado</th>
+                  <th className="p-3.5 text-center">Estado</th>
+                  <th className="p-3.5 text-center">Modificar Precios</th>
+                  <th className="p-3.5 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4 font-bold flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 text-xs font-semibold">
-                        {u.nombre.slice(0, 2).toUpperCase()}
-                      </div>
-                      <span>{u.nombre}</span>
+              <tbody className="divide-y divide-[var(--border)]">
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                    <td className="p-3.5">
+                      <div className="font-bold text-sm text-[var(--foreground)]">{user.nombre}</div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">{user.email}</div>
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground text-xs">{u.email}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg border text-[10px] font-bold ${getRoleBadge(u.rol)}`}>
-                        {getRoleLabel(u.rol)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {u.rol === 'ROL_VENDEDOR' ? (
-                        <button
-                          onClick={() => handleTogglePermisoPrecio(u.id)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
-                            u.permiteCambiarPrecio
-                              ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20'
-                              : 'bg-slate-500/10 text-slate-500 border border-slate-500/20 hover:bg-slate-500/20'
-                          }`}
-                          title="Haz clic para activar/desactivar el permiso de modificar precios"
-                        >
-                          {u.permiteCambiarPrecio ? '✓ Autorizado' : '✕ Bloqueado'}
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground font-semibold">Ilimitado</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        u.activo ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500'
+                    <td className="p-3.5">
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                        user.rol === 'ROL_ADMIN' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                        user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                        'bg-amber-500/10 text-amber-600 border-amber-500/20'
                       }`}>
-                        {u.activo ? 'Activo' : 'Inactivo'}
+                        {user.rol === 'ROL_ADMIN' ? 'Administrador' : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="p-3.5 text-center">
                       <button
-                        onClick={() => handleToggleActive(u.id)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                          u.activo 
-                            ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' 
-                            : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                        onClick={() => handleToggleActive(user)}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                          user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
                         }`}
                       >
-                        {u.activo ? (
-                          <><UserMinus size={13} /><span>Desactivar</span></>
-                        ) : (
-                          <><UserCheck size={13} /><span>Activar</span></>
-                        )}
+                        {user.activo ? 'Activo' : 'Inactivo'}
+                      </button>
+                    </td>
+                    <td className="p-3.5 text-center">
+                      <button
+                        onClick={() => handleTogglePermisoPrecio(user)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                          user.permiteCambiarPrecio ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                        }`}
+                      >
+                        {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
+                      </button>
+                    </td>
+                    <td className="p-3.5 text-right space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingUser(user);
+                          setShowEditModal(true);
+                        }}
+                        className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
+                        title="Editar Colaborador"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResettingUser(user);
+                          setShowResetPasswordModal(true);
+                        }}
+                        className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors"
+                        title="Resetear Contraseña"
+                      >
+                        <KeyRound size={14} />
                       </button>
                     </td>
                   </tr>
@@ -272,79 +545,402 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         </div>
       )}
 
-      {/* MODAL REGISTRAR USUARIO */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">Registrar Nuevo Personal</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">Crea una cuenta con rol asignado para el sistema</p>
-              </div>
-              <button
-                onClick={() => { setShowAddModal(false); resetForm(); }}
-                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
-              >
-                <X size={18} />
-              </button>
+      {/* ═══ TAB 3: STOCK INTER-SUCURSAL ═══ */}
+      {tabActiva === 'stock-inter' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-base font-bold text-[var(--foreground)]">Consulta de Stock Inter-Sucursal</h2>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Verifica la existencia de calzado y tallas disponibles en las demás sucursales de tu empresa.
+            </p>
+          </div>
+
+          <form onSubmit={handleSearchStockInter} className="flex gap-3 max-w-lg">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3.5 top-3 text-[var(--muted-foreground)]" />
+              <input
+                type="text"
+                value={searchStockQuery}
+                onChange={(e) => setSearchStockQuery(e.target.value)}
+                placeholder="Buscar por modelo o código (Ej: Oxford, 2026)..."
+                className="w-full pl-10 pr-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              />
             </div>
+            <button
+              type="submit"
+              disabled={loadingStock}
+              className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+            >
+              {loadingStock ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+              Consultar
+            </button>
+          </form>
 
-            <form onSubmit={handleCreateUser} className="p-5 space-y-4">
+          {loadingStock ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="animate-spin text-[#0F172A]" size={28} />
+            </div>
+          ) : stockResultados.length === 0 ? (
+            <div className="p-8 text-center bg-[var(--card)] border border-dashed border-[var(--border)] rounded-2xl text-xs text-[var(--muted-foreground)]">
+              {searchStockQuery ? 'No se encontraron existencias en las otras sucursales para esta búsqueda.' : 'Ingresa un nombre o código para consultar pares disponibles en otras sucursales.'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {stockResultados.map((item, idx) => (
+                <div key={idx} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-3 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-full">
+                        Sucursal: {item.sucursalNombre}
+                      </span>
+                      <div className="font-bold text-sm mt-1">{item.modeloNombre} - {item.color}</div>
+                      <div className="text-xs text-[var(--muted-foreground)] font-mono">Código: {item.codigo}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-[var(--muted-foreground)]">Stock Total</div>
+                      <div className="text-lg font-black text-emerald-600 font-mono">{item.stockTotal} pares</div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-[var(--border)]">
+                    <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                      Tallas Disponibles:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {item.tallasDisponibles.map((t, tidx) => (
+                        <span key={tidx} className="px-2 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-xs font-mono font-bold">
+                          T{t.talla}: <span className="text-emerald-600">{t.cantidad}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ MODAL CREAR SUCURSAL ═══ */}
+      {showAddSucursalModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <Store size={20} className="text-[#0F172A]" /> Nueva Sucursal / Punto de Venta
+            </h2>
+            <form onSubmit={handleCreateSucursal} className="space-y-3">
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre Completo <span className="text-red-400">*</span></label>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Nombre de la Sucursal</label>
                 <input
-                  type="text" required placeholder="Ej. Carlos Mendoza"
-                  value={nombre} onChange={(e) => setNombre(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
+                  type="text"
+                  required
+                  value={newSucursal.name}
+                  onChange={(e) => setNewSucursal({ ...newSucursal, name: e.target.value })}
+                  placeholder="Ej: Calzados Cevallos - Sucursal Mall"
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Email <span className="text-red-400">*</span></label>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Dirección del Local</label>
                 <input
-                  type="email" required placeholder="Ej. carlos@nexora.app"
-                  value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
+                  type="text"
+                  value={newSucursal.direccion}
+                  onChange={(e) => setNewSucursal({ ...newSucursal, direccion: e.target.value })}
+                  placeholder="Av. Cevallos y Montalvo"
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Contraseña (mín. 8 car.) <span className="text-red-400">*</span></label>
-                <input
-                  type="password" required minLength={8} placeholder="••••••••"
-                  value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Teléfono</label>
+                  <input
+                    type="text"
+                    value={newSucursal.telefono}
+                    onChange={(e) => setNewSucursal({ ...newSucursal, telefono: e.target.value })}
+                    placeholder="032870123"
+                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Correo</label>
+                  <input
+                    type="email"
+                    value={newSucursal.email}
+                    onChange={(e) => setNewSucursal({ ...newSucursal, email: e.target.value })}
+                    placeholder="sucursal@negocio.com"
+                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol / Permisos <span className="text-red-400">*</span></label>
-                <select
-                  required value={rol} onChange={(e) => setRol(e.target.value as any)}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
+              <div className="pt-2 border-t border-[var(--border)]">
+                <span className="text-[11px] font-bold text-[var(--muted-foreground)] block mb-2">Encargado Inicial (Opcional):</span>
+                <div className="space-y-2">
+                  <input
+                    type="email"
+                    value={newSucursal.adminEmail}
+                    onChange={(e) => setNewSucursal({ ...newSucursal, adminEmail: e.target.value })}
+                    placeholder="Correo del Encargado"
+                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  />
+                  <input
+                    type="password"
+                    value={newSucursal.adminPassword}
+                    onChange={(e) => setNewSucursal({ ...newSucursal, adminPassword: e.target.value })}
+                    placeholder="Contraseña Inicial"
+                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSucursalModal(false)}
+                  className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-bold"
                 >
-                  <option value="ROL_VENDEDOR">Vendedor — Ventas y pedidos</option>
-                  <option value="ROL_BODEGUERO">Bodeguero — Gestión de stock</option>
-                  <option value="ROL_ADMIN">Administrador — Control total</option>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingSucursal}
+                  className="flex-1 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
+                >
+                  {creatingSucursal ? 'Creando...' : 'Crear Sucursal'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL CREAR COLABORADOR ═══ */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <User size={20} className="text-[#0F172A]" /> Registrar Nuevo Colaborador
+            </h2>
+            <form onSubmit={handleCreateUser} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Nombre Completo</label>
+                <input
+                  type="text"
+                  required
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  placeholder="Ej: Carlos Gómez"
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Correo Electrónico</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="carlos@negocio.com"
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Contraseña</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Rol</label>
+                <select
+                  value={rol}
+                  onChange={(e) => setRol(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm font-semibold"
+                >
+                  <option value="ROL_VENDEDOR">Vendedor</option>
+                  <option value="ROL_BODEGUERO">Bodeguero</option>
+                  <option value="ROL_ADMIN">Administrador</option>
                 </select>
               </div>
 
-              {errorMsg && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-                  <AlertCircle size={14} /> {errorMsg}
-                </div>
-              )}
+              <div className="pt-2">
+                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={permiteCambiarPrecio}
+                    onChange={(e) => setPermiteCambiarPrecio(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#0F172A]"
+                  />
+                  Permitir modificar precios de venta
+                </label>
+              </div>
 
-              <button
-                type="submit" disabled={saving}
-                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {saving ? (
-                  <><Loader2 size={16} className="animate-spin" /><span>Guardando...</span></>
-                ) : (
-                  <><User size={16} /><span>Registrar Usuario</span></>
-                )}
-              </button>
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
+                >
+                  {saving ? 'Guardando...' : 'Registrar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL EDITAR COLABORADOR ═══ */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <Edit2 size={20} className="text-[#0F172A]" /> Editar Colaborador
+            </h2>
+            <form onSubmit={handleUpdateUser} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Nombre Completo</label>
+                <input
+                  type="text"
+                  required
+                  value={editingUser.nombre}
+                  onChange={(e) => setEditingUser({ ...editingUser, nombre: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Correo Electrónico</label>
+                <input
+                  type="email"
+                  required
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Rol</label>
+                  <select
+                    value={editingUser.rol}
+                    onChange={(e) => setEditingUser({ ...editingUser, rol: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm font-semibold"
+                  >
+                    <option value="ROL_VENDEDOR">Vendedor</option>
+                    <option value="ROL_BODEGUERO">Bodeguero</option>
+                    <option value="ROL_ADMIN">Administrador</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Estado</label>
+                  <select
+                    value={editingUser.activo ? 'ACTIVO' : 'INACTIVO'}
+                    onChange={(e) => setEditingUser({ ...editingUser, activo: e.target.value === 'ACTIVO' })}
+                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm font-semibold"
+                  >
+                    <option value="ACTIVO">Activo</option>
+                    <option value="INACTIVO">Inactivo</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editingUser.permiteCambiarPrecio || false}
+                    onChange={(e) => setEditingUser({ ...editingUser, permiteCambiarPrecio: e.target.checked })}
+                    className="w-4 h-4 rounded text-[#0F172A]"
+                  />
+                  Permitir modificar precios de venta
+                </label>
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
+                >
+                  {saving ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL RESETEAR CONTRASEÑA ═══ */}
+      {showResetPasswordModal && resettingUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <KeyRound size={20} className="text-amber-500" /> Restablecer Contraseña
+            </h2>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Ingresa la nueva contraseña para <strong>{resettingUser.nombre}</strong> ({resettingUser.email}).
+            </p>
+            <form onSubmit={handleResetPassword} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Nueva Contraseña</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowResetPasswordModal(false);
+                    setResettingUser(null);
+                    setNewPassword('');
+                  }}
+                  className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPassword}
+                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold"
+                >
+                  {savingPassword ? 'Guardando...' : 'Restablecer'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
