@@ -32,6 +32,7 @@ import {
   EyeOff,
   FileText,
   Palette,
+  Loader2,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import { ToastProvider } from '@/components/ui/toast';
@@ -125,6 +126,11 @@ function MainApp() {
 
   const fetchBusinessBranding = async () => {
     try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        if (parsed?.rol === 'ROL_SUPER_ADMIN') return;
+      }
       const config = await ApiService.get('/configuracion/negocio');
       if (config) {
         if (config.logoUrl) setBusinessLogo(config.logoUrl);
@@ -164,10 +170,14 @@ function MainApp() {
         localStorage.setItem('user', JSON.stringify(response.user));
         setUser(response.user);
       } else {
-        if (username.trim() !== 'admin@nexora.com' || password.trim() !== 'Admin123!') {
-          throw new Error('Modo Offline: use admin@nexora.com / Admin123!');
+        let mockUser;
+        if (username.trim() === 'superadmin@nexora.com' && password.trim() === 'SuperAdmin2026!') {
+          mockUser = { id: 'offline-superadmin', email: 'superadmin@nexora.com', nombre: 'Super Administrador Global', rol: 'ROL_SUPER_ADMIN' };
+        } else if (username.trim() === 'admin@nexora.com' && password.trim() === 'Admin123!') {
+          mockUser = { id: 'offline-admin', email: 'admin@nexora.com', nombre: 'Administrador Local', rol: 'ROL_ADMIN' };
+        } else {
+          throw new Error('Modo Offline: use superadmin@nexora.com / SuperAdmin2026! o admin@nexora.com / Admin123!');
         }
-        const mockUser = { id: 'offline-admin', email: 'admin@nexora.com', nombre: 'Administrador', rol: 'ROL_ADMIN' };
         localStorage.setItem('token', 'offline-token-mock');
         localStorage.setItem('user', JSON.stringify(mockUser));
         setUser(mockUser);
@@ -192,6 +202,15 @@ function MainApp() {
 
   const fetchStats = async () => {
     try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        if (parsed?.rol === 'ROL_SUPER_ADMIN') {
+          setStats({ totalSales: 0, activeClients: 0, lowStockCount: 0, pendingSyncCount: 0 });
+          return;
+        }
+      }
+
       const pendingOrders = await db.pedidosOffline.count();
       const pendingMovements = await db.movimientosOffline.count();
       
@@ -342,7 +361,9 @@ function MainApp() {
             </div>
             {NAV_ITEMS.filter((item) => {
               if (!user) return item.id !== 'super-admin';
-              if (user.rol === 'ROL_SUPER_ADMIN') return true; // Super Admin ve todo
+              if (user.rol === 'ROL_SUPER_ADMIN') {
+                return ['dashboard', 'super-admin', 'auditoria'].includes(item.id);
+              }
               if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin'; // Admin ve todo excepto gestión de tenants
               if (user.rol === 'ROL_VENDEDOR') {
                 return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri'].includes(item.id);
@@ -435,7 +456,13 @@ function MainApp() {
           )}
 
           {/* Renderizado condicional de vistas */}
-          {vistaActual === 'dashboard' && <DashboardView stats={stats} />}
+          {vistaActual === 'dashboard' && (
+            user?.rol === 'ROL_SUPER_ADMIN' ? (
+              <SuperAdminDashboard online={online} onNavigateToTenants={() => setVistaActual('super-admin')} />
+            ) : (
+              <DashboardView stats={stats} />
+            )
+          )}
           {vistaActual === 'inventario' && <InventarioComponent online={online} userRole={user?.rol} />}
           {vistaActual === 'modelos' && <ModelosComponent online={online} />}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
@@ -452,6 +479,156 @@ function MainApp() {
           {vistaActual === 'auditoria' && <AuditoriaComponent />}
         </section>
       </main>
+    </div>
+  );
+}
+
+// ─── Super Admin Global Dashboard ──────────────────────────────
+function SuperAdminDashboard({ online, onNavigateToTenants }: { online: boolean; onNavigateToTenants: () => void }) {
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!online) {
+      setLoading(false);
+      return;
+    }
+    ApiService.get('/tenants')
+      .then((data) => {
+        if (Array.isArray(data)) setTenants(data);
+      })
+      .catch((err) => console.error('Error cargando tenants para dashboard:', err))
+      .finally(() => setLoading(false));
+  }, [online]);
+
+  const totalTenants = tenants.length;
+  const activeTenants = tenants.filter((t) => t.active).length;
+  const totalUsers = tenants.reduce((sum, t) => sum + (t.stats?.users || 0), 0);
+  const totalModels = tenants.reduce((sum, t) => sum + (t.stats?.models || 0), 0);
+  const totalOrders = tenants.reduce((sum, t) => sum + (t.stats?.orders || 0), 0);
+
+  return (
+    <div className="space-y-8">
+      {/* Header Banner */}
+      <div className="p-8 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-3xl border border-slate-700/80 text-white relative overflow-hidden shadow-xl">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="space-y-3 max-w-xl">
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Gobernanza Multitenant
+              </span>
+              <span className="text-xs text-slate-400">Panel Central de Control</span>
+            </div>
+            <h2 className="text-2xl font-black tracking-tight">Super Administrador Global</h2>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              Supervisión de sucursales, administración centralizada de administradores y gobernanza general de la plataforma NEXORA.
+            </p>
+          </div>
+          <button
+            onClick={onNavigateToTenants}
+            className="flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg hover:shadow-amber-500/20 shrink-0"
+          >
+            <Building2 size={16} />
+            <span>Gestionar Sucursales / Tenants</span>
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards Globales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KpiCard
+          title="Sucursales / Tenants"
+          value={loading ? '...' : String(totalTenants)}
+          subtitle={loading ? 'Cargando...' : `${activeTenants} activas • ${totalTenants - activeTenants} inactivas`}
+          subtitleColor="text-emerald-500"
+          icon={<Building2 size={16} />}
+          iconBg="bg-blue-500/10 text-blue-500"
+        />
+        <KpiCard
+          title="Personal Registrado"
+          value={loading ? '...' : String(totalUsers)}
+          subtitle="En todas las sucursales"
+          icon={<Users size={16} />}
+          iconBg="bg-amber-500/10 text-amber-500"
+        />
+        <KpiCard
+          title="Modelos de Calzado"
+          value={loading ? '...' : String(totalModels)}
+          subtitle="Catálogos combinados"
+          icon={<Package size={16} />}
+          iconBg="bg-emerald-500/10 text-emerald-500"
+        />
+        <KpiCard
+          title="Pedidos Procesados"
+          value={loading ? '...' : String(totalOrders)}
+          subtitle="Volumen transaccional global"
+          icon={<CreditCard size={16} />}
+          iconBg="bg-indigo-500/10 text-indigo-500"
+        />
+      </div>
+
+      {/* Resumen de Sucursales */}
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-[var(--foreground)]">Sucursales del Ecosistema</h3>
+            <p className="text-xs text-[var(--muted-foreground)]">Resumen de comercios conectados a NEXORA</p>
+          </div>
+          <button
+            onClick={onNavigateToTenants}
+            className="text-xs text-amber-500 hover:text-amber-400 font-bold hover:underline"
+          >
+            Ver todas →
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-[var(--muted-foreground)]">
+            <Loader2 className="animate-spin text-amber-500 mr-2" size={20} />
+            <span className="text-xs">Cargando sucursales...</span>
+          </div>
+        ) : tenants.length === 0 ? (
+          <div className="text-center py-8 text-xs text-[var(--muted-foreground)]">
+            No hay sucursales registradas aún.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {tenants.map((t) => (
+              <div
+                key={t.id}
+                onClick={onNavigateToTenants}
+                className="p-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]/20 hover:bg-[var(--muted)]/50 transition-all cursor-pointer space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-sm text-[var(--foreground)] truncate">{t.name}</span>
+                  <span
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                      t.active ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                    }`}
+                  >
+                    {t.active ? 'ACTIVO' : 'INACTIVO'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1 border-t border-[var(--border)]">
+                  <div>
+                    <div className="font-bold text-[var(--foreground)]">{t.stats?.users || 0}</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
+                  </div>
+                  <div>
+                    <div className="font-bold text-[var(--foreground)]">{t.stats?.models || 0}</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
+                  </div>
+                  <div>
+                    <div className="font-bold text-[var(--foreground)]">{t.stats?.orders || 0}</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
