@@ -233,6 +233,24 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [newVenta, setNewVenta] = useState("");
   const [motivo, setMotivo] = useState("");
 
+  // ── Estado para modal de Edición Integral de Variante ──
+  const [showEditProduct, setShowEditProduct] = useState(false);
+  const [editProduct, setEditProduct] = useState<Producto | null>(null);
+  const [editProductColor, setEditProductColor] = useState("");
+  const [editProductImage, setEditProductImage] = useState<string | null>(null);
+  const [editProductImageChanged, setEditProductImageChanged] = useState(false);
+  const [editProductCosto, setEditProductCosto] = useState("");
+  const [editProductVenta, setEditProductVenta] = useState("");
+  const [editProductTallas, setEditProductTallas] = useState<{ tallaId: string; numero: number; cantidad: number }[]>([]);
+
+  // ── Estado para modal de Edición del Modelo Base ──
+  const [showEditModel, setShowEditModel] = useState(false);
+  const [editModel, setEditModel] = useState<ModeloAgrupado | null>(null);
+  const [editModelName, setEditModelName] = useState("");
+  const [editModelBrand, setEditModelBrand] = useState("");
+  const [editModelBaseCode, setEditModelBaseCode] = useState("");
+  const [editModelMaterial, setEditModelMaterial] = useState("");
+
   useEffect(() => { loadData(); }, [online]);
 
   const loadData = async () => {
@@ -739,6 +757,131 @@ export default function ModelosComponent({ online }: ModelosProps) {
     }
   };
 
+  // ── Abrir modal de edición integral de variante ──
+  const openEditProduct = (p: Producto) => {
+    setEditProduct(p);
+    setEditProductColor(p.color);
+    setEditProductImage(p.fotoUrl || null);
+    setEditProductImageChanged(false);
+    setEditProductCosto(String(p.precioCosto));
+    setEditProductVenta(String(p.precioVenta));
+    const tallasData = (p.tallas || (p as any).stockPorTalla || []).map((t: any) => ({
+      tallaId: t.tallaId,
+      numero: t.numero,
+      cantidad: t.cantidad ?? t.disponible ?? 0,
+    }));
+    setEditProductTallas(tallasData);
+    setError("");
+    setShowEditProduct(true);
+  };
+
+  const handleEditProductFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const compressed = await compressImageToWebP(reader.result as string);
+        setEditProductImage(compressed);
+        setEditProductImageChanged(true);
+      } catch (err) {
+        console.error("Error comprimiendo imagen:", err);
+      }
+    };
+    reader.readAsDataURL(f);
+  };
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editProduct) return;
+    setError("");
+
+    if (!editProductColor.trim()) {
+      setError("El color es obligatorio.");
+      return;
+    }
+    const costo = parseFloat(editProductCosto);
+    const venta = parseFloat(editProductVenta);
+    if (isNaN(costo) || costo <= 0 || isNaN(venta) || venta <= 0) {
+      setError("Los precios deben ser mayores a 0.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      let finalImageUrl = editProductImage;
+      if (editProductImageChanged && editProductImage && online) {
+        // Si la imagen cambió, subir a Cloudinary
+        if (editProductImage.startsWith("data:")) {
+          finalImageUrl = await uploadToCloudinary(editProductImage, 'nexora_modelos');
+        }
+      }
+
+      await ApiService.put(`/inventario/productos/${editProduct.id}`, {
+        color: editProductColor.trim(),
+        imageUrl: finalImageUrl || undefined,
+        costPrice: costo,
+        salePrice: venta,
+        tallas: editProductTallas.map(t => ({
+          tallaId: t.tallaId,
+          cantidad: t.cantidad,
+        })),
+      });
+
+      setSuccess("Variante actualizada exitosamente.");
+      setShowEditProduct(false);
+      setEditProduct(null);
+      loadData();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al actualizar la variante.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Abrir modal de edición del modelo base ──
+  const openEditModel = (m: ModeloAgrupado) => {
+    setEditModel(m);
+    setEditModelName(m.name);
+    setEditModelBrand(m.brand);
+    setEditModelBaseCode(m.baseCode);
+    setEditModelMaterial(m.material || "");
+    setError("");
+    setShowEditModel(true);
+  };
+
+  const handleUpdateModel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editModel) return;
+    setError("");
+
+    if (!editModelName.trim() || !editModelBrand.trim() || !editModelBaseCode.trim()) {
+      setError("Nombre, marca y código base son obligatorios.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await ApiService.put(`/inventario/modelos/${editModel.id}`, {
+        name: editModelName.trim(),
+        brand: editModelBrand.trim(),
+        baseCode: editModelBaseCode.trim(),
+        material: editModelMaterial.trim() || undefined,
+      });
+
+      setSuccess("Modelo actualizado exitosamente.");
+      setShowEditModel(false);
+      setEditModel(null);
+      loadData();
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al actualizar el modelo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleToggleModel = (id: string, modelName: string, currentActive: boolean) => {
     if (currentActive) {
       setConfirmModal({
@@ -952,6 +1095,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
                     <div className="flex items-center gap-2">
                       {online && (
                         <>
+                          <button type="button" onClick={() => openEditModel(m)}
+                            title="Editar nombre, marca, código base o material del modelo"
+                            className="px-3 py-2 text-xs font-bold rounded-xl bg-blue-600/10 text-blue-600 border border-blue-600/20 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1">
+                            <Edit2 size={13} />
+                            <span>Editar Modelo</span>
+                          </button>
                           <button type="button" onClick={() => openAddColorModal(m)}
                             title="Añadir un nuevo color a este modelo"
                             className="px-3 py-2 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm">
@@ -1074,9 +1223,13 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                   {p.activo ? "Deshabilitar" : "Habilitar"}
                                 </button>
                               )}
+                              <button onClick={() => openEditProduct(p)}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-600 border border-blue-500/30 rounded-lg hover:bg-blue-500/10 transition-colors">
+                                <Edit2 size={12} /><span>Editar Variante</span>
+                              </button>
                               <button onClick={() => openPrice(p)}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#0F172A] border border-[#0F172A]/30 rounded-lg hover:bg-[#0F172A]/10 transition-colors">
-                                <Edit2 size={12} /><span>Ajustar Precios</span>
+                                <DollarSign size={12} /><span>Ajustar Precios</span>
                               </button>
                             </div>
                           </div>
@@ -1800,6 +1953,168 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 <button type="submit" disabled={saving}
                   className="px-4 py-2.5 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Edit2 size={14} />}
+                  <span>Guardar Cambios</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDITAR VARIANTE INTEGRAL ── */}
+      {showEditProduct && editProduct && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="font-bold text-base">Editar Variante</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {editProduct.codigo} · {editProduct.serie?.nombre ? getNombreSerie(editProduct.serie.nombre) : ""}
+                </p>
+              </div>
+              <button onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
+                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateProduct} className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Imagen */}
+              <div>
+                <Lbl t="Imagen del Producto" />
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                    {editProductImage ? (
+                      <img src={editProductImage} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon size={24} className="text-[var(--muted-foreground)] opacity-40" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <label className="flex items-center gap-2 px-3 py-2 bg-blue-600/10 text-blue-600 border border-blue-600/20 rounded-xl text-xs font-bold cursor-pointer hover:bg-blue-600/20 transition-colors">
+                      <ImageIcon size={14} />
+                      <span>Cambiar Imagen</span>
+                      <input type="file" accept="image/*" onChange={handleEditProductFoto} className="hidden" />
+                    </label>
+                    {editProductImage && (
+                      <button type="button" onClick={() => { setEditProductImage(null); setEditProductImageChanged(true); }}
+                        className="text-xs text-red-500 hover:underline">
+                        Quitar imagen
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Color */}
+              <div>
+                <Lbl t="Color" req />
+                <input type="text" value={editProductColor} onChange={e => setEditProductColor(e.target.value)}
+                  className={INPUT} required placeholder="Ej: Negro, Café, Miel..." />
+              </div>
+
+              {/* Precios */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Lbl t="Precio Costo ($)" req />
+                  <input type="number" step="0.01" min="0.01" value={editProductCosto}
+                    onChange={e => setEditProductCosto(e.target.value)} className={INPUT} required />
+                </div>
+                <div>
+                  <Lbl t="Precio Venta ($)" req />
+                  <input type="number" step="0.01" min="0.01" value={editProductVenta}
+                    onChange={e => setEditProductVenta(e.target.value)} className={INPUT} required />
+                </div>
+              </div>
+
+              {/* Stock por Tallas */}
+              {editProductTallas.length > 0 && (
+                <div>
+                  <Lbl t="Stock por Talla (pares)" />
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-1">
+                    {editProductTallas.sort((a, b) => a.numero - b.numero).map((t, i) => (
+                      <div key={t.tallaId} className="flex flex-col items-center gap-1">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">T{t.numero}</span>
+                        <input type="number" min="0" value={t.cantidad}
+                          onChange={e => {
+                            const val = parseInt(e.target.value) || 0;
+                            setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: val } : tt));
+                          }}
+                          className="w-full px-2 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-lg text-xs text-center focus:outline-none focus:border-[#0F172A]" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={saving}
+                  className="px-4 py-2.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                  <span>Guardar Cambios</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDITAR MODELO BASE ── */}
+      {showEditModel && editModel && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base">Editar Modelo</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Modifica los datos base del modelo</p>
+              </div>
+              <button onClick={() => { setShowEditModel(false); setEditModel(null); }}
+                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateModel} className="p-5 space-y-4">
+              <div>
+                <Lbl t="Nombre del Modelo" req />
+                <input type="text" value={editModelName} onChange={e => setEditModelName(e.target.value)}
+                  className={INPUT} required placeholder="Ej: Botín Chelsea" />
+              </div>
+              <div>
+                <Lbl t="Marca" req />
+                <input type="text" value={editModelBrand} onChange={e => setEditModelBrand(e.target.value)}
+                  className={INPUT} required placeholder="Ej: NEXORA" />
+              </div>
+              <div>
+                <Lbl t="Código Base" req />
+                <input type="text" value={editModelBaseCode} onChange={e => setEditModelBaseCode(e.target.value)}
+                  className={INPUT} required placeholder="Ej: BCH-001" />
+              </div>
+              <div>
+                <Lbl t="Material (Opcional)" />
+                <input type="text" value={editModelMaterial} onChange={e => setEditModelMaterial(e.target.value)}
+                  className={INPUT} placeholder="Ej: Cuero genuino" />
+              </div>
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => { setShowEditModel(false); setEditModel(null); }}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={saving}
+                  className="px-4 py-2.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                   <span>Guardar Cambios</span>
                 </button>
               </div>
