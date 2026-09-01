@@ -1660,16 +1660,16 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   </span>
                                 </div>
 
-                                <div className="flex flex-wrap gap-1.5">
+                                <div className="flex flex-wrap gap-2">
                                   {productoSeleccionadoObj.tallas.map((t: any) => {
                                     const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
                                     const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
                                     const stockTalla = t.cantidad ?? t.stock ?? 0;
                                     return (
-                                      <div key={t.tallaId} className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs flex items-center gap-1.5">
-                                        <span className="font-bold text-emerald-700">T{t.numero ?? t.nombre}:</span>
-                                        <span className="font-black text-emerald-900 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">{factor} pares</span>
-                                        <span className="text-[9px] text-[var(--muted-foreground)] font-semibold">(Stock: {stockTalla})</span>
+                                      <div key={t.tallaId} className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs shadow-2xs">
+                                        <span className="font-extrabold text-xs font-mono text-[var(--foreground)]">T{t.numero ?? t.nombre}</span>
+                                        <span className="font-bold text-xs text-emerald-600 font-mono">({factor} pares)</span>
+                                        <span className="text-[10px] text-[var(--muted-foreground)] font-medium">disp: {stockTalla}</span>
                                       </div>
                                     );
                                   })}
@@ -1949,6 +1949,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                         const primerItem = lineas[0];
                         const totalPares = lineas.reduce((acc, l) => acc + l.cantidad, 0);
                         const subtotalGrupo = lineas.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
+                        const sortedLineas = [...lineas].sort((a, b) => (a.numeroTalla || 0) - (b.numeroTalla || 0));
 
                         return (
                           <div key={key} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1967,71 +1968,97 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   {primerItem.color} · <span className="font-semibold text-emerald-600">Serie: {primerItem.serieNombre || 'Estándar'}</span>
                                 </div>
 
-                                {/* Chips de Tallas Interactivos y Editables T34: [-] 2 [+], T35: [-] 2 [+]... */}
-                                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                  {lineas.map((l, i) => (
-                                    <div
-                                      key={i}
-                                      className="px-2 py-1 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs"
+                                {/* Chips de Tallas Interactivos y Editables con diseño estandarizado (Photo 1) */}
+                                <div className="mt-2.5 space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {sortedLineas.map((l, i) => (
+                                      <div
+                                        key={i}
+                                        className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--card)] px-2 py-1 shadow-2xs"
+                                      >
+                                        <span className="text-[var(--foreground)] font-extrabold text-xs font-mono">T{l.numeroTalla}</span>
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const nuevasLineas = [...lineasPedido];
+                                              const idx = nuevasLineas.findIndex(
+                                                (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
+                                              );
+                                              if (idx !== -1) {
+                                                if (nuevasLineas[idx].cantidad > 1) {
+                                                  nuevasLineas[idx].cantidad -= 1;
+                                                  setLineasPedido(nuevasLineas);
+                                                } else {
+                                                  setLineasPedido(nuevasLineas.filter((_, itemIdx) => itemIdx !== idx));
+                                                }
+                                              }
+                                            }}
+                                            className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                            title={`Quitar 1 par T${l.numeroTalla}`}
+                                          >
+                                            −
+                                          </button>
+                                          <span className="w-6 text-center text-xs font-bold font-mono text-[var(--foreground)]">
+                                            {l.cantidad}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const nuevasLineas = [...lineasPedido];
+                                              const idx = nuevasLineas.findIndex(
+                                                (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
+                                              );
+                                              if (idx !== -1) {
+                                                nuevasLineas[idx].cantidad += 1;
+                                                setLineasPedido(nuevasLineas);
+                                              }
+                                            }}
+                                            className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                            title={`Agregar 1 par T${l.numeroTalla}`}
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const nuevasLineas = lineasPedido.map(item => {
+                                          if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                            return { ...item, cantidad: item.cantidad + 1 };
+                                          }
+                                          return item;
+                                        });
+                                        setLineasPedido(nuevasLineas);
+                                      }}
+                                      className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                     >
-                                      <span className="font-extrabold text-[11px]">T{l.numeroTalla}:</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const nuevasLineas = [...lineasPedido];
-                                          const idx = nuevasLineas.findIndex(
-                                            (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
-                                          );
-                                          if (idx !== -1) {
-                                            if (nuevasLineas[idx].cantidad > 1) {
-                                              nuevasLineas[idx].cantidad -= 1;
-                                              setLineasPedido(nuevasLineas);
-                                            } else {
-                                              setLineasPedido(nuevasLineas.filter((_, itemIdx) => itemIdx !== idx));
-                                            }
+                                      +1 par c/talla
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const nuevasLineas = lineasPedido.map(item => {
+                                          if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                            return { ...item, cantidad: Math.max(1, item.cantidad - 1) };
                                           }
-                                        }}
-                                        className="w-4 h-4 bg-emerald-500/20 hover:bg-emerald-500/40 rounded flex items-center justify-center font-black text-[11px] cursor-pointer"
-                                        title="Disminuir 1 par"
-                                      >
-                                        -
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        value={l.cantidad}
-                                        onChange={(e) => {
-                                          const val = Math.max(1, parseInt(e.target.value) || 1);
-                                          const nuevasLineas = [...lineasPedido];
-                                          const idx = nuevasLineas.findIndex(
-                                            (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
-                                          );
-                                          if (idx !== -1) {
-                                            nuevasLineas[idx].cantidad = val;
-                                            setLineasPedido(nuevasLineas);
-                                          }
-                                        }}
-                                        className="w-8 h-5 text-center font-black bg-[var(--card)] border border-emerald-500/40 rounded text-xs text-[var(--foreground)] font-mono"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const nuevasLineas = [...lineasPedido];
-                                          const idx = nuevasLineas.findIndex(
-                                            (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
-                                          );
-                                          if (idx !== -1) {
-                                            nuevasLineas[idx].cantidad += 1;
-                                            setLineasPedido(nuevasLineas);
-                                          }
-                                        }}
-                                        className="w-4 h-4 bg-emerald-500/20 hover:bg-emerald-500/40 rounded flex items-center justify-center font-black text-[11px] cursor-pointer"
-                                        title="Aumentar 1 par"
-                                      >
-                                        +
-                                      </button>
-                                    </div>
-                                  ))}
+                                          return item;
+                                        });
+                                        setLineasPedido(nuevasLineas);
+                                      }}
+                                      className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                    >
+                                      −1 par c/talla
+                                    </button>
+                                    <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
+                                      = {totalPares} pares total
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -2055,7 +2082,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   // Eliminar todas las líneas de este grupo
                                   setLineasPedido(lineasPedido.filter((l) => !(l.productId === primerItem.productId && l.tipoVenta === primerItem.tipoVenta)));
                                 }}
-                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors"
+                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                                 title="Eliminar del pedido"
                               >
                                 <XCircle size={18} />
