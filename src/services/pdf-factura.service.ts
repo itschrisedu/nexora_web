@@ -286,6 +286,8 @@ export interface OrdenCompraPdfData {
     marca?: string;
     color?: string;
     codigo: string;
+    serie?: string;
+    numeracion?: string;
     imageUrl?: string;
     cantidadPares: number;
     precioCosto: number;
@@ -346,7 +348,7 @@ export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
 
   y += 38;
 
-  // ── Datos del Proveedor ──
+  // ── Datos del Proveedor / Fabricante ──
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(12, y, pageWidth - 24, 24, 1.5, 1.5, "FD");
@@ -371,20 +373,24 @@ export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
 
   y += 28;
 
-  // ── Observaciones Generales ──
+  // ── Observaciones Generales (Términos de fabricación) ──
   if (data.orden.observaciones) {
-    doc.setFillColor(254, 243, 199); // Amber 100
-    doc.setDrawColor(251, 191, 36);
-    doc.roundedRect(12, y, pageWidth - 24, 11, 1.5, 1.5, "FD");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(146, 64, 14);
-    doc.text("OBSERVACIONES / ESPECIFICACIONES DE ENTREGA:", 16, y + 4.5);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text(data.orden.observaciones, 16, y + 8.5);
-    y += 15;
+    // Filtrar para no mostrar nombres de clientes en observaciones de la orden
+    const obsLimpia = data.orden.observaciones.replace(/Cliente:\s*[^|]+(\||\n)?/gi, '').trim();
+    if (obsLimpia) {
+      doc.setFillColor(254, 243, 199); // Amber 100
+      doc.setDrawColor(251, 191, 36);
+      doc.roundedRect(12, y, pageWidth - 24, 11, 1.5, 1.5, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(146, 64, 14);
+      doc.text("OBSERVACIONES / ESPECIFICACIONES DE ENTREGA:", 16, y + 4.5);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(obsLimpia, 16, y + 8.5);
+      y += 15;
+    }
   }
 
   // ── Tabla de Modelos Solicitados ──
@@ -394,7 +400,7 @@ export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(255, 255, 255);
-  doc.text("MODELO / PRODUCTO", 16, y + 4.5);
+  doc.text("MODELO / DETALLE DE NUMERACIÓN", 16, y + 4.5);
   doc.text("CANTIDAD", pageWidth - 75, y + 4.5, { align: "center" });
   doc.text("P. COSTO", pageWidth - 48, y + 4.5, { align: "right" });
   doc.text("SUBTOTAL", pageWidth - 16, y + 4.5, { align: "right" });
@@ -406,7 +412,11 @@ export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
   doc.setTextColor(15, 23, 42);
 
   data.lineas.forEach((line, i) => {
-    const rowHeight = line.observacion ? 11 : 7.5;
+    let extraLines = 0;
+    if (line.numeracion) extraLines += 4;
+    if (line.observacion) extraLines += 4;
+    const rowHeight = 8 + extraLines;
+
     if (i % 2 === 1) {
       doc.setFillColor(248, 250, 252);
       doc.rect(12, y, pageWidth - 24, rowHeight, "F");
@@ -421,19 +431,32 @@ export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
       ? `6 pares (½ docena)`
       : `${line.cantidadPares} pares`;
 
+    let currentLineY = y + 4.5;
     doc.setFont("helvetica", "bold");
-    doc.text(`${line.marca ? line.marca + " " : ""}${line.modelo} (${line.codigo}${line.color ? " - " + line.color : ""})`, 16, y + 4.5);
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${line.marca ? line.marca + " " : ""}${line.modelo} (${line.codigo}${line.color ? " - " + line.color : ""})`, 16, currentLineY);
     
+    // Desglose de numeración para el fabricante
+    if (line.numeracion) {
+      currentLineY += 4;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Numeración: ${line.numeracion}`, 16, currentLineY);
+    }
+
     if (line.observacion) {
+      currentLineY += 4;
       doc.setFont("helvetica", "italic");
       doc.setFontSize(7);
       doc.setTextColor(180, 83, 9);
-      doc.text(`Nota: ${line.observacion}`, 16, y + 8.5);
-      doc.setFontSize(8);
-      doc.setTextColor(15, 23, 42);
+      doc.text(`Nota: ${line.observacion}`, 16, currentLineY);
     }
 
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
     doc.text(textoPares, pageWidth - 75, y + 4.5, { align: "center" });
     doc.text(`$${Number(line.precioCosto).toFixed(2)}`, pageWidth - 48, y + 4.5, { align: "right" });
     doc.setFont("helvetica", "bold");
@@ -484,7 +507,7 @@ export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
-  doc.text("Documento oficial de Orden de Compra emitido electrónicamente", pageWidth / 2, y, { align: "center" });
+  doc.text("Documento oficial de Orden de Compra emitido electrónicamente por NEXORA", pageWidth / 2, y, { align: "center" });
 
   return doc;
 }
@@ -493,5 +516,11 @@ export function descargarOrdenCompraPdf(data: OrdenCompraPdfData): void {
   const doc = generarOrdenCompraPdfDoc(data);
   const fileName = `Orden_Compra_${data.orden.numero}.pdf`;
   doc.save(fileName);
+}
+
+export function obtenerOrdenCompraPdfBlobUrl(data: OrdenCompraPdfData): string {
+  const doc = generarOrdenCompraPdfDoc(data);
+  const blob = doc.output("blob");
+  return URL.createObjectURL(blob);
 }
 

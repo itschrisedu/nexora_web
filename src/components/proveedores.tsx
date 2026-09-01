@@ -48,7 +48,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
-import { descargarOrdenCompraPdf, OrdenCompraPdfData } from '../services/pdf-factura.service';
+import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, OrdenCompraPdfData } from '../services/pdf-factura.service';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 
 interface ProveedoresProps {
@@ -291,6 +291,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrdenCompra | null>(null);
   const [editingOrder, setEditingOrder] = useState(false);
+
+  // Modal Previsualizador de PDF
+  const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewData, setPdfPreviewData] = useState<OrdenCompraPdfData | null>(null);
 
   // Modal Cuenta Corriente
   const [showCuentaModal, setShowCuentaModal] = useState(false);
@@ -633,13 +638,70 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
+  // Constructor unificado de datos para el PDF del fabricante (100% Confidencial - Sin datos de clientes)
+  const construirPdfData = (order: any): OrdenCompraPdfData => {
+    const lineasConsolidadas = consolidarLineasOrden(order.lines || [], productos);
+
+    return {
+      emisor: {
+        nombre: "LOCAL COMERCIAL DE CALZADO",
+        ruc: "1804884664001",
+        direccion: "Cevallos, Tungurahua, Ecuador",
+        telefono: "0998765432",
+        email: "pedidos@calzadocevallos.com",
+      },
+      orden: {
+        numero: `OC-${String(order.numero).padStart(4, '0')}`,
+        fecha: new Date(order.createdAt).toLocaleDateString('es-EC'),
+        estado: order.estado === 'PENDIENTE' ? 'ENVIADA' : order.estado,
+        observaciones: order.observaciones,
+      },
+      proveedor: {
+        nombre: order.supplier?.razonSocial || order.supplier?.nombre || 'Proveedor',
+        ruc: order.supplier?.ruc || '9999999999001',
+        contacto: order.supplier?.contacto,
+        direccion: order.supplier?.direccion,
+        email: order.supplier?.email,
+      },
+      lineas: lineasConsolidadas.map((l) => {
+        const numeracionStr = l.tallasDesglose && l.tallasDesglose.length > 0
+          ? l.tallasDesglose.map((t) => `T${t.talla} (${t.cantidad})`).join(' | ')
+          : undefined;
+
+        // Limpieza de privacidad: Nunca incluir nombres de clientes en el PDF para el taller/fabricante
+        let obsFab: string | undefined = undefined;
+        if (l.observacionLinea && !l.observacionLinea.includes('Cliente:')) {
+          obsFab = l.observacionLinea;
+        }
+
+        return {
+          modelo: l.nombre,
+          marca: l.marca,
+          color: l.color,
+          codigo: l.codigo,
+          serie: l.serie,
+          numeracion: numeracionStr,
+          imageUrl: l.imageUrl,
+          cantidadPares: l.cantidadPedida,
+          precioCosto: l.precioCosto,
+          subtotal: l.subtotal,
+          observacion: obsFab,
+        };
+      }),
+      totales: {
+        totalPares: lineasConsolidadas.reduce((acc, l) => acc + l.cantidadPedida, 0),
+        totalPagar: Number(order.total),
+      },
+    };
+  };
+
   // Botón EXPLÍCITO para ENVIAR la orden y cambiar estado a ENVIADA
   const handleEnviarYGenerarPDF = async (orderId: string) => {
     setSaving(true);
     try {
       await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/confirmar`, {});
       showToast('¡Orden de compra enviada al proveedor exitosamente! Estado: ENVIADA', 'success');
-      await handleDescargarPDFOrden(orderId);
+      await handlePrevisualizarPDFOrden(orderId);
 
       if (selectedOrder && selectedOrder.id === orderId) {
         handleVerDetalleOrden(orderId);
@@ -652,59 +714,60 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
+  const handlePrevisualizarPDFOrden = async (orderId: string) => {
+    try {
+      const order = await ApiService.get(`/proveedores/ordenes-compra/${orderId}`);
+      if (!order) return;
+
+      const pdfData = construirPdfData(order);
+      const url = obtenerOrdenCompraPdfBlobUrl(pdfData);
+      setPdfPreviewData(pdfData);
+      setPdfPreviewUrl(url);
+      setShowPdfPreviewModal(true);
+    } catch (e: any) {
+      showToast('No se pudo generar la vista previa del PDF.', 'error');
+    }
+  };
+
   const handleDescargarPDFOrden = async (orderId: string) => {
     try {
       const order = await ApiService.get(`/proveedores/ordenes-compra/${orderId}`);
       if (!order) return;
 
-      const lineasConsolidadas = consolidarLineasOrden(order.lines || [], productos);
-
-      const pdfData: OrdenCompraPdfData = {
-        emisor: {
-          nombre: "LOCAL COMERCIAL DE CALZADO",
-          ruc: "1804884664001",
-          direccion: "Cevallos, Tungurahua, Ecuador",
-          telefono: "0998765432",
-          email: "pedidos@calzadocevallos.com",
-        },
-        orden: {
-          numero: `OC-${String(order.numero).padStart(4, '0')}`,
-          fecha: new Date(order.createdAt).toLocaleDateString('es-EC'),
-          estado: order.estado === 'PENDIENTE' ? 'ENVIADA' : order.estado,
-          observaciones: order.observaciones,
-        },
-        proveedor: {
-          nombre: order.supplier?.razonSocial || order.supplier?.nombre || 'Proveedor',
-          ruc: order.supplier?.ruc || '9999999999001',
-          contacto: order.supplier?.contacto,
-          direccion: order.supplier?.direccion,
-          email: order.supplier?.email,
-        },
-        lineas: lineasConsolidadas.map((l) => ({
-          modelo: l.nombre,
-          marca: l.marca,
-          color: l.color,
-          codigo: l.codigo,
-          imageUrl: l.imageUrl,
-          cantidadPares: l.cantidadPedida,
-          precioCosto: l.precioCosto,
-          subtotal: l.subtotal,
-          // Confidencialidad: En el PDF para el fabricante/proveedor NO se envía información del cliente
-          observacion: l.observacionLinea && !l.observacionLinea.includes('Cliente:')
-            ? l.observacionLinea
-            : undefined,
-        })),
-        totales: {
-          totalPares: lineasConsolidadas.reduce((acc, l) => acc + l.cantidadPedida, 0),
-          totalPagar: Number(order.total),
-        },
-      };
-
+      const pdfData = construirPdfData(order);
       descargarOrdenCompraPdf(pdfData);
       showToast('PDF de Orden de Compra descargado.', 'success');
     } catch (e: any) {
       showToast('No se pudo generar el documento PDF.', 'error');
     }
+  };
+
+  const handleEnviarOrdenWhatsApp = (order: any) => {
+    const telefono = order.supplier?.contacto;
+    if (!telefono) {
+      showToast('El proveedor no tiene número de teléfono registrado.', 'warning');
+      return;
+    }
+
+    const pdfData = construirPdfData(order);
+    const numOrden = `OC-${String(order.numero).padStart(4, '0')}`;
+    const fecha = new Date(order.createdAt).toLocaleDateString('es-EC');
+    const provNombre = order.supplier?.razonSocial || order.supplier?.nombre || 'Estimado Proveedor';
+
+    let desglose = '';
+    pdfData.lineas.forEach((l) => {
+      desglose += `\n• *${l.modelo}* (${l.codigo}${l.color ? ' - ' + l.color : ''}): ${l.cantidadPares} pares`;
+      if (l.numeracion) desglose += `\n  ↳ _${l.numeracion}_`;
+    });
+
+    const mensaje = `Estimado/a *${provNombre}*,\n\nLe saludamos cordialmente de parte de *NEXORA*. Remitimos la siguiente orden de fabricación:\n\n📋 *ORDEN DE COMPRA ${numOrden}*\n📅 *Fecha:* ${fecha}\n\n👟 *DETALLE DE MODELOS Y NUMERACIÓN:*${desglose}\n\n📦 *TOTAL PARES:* ${pdfData.totales.totalPares} pares\n💰 *VALOR TOTAL:* $${pdfData.totales.totalPagar.toFixed(2)}\n\nPor favor confirmar recepción y fecha estimada de entrega. ¡Muchas gracias!`;
+
+    let numLimpio = telefono.replace(/\D/g, '');
+    if (numLimpio.startsWith('09') && numLimpio.length === 10) numLimpio = '593' + numLimpio.substring(1);
+    else if (numLimpio.startsWith('0') && numLimpio.length === 10) numLimpio = '593' + numLimpio.substring(1);
+
+    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank');
   };
 
   const handleCancelarOrden = async (orderId: string) => {
@@ -1830,8 +1893,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
          ══════════════════════════════════════════ */}
       {showOrderDetailModal && selectedOrder && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-6 pr-16 border-b border-[var(--border)] flex flex-wrap justify-between items-center gap-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900 rounded-2xl font-bold">
                   <FileText size={18} />
@@ -1857,24 +1920,88 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 </div>
               </div>
 
+              {/* Botones de Acción Oficiales */}
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePrevisualizarPDFOrden(selectedOrder.id)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                  title="Previsualizar documento PDF de la orden"
+                >
+                  <Eye size={13} />
+                  <span>Previsualizar PDF</span>
+                </button>
                 <button
                   onClick={() => handleDescargarPDFOrden(selectedOrder.id)}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                  title="Descargar PDF oficial"
                 >
                   <Download size={13} />
-                  <span>PDF Orden</span>
+                  <span>Descargar</span>
                 </button>
                 <button
-                  onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
-                  className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+                  onClick={() => handleEnviarOrdenWhatsApp(selectedOrder)}
+                  className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  title="Enviar resumen de orden por WhatsApp al proveedor"
                 >
-                  <X size={16} />
+                  <MessageCircle size={13} />
+                  <span>WhatsApp</span>
                 </button>
               </div>
+
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              <button
+                onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
+                className="absolute top-5 right-5 p-2 rounded-xl border border-[var(--border)] hover:bg-rose-500/10 hover:border-rose-500/30 text-[var(--muted-foreground)] hover:text-rose-600 transition-colors z-20"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+              {/* Tarjeta Destacada: Cliente / Pedido Originador */}
+              {(() => {
+                const obsText = (selectedOrder.lines || []).map((l: any) => l.observacionLinea).filter(Boolean).join(' ');
+                const clienteMatch = obsText.match(/Cliente:\s*([^|]+)/i);
+                const refMatch = obsText.match(/Ref Pedido:\s*(#?[a-z0-9]+)/i);
+                const rawCli = clienteMatch ? clienteMatch[1].trim() : null;
+                const foundCli = rawCli ? clientesList.find(c => `${c.nombre || ''} ${c.apellido || ''}`.toLowerCase().includes(rawCli.toLowerCase()) || rawCli.toLowerCase().includes(c.nombre?.toLowerCase())) : null;
+                const cliNombre = foundCli ? `${foundCli.nombre || ''} ${foundCli.apellido || ''}`.trim() : rawCli;
+                const rep = getClienteReputacion(foundCli);
+                let refCode = refMatch ? refMatch[1].trim() : null;
+                if (refCode && !refCode.startsWith('#')) refCode = `#${refCode}`;
+                if (refCode) refCode = refCode.slice(0, 7).toUpperCase();
+
+                if (!cliNombre) return null;
+
+                return (
+                  <div className="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        👤
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">
+                          Pedido Solicitado para Cliente
+                        </div>
+                        <div className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                          <span>{cliNombre}</span>
+                          {foundCli && (
+                            <span className={`px-2 py-0.5 rounded text-[10px] border ${rep.badgeClass}`} title={rep.descripcion}>
+                              {rep.icon} {rep.label}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {refCode && (
+                      <span className="px-2.5 py-1 bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/25 rounded-xl font-mono text-xs font-black">
+                        📦 Ref Pedido: {refCode}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
               <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl p-4 space-y-1.5">
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
                   Observaciones / Términos de Entrega
@@ -2948,6 +3075,67 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 )}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          MODAL: PREVISUALIZADOR DE PDF DE ORDEN
+         ══════════════════════════════════════════ */}
+      {showPdfPreviewModal && pdfPreviewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-150">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-4 px-6 pr-16 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/30 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-600 text-white rounded-xl font-bold">
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                    <span>Documento Oficial: {pdfPreviewData?.orden.numero || 'Orden de Compra'}</span>
+                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold rounded-full">
+                      Confidencial / Fabricante
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Proveedor: <strong>{pdfPreviewData?.proveedor.nombre}</strong> • Sin datos de clientes en el documento
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {pdfPreviewData && (
+                  <button
+                    onClick={() => descargarOrdenCompraPdf(pdfPreviewData)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                  >
+                    <Download size={13} />
+                    <span>Descargar PDF</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              <button
+                onClick={() => {
+                  setShowPdfPreviewModal(false);
+                  if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+                  setPdfPreviewUrl(null);
+                }}
+                className="absolute top-4 right-4 p-2 rounded-xl border border-[var(--border)] hover:bg-rose-500/10 hover:border-rose-500/30 text-[var(--muted-foreground)] hover:text-rose-600 transition-colors z-20"
+                title="Cerrar visor"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 w-full h-full bg-slate-900/5 dark:bg-slate-950/40 p-2">
+              <iframe
+                src={pdfPreviewUrl}
+                title="Vista Previa de Orden de Compra"
+                className="w-full h-full rounded-2xl border border-[var(--border)] shadow-inner"
+              />
+            </div>
           </div>
         </div>
       )}
