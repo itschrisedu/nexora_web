@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ApiService } from '../services/api.service';
 import {
   User, UserPlus, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
   RefreshCw, CheckCircle, AlertCircle, Building2, Store,
-  Users, KeyRound, Search, Share2, Edit2, MapPin, X
+  Users, KeyRound, Search, Share2, Edit2, MapPin, X,
+  Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2
 } from 'lucide-react';
 
 interface UsuariosProps {
@@ -52,7 +53,7 @@ interface StockInterItem {
 }
 
 export default function UsuariosComponent({ online }: UsuariosProps) {
-  const [tabActiva, setTabActiva] = useState<'sucursales' | 'personal' | 'stock-inter'>('sucursales');
+  const [tabActiva, setTabActiva] = useState<'sucursales' | 'personal' | 'stock-inter' | 'personalizacion'>('sucursales');
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -72,8 +73,26 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     adminPassword: '',
   });
 
+  // ─── MASTER-DETAIL: Sucursal seleccionada ───
+  const [selectedSucursalId, setSelectedSucursalId] = useState<string | null>(null);
+  const [personalSucursal, setPersonalSucursal] = useState<UserListItem[]>([]);
+  const [loadingPersonalSuc, setLoadingPersonalSuc] = useState(false);
+
+  // ─── EDITAR SUCURSAL ───
+  const [showEditSucursalModal, setShowEditSucursalModal] = useState(false);
+  const [editingSucursal, setEditingSucursal] = useState<SucursalItem | null>(null);
+  const [editSucursalForm, setEditSucursalForm] = useState({ name: '', direccion: '', telefono: '', email: '', active: true });
+  const [savingSucursal, setSavingSucursal] = useState(false);
+
+  // ─── TRANSFERIR PERSONAL ───
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferringUser, setTransferringUser] = useState<UserListItem | null>(null);
+  const [targetSucursalId, setTargetSucursalId] = useState('');
+  const [savingTransfer, setSavingTransfer] = useState(false);
+
   // ─── PERSONAL ───
   const [users, setUsers] = useState<UserListItem[]>([]);
+  const [searchPersonal, setSearchPersonal] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
@@ -97,6 +116,15 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [stockResultados, setStockResultados] = useState<StockInterItem[]>([]);
   const [loadingStock, setLoadingStock] = useState(false);
 
+  // ─── PERSONALIZACIÓN ───
+  const [businessConfig, setBusinessConfig] = useState<any>(null);
+  const [customColor, setCustomColor] = useState('#0F172A');
+  const [customLogo, setCustomLogo] = useState('');
+  const [logoPreview, setLogoPreview] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (online) {
       loadAll();
@@ -106,9 +134,23 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const loadAll = async () => {
     setLoading(true);
     try {
-      await Promise.all([loadSucursales(), loadUsers()]);
+      await Promise.all([loadSucursales(), loadUsers(), loadBusinessConfig()]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBusinessConfig = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/negocio');
+      if (data) {
+        setBusinessConfig(data);
+        setCustomColor(data.primaryColor || '#0F172A');
+        setCustomLogo(data.logoUrl || '');
+        setLogoPreview(data.logoUrl || '');
+      }
+    } catch (err) {
+      console.error('Error cargando config negocio:', err);
     }
   };
 
@@ -285,6 +327,132 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     }
   };
 
+  // ─── HANDLERS MASTER-DETAIL SUCURSAL ───
+  const handleSelectSucursal = async (sucursalId: string) => {
+    if (selectedSucursalId === sucursalId) {
+      setSelectedSucursalId(null);
+      setPersonalSucursal([]);
+      return;
+    }
+    setSelectedSucursalId(sucursalId);
+    setLoadingPersonalSuc(true);
+    try {
+      const data = await ApiService.get(`/configuracion/sucursales/${sucursalId}/personal`);
+      setPersonalSucursal(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error cargando personal de sucursal:', err);
+      setPersonalSucursal([]);
+    } finally {
+      setLoadingPersonalSuc(false);
+    }
+  };
+
+  const handleEditSucursal = (suc: SucursalItem) => {
+    setEditingSucursal(suc);
+    setEditSucursalForm({
+      name: suc.name,
+      direccion: suc.direccion,
+      telefono: suc.telefono,
+      email: suc.email,
+      active: suc.active,
+    });
+    setShowEditSucursalModal(true);
+  };
+
+  const handleSaveEditSucursal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSucursal) return;
+    setSavingSucursal(true);
+    setErrorMsg('');
+    try {
+      const data = await ApiService.put(`/configuracion/sucursales/${editingSucursal.id}`, editSucursalForm);
+      if (Array.isArray(data)) setSucursales(data);
+      setSuccessMsg(`Sucursal "${editSucursalForm.name}" actualizada.`);
+      setShowEditSucursalModal(false);
+      setEditingSucursal(null);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al actualizar sucursal.');
+    } finally {
+      setSavingSucursal(false);
+    }
+  };
+
+  const handleOpenTransfer = (user: UserListItem) => {
+    setTransferringUser(user);
+    setTargetSucursalId('');
+    setShowTransferModal(true);
+  };
+
+  const handleTransferPersonal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!transferringUser || !targetSucursalId) return;
+    setSavingTransfer(true);
+    setErrorMsg('');
+    try {
+      await ApiService.patch(`/configuracion/personal/${transferringUser.id}/transferir`, { targetTenantId: targetSucursalId });
+      setSuccessMsg(`${transferringUser.nombre} transferido exitosamente.`);
+      setShowTransferModal(false);
+      setTransferringUser(null);
+      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      loadSucursales();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al transferir colaborador.');
+    } finally {
+      setSavingTransfer(false);
+    }
+  };
+
+  // ─── HANDLERS PERSONALIZACIÓN ───
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        setLogoPreview(base64);
+        const res = await ApiService.post('/cloudinary/upload', { base64Data: base64, folder: 'nexora-logos' });
+        if (res?.secure_url) {
+          setCustomLogo(res.secure_url);
+          setLogoPreview(res.secure_url);
+        }
+        setUploadingLogo(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al subir logo.');
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setCustomLogo('');
+    setLogoPreview('');
+  };
+
+  const handleSavePersonalizacion = async () => {
+    if (!businessConfig) return;
+    setSavingConfig(true);
+    setErrorMsg('');
+    try {
+      await ApiService.put('/configuracion/negocio', {
+        ...businessConfig,
+        primaryColor: customColor,
+        logoUrl: customLogo,
+      });
+      setSuccessMsg('Personalización guardada correctamente.');
+      loadBusinessConfig();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al guardar personalización.');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
   const handleSearchStockInter = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchStockQuery.trim()) return;
@@ -350,6 +518,18 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         >
           <Share2 size={15} /> Consulta de Stock Inter-Sucursal
         </button>
+
+        <button
+          type="button"
+          onClick={() => setTabActiva('personalizacion')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            tabActiva === 'personalizacion'
+              ? 'bg-[#0F172A] text-white shadow-sm'
+              : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+        >
+          <Palette size={15} /> Personalización
+        </button>
       </div>
 
       {/* ═══ TAB 1: SUCURSALES ═══ */}
@@ -383,8 +563,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               {sucursales.map((sucursal) => (
                 <div
                   key={sucursal.id}
-                  className={`bg-[var(--card)] border rounded-2xl p-5 space-y-4 shadow-sm transition-all ${
-                    sucursal.isCurrent ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-[var(--border)]'
+                  onClick={() => handleSelectSucursal(sucursal.id)}
+                  className={`bg-[var(--card)] border rounded-2xl p-5 space-y-4 shadow-sm transition-all cursor-pointer hover:shadow-md ${
+                    selectedSucursalId === sucursal.id
+                      ? 'border-[#0F172A] ring-2 ring-[#0F172A]/20'
+                      : sucursal.isCurrent ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-[var(--border)]'
                   }`}
                 >
                   <div className="flex items-start justify-between">
@@ -404,12 +587,20 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                           </span>
                           {sucursal.isCurrent && (
                             <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full">
-                              Sesión Actual
+                              Sesion Actual
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleEditSucursal(sucursal); }}
+                      className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
+                      title="Editar Sucursal"
+                    >
+                      <Edit2 size={14} />
+                    </button>
                   </div>
 
                   <div className="space-y-1 text-xs text-[var(--muted-foreground)]">
@@ -434,6 +625,90 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ─── PANEL MASTER-DETAIL: Personal de la Sucursal seleccionada ─── */}
+          {selectedSucursalId && (
+            <div className="mt-6 p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users size={16} className="text-[#0F172A]" />
+                  <h3 className="font-bold text-sm text-[var(--foreground)]">
+                    Personal de: {sucursales.find(s => s.id === selectedSucursalId)?.name || 'Sucursal'}
+                  </h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-full">
+                    {personalSucursal.length} colaboradores
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedSucursalId(null); setPersonalSucursal([]); }}
+                  className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors"
+                  title="Cerrar panel"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {loadingPersonalSuc ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="animate-spin text-[#0F172A]" size={24} />
+                </div>
+              ) : personalSucursal.length === 0 ? (
+                <div className="p-6 text-center text-xs text-[var(--muted-foreground)] bg-[var(--muted)]/20 rounded-xl border border-dashed border-[var(--border)]">
+                  Esta sucursal no tiene colaboradores asignados.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3">Colaborador</th>
+                        <th className="p-3">Rol</th>
+                        <th className="p-3 text-center">Estado</th>
+                        <th className="p-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {personalSucursal.map((user) => (
+                        <tr key={user.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                          <td className="p-3">
+                            <div className="font-bold text-sm text-[var(--foreground)]">{user.nombre}</div>
+                            <div className="text-[11px] text-[var(--muted-foreground)]">{user.email}</div>
+                          </td>
+                          <td className="p-3">
+                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                              user.rol === 'ROL_ADMIN' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                              user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                              'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                            }`}>
+                              {user.rol === 'ROL_ADMIN' ? 'Admin' : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                              user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                            }`}>
+                              {user.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenTransfer(user)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 text-[10px] font-bold transition-colors"
+                              title="Transferir a otra sucursal"
+                            >
+                              <ArrowRightLeft size={12} /> Transferir
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -618,6 +893,173 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══ TAB 4: PERSONALIZACIÓN ═══ */}
+      {tabActiva === 'personalizacion' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-base font-bold text-[var(--foreground)]">Personalización de Marca</h2>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Define la identidad visual de tu negocio: color primario y logo del establecimiento.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* ─── Color Primario ─── */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Paintbrush size={16} className="text-[var(--foreground)]" />
+                <h3 className="font-bold text-sm text-[var(--foreground)]">Color Primario del Sistema</h3>
+              </div>
+
+              {/* Paleta Predefinida */}
+              <div>
+                <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">Paleta Corporativa</div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { hex: '#0F172A', name: 'Azul Marino' },
+                    { hex: '#1E293B', name: 'Slate' },
+                    { hex: '#064E3B', name: 'Esmeralda' },
+                    { hex: '#312E81', name: 'Indigo' },
+                    { hex: '#581C87', name: 'Violeta' },
+                    { hex: '#7C2D12', name: 'Terracota' },
+                    { hex: '#1E3A5F', name: 'Cobalto' },
+                    { hex: '#0D3B66', name: 'Navy' },
+                    { hex: '#2D1B69', name: 'Púrpura' },
+                    { hex: '#14532D', name: 'Bosque' },
+                    { hex: '#7F1D1D', name: 'Borgoña' },
+                    { hex: '#44403C', name: 'Piedra' },
+                  ].map((c) => (
+                    <button
+                      key={c.hex}
+                      type="button"
+                      onClick={() => setCustomColor(c.hex)}
+                      className={`w-9 h-9 rounded-xl border-2 transition-all hover:scale-110 ${
+                        customColor === c.hex ? 'border-[var(--foreground)] ring-2 ring-[var(--foreground)]/20 scale-110' : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: c.hex }}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Color Picker + Hex Input */}
+              <div className="flex items-center gap-4">
+                <div>
+                  <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Selector Libre</div>
+                  <input
+                    type="color"
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    className="w-12 h-10 rounded-xl border border-[var(--border)] cursor-pointer"
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Código HEX</div>
+                  <input
+                    type="text"
+                    value={customColor}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setCustomColor(v);
+                    }}
+                    placeholder="#0F172A"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div>
+                <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Vista Previa</div>
+                <div className="rounded-xl overflow-hidden border border-[var(--border)]">
+                  <div className="p-4 text-white font-bold text-sm" style={{ backgroundColor: customColor }}>
+                    Header del Sistema — {businessConfig?.nombre || 'Mi Negocio'}
+                  </div>
+                  <div className="p-3 bg-[var(--card)] text-xs text-[var(--muted-foreground)]">
+                    Este es el color que se usara en la cabecera, botones principales y acentos del sistema.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ─── Logo del Negocio ─── */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={16} className="text-[var(--foreground)]" />
+                <h3 className="font-bold text-sm text-[var(--foreground)]">Logo del Negocio</h3>
+              </div>
+
+              {/* Preview del Logo */}
+              <div className="flex items-center justify-center">
+                {logoPreview ? (
+                  <div className="relative">
+                    <img
+                      src={logoPreview}
+                      alt="Logo"
+                      className="w-32 h-32 object-contain rounded-2xl border border-[var(--border)] bg-white p-2"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-colors shadow-md"
+                      title="Quitar logo"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-2">
+                    <ImageIcon size={28} />
+                    <span className="text-[10px] font-bold">Sin Logo</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Botón de Subida */}
+              <div>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold hover:bg-[var(--muted)] transition-colors disabled:opacity-50"
+                >
+                  {uploadingLogo ? (
+                    <><Loader2 size={14} className="animate-spin" /> Subiendo...</>
+                  ) : (
+                    <><Upload size={14} /> Seleccionar Imagen (PNG, JPG, WebP, SVG)</>
+                  )}
+                </button>
+              </div>
+
+              <p className="text-[10px] text-[var(--muted-foreground)] text-center">
+                El logo se sube automaticamente a la nube (Cloudinary) y se muestra en facturas, reportes y el encabezado del sistema.
+              </p>
+            </div>
+          </div>
+
+          {/* Botón Guardar */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleSavePersonalizacion}
+              disabled={savingConfig}
+              className="flex items-center gap-2 px-6 py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition-all disabled:opacity-50"
+            >
+              {savingConfig ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+              {savingConfig ? 'Guardando...' : 'Guardar Personalización'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -980,6 +1422,170 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
                   {savingPassword ? 'Guardando...' : 'Restablecer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL EDITAR SUCURSAL ═══ */}
+      {showEditSucursalModal && editingSucursal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                  <Edit2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Editar Sucursal</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Modificar datos del punto de venta</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEditSucursalModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEditSucursal} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre de la Sucursal</label>
+                <input
+                  type="text"
+                  required
+                  value={editSucursalForm.name}
+                  onChange={(e) => setEditSucursalForm({ ...editSucursalForm, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Direccion</label>
+                <input
+                  type="text"
+                  value={editSucursalForm.direccion}
+                  onChange={(e) => setEditSucursalForm({ ...editSucursalForm, direccion: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Telefono</label>
+                  <input
+                    type="text"
+                    value={editSucursalForm.telefono}
+                    onChange={(e) => setEditSucursalForm({ ...editSucursalForm, telefono: e.target.value })}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electronico</label>
+                  <input
+                    type="email"
+                    value={editSucursalForm.email}
+                    onChange={(e) => setEditSucursalForm({ ...editSucursalForm, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Estado</label>
+                <select
+                  value={editSucursalForm.active ? 'ACTIVA' : 'INACTIVA'}
+                  onChange={(e) => setEditSucursalForm({ ...editSucursalForm, active: e.target.value === 'ACTIVA' })}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                >
+                  <option value="ACTIVA">Activa</option>
+                  <option value="INACTIVA">Inactiva</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSucursalModal(false)}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSucursal}
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+                >
+                  {savingSucursal ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL TRANSFERIR PERSONAL ═══ */}
+      {showTransferModal && transferringUser && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-purple-400 font-bold">
+                  <ArrowRightLeft size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Transferir Colaborador</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Mover a <strong>{transferringUser.nombre}</strong></p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTransferModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleTransferPersonal} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Destino</label>
+                <select
+                  required
+                  value={targetSucursalId}
+                  onChange={(e) => setTargetSucursalId(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                >
+                  <option value="">Seleccionar sucursal...</option>
+                  {sucursales
+                    .filter(s => s.id !== selectedSucursalId)
+                    .map(s => (
+                      <option key={s.id} value={s.id}>{s.name} {s.isMatriz ? '(Matriz)' : ''}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-600 font-semibold">
+                El colaborador sera desvinculado de la sucursal actual y asignado a la sucursal seleccionada.
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTransferModal(false)}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTransfer || !targetSucursalId}
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+                >
+                  {savingTransfer ? 'Transfiriendo...' : 'Confirmar Transferencia'}
                 </button>
               </div>
             </form>
