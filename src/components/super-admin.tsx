@@ -23,6 +23,7 @@ import {
   UserPlus,
   Lock,
   KeyRound,
+  X,
   ShieldAlert,
 } from "lucide-react";
 
@@ -587,16 +588,25 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
       {/* ═══ MODAL: CREAR TENANT ═══ */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="p-6 border-b border-[var(--border)]">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Building2 size={20} className="text-[#0F172A]" />
-                Crear Nuevo Tenant
-              </h2>
-              <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                Se creará una organización con su administrador inicial.
-              </p>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Crear Nuevo Tenant</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Se creará una organización con su administrador inicial</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
             </div>
             <form onSubmit={handleCreateTenant} className="p-6 space-y-4">
               <div>

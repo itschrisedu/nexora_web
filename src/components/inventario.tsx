@@ -315,16 +315,28 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
       {/* MODAL MOVIMIENTO MULTIFORMATO */}
       {showMovModal && movProd && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  {movType === "entrada" ? <TrendingUp size={18} className="text-emerald-600" /> : <TrendingDown size={18} className="text-red-500" />}
-                  <h3 className="font-bold text-base">{movType === "entrada" ? "Ingreso de Mercadería" : "Salida de Stock"}</h3>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 font-bold ${
+                  movType === "entrada" ? "text-emerald-400" : "text-rose-400"
+                }`}>
+                  {movType === "entrada" ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                 </div>
-                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{movProd.nombre} · {movProd.codigo} {movProd.serie?.nombre ? `(${movProd.serie.nombre})` : ""}</p>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">
+                    {movType === "entrada" ? "Ingreso de Mercadería a Bodega" : "Salida / Ajuste de Stock"}
+                  </h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    {movProd.nombre} · {movProd.codigo} {movProd.serie?.nombre ? `(${movProd.serie.nombre})` : ""}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setShowMovModal(false)} className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => setShowMovModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>

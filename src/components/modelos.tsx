@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { ApiService } from "../services/api.service";
 import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
-  Plus, Search, Loader2, ImageIcon, Package, Edit2, Trash2, AlertTriangle,
-  DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette
+  Plus, Search, Loader2, ImageIcon, Package, Edit2, Edit3, Trash2, AlertTriangle,
+  DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette,
+  Layers, Boxes
 } from "lucide-react";
 
 interface ModelosProps {
@@ -1284,14 +1285,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* MODAL CREAR MASIVO */}
       {showCreate && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">Nuevo Modelo y Variantes</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">Crea un diseño base y genera variantes para colores y series en lote</p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Plus size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Nuevo Modelo y Variantes</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Crea un diseño base y genera variantes para colores y series en lote</p>
+                </div>
               </div>
-              <button onClick={() => { setShowCreate(false); resetForm(); }}
-                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => { setShowCreate(false); resetForm(); }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -1563,19 +1572,24 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* ── MODAL AÑADIR NUEVO COLOR A MODELO EXISTENTE ── */}
       {showAddColorModal && selectedModelForColor && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base flex items-center gap-2">
-                  <Palette size={18} className="text-[#0F172A]" />
-                  <span>Añadir Nuevo Color a "{selectedModelForColor.name}"</span>
-                </h3>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  Código Base: <span className="font-mono font-bold text-[var(--foreground)]">{selectedModelForColor.baseCode}</span> · Marca: {selectedModelForColor.brand}
-                </p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                  <Palette size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Añadir Nuevo Color a "{selectedModelForColor.name}"</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Código Base: <span className="font-mono font-bold text-white">{selectedModelForColor.baseCode}</span> · Marca: {selectedModelForColor.brand}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => { setShowAddColorModal(false); setSelectedModelForColor(null); }}
-                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => { setShowAddColorModal(false); setSelectedModelForColor(null); }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -1802,14 +1816,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* MODAL PRECIOS */}
       {showPrice && priceProd && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">Actualizar Precios</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">{priceProd.nombre} · Color {priceProd.color} · Tallas {getNombreSerie(priceProd.serie?.nombre ?? "")}</p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <DollarSign size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Actualizar Precios</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">{priceProd.nombre} · Color {priceProd.color} · Tallas {getNombreSerie(priceProd.serie?.nombre ?? "")}</p>
+                </div>
               </div>
-              <button onClick={() => setShowPrice(false)}
-                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => setShowPrice(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -1895,14 +1917,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* ── MODAL CREAR SERIE PERSONALIZADA ── */}
       {showCreateSeriesModal && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">Crear Nueva Serie</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">Define un nombre y rango de tallas para la serie (ej: CHINO, 35-40)</p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Layers size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Crear Nueva Serie</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Define un nombre y rango de tallas para la serie (ej: CHINO, 35-40)</p>
+                </div>
               </div>
-              <button onClick={() => setShowCreateSeriesModal(false)}
-                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => setShowCreateSeriesModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -1948,14 +1978,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* ── MODAL EDITAR SERIE EXISTENTE ── */}
       {showEditSeriesModal && editingSerie && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-in">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">Editar Serie "{editingSerie.nombre}"</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">Modifica el nombre o rango de tallas configurado</p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                  <Layers size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Editar Serie "{editingSerie.nombre}"</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Modifica el nombre o rango de tallas configurado</p>
+                </div>
               </div>
-              <button onClick={() => { setShowEditSeriesModal(false); setEditingSerie(null); }}
-                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => { setShowEditSeriesModal(false); setEditingSerie(null); }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -2001,16 +2039,24 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* ── MODAL EDITAR VARIANTE INTEGRAL ── */}
       {showEditProduct && editProduct && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="font-bold text-base">Editar Variante de Calzado</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  {editProduct.codigo} · Modifica color, serie, numeración, stock, precios e imagen
-                </p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Boxes size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Editar Variante de Calzado</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    {editProduct.codigo} · Modifica color, serie, numeración, stock y precios
+                  </p>
+                </div>
               </div>
-              <button onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
-                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -2178,14 +2224,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* ── MODAL EDITAR MODELO BASE ── */}
       {showEditModel && editModel && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">Editar Modelo</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">Modifica los datos base del modelo</p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-blue-400 font-bold">
+                  <Edit3 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Editar Modelo Base</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Modifica los datos base del modelo</p>
+                </div>
               </div>
-              <button onClick={() => { setShowEditModel(false); setEditModel(null); }}
-                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => { setShowEditModel(false); setEditModel(null); }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>

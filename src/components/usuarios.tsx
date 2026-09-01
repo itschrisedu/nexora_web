@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { ApiService } from '../services/api.service';
 import {
-  User, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
+  User, UserPlus, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
   RefreshCw, CheckCircle, AlertCircle, Building2, Store,
-  Users, KeyRound, Search, Share2, Edit2, MapPin
+  Users, KeyRound, Search, Share2, Edit2, MapPin, X
 } from 'lucide-react';
 
 interface UsuariosProps {
@@ -623,92 +623,87 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL CREAR SUCURSAL ═══ */}
       {showAddSucursalModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-            <h2 className="text-base font-bold flex items-center gap-2">
-              <Store size={20} className="text-[#0F172A]" /> Nueva Sucursal / Punto de Venta
-            </h2>
-            <form onSubmit={handleCreateSucursal} className="space-y-3">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Store size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Nueva Sucursal / Punto de Venta</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Gestión de locales comerciales de calzado</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddSucursalModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateSucursal} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Nombre de la Sucursal</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre de la Sucursal</label>
                 <input
                   type="text"
                   required
                   value={newSucursal.name}
                   onChange={(e) => setNewSucursal({ ...newSucursal, name: e.target.value })}
                   placeholder="Ej: Calzados Cevallos - Sucursal Mall"
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Dirección del Local</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Dirección del Local</label>
                 <input
                   type="text"
                   value={newSucursal.direccion}
                   onChange={(e) => setNewSucursal({ ...newSucursal, direccion: e.target.value })}
                   placeholder="Av. Cevallos y Montalvo"
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Teléfono</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Teléfono</label>
                   <input
                     type="text"
                     value={newSucursal.telefono}
                     onChange={(e) => setNewSucursal({ ...newSucursal, telefono: e.target.value })}
-                    placeholder="032870123"
-                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                    placeholder="0991234567"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Correo</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico</label>
                   <input
                     type="email"
                     value={newSucursal.email}
                     onChange={(e) => setNewSucursal({ ...newSucursal, email: e.target.value })}
-                    placeholder="sucursal@negocio.com"
-                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                    placeholder="sucursal@calzados.com"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-[var(--border)]">
-                <span className="text-[11px] font-bold text-[var(--muted-foreground)] block mb-2">Encargado Inicial (Opcional):</span>
-                <div className="space-y-2">
-                  <input
-                    type="email"
-                    value={newSucursal.adminEmail}
-                    onChange={(e) => setNewSucursal({ ...newSucursal, adminEmail: e.target.value })}
-                    placeholder="Correo del Encargado"
-                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
-                  />
-                  <input
-                    type="password"
-                    value={newSucursal.adminPassword}
-                    onChange={(e) => setNewSucursal({ ...newSucursal, adminPassword: e.target.value })}
-                    placeholder="Contraseña Inicial"
-                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-3">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddSucursalModal(false)}
-                  className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-bold"
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={creatingSucursal}
-                  className="flex-1 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
+                  disabled={saving}
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
-                  {creatingSucursal ? 'Creando...' : 'Crear Sucursal'}
+                  {saving ? 'Guardando...' : 'Crear Sucursal'}
                 </button>
               </div>
             </form>
@@ -718,55 +713,70 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL CREAR COLABORADOR ═══ */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-            <h2 className="text-base font-bold flex items-center gap-2">
-              <User size={20} className="text-[#0F172A]" /> Registrar Nuevo Colaborador
-            </h2>
-            <form onSubmit={handleCreateUser} className="space-y-3">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <UserPlus size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Registrar Nuevo Colaborador</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Asignación de rol, contraseña y permisos</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Nombre Completo</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre Completo</label>
                 <input
                   type="text"
                   required
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Ej: Carlos Gómez"
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Correo Electrónico</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico</label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="carlos@negocio.com"
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  placeholder="carlos@calzados.com"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Contraseña</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Contraseña Temporal</label>
                 <input
                   type="password"
                   required
                   minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Rol</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol en el Negocio</label>
                 <select
                   value={rol}
                   onChange={(e) => setRol(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm font-semibold"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                 >
                   <option value="ROL_VENDEDOR">Vendedor</option>
                   <option value="ROL_BODEGUERO">Bodeguero</option>
@@ -774,7 +784,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </select>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-1">
                 <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
                   <input
                     type="checkbox"
@@ -786,20 +796,20 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </label>
               </div>
 
-              <div className="flex gap-3 pt-3">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-bold"
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
-                  {saving ? 'Guardando...' : 'Registrar'}
+                  {saving ? 'Guardando...' : 'Crear Colaborador'}
                 </button>
               </div>
             </form>
@@ -809,41 +819,56 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL EDITAR COLABORADOR ═══ */}
       {showEditModal && editingUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-            <h2 className="text-base font-bold flex items-center gap-2">
-              <Edit2 size={20} className="text-[#0F172A]" /> Editar Colaborador
-            </h2>
-            <form onSubmit={handleUpdateUser} className="space-y-3">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                  <Edit2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Editar Colaborador</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Modificación de permisos, rol y estado</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateUser} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Nombre Completo</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre Completo</label>
                 <input
                   type="text"
                   required
                   value={editingUser.nombre}
                   onChange={(e) => setEditingUser({ ...editingUser, nombre: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Correo Electrónico</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico</label>
                 <input
                   type="email"
                   required
                   value={editingUser.email}
                   onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Rol</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol</label>
                   <select
                     value={editingUser.rol}
                     onChange={(e) => setEditingUser({ ...editingUser, rol: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm font-semibold"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   >
                     <option value="ROL_VENDEDOR">Vendedor</option>
                     <option value="ROL_BODEGUERO">Bodeguero</option>
@@ -852,11 +877,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Estado</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Estado</label>
                   <select
                     value={editingUser.activo ? 'ACTIVO' : 'INACTIVO'}
                     onChange={(e) => setEditingUser({ ...editingUser, activo: e.target.value === 'ACTIVO' })}
-                    className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm font-semibold"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   >
                     <option value="ACTIVO">Activo</option>
                     <option value="INACTIVO">Inactivo</option>
@@ -864,7 +889,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-1">
                 <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
                   <input
                     type="checkbox"
@@ -876,18 +901,18 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </label>
               </div>
 
-              <div className="flex gap-3 pt-3">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-bold"
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
                   {saving ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
@@ -899,17 +924,33 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL RESETEAR CONTRASEÑA ═══ */}
       {showResetPasswordModal && resettingUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
-            <h2 className="text-base font-bold flex items-center gap-2">
-              <KeyRound size={20} className="text-amber-500" /> Restablecer Contraseña
-            </h2>
-            <p className="text-xs text-[var(--muted-foreground)]">
-              Ingresa la nueva contraseña para <strong>{resettingUser.nombre}</strong> ({resettingUser.email}).
-            </p>
-            <form onSubmit={handleResetPassword} className="space-y-3">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                  <KeyRound size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Restablecer Contraseña</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Clave para <strong>{resettingUser.nombre}</strong></p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowResetPasswordModal(false);
+                  setResettingUser(null);
+                  setNewPassword('');
+                }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleResetPassword} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase mb-1">Nueva Contraseña</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nueva Contraseña</label>
                 <input
                   type="password"
                   required
@@ -917,11 +958,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Mínimo 6 caracteres"
-                  className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -929,14 +970,14 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     setResettingUser(null);
                     setNewPassword('');
                   }}
-                  className="flex-1 py-2 border border-[var(--border)] rounded-xl text-xs font-bold"
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingPassword}
-                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold"
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
                   {savingPassword ? 'Guardando...' : 'Restablecer'}
                 </button>
