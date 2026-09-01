@@ -48,7 +48,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
-import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, OrdenCompraPdfData } from '../services/pdf-factura.service';
+import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, compartirOrdenCompraPdf, OrdenCompraPdfData } from '../services/pdf-factura.service';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 
 interface ProveedoresProps {
@@ -742,32 +742,24 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  const handleEnviarOrdenWhatsApp = (order: any) => {
+  const handleEnviarOrdenWhatsApp = async (order: any) => {
     const telefono = order.supplier?.contacto;
     if (!telefono) {
       showToast('El proveedor no tiene número de teléfono registrado.', 'warning');
       return;
     }
 
-    const pdfData = construirPdfData(order);
-    const numOrden = `OC-${String(order.numero).padStart(4, '0')}`;
-    const fecha = new Date(order.createdAt).toLocaleDateString('es-EC');
-    const provNombre = order.supplier?.razonSocial || order.supplier?.nombre || 'Estimado Proveedor';
-
-    let desglose = '';
-    pdfData.lineas.forEach((l) => {
-      desglose += `\n• *${l.modelo}* (${l.codigo}${l.color ? ' - ' + l.color : ''}): ${l.cantidadPares} pares`;
-      if (l.numeracion) desglose += `\n  ↳ _${l.numeracion}_`;
-    });
-
-    const mensaje = `Estimado/a *${provNombre}*,\n\nLe saludamos cordialmente de parte de *NEXORA*. Remitimos la siguiente orden de fabricación:\n\n📋 *ORDEN DE COMPRA ${numOrden}*\n📅 *Fecha:* ${fecha}\n\n👟 *DETALLE DE MODELOS Y NUMERACIÓN:*${desglose}\n\n📦 *TOTAL PARES:* ${pdfData.totales.totalPares} pares\n💰 *VALOR TOTAL:* $${pdfData.totales.totalPagar.toFixed(2)}\n\nPor favor confirmar recepción y fecha estimada de entrega. ¡Muchas gracias!`;
-
-    let numLimpio = telefono.replace(/\D/g, '');
-    if (numLimpio.startsWith('09') && numLimpio.length === 10) numLimpio = '593' + numLimpio.substring(1);
-    else if (numLimpio.startsWith('0') && numLimpio.length === 10) numLimpio = '593' + numLimpio.substring(1);
-
-    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-    window.open(url, '_blank');
+    try {
+      const pdfData = construirPdfData(order);
+      const res = await compartirOrdenCompraPdf(pdfData, telefono);
+      if (res.metodo === 'WEB_SHARE') {
+        showToast('Documento PDF de Orden de Compra enviado.', 'success');
+      } else {
+        showToast('Se descargó el archivo PDF oficial y se abrió WhatsApp.', 'info');
+      }
+    } catch (e: any) {
+      showToast('No se pudo compartir el archivo PDF de la orden.', 'error');
+    }
   };
 
   const handleCancelarOrden = async (orderId: string) => {

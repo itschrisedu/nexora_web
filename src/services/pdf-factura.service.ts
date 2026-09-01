@@ -524,3 +524,61 @@ export function obtenerOrdenCompraPdfBlobUrl(data: OrdenCompraPdfData): string {
   return URL.createObjectURL(blob);
 }
 
+/**
+ * Comparte la Orden de Compra oficial como archivo PDF (vía Web Share API con PDF adjunto,
+ * o descarga automática y apertura de WhatsApp)
+ */
+export async function compartirOrdenCompraPdf(
+  data: OrdenCompraPdfData,
+  telefono: string
+): Promise<{ metodo: "WEB_SHARE" | "DOWNLOAD_WHATSAPP" }> {
+  const doc = generarOrdenCompraPdfDoc(data);
+  const pdfBlob = doc.output("blob");
+  const fileName = `Orden_Compra_${data.orden.numero.replace(/\s+/g, "_")}.pdf`;
+  const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+  let numLimpio = telefono.replace(/\D/g, "");
+  if (numLimpio.startsWith("09") && numLimpio.length === 10) {
+    numLimpio = "593" + numLimpio.substring(1);
+  } else if (numLimpio.startsWith("0") && numLimpio.length === 10) {
+    numLimpio = "593" + numLimpio.substring(1);
+  }
+
+  let desglose = "";
+  data.lineas.forEach((l) => {
+    desglose += `\n• *${l.modelo}* (${l.codigo}${l.color ? " - " + l.color : ""}): ${l.cantidadPares} pares`;
+    if (l.numeracion) desglose += `\n  ↳ _${l.numeracion}_`;
+  });
+
+  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe saludamos cordialmente de parte de *NEXORA*. Adjuntamos el documento oficial PDF de la orden de producción:\n\n📋 *ORDEN DE COMPRA ${data.orden.numero}*\n📅 *Fecha:* ${data.orden.fecha}\n\n👟 *DETALLE DE MODELOS Y NUMERACIÓN:*${desglose}\n\n📦 *TOTAL PARES:* ${data.totales.totalPares} pares\n💰 *VALOR TOTAL:* $${data.totales.totalPagar.toFixed(2)}\n\nPor favor confirmar recepción del documento PDF y fecha estimada de entrega. ¡Muchas gracias!`;
+
+  // 1. Intentar Web Share API con archivo PDF adjunto
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.canShare &&
+    navigator.canShare({ files: [pdfFile] })
+  ) {
+    try {
+      await navigator.share({
+        title: `Orden de Compra ${data.orden.numero}`,
+        text: mensajeTexto,
+        files: [pdfFile],
+      });
+      return { metodo: "WEB_SHARE" };
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        console.warn("Error en navigator.share, usando fallback WhatsApp:", err);
+      } else {
+        return { metodo: "WEB_SHARE" };
+      }
+    }
+  }
+
+  // 2. Fallback: Descarga automática del archivo PDF oficial + apertura directa de WhatsApp Web
+  doc.save(fileName);
+  const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
+  window.open(waUrl, "_blank");
+
+  return { metodo: "DOWNLOAD_WHATSAPP" };
+}
+

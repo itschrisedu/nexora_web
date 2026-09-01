@@ -2724,20 +2724,20 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
           onClick={() => setShowFacturaModal(false)}
         >
           <div
-            className="bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
+            className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del Modal */}
-            <div className="p-5 border-b border-[var(--border)] bg-gradient-to-r from-[#0F172A] to-[#1e293b]">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 text-emerald-400">
+                  <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400">
                     <ShieldCheck size={22} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-extrabold text-base text-white">Facturación Electrónica SRI</h3>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded text-[10px] font-bold border border-emerald-500/30">
+                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px] font-bold border border-emerald-500/30">
                         Comprobante Digital
                       </span>
                     </div>
@@ -2746,34 +2746,22 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowFacturaModal(false);
-                      setShowCuentaModal(true);
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-white/10 text-slate-200 hover:text-white hover:bg-white/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10"
-                    title="Volver a la gestión de cobro"
-                  >
-                    <ArrowLeft size={14} />
-                    <span>Volver a Cobros</span>
-                  </button>
-                  <button
-                    onClick={() => setShowFacturaModal(false)}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                    title="Cerrar ventana"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
+
+                {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
+                <button
+                  onClick={() => setShowFacturaModal(false)}
+                  className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Cerrar ventana"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
               {/* Pestañas */}
-              <div className="flex gap-1 mt-4">
+              <div className="flex gap-1.5 mt-5">
                 <button
                   onClick={() => setTabFactura('CONFIGURAR')}
-                  className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                     tabFactura === 'CONFIGURAR'
                       ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
                       : 'bg-white/10 text-slate-300 hover:bg-white/20'
@@ -2784,7 +2772,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                 </button>
                 <button
                   onClick={() => setTabFactura('PREVISUALIZAR')}
-                  className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                     tabFactura === 'PREVISUALIZAR'
                       ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
                       : 'bg-white/10 text-slate-300 hover:bg-white/20'
@@ -3140,15 +3128,15 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
               {/* ═══ PESTAÑA: VISTA PREVIA PDF ═══ */}
               {tabFactura === 'PREVISUALIZAR' && (
-                <div className="space-y-0" id="seccion-factura-pdf">
-                  {/* Comprobante PDF Oficial */}
-                  <div className="border-2 border-[var(--border)] rounded-2xl overflow-hidden bg-white dark:bg-slate-50 text-slate-900 shadow-lg">
+                <div className="p-4 sm:p-6 bg-slate-900/5 dark:bg-slate-950/40 rounded-3xl border border-[var(--border)] flex justify-center shadow-inner" id="seccion-factura-pdf">
+                  {/* Comprobante PDF Oficial con diseño centrado y márgenes impecables */}
+                  <div className="w-full max-w-3xl border border-slate-300 dark:border-slate-700 rounded-2xl overflow-hidden bg-white text-slate-900 shadow-xl">
                     {/* Encabezado con Datos del Dueño del Negocio / RUC Emisor */}
-                    <div className="p-5 border-b-2 border-slate-300">
-                      <div className="grid grid-cols-2 gap-4">
+                    <div className="p-6 border-b-2 border-slate-300">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Datos del Emisor (Dueño del Negocio) */}
                         <div className="space-y-1">
-                          <h4 className="font-black text-sm text-slate-900 uppercase">
+                          <h4 className="font-black text-sm text-slate-900 uppercase tracking-tight">
                             {businessConfig?.nombre || 'CALZADO ARTESANAL CEVALLOS'}
                           </h4>
                           <p className="text-[10px] text-slate-600 leading-tight">
@@ -3165,10 +3153,10 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                           </p>
                         </div>
                         {/* Datos del Comprobante */}
-                        <div className="text-right space-y-1">
-                          <div className="inline-block px-3 py-1.5 border-2 border-slate-900 rounded-lg">
+                        <div className="sm:text-right space-y-1">
+                          <div className="inline-block px-3.5 py-2 border-2 border-slate-900 rounded-xl bg-slate-50">
                             <p className="font-black text-xs text-slate-900 uppercase">Factura</p>
-                            <p className="text-[10px] text-slate-700 font-bold">
+                            <p className="text-[11px] text-slate-700 font-bold font-mono">
                               No. {businessConfig?.sriEstablecimiento || '001'}-{businessConfig?.sriPuntoEmision || '001'}-000000001
                             </p>
                           </div>
@@ -3183,21 +3171,21 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     </div>
 
                     {/* Datos del Comprador */}
-                    <div className="px-5 py-3 border-b border-slate-200 bg-slate-50">
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                        <div className="flex gap-1 text-[10px]">
+                    <div className="px-6 py-3.5 border-b border-slate-200 bg-slate-50">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                        <div className="flex gap-1.5 text-[11px]">
                           <span className="font-bold text-slate-700">Razón Social:</span>
                           <span className="text-slate-900 font-semibold">{facturaCliente.nombre}</span>
                         </div>
-                        <div className="flex gap-1 text-[10px]">
+                        <div className="flex gap-1.5 text-[11px]">
                           <span className="font-bold text-slate-700">Identificación:</span>
-                          <span className="text-slate-900 font-semibold">{facturaCliente.cedula}</span>
+                          <span className="text-slate-900 font-semibold font-mono">{facturaCliente.cedula}</span>
                         </div>
-                        <div className="flex gap-1 text-[10px]">
+                        <div className="flex gap-1.5 text-[11px]">
                           <span className="font-bold text-slate-700">Dirección:</span>
                           <span className="text-slate-900">{facturaCliente.direccion || 'No registrada'}</span>
                         </div>
-                        <div className="flex gap-1 text-[10px]">
+                        <div className="flex gap-1.5 text-[11px]">
                           <span className="font-bold text-slate-700">Email:</span>
                           <span className="text-slate-900">{facturaCliente.email || 'No registrado'}</span>
                         </div>
@@ -3205,15 +3193,15 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     </div>
 
                     {/* Tabla de Detalle */}
-                    <div className="px-5 py-3">
-                      <table className="w-full text-[10px]">
+                    <div className="px-6 py-4 overflow-x-auto">
+                      <table className="w-full text-[11px]">
                         <thead>
                           <tr className="border-b-2 border-slate-300 text-slate-700 font-black uppercase">
-                            <th className="py-1.5 text-left">Descripción</th>
-                            <th className="py-1.5 text-center w-14">Cant.</th>
-                            <th className="py-1.5 text-right w-20">P. Unit.</th>
-                            <th className="py-1.5 text-right w-16">Desc.</th>
-                            <th className="py-1.5 text-right w-20">Subtotal</th>
+                            <th className="py-2 text-left">Descripción</th>
+                            <th className="py-2 text-center w-16">Cant.</th>
+                            <th className="py-2 text-right w-24">P. Unit.</th>
+                            <th className="py-2 text-right w-20">Desc.</th>
+                            <th className="py-2 text-right w-24">Subtotal</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3221,11 +3209,11 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                             const sub = d.cantidad * d.precioUnitario - (d.descuento || 0);
                             return (
                               <tr key={idx} className="border-b border-slate-200">
-                                <td className="py-1.5 text-left font-semibold text-slate-900">{d.descripcion}</td>
-                                <td className="py-1.5 text-center font-bold">{d.cantidad}</td>
-                                <td className="py-1.5 text-right">${d.precioUnitario.toFixed(2)}</td>
-                                <td className="py-1.5 text-right">${(d.descuento || 0).toFixed(2)}</td>
-                                <td className="py-1.5 text-right font-bold">${sub.toFixed(2)}</td>
+                                <td className="py-2 text-left font-semibold text-slate-900">{d.descripcion}</td>
+                                <td className="py-2 text-center font-bold">{d.cantidad}</td>
+                                <td className="py-2 text-right font-mono">${d.precioUnitario.toFixed(2)}</td>
+                                <td className="py-2 text-right font-mono">${(d.descuento || 0).toFixed(2)}</td>
+                                <td className="py-2 text-right font-bold font-mono">${sub.toFixed(2)}</td>
                               </tr>
                             );
                           })}
@@ -3234,35 +3222,35 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     </div>
 
                     {/* Totales PDF */}
-                    <div className="px-5 py-3 border-t-2 border-slate-300 bg-slate-50">
+                    <div className="px-6 py-4 border-t-2 border-slate-300 bg-slate-50">
                       <div className="flex justify-end">
-                        <div className="w-64 space-y-1">
-                          <div className="flex justify-between text-[10px] text-slate-700">
+                        <div className="w-72 space-y-1.5">
+                          <div className="flex justify-between text-[11px] text-slate-700">
                             <span>SUBTOTAL 15%:</span>
-                            <span className="font-bold">${subtotalCalc.toFixed(2)}</span>
+                            <span className="font-bold font-mono">${subtotalCalc.toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between text-[10px] text-slate-700">
+                          <div className="flex justify-between text-[11px] text-slate-700">
                             <span>SUBTOTAL 0%:</span>
-                            <span className="font-bold">$0.00</span>
+                            <span className="font-bold font-mono">$0.00</span>
                           </div>
-                          <div className="flex justify-between text-[10px] text-slate-700">
+                          <div className="flex justify-between text-[11px] text-slate-700">
                             <span>DESCUENTO:</span>
-                            <span className="font-bold">$0.00</span>
+                            <span className="font-bold font-mono">$0.00</span>
                           </div>
-                          <div className="flex justify-between text-[10px] text-slate-700">
+                          <div className="flex justify-between text-[11px] text-slate-700">
                             <span>IVA 15%:</span>
-                            <span className="font-bold">${ivaCalc.toFixed(2)}</span>
+                            <span className="font-bold font-mono">${ivaCalc.toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between text-xs font-black text-slate-900 border-t-2 border-slate-400 pt-1.5">
+                          <div className="flex justify-between text-sm font-black text-slate-900 border-t-2 border-slate-400 pt-2">
                             <span>VALOR TOTAL:</span>
-                            <span>${totalCalc.toFixed(2)}</span>
+                            <span className="font-mono text-emerald-700">${totalCalc.toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Información adicional PDF */}
-                    <div className="px-5 py-3 border-t border-slate-200 text-[9px] text-slate-500 space-y-0.5">
+                    <div className="px-6 py-3 border-t border-slate-200 text-[10px] text-slate-500 space-y-0.5 bg-slate-100/50">
                       <p>Forma de Pago: {facturaCliente.formaPago === '01' ? 'Sin utilización del sistema financiero (Efectivo)' : facturaCliente.formaPago === '20' ? 'Otros con utilización del sistema financiero' : facturaCliente.formaPago === '16' ? 'Tarjeta de Débito' : 'Tarjeta de Crédito'} — Plazo: 30 días</p>
                       <p>Este documento es una previsualización PDF de la factura electrónica a emitirse ante el SRI.</p>
                     </div>
@@ -3271,27 +3259,21 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
               )}
             </div>
 
-            {/* Footer con Acciones */}
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFacturaModal(false);
-                    setShowCuentaModal(true);
-                  }}
-                  className="flex-1 sm:flex-none px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                >
-                  <ArrowLeft size={14} />
-                  <span>Volver a Cobros</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowFacturaModal(false)}
-                  className="flex-1 sm:flex-none px-4 py-2.5 border border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Cerrar Todo
-                </button>
+            {/* Footer con Acciones Estandarizadas */}
+            <div className="p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFacturaModal(false);
+                  setShowCuentaModal(true);
+                }}
+                className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <ArrowLeft size={14} />
+                <span>Volver a Cobros</span>
+              </button>
+
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Botón Imprimir / Guardar PDF */}
                 {tabFactura === 'PREVISUALIZAR' && (
                   <button
@@ -3300,12 +3282,13 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       doc.save(`Factura_${armarDatosPdf().comprobante.numero}.pdf`);
                       showToast('Archivo PDF generado y descargado.', 'success');
                     }}
-                    className="flex-1 sm:flex-none px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-bold hover:bg-[var(--muted)] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                   >
                     <Download size={14} />
                     <span>Guardar PDF</span>
                   </button>
                 )}
+
                 {/* Botón Compartir PDF directamente a WhatsApp */}
                 {facturaCliente.telefono && tabFactura === 'PREVISUALIZAR' && !facturaResultado && (
                   <button
@@ -3317,28 +3300,27 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                         showToast('Se descargó el PDF y se abrió el chat de WhatsApp.', 'info');
                       }
                     }}
-                    className="flex-1 sm:flex-none px-4 py-2.5 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2.5 bg-emerald-500/15 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <MessageCircle size={14} />
-                    <span>Enviar Factura PDF por WhatsApp</span>
+                    <span>Enviar Factura PDF</span>
                   </button>
                 )}
-              </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
                 {tabFactura === 'CONFIGURAR' && (
                   <button
                     onClick={() => setTabFactura('PREVISUALIZAR')}
-                    className="flex-1 sm:flex-none px-5 py-2.5 border border-[#0F172A]/30 bg-[#0F172A]/5 hover:bg-[#0F172A]/10 text-[#0F172A] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                   >
                     <Eye size={14} />
-                    <span>Ver Previsualización PDF</span>
+                    <span>Previsualizar PDF</span>
                   </button>
                 )}
+
                 <button
                   onClick={handleEmitirFacturaSRI}
                   disabled={emittingFactura || !online}
-                  className="flex-1 sm:flex-none px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer border border-slate-700"
                 >
                   {emittingFactura ? (
                     <>
@@ -3347,7 +3329,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     </>
                   ) : (
                     <>
-                      <FileCheck size={16} />
+                      <FileCheck size={16} className="text-emerald-400" />
                       <span>Emitir Factura Electrónica SRI</span>
                     </>
                   )}
