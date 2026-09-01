@@ -20,12 +20,12 @@ import { useToast } from "./ui/toast";
 interface ItemPrediccion {
   modelo: string;
   serie: string;
-  talla: string;
+  talla: string | number;
   demanda_estimada: number;
   confianza: number;
-  tendencia: "subida" | "bajada" | "estable";
+  tendencia: string;
   sugerencia_reorden: number;
-  prioridad: "Alta" | "Media" | "Baja";
+  prioridad?: string;
 }
 
 interface RespuestaPrediccion {
@@ -266,19 +266,17 @@ export default function PrediccionDemandaComponent() {
                       {item.demanda_estimada} <span className="text-[10px] font-normal text-[var(--muted-foreground)]">par(es)</span>
                     </td>
                     <td className="py-3 text-center">
-                      {item.tendencia === "subida" && (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                          <ArrowUpRight size={14} /> Alta Rotación
+                      {(item.tendencia?.toUpperCase() === "ALZA" || item.tendencia?.toLowerCase() === "subida" || item.tendencia?.toUpperCase() === "CRECIENTE") ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px]">
+                          <ArrowUpRight size={13} /> Alta Rotación
                         </span>
-                      )}
-                      {item.tendencia === "bajada" && (
-                        <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
-                          <ArrowDownRight size={14} /> Desacelerando
+                      ) : (item.tendencia?.toUpperCase() === "BAJA" || item.tendencia?.toLowerCase() === "bajada" || item.tendencia?.toUpperCase() === "DECRECIENTE") ? (
+                        <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-[11px]">
+                          <ArrowDownRight size={13} /> Desacelerando
                         </span>
-                      )}
-                      {item.tendencia === "estable" && (
-                        <span className="inline-flex items-center gap-1 text-[var(--muted-foreground)] font-medium">
-                          <Minus size={14} /> Estable
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300 font-medium px-2.5 py-0.5 rounded-full bg-slate-500/10 border border-slate-500/20 text-[11px]">
+                          <Minus size={13} /> Estable
                         </span>
                       )}
                     </td>
