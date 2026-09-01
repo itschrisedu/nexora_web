@@ -472,7 +472,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                           className="w-24 px-2 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-[#0F172A]"
                         />
                       </td>
-                    </tr>
+            </tr>
                   );
                 })}
               </tbody>
@@ -480,16 +480,59 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </div>
         </div>
 
-        {/* SECCIÓN 5: HORARIOS OPERATIVOS */}
+        {/* SECCIÓN 5: DESPACHO AUTOMÁTICO DE ÓRDENES DE COMPRA A PROVEEDORES */}
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
+          <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="text-[#0F172A] dark:text-amber-400" size={20} />
+              <div>
+                <h2 className="text-base font-bold text-[var(--foreground)]">5. Envío Automático Programado de Órdenes a Proveedores 🚚</h2>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Configura el envío automático diario de los pedidos y borradores acumulados a cada fabricante/proveedor.
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+              08:00 AM (Por Defecto)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                Hora de Envío Automático Diario a Proveedores
+              </label>
+              <input
+                type="time"
+                value={config.horaInicioOperativa || "08:00"}
+                onChange={(e) => setConfig(prev => ({ ...prev, horaInicioOperativa: e.target.value }))}
+                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              />
+              <span className="text-[11px] text-[var(--muted-foreground)] mt-1 block">
+                A esta hora, todas las órdenes en Borrador generadas por ventas o faltantes se emiten automáticamente.
+              </span>
+            </div>
+
+            <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs space-y-2">
+              <span className="font-bold text-[var(--foreground)] block">💡 ¿Cómo funciona la consolidación?</span>
+              <p className="text-[var(--muted-foreground)] leading-relaxed">
+                Durante el día, todos los pedidos de clientes con faltante de stock y calzados bajo inventario mínimo se acumulan en un solo <strong>Borrador por Proveedor</strong> (con el faltante + 1 docena de reserva). A la hora indicada ({config.horaInicioOperativa || "08:00"}), el sistema envía automáticamente el consolidado sin que tengas que generar múltiples órdenes manuales.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* SECCIÓN 6: HORARIOS OPERATIVOS Y SEGURIDAD */}
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
             <Clock className="text-[#0F172A]" size={20} />
-            <h2 className="text-base font-bold text-[var(--foreground)]">5. Horarios Operativos de Sesión</h2>
+            <h2 className="text-base font-bold text-[var(--foreground)]">6. Horarios Operativos de Sesión & Duración de Tokens</h2>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Hora de Inicio Jornada
+                Hora Inicio Jornada
               </label>
               <input
                 type="time"

@@ -930,7 +930,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                               <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
                                 <Loader2 size={12} className="animate-spin text-[#0F172A]" /> Actualizando...
                               </span>
-                            ) : p.estado === 'PENDIENTE' ? (
+                            ) : p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK' ? (
                               <>
                                 <button
                                   onClick={() => handleAbrirEditarPedido(p)}
@@ -938,12 +938,14 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                 >
                                   ✏️ Editar
                                 </button>
-                                <button
-                                  onClick={() => handleCambiarEstado(p.id, 'EN_PREPARACION')}
-                                  className="px-2.5 py-1 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-600/20 flex items-center gap-1"
-                                >
-                                  <Package size={12} /> Preparar
-                                </button>
+                                {p.estado === 'PENDIENTE' && (
+                                  <button
+                                    onClick={() => handleCambiarEstado(p.id, 'EN_PREPARACION')}
+                                    className="px-2.5 py-1 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-600/20 flex items-center gap-1"
+                                  >
+                                    <Package size={12} /> Preparar
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
                                   className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
@@ -1000,7 +1002,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                     <MessageCircle size={13} />
                                     <span>Confirmar por WhatsApp</span>
                                   </button>
-                                  {(p.estado === 'PENDIENTE' || p.estado === 'EN_PREPARACION') && (
+                                  {(p.estado === 'PENDIENTE' || p.estado === 'EN_PREPARACION' || p.estado === 'EN_ESPERA_STOCK') && (
                                     <button
                                       onClick={() => handleAbrirEditarPedido(p)}
                                       className="px-3 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold transition-all border border-amber-500/20 flex items-center gap-1.5 shadow-sm cursor-pointer"
@@ -1501,14 +1503,31 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                   {tipoVentaItem === 'SERIE_COMPLETA' ? (
                     <div className="sm:col-span-2 space-y-3 p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
                       {(() => {
-                        const totalPares = (productoSeleccionadoObj?.tallas || []).reduce(
+                        const getCurvaRatio = (talla: any, tallas: any[]) => {
+                          if (talla.ratio && talla.ratio > 0) return talla.ratio;
+                          if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
+                          const positive = tallas.map((x: any) => x.cantidad || x.stock || 1).filter((q: number) => q > 0);
+                          const minQ = positive.length > 0 ? Math.min(...positive) : 1;
+                          return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
+                        };
+
+                        const baseParesPorSerie = (productoSeleccionadoObj?.tallas || []).reduce(
+                          (sum: number, t: any) => sum + getCurvaRatio(t, productoSeleccionadoObj?.tallas || []),
+                          0
+                        ) || (productoSeleccionadoObj?.tallas?.length || 6);
+
+                        const paresMediaDocena = baseParesPorSerie;
+                        const paresDocenaCompleta = baseParesPorSerie * 2;
+
+                        const totalParesStock = (productoSeleccionadoObj?.tallas || []).reduce(
                           (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
                           0
                         );
-                        const mediasDocenasStock = Math.floor(totalPares / 6);
-                        const docenasStock = Math.floor(totalPares / 12);
+                        const mediasDocenasStock = Math.floor(totalParesStock / (paresMediaDocena || 1));
+                        const docenasStock = Math.floor(totalParesStock / (paresDocenaCompleta || 1));
                         const stockActualSerie = subtipoSerie === 'MEDIA_DOCENA' ? mediasDocenasStock : docenasStock;
                         const hayFaltante = cantidadSeries > stockActualSerie;
+                        const paresSeleccionadosTotales = (subtipoSerie === 'MEDIA_DOCENA' ? paresMediaDocena : paresDocenaCompleta) * (cantidadSeries || 1);
 
                         return (
                           <>
@@ -1526,7 +1545,9 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                       : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
                                   }`}
                                 >
-                                  <span>½ Media Docena (6 pares)</span>
+                                  <span>
+                                    {paresMediaDocena === 6 ? '½ Media Docena (6 pares)' : `Curva Serie (${paresMediaDocena} pares)`}
+                                  </span>
                                   <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
                                     subtipoSerie === 'MEDIA_DOCENA' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-700'
                                   }`}>
@@ -1542,7 +1563,9 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                       : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
                                   }`}
                                 >
-                                  <span>1 Docena (12 pares)</span>
+                                  <span>
+                                    {paresDocenaCompleta === 12 ? '1 Docena (12 pares)' : `Doble Serie (${paresDocenaCompleta} pares)`}
+                                  </span>
                                   <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
                                     subtipoSerie === 'DOCENA' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-700'
                                   }`}>
@@ -1555,7 +1578,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                               <div className="flex items-center gap-2">
                                 <label className="text-xs font-semibold text-[var(--muted-foreground)] shrink-0">
-                                  ¿Cuántas {subtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}?:
+                                  ¿Cuántas {subtipoSerie === 'MEDIA_DOCENA' ? (paresMediaDocena === 6 ? 'medias docenas' : 'series') : (paresDocenaCompleta === 12 ? 'docenas' : 'doble series')}?:
                                 </label>
                                 <div className="flex items-center gap-1">
                                   <button
@@ -1581,7 +1604,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   </button>
                                 </div>
                                 <span className="text-xs font-black text-emerald-700 ml-1">
-                                  = { (subtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (cantidadSeries || 1) } pares
+                                  = {paresSeleccionadosTotales} pares
                                 </span>
                               </div>
 
@@ -1936,12 +1959,70 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   {primerItem.color} · <span className="font-semibold text-emerald-600">Serie: {primerItem.serieNombre || 'Estándar'}</span>
                                 </div>
 
-                                {/* Chips de Tallas estilo Catálogo/Modelos T38: 2, T39: 2, T40: 4... */}
-                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                {/* Chips de Tallas Interactivos y Editables T34: [-] 2 [+], T35: [-] 2 [+]... */}
+                                <div className="flex flex-wrap items-center gap-1.5 mt-2">
                                   {lineas.map((l, i) => (
-                                    <span key={i} className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-md text-[11px] font-bold">
-                                      T{l.numeroTalla}: {l.cantidad}
-                                    </span>
+                                    <div
+                                      key={i}
+                                      className="px-2 py-1 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs"
+                                    >
+                                      <span className="font-extrabold text-[11px]">T{l.numeroTalla}:</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nuevasLineas = [...lineasPedido];
+                                          const idx = nuevasLineas.findIndex(
+                                            (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
+                                          );
+                                          if (idx !== -1) {
+                                            if (nuevasLineas[idx].cantidad > 1) {
+                                              nuevasLineas[idx].cantidad -= 1;
+                                              setLineasPedido(nuevasLineas);
+                                            } else {
+                                              setLineasPedido(nuevasLineas.filter((_, itemIdx) => itemIdx !== idx));
+                                            }
+                                          }
+                                        }}
+                                        className="w-4 h-4 bg-emerald-500/20 hover:bg-emerald-500/40 rounded flex items-center justify-center font-black text-[11px] cursor-pointer"
+                                        title="Disminuir 1 par"
+                                      >
+                                        -
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={l.cantidad}
+                                        onChange={(e) => {
+                                          const val = Math.max(1, parseInt(e.target.value) || 1);
+                                          const nuevasLineas = [...lineasPedido];
+                                          const idx = nuevasLineas.findIndex(
+                                            (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
+                                          );
+                                          if (idx !== -1) {
+                                            nuevasLineas[idx].cantidad = val;
+                                            setLineasPedido(nuevasLineas);
+                                          }
+                                        }}
+                                        className="w-8 h-5 text-center font-black bg-[var(--card)] border border-emerald-500/40 rounded text-xs text-[var(--foreground)] font-mono"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nuevasLineas = [...lineasPedido];
+                                          const idx = nuevasLineas.findIndex(
+                                            (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
+                                          );
+                                          if (idx !== -1) {
+                                            nuevasLineas[idx].cantidad += 1;
+                                            setLineasPedido(nuevasLineas);
+                                          }
+                                        }}
+                                        className="w-4 h-4 bg-emerald-500/20 hover:bg-emerald-500/40 rounded flex items-center justify-center font-black text-[11px] cursor-pointer"
+                                        title="Aumentar 1 par"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
                                   ))}
                                 </div>
                               </div>

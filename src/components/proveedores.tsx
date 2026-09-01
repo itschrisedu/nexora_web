@@ -29,6 +29,8 @@ import {
   Building,
   ArrowRight,
   Package,
+  PackageCheck,
+  Boxes,
   History,
   CheckCircle2,
   AlertCircle,
@@ -436,11 +438,22 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  // Cálculo de pares totales y distribución al agregar modelo
+  // Cálculo dinámico de pares totales y distribución de curva según la serie real del modelo
+  const baseParesSerieSeleccionada = useMemo(() => {
+    if (!productoSeleccionado) return 6;
+    const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
+    if (prodTallas.length === 0) return 6;
+    const sum = prodTallas.reduce(
+      (acc: number, t: any) => acc + getCurvaRatio(t, prodTallas),
+      0
+    );
+    return sum || prodTallas.length || 6;
+  }, [productoSeleccionado]);
+
   const paresCalculados = useMemo(() => {
-    const base = subtipoCurva === 'MEDIA_DOCENA' ? 6 : 12;
+    const base = subtipoCurva === 'MEDIA_DOCENA' ? baseParesSerieSeleccionada : baseParesSerieSeleccionada * 2;
     return (cantidadCurvas || 1) * base;
-  }, [subtipoCurva, cantidadCurvas]);
+  }, [subtipoCurva, cantidadCurvas, baseParesSerieSeleccionada]);
 
   const distribucionPreview = useMemo(() => {
     if (!productoSeleccionado) return [];
@@ -655,7 +668,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           cantidadPares: l.cantidadPedida,
           precioCosto: l.precioCosto,
           subtotal: l.subtotal,
-          observacion: l.observacionLinea,
+          // Confidencialidad: En el PDF para el fabricante/proveedor NO se envía información del cliente
+          observacion: l.observacionLinea && !l.observacionLinea.includes('Cliente:')
+            ? l.observacionLinea
+            : undefined,
         })),
         totales: {
           totalPares: lineasConsolidadas.reduce((acc, l) => acc + l.cantidadPedida, 0),
@@ -852,15 +868,25 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
       showToast(
         hayFaltantes
-          ? 'Mercancía ingresada con faltantes. La orden queda como Parcial de saldo pendiente.'
-          : 'Recepción completada exitosamente. Stock físico actualizado.',
+          ? 'Mercancía ingresada con faltantes. La orden queda como Parcial y el saldo se actualizó.'
+          : 'Recepción completada exitosamente. Stock físico y saldo por pagar actualizados al instante.',
         'success'
       );
       setEntrySupplierId('');
       setEntryOrderId('');
       setEntryObservaciones('');
       setEntryModelos([]);
-      loadData();
+
+      // Recarga inmediata de proveedores, órdenes y saldos por pagar
+      await loadData();
+
+      // Cambiar de inmediato a la pestaña de Proveedores y Deudas para ver el saldo actualizado en vivo
+      setActiveTab('proveedores');
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('proveedores_data_updated'));
+        window.dispatchEvent(new CustomEvent('dashboard_refresh'));
+      }
     } catch (err: any) {
       showToast(err.message || 'Error al registrar la recepción.', 'error');
     } finally {
@@ -912,12 +938,16 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         supplierOrderId: paymentOrderId || undefined,
       });
 
-      showToast('Pago registrado correctamente.', 'success');
+      showToast('Pago registrado correctamente. Saldo actualizado.', 'success');
       setShowPaymentModal(false);
       if (showCuentaModal && selectedSupplierId === paymentSupplierId) {
         handleAbrirCuentaCorriente(paymentSupplierId);
       }
-      loadData();
+      await loadData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('proveedores_data_updated'));
+        window.dispatchEvent(new CustomEvent('dashboard_refresh'));
+      }
     } catch (err: any) {
       showToast(err.message || 'Error al registrar el pago.', 'error');
     } finally {
@@ -1071,7 +1101,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           {([
             ['proveedores', 'Proveedores & Deudas', Truck],
             ['ordenes', 'Órdenes de Compra', FileText],
-            ['ingreso', 'Recepción de Mercancía', Package],
+            ['ingreso', 'Recepción de Mercancía', PackageCheck],
             ['pagos', 'Historial de Pagos', DollarSign],
           ] as const).map(([id, label, Icon]) => (
             <button
@@ -1334,10 +1364,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               {(o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL') && (
                                 <button
                                   onClick={() => handleIrARecepcionDesdeOrden(o)}
-                                  className="p-1.5 bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-600 rounded-lg transition-colors"
+                                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg transition-all text-xs font-bold shadow-2xs"
                                   title="Recibir Mercancía en Bodega"
                                 >
-                                  <Package size={13} />
+                                  <PackageCheck size={13} />
+                                  <span>Recibir</span>
                                 </button>
                               )}
                               <button
@@ -1890,9 +1921,17 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                                 {line.serie && <span>• Serie: {line.serie}</span>}
                               </div>
                               {line.observacionLinea && (
-                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 italic">
-                                  Nota: {line.observacionLinea}
-                                </p>
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                  {line.observacionLinea.includes('Cliente:') ? (
+                                    <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-md text-[10px] font-bold flex items-center gap-1">
+                                      <span>👤 {line.observacionLinea}</span>
+                                    </span>
+                                  ) : (
+                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 italic">
+                                      Nota: {line.observacionLinea}
+                                    </p>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -2032,11 +2071,14 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
                 {(selectedOrder.estado === 'PENDIENTE' || selectedOrder.estado === 'RECIBIDA_PARCIAL') && (
                   <button
-                    onClick={() => handleIrARecepcionDesdeOrden(selectedOrder)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm"
+                    onClick={() => {
+                      setShowOrderDetailModal(false);
+                      handleIrARecepcionDesdeOrden(selectedOrder);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
                   >
-                    <Package size={13} />
-                    <span>Recibir Mercancía</span>
+                    <PackageCheck size={14} />
+                    <span>Recibir Mercancía en Bodega</span>
                   </button>
                 )}
 
@@ -2480,7 +2522,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]'
                           }`}
                         >
-                          ½ Media Docena (6 pares)
+                          {baseParesSerieSeleccionada === 6 ? '½ Media Docena (6 pares)' : `Curva Serie (${baseParesSerieSeleccionada} pares)`}
                         </button>
                         <button
                           type="button"
@@ -2491,14 +2533,16 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]'
                           }`}
                         >
-                          1 Docena (12 pares)
+                          {baseParesSerieSeleccionada * 2 === 12 ? '1 Docena (12 pares)' : `Doble Serie (${baseParesSerieSeleccionada * 2} pares)`}
                         </button>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-xs font-bold text-[var(--foreground)]">
-                        {subtipoCurva === 'MEDIA_DOCENA' ? '¿Cuántas medias docenas?:' : '¿Cuántas docenas?:'}
+                        {subtipoCurva === 'MEDIA_DOCENA'
+                          ? (baseParesSerieSeleccionada === 6 ? '¿Cuántas medias docenas?:' : '¿Cuántas series?:')
+                          : (baseParesSerieSeleccionada * 2 === 12 ? '¿Cuántas docenas?:' : '¿Cuántas doble series?:')}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
