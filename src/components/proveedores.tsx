@@ -185,6 +185,9 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
     const prodCat = catalogoProductos.find((p) => p.id === l.productId);
     const foto = obtenerFotoProducto(l.producto) || obtenerFotoProducto(prodCat);
 
+    // Si el usuario editó manualmente las tallas, usar esa versión
+    const tallasOverride = (l as any)._tallasOverride as Array<{ talla: string | number; cantidad: number }> | undefined;
+
     if (existing) {
       existing.cantidadPedida += l.cantidadPedida;
       existing.subtotal += subtotal;
@@ -193,36 +196,47 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
       }
       if (l.id) existing.ids.push(l.id);
 
-      // Recalcular tallas con la nueva cantidad total
-      const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
-      if (Array.isArray(prodTallas) && prodTallas.length > 0) {
-        const sumRatios = prodTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, prodTallas), 0);
-        const factor = sumRatios > 0 ? existing.cantidadPedida / sumRatios : 1;
-        existing.tallasDesglose = prodTallas.map((t: any) => ({
-          talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
-          cantidad: Math.max(1, Math.round(getCurvaRatio(t, prodTallas) * factor)),
-        }));
+      if (tallasOverride && tallasOverride.length > 0) {
+        // Usar las tallas editadas manualmente
+        existing.tallasDesglose = tallasOverride;
+      } else {
+        // Recalcular tallas con la nueva cantidad total
+        const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
+        if (Array.isArray(prodTallas) && prodTallas.length > 0) {
+          const sumRatios = prodTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, prodTallas), 0);
+          const factor = sumRatios > 0 ? existing.cantidadPedida / sumRatios : 1;
+          existing.tallasDesglose = prodTallas.map((t: any) => ({
+            talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
+            cantidad: Math.round(getCurvaRatio(t, prodTallas) * factor),
+          }));
+        }
       }
     } else {
       let tallasCalc: Array<{ talla: string | number; cantidad: number }> = [];
-      const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
 
-      if (Array.isArray(prodTallas) && prodTallas.length > 0) {
-        const sumRatios = prodTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, prodTallas), 0);
-        const factor = sumRatios > 0 ? l.cantidadPedida / sumRatios : 1;
-        tallasCalc = prodTallas.map((t: any) => ({
-          talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
-          cantidad: Math.max(1, Math.round(getCurvaRatio(t, prodTallas) * factor)),
-        }));
+      if (tallasOverride && tallasOverride.length > 0) {
+        // Usar las tallas editadas manualmente
+        tallasCalc = tallasOverride;
       } else {
-        const tallasEstandar = [34, 35, 36, 37, 38];
-        const ratios = [1, 1, 2, 1, 1]; // 6 pares = 1 media docena
-        const sumRatios = ratios.reduce((a, b) => a + b, 0);
-        const factor = l.cantidadPedida / sumRatios;
-        tallasCalc = tallasEstandar.map((t, i) => ({
-          talla: t,
-          cantidad: Math.max(1, Math.round(ratios[i] * factor)),
-        }));
+        const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
+
+        if (Array.isArray(prodTallas) && prodTallas.length > 0) {
+          const sumRatios = prodTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, prodTallas), 0);
+          const factor = sumRatios > 0 ? l.cantidadPedida / sumRatios : 1;
+          tallasCalc = prodTallas.map((t: any) => ({
+            talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
+            cantidad: Math.round(getCurvaRatio(t, prodTallas) * factor),
+          }));
+        } else {
+          const tallasEstandar = [34, 35, 36, 37, 38];
+          const ratios = [1, 1, 2, 1, 1]; // 6 pares = 1 media docena
+          const sumRatios = ratios.reduce((a, b) => a + b, 0);
+          const factor = l.cantidadPedida / sumRatios;
+          tallasCalc = tallasEstandar.map((t, i) => ({
+            talla: t,
+            cantidad: Math.round(ratios[i] * factor),
+          }));
+        }
       }
 
       map.set(key, {
@@ -1939,47 +1953,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                           <div className="flex items-center gap-3 self-end sm:self-center">
                             {editingOrder ? (
                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updatedLines = [...(selectedOrder.lines || [])];
-                                    const target = updatedLines.find((l) => l.productId === line.productId);
-                                    if (target) target.cantidadPedida += 12;
-                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
-                                  }}
-                                  className="px-2 py-1 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[10px] font-bold rounded"
-                                  title="Agregar 1 docena más (+12 pares)"
-                                >
-                                  +1 doc
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updatedLines = [...(selectedOrder.lines || [])];
-                                    const target = updatedLines.find((l) => l.productId === line.productId);
-                                    if (target) target.cantidadPedida += 6;
-                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
-                                  }}
-                                  className="px-2 py-1 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[10px] font-bold rounded"
-                                  title="Agregar media docena (+6 pares)"
-                                >
-                                  +½ doc
-                                </button>
-
                                 <div>
-                                  <span className="text-[9px] text-[var(--muted-foreground)] block text-center">Pares</span>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={line.cantidadPedida}
-                                    onChange={(e) => {
-                                      const updatedLines = [...(selectedOrder.lines || [])];
-                                      const target = updatedLines.find((l) => l.productId === line.productId);
-                                      if (target) target.cantidadPedida = parseInt(e.target.value) || 1;
-                                      setSelectedOrder({ ...selectedOrder, lines: updatedLines });
-                                    }}
-                                    className="w-16 px-2 py-1 bg-[var(--muted)] border border-[var(--border)] rounded text-xs text-center font-bold font-mono"
-                                  />
+                                  <span className="text-[9px] text-[var(--muted-foreground)] block text-center">Total Pares</span>
+                                  <span className="w-16 px-2 py-1 bg-[var(--muted)] border border-[var(--border)] rounded text-xs text-center font-bold font-mono block">
+                                    {line.tallasDesglose?.reduce((s, t) => s + t.cantidad, 0) || line.cantidadPedida}
+                                  </span>
                                 </div>
                                 <button
                                   type="button"
@@ -2010,21 +1988,115 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                           </div>
                         </div>
 
-                        {/* Despliegue de Chips de Numeración exacta calculada */}
+                        {/* Despliegue de Chips de Numeración — con +/- por talla en edición */}
                         {isExpanded && (
-                          <div className="px-4 py-3 bg-[var(--muted)]/20 border-t border-[var(--border)] flex flex-wrap items-center gap-1.5">
-                            <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1">
-                              Numeración Solicitada:
+                          <div className="px-4 py-3 bg-[var(--muted)]/20 border-t border-[var(--border)]">
+                            <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1 block mb-2">
+                              {editingOrder ? 'Ajustar Numeración por Talla:' : 'Numeración Solicitada:'}
                             </span>
-                            {line.tallasDesglose?.map((td, tIdx) => (
-                              <div
-                                key={tIdx}
-                                className="px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold shadow-2xs flex items-center gap-1"
-                              >
-                                <span className="text-[var(--foreground)] font-extrabold">T{td.talla}</span>
-                                <span className="text-[10px] text-[var(--muted-foreground)]">({td.cantidad})</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {line.tallasDesglose?.map((td, tIdx) => (
+                                <div
+                                  key={tIdx}
+                                  className={`flex items-center gap-1 rounded-lg border border-[var(--border)] shadow-2xs ${editingOrder ? 'bg-[var(--card)] px-1.5 py-1' : 'bg-[var(--card)] px-2.5 py-1'}`}
+                                >
+                                  <span className="text-[var(--foreground)] font-extrabold text-xs font-mono">T{td.talla}</span>
+                                  {editingOrder ? (
+                                    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (td.cantidad <= 0) return;
+                                          const newTallas = [...(line.tallasDesglose || [])];
+                                          newTallas[tIdx] = { ...newTallas[tIdx], cantidad: td.cantidad - 1 };
+                                          const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
+                                          // Update the actual order lines
+                                          const updatedLines = [...(selectedOrder.lines || [])];
+                                          const target = updatedLines.find((l) => l.productId === line.productId);
+                                          if (target) {
+                                            target.cantidadPedida = newTotal;
+                                            // Store tallas breakdown in a temporary field for UI
+                                            (target as any)._tallasOverride = newTallas;
+                                          }
+                                          setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                        }}
+                                        className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors"
+                                        title={`Quitar 1 par T${td.talla}`}
+                                      >
+                                        −
+                                      </button>
+                                      <span className="w-7 text-center text-xs font-bold font-mono text-[var(--foreground)]">
+                                        {td.cantidad}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newTallas = [...(line.tallasDesglose || [])];
+                                          newTallas[tIdx] = { ...newTallas[tIdx], cantidad: td.cantidad + 1 };
+                                          const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
+                                          const updatedLines = [...(selectedOrder.lines || [])];
+                                          const target = updatedLines.find((l) => l.productId === line.productId);
+                                          if (target) {
+                                            target.cantidadPedida = newTotal;
+                                            (target as any)._tallasOverride = newTallas;
+                                          }
+                                          setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                        }}
+                                        className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-black transition-colors"
+                                        title={`Agregar 1 par T${td.talla}`}
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">({td.cantidad})</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {editingOrder && (
+                              <div className="mt-2 flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newTallas = (line.tallasDesglose || []).map(t => ({ ...t, cantidad: t.cantidad + 1 }));
+                                    const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
+                                    const updatedLines = [...(selectedOrder.lines || [])];
+                                    const target = updatedLines.find((l) => l.productId === line.productId);
+                                    if (target) {
+                                      target.cantidadPedida = newTotal;
+                                      (target as any)._tallasOverride = newTallas;
+                                    }
+                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                  }}
+                                  className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold transition-colors"
+                                >
+                                  +1 par c/talla
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newTallas = (line.tallasDesglose || []).map(t => ({ ...t, cantidad: Math.max(0, t.cantidad - 1) }));
+                                    const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
+                                    const updatedLines = [...(selectedOrder.lines || [])];
+                                    const target = updatedLines.find((l) => l.productId === line.productId);
+                                    if (target) {
+                                      target.cantidadPedida = newTotal;
+                                      (target as any)._tallasOverride = newTallas;
+                                    }
+                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-colors"
+                                >
+                                  −1 par c/talla
+                                </button>
+                                <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                  = {line.tallasDesglose?.reduce((s, t) => s + t.cantidad, 0) || 0} pares total
+                                </span>
                               </div>
-                            ))}
+                            )}
                           </div>
                         )}
                       </div>
