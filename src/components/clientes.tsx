@@ -5,7 +5,7 @@ import { ApiService } from "../services/api.service";
 import { db } from "../db/local-db";
 import {
   Plus, Search, Loader2, Users, Edit2, CheckCircle,
-  AlertCircle, X, RefreshCw, Phone, Mail, MapPin, User, CreditCard,
+  AlertCircle, X, RefreshCw, Phone, Mail, MapPin, User, UserPlus, CreditCard,
   Award, DollarSign, TrendingUp, ShieldAlert, FileText, Star
 } from "lucide-react";
 import { getClienteReputacion } from "../utils/cliente-reputacion";
@@ -567,13 +567,22 @@ export default function ClientesComponent({ online }: ClientesProps) {
       {/* Modal Crear / Editar */}
       {(showCreate || (showEdit && selected)) && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">{showCreate ? "Registrar Cliente" : "Editar Cliente"}</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">Los campos con * son obligatorios</p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <UserPlus size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">{showCreate ? "Registrar Cliente" : "Editar Cliente"}</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Gestión de datos de facturación, contacto y crédito</p>
+                </div>
               </div>
-              <button onClick={() => { setShowCreate(false); setShowEdit(false); resetForm(); }} className="p-2 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+              <button
+                onClick={() => { setShowCreate(false); setShowEdit(false); resetForm(); }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
                 <X size={18} />
               </button>
             </div>

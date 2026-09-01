@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   MessageCircle,
+  ShoppingBag,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -1082,22 +1083,28 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       {/* MODAL CREAR / EDITAR PEDIDO */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header Modal */}
-            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
-              <div>
-                <h3 className="font-bold text-lg text-[var(--foreground)]">
-                  {editingOrderId ? `Editar Pedido #${editingOrderNumero || editingOrderId.slice(0, 6).toUpperCase()}` : 'Registrar Nuevo Pedido'}
-                </h3>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  {editingOrderId ? 'Modifica los datos del pedido y líneas de calzado' : 'Selecciona el cliente y agrega las series o tallas'}
-                </p>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header Modal Estandarizado */}
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <ShoppingBag size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">
+                    {editingOrderId ? `Editar Pedido #${editingOrderNumero || editingOrderId.slice(0, 6).toUpperCase()}` : 'Registrar Nuevo Pedido'}
+                  </h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    {editingOrderId ? 'Modifica los datos del pedido y líneas de calzado' : 'Selecciona el cliente y agrega las series o tallas'}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
@@ -2113,15 +2120,15 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       {/* ── MODAL GENERAR ORDEN A PROVEEDOR ── */}
       {showSupplierOrderModal && supplierOrderProductData && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between bg-purple-500/10 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-700 flex items-center justify-center">
-                  <Truck size={18} />
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Truck size={20} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-[var(--foreground)]">Orden de Fabricación / Compra</h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">Especifica curva, numeración y observaciones para el proveedor</p>
+                  <h3 className="font-extrabold text-base text-white">Orden de Fabricación / Compra</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Especifica curva, numeración y observaciones para el proveedor</p>
                 </div>
               </div>
               <button
@@ -2129,7 +2136,8 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                   setShowSupplierOrderModal(false);
                   setSupplierOrderProductData(null);
                 }}
-                className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>

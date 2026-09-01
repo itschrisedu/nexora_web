@@ -27,7 +27,9 @@ import {
   X,
   CreditCard,
   Building,
+  Building2,
   ArrowRight,
+  ArrowLeft,
   Package,
   PackageCheck,
   Boxes,
@@ -1886,64 +1888,39 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       {showOrderDetailModal && selectedOrder && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-6 pr-16 border-b border-[var(--border)] flex flex-wrap justify-between items-center gap-4 shrink-0">
+            {/* Header del Modal Estandarizado (Azul Oscuro #0F172A / Blanco) */}
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900 rounded-2xl font-bold">
-                  <FileText size={18} />
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400">
+                  <FileText size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base flex items-center gap-2">
-                    <span>Orden de Compra OC-{String(selectedOrder.numero).padStart(4, '0')}</span>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-base text-white">
+                      Orden de Compra OC-{String(selectedOrder.numero).padStart(4, '0')}
+                    </h3>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                       selectedOrder.estado === 'BORRADOR'
-                        ? 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20'
+                        ? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
                         : selectedOrder.estado === 'PENDIENTE'
-                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                         : selectedOrder.estado === 'RECIBIDA'
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                     }`}>
                       {selectedOrder.estado === 'BORRADOR' ? 'Borrador (Acumulándose)' : selectedOrder.estado === 'PENDIENTE' ? 'Enviada al Proveedor' : selectedOrder.estado}
                     </span>
-                  </h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Proveedor: <strong>{selectedOrder.supplier?.razonSocial || selectedOrder.supplier?.nombre}</strong> ({selectedOrder.supplier?.ruc})
+                  </div>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Proveedor: <strong className="text-white">{selectedOrder.supplier?.razonSocial || selectedOrder.supplier?.nombre}</strong> ({selectedOrder.supplier?.ruc})
                   </p>
                 </div>
-              </div>
-
-              {/* Botones de Acción Oficiales */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePrevisualizarPDFOrden(selectedOrder.id)}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
-                  title="Previsualizar documento PDF de la orden"
-                >
-                  <Eye size={13} />
-                  <span>Previsualizar PDF</span>
-                </button>
-                <button
-                  onClick={() => handleDescargarPDFOrden(selectedOrder.id)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
-                  title="Descargar PDF oficial"
-                >
-                  <Download size={13} />
-                  <span>Descargar</span>
-                </button>
-                <button
-                  onClick={() => handleEnviarOrdenWhatsApp(selectedOrder)}
-                  className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
-                  title="Enviar resumen de orden por WhatsApp al proveedor"
-                >
-                  <MessageCircle size={13} />
-                  <span>WhatsApp</span>
-                </button>
               </div>
 
               {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
-                className="absolute top-5 right-5 p-2 rounded-xl border border-[var(--border)] hover:bg-rose-500/10 hover:border-rose-500/30 text-[var(--muted-foreground)] hover:text-rose-600 transition-colors z-20"
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
@@ -2293,64 +2270,92 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               </div>
             </div>
 
-            {/* Footer Modal con Botones */}
-            <div className="p-6 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap justify-between items-center gap-3 shrink-0">
-              <div className="text-sm">
-                <span className="text-[var(--muted-foreground)]">Total de la Orden: </span>
-                <span className="font-black text-[#0F172A] dark:text-amber-400 font-mono text-lg ml-1">
-                  ${consolidarLineasOrden(selectedOrder.lines || [], productos).reduce((sum, l) => sum + (l.cantidadPedida * l.precioCosto), 0).toFixed(2)}
-                </span>
-                <span className="text-xs text-[var(--muted-foreground)] ml-2 font-mono">
-                  ({consolidarLineasOrden(selectedOrder.lines || [], productos).reduce((sum, l) => sum + l.cantidadPedida, 0)} pares totales)
-                </span>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {editingOrder && (
-                  <button
-                    onClick={handleGuardarEdicionOrden}
-                    disabled={saving}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Save size={13} />
-                    <span>Guardar Cambios</span>
-                  </button>
-                )}
-
-                {selectedOrder.estado === 'BORRADOR' && (
-                  <button
-                    onClick={() => handleEnviarYGenerarPDF(selectedOrder.id)}
-                    disabled={saving}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-md transition-transform hover:scale-105"
-                  >
-                    <Send size={14} />
-                    <span>Enviar Orden de Compra al Proveedor</span>
-                  </button>
-                )}
-
-                {(selectedOrder.estado === 'PENDIENTE' || selectedOrder.estado === 'RECIBIDA_PARCIAL') && (
-                  <button
-                    onClick={() => {
-                      setShowOrderDetailModal(false);
-                      handleIrARecepcionDesdeOrden(selectedOrder);
-                    }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <PackageCheck size={14} />
-                    <span>Recibir Mercancía en Bodega</span>
-                  </button>
-                )}
+            {/* Footer Modal con Botones Estandarizados */}
+            <div className="p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
+                  className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Volver a Órdenes</span>
+                </button>
 
                 {(selectedOrder.estado === 'BORRADOR' || selectedOrder.estado === 'PENDIENTE') && !editingOrder && (
                   <button
                     onClick={() => handleCancelarOrden(selectedOrder.id)}
                     disabled={saving}
-                    className="px-4 py-2 border border-rose-500/30 text-rose-600 hover:bg-rose-500/10 font-bold text-xs rounded-xl flex items-center gap-1.5"
+                    className="px-3.5 py-2.5 border border-rose-500/30 text-rose-600 hover:bg-rose-500/10 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Ban size={13} />
-                    <span>Cancelar Orden</span>
+                    <span>Cancelar</span>
                   </button>
                 )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Botón Previsualizar PDF */}
+                <button
+                  onClick={() => handlePrevisualizarPDFOrden(selectedOrder.id)}
+                  className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  title="Previsualizar documento PDF oficial"
+                >
+                  <Eye size={14} />
+                  <span>Previsualizar PDF</span>
+                </button>
+
+                {/* Botón Descargar PDF */}
+                <button
+                  onClick={() => handleDescargarPDFOrden(selectedOrder.id)}
+                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  title="Descargar archivo PDF"
+                >
+                  <Download size={14} />
+                  <span>Guardar PDF</span>
+                </button>
+
+                {/* Botón Enviar PDF por WhatsApp */}
+                <button
+                  onClick={() => handleEnviarOrdenWhatsApp(selectedOrder)}
+                  className="px-3.5 py-2.5 bg-emerald-500/15 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Enviar archivo PDF por WhatsApp al fabricante"
+                >
+                  <MessageCircle size={14} />
+                  <span>Enviar PDF</span>
+                </button>
+
+                {/* Acción Principal */}
+                {editingOrder ? (
+                  <button
+                    onClick={handleGuardarEdicionOrden}
+                    disabled={saving}
+                    className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm border border-slate-700 cursor-pointer"
+                  >
+                    <Save size={14} className="text-emerald-400" />
+                    <span>Guardar Cambios</span>
+                  </button>
+                ) : selectedOrder.estado === 'BORRADOR' ? (
+                  <button
+                    onClick={() => handleEnviarYGenerarPDF(selectedOrder.id)}
+                    disabled={saving}
+                    className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm border border-slate-700 cursor-pointer"
+                  >
+                    <Send size={14} className="text-emerald-400" />
+                    <span>Confirmar y Enviar al Proveedor</span>
+                  </button>
+                ) : (selectedOrder.estado === 'PENDIENTE' || selectedOrder.estado === 'RECIBIDA_PARCIAL') ? (
+                  <button
+                    onClick={() => {
+                      setShowOrderDetailModal(false);
+                      handleIrARecepcionDesdeOrden(selectedOrder);
+                    }}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm cursor-pointer"
+                  >
+                    <PackageCheck size={14} />
+                    <span>Recibir Mercancía en Bodega</span>
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -2362,27 +2367,29 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
          ══════════════════════════════════════════ */}
       {showCuentaModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-600 text-white rounded-2xl font-bold">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
                   <Receipt size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base">
+                  <h3 className="font-extrabold text-base text-white">
                     Estado de Cuenta — {cuentaCorrienteData?.supplier?.razonSocial || cuentaCorrienteData?.supplier?.nombre || 'Proveedor'}
                   </h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
+                  <p className="text-[11px] text-slate-300 mt-0.5">
                     RUC: {cuentaCorrienteData?.supplier?.ruc} • Histórico de compras, entregas y pagos
                   </p>
                 </div>
               </div>
 
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => setShowCuentaModal(false)}
-                className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
@@ -2516,14 +2523,25 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
          ══════════════════════════════════════════ */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
-              <h3 className="font-extrabold text-base flex items-center gap-2">
-                <DollarSign className="text-emerald-500" size={18} />
-                <span>Registrar Pago a Proveedor</span>
-              </h3>
-              <button onClick={() => setShowPaymentModal(false)} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-                <X size={16} />
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <DollarSign size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Registrar Pago a Proveedor</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Abono o liquidación de compra con comprobante</p>
+                </div>
+              </div>
+
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
               </button>
             </div>
 
@@ -2621,14 +2639,25 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
          ══════════════════════════════════════════ */}
       {showOrderModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
-              <h3 className="font-extrabold text-base flex items-center gap-2">
-                <FileText className="text-[#0F172A] dark:text-amber-400" size={18} />
-                <span>Emitir Orden de Compra a Proveedor (Borrador)</span>
-              </h3>
-              <button onClick={() => setShowOrderModal(false)} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-                <X size={16} />
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Emitir Orden de Compra a Proveedor</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Borrador acumulativo con cálculo de curva y numeración</p>
+                </div>
+              </div>
+
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              <button
+                onClick={() => setShowOrderModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
               </button>
             </div>
 
@@ -2976,14 +3005,25 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
          ══════════════════════════════════════════ */}
       {showSupplierModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
-              <h3 className="font-extrabold text-base flex items-center gap-2">
-                <Truck className="text-emerald-500" size={18} />
-                <span>Registrar Nuevo Proveedor</span>
-              </h3>
-              <button onClick={() => { setShowSupplierModal(false); resetSupplierForm(); }} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-                <X size={16} />
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Truck size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Registrar Nuevo Proveedor</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Taller de fabricación o curtiduría de calzado</p>
+                </div>
+              </div>
+
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              <button
+                onClick={() => { setShowSupplierModal(false); resetSupplierForm(); }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
               </button>
             </div>
 
@@ -2998,7 +3038,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   placeholder="Ej. 1792348574001"
                   value={ruc}
                   onChange={(e) => setRuc(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
@@ -3012,7 +3052,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   placeholder="Ej. Curtiduría & Calzado Cevallos S.A."
                   value={razonSocial}
                   onChange={(e) => setRazonSocial(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
                 />
               </div>
 
@@ -3025,7 +3065,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   placeholder="Ej. 0998765432"
                   value={contacto}
                   onChange={(e) => setContacto(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
@@ -3038,7 +3078,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   placeholder="Ej. pedidos@proveedor.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
@@ -3051,21 +3091,33 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   placeholder="Ej. Av. 24 de Mayo y Calzado, Cevallos"
                   value={direccion}
                   onChange={(e) => setDireccion(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 border border-slate-700"
-              >
-                {saving ? (
-                  <><Loader2 size={14} className="animate-spin" /><span>Registrando...</span></>
-                ) : (
-                  <><CheckCircle size={14} className="text-emerald-400" /><span>Guardar Proveedor</span></>
-                )}
-              </button>
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowSupplierModal(false); resetSupplierForm(); }}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700"
+                >
+                  {saving ? (
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Guardando...</span>
+                    </div>
+                  ) : (
+                    <span>Guardar Proveedor</span>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -3077,20 +3129,20 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       {showPdfPreviewModal && pdfPreviewUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-150">
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-4 px-6 pr-16 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/30 shrink-0">
+            <div className="p-4 px-6 pr-16 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-600 text-white rounded-xl font-bold">
+                <div className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 text-emerald-400 font-bold">
                   <FileText size={18} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
                     <span>Documento Oficial: {pdfPreviewData?.orden.numero || 'Orden de Compra'}</span>
-                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold rounded-full">
+                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold rounded-full">
                       Confidencial / Fabricante
                     </span>
                   </h3>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Proveedor: <strong>{pdfPreviewData?.proveedor.nombre}</strong> • Sin datos de clientes en el documento
+                  <p className="text-[11px] text-slate-300">
+                    Proveedor: <strong className="text-white">{pdfPreviewData?.proveedor.nombre}</strong> • Sin datos de clientes en el documento
                   </p>
                 </div>
               </div>
@@ -3099,7 +3151,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 {pdfPreviewData && (
                   <button
                     onClick={() => descargarOrdenCompraPdf(pdfPreviewData)}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                   >
                     <Download size={13} />
                     <span>Descargar PDF</span>
@@ -3114,7 +3166,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
                   setPdfPreviewUrl(null);
                 }}
-                className="absolute top-4 right-4 p-2 rounded-xl border border-[var(--border)] hover:bg-rose-500/10 hover:border-rose-500/30 text-[var(--muted-foreground)] hover:text-rose-600 transition-colors z-20"
+                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar visor"
               >
                 <X size={18} />
