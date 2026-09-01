@@ -67,22 +67,29 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard',       label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
-  { id: 'reportes',        label: 'Reportes & BI',        icon: <BarChart3 size={18} /> },
-  { id: 'super-admin',     label: 'Gestión de Empresas',  icon: <Building2 size={18} /> },
-  { id: 'ubicaciones',     label: 'Rastreo GPS Personal', icon: <MapPin size={18} /> },
+  // ── Operativo Diario (Mayor uso) ──
+  { id: 'dashboard',       label: 'Panel Principal',       icon: <LayoutDashboard size={18} /> },
+  { id: 'pos',             label: 'Punto de Venta',        icon: <Store size={18} /> },
+  { id: 'comercial',       label: 'Pedidos',               icon: <CreditCard size={18} /> },
+  { id: 'inventario',      label: 'Inventario',            icon: <Package size={18} /> },
+
+  // ── Gestión Comercial ──
+  { id: 'clientes',        label: 'Clientes y Créditos',   icon: <Users size={18} /> },
+  { id: 'financiero',      label: 'Cobros y Finanzas',     icon: <DollarSign size={18} /> },
+  { id: 'proveedores',     label: 'Proveedores',           icon: <Truck size={18} /> },
+  { id: 'modelos',         label: 'Catálogo de Modelos',   icon: <ShoppingBag size={18} /> },
+
+  // ── Analítica y Reportes ──
+  { id: 'reportes',        label: 'Reportes',              icon: <BarChart3 size={18} /> },
+  { id: 'prediccion-ml',   label: 'Predicción Inteligente', icon: <BrainCircuit size={18} /> },
+
+  // ── Administración ──
+  { id: 'usuarios',        label: 'Sucursales y Equipo',   icon: <Building2 size={18} /> },
+  { id: 'catalogo',        label: 'Catálogo Digital',      icon: <ShoppingBag size={18} /> },
   { id: 'sri',             label: 'Facturación SRI',       icon: <FileText size={18} /> },
-  { id: 'catalogo',     label: 'Catálogo WhatsApp',    icon: <ShoppingBag size={18} /> },
-  { id: 'pos',           label: 'Caja & Venta Rápida',  icon: <Store size={18} /> },
-  { id: 'prediccion-ml', label: 'Predicción ML Demanda', icon: <BrainCircuit size={18} /> },
-  { id: 'auditoria',     label: 'Auditoría & Seguridad', icon: <ShieldCheck size={18} /> },
-  { id: 'inventario',   label: 'Inventario',            icon: <ShoppingBag size={18} /> },
-  { id: 'modelos',      label: 'Catálogo de Modelos',   icon: <Package size={18} /> },
-  { id: 'clientes',     label: 'Clientes & Crédito',   icon: <Users size={18} /> },
-  { id: 'comercial',    label: 'Pedidos',               icon: <CreditCard size={18} /> },
-  { id: 'financiero',   label: 'Cobros & Finanzas',    icon: <DollarSign size={18} /> },
-  { id: 'proveedores',  label: 'Proveedores',           icon: <Truck size={18} /> },
-  { id: 'usuarios',     label: 'Sucursales & Personal', icon: <Store size={18} /> },
+  { id: 'auditoria',       label: 'Auditoría',             icon: <ShieldCheck size={18} /> },
+  { id: 'ubicaciones',     label: 'Rastreo GPS',           icon: <MapPin size={18} /> },
+  { id: 'super-admin',     label: 'Gestión de Empresas',   icon: <Building2 size={18} /> },
 ];
 
 function MainApp() {
@@ -361,37 +368,59 @@ function MainApp() {
           </div>
 
           {/* Navegación (Scroll vertical independiente únicamente en el área de items) */}
-          <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
-            <div className="px-3 py-2 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-              Módulos Operativos
-            </div>
-            {NAV_ITEMS.filter((item) => {
-              if (!user) return item.id !== 'super-admin';
-              if (user.rol === 'ROL_SUPER_ADMIN') {
-                return ['dashboard', 'super-admin', 'auditoria', 'ubicaciones'].includes(item.id);
-              }
-              if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin'; // Admin ve todo excepto gestión de tenants
-              if (user.rol === 'ROL_VENDEDOR') {
-                return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
-              }
-              if (user.rol === 'ROL_BODEGUERO') {
-                return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
-              }
-              return !['modelos', 'super-admin'].includes(item.id); // Por defecto ocultar modelos y super-admin
-            }).map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setVistaActual(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                  vistaActual === item.id
-                    ? 'bg-[#0F172A]/10 text-[#0F172A] font-semibold'
-                    : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
-                }`}
-              >
-                <div className="flex items-center gap-3">{item.icon}<span>{item.label}</span></div>
-                {vistaActual !== item.id && <ChevronRight size={14} />}
-              </button>
-            ))}
+          <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-0.5">
+            {(() => {
+              const SECTION_GROUPS: { label: string; ids: Vista[] }[] = [
+                { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
+                { label: 'Gestión Comercial', ids: ['clientes', 'financiero', 'proveedores', 'modelos'] },
+                { label: 'Analítica', ids: ['reportes', 'prediccion-ml'] },
+                { label: 'Administración', ids: ['usuarios', 'catalogo', 'sri', 'auditoria', 'ubicaciones', 'super-admin'] },
+              ];
+
+              const filteredItems = NAV_ITEMS.filter((item) => {
+                if (!user) return item.id !== 'super-admin';
+                if (user.rol === 'ROL_SUPER_ADMIN') {
+                  return ['dashboard', 'super-admin', 'auditoria', 'ubicaciones'].includes(item.id);
+                }
+                if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin';
+                if (user.rol === 'ROL_VENDEDOR') {
+                  return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
+                }
+                if (user.rol === 'ROL_BODEGUERO') {
+                  return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
+                }
+                return !['modelos', 'super-admin'].includes(item.id);
+              });
+
+              return SECTION_GROUPS.map((group, gi) => {
+                const groupItems = group.ids
+                  .map((id) => filteredItems.find((fi) => fi.id === id))
+                  .filter(Boolean) as NavItem[];
+                if (groupItems.length === 0) return null;
+                return (
+                  <div key={group.label}>
+                    {gi > 0 && <div className="my-2 border-t border-[var(--border)]" />}
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                      {group.label}
+                    </div>
+                    {groupItems.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setVistaActual(item.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                          vistaActual === item.id
+                            ? 'bg-[#0F172A]/10 text-[#0F172A] font-semibold dark:bg-amber-400/10 dark:text-amber-400'
+                            : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">{item.icon}<span>{item.label}</span></div>
+                        {vistaActual !== item.id && <ChevronRight size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                );
+              });
+            })()}
           </nav>
         </div>
 
