@@ -86,7 +86,7 @@ export default function PrediccionDemandaComponent() {
   const handleReentrenar = async () => {
     setReentrenando(true);
     try {
-      await ApiService.post("/ml/reentrenar", {});
+      await ApiService.post("/ml/reentrenamiento", {});
       showToast("Modelo IA reentrenado exitosamente", "success");
       await cargarEstadoModelo();
       await cargarPrediccion(horizonte);

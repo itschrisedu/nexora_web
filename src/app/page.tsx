@@ -35,6 +35,7 @@ import {
   Loader2,
   MapPin,
   Settings,
+  BarChart3,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import { ToastProvider } from '@/components/ui/toast';
@@ -55,8 +56,9 @@ const PrediccionDemandaComponent = dynamic(() => import('@/components/prediccion
 const AuditoriaComponent = dynamic(() => import('@/components/auditoria'), { ssr: false });
 const PersonalizacionComponent = dynamic(() => import('@/components/personalizacion'), { ssr: false });
 const UbicacionesComponent = dynamic(() => import('@/components/ubicaciones'), { ssr: false });
+const ReportesComponent = dynamic(() => import('@/components/reportes'), { ssr: false });
 
-type Vista = 'dashboard' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
+type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
 
 interface NavItem {
   id: Vista;
@@ -66,6 +68,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',       label: 'Dashboard',            icon: <LayoutDashboard size={18} /> },
+  { id: 'reportes',        label: 'Reportes & BI',        icon: <BarChart3 size={18} /> },
   { id: 'super-admin',     label: 'Gestión de Empresas',  icon: <Building2 size={18} /> },
   { id: 'ubicaciones',     label: 'Rastreo GPS Personal', icon: <MapPin size={18} /> },
   { id: 'sri',             label: 'Facturación SRI',       icon: <FileText size={18} /> },
@@ -481,6 +484,7 @@ function MainApp() {
               <DashboardView stats={stats} />
             )
           )}
+          {vistaActual === 'reportes' && <ReportesComponent />}
           {vistaActual === 'inventario' && <InventarioComponent online={online} userRole={user?.rol} />}
           {vistaActual === 'modelos' && <ModelosComponent online={online} />}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
