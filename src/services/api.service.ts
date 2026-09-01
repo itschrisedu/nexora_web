@@ -3,6 +3,36 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 // Solo estas rutas son públicas (no necesitan Bearer token)
 const PUBLIC_PATHS = ['/auth/login', '/auth/refresh'];
 
+/**
+ * Traduce errores HTTP y de red a mensajes amigables para usuarios finales.
+ * Los usuarios no son técnicos: nunca deben ver códigos de estado ni errores de fetch crudos.
+ */
+function mensajeAmigable(status: number | null, serverMessage?: string): string {
+  // Si el backend ya envía un mensaje claro, usarlo
+  if (serverMessage && !serverMessage.includes('fetch') && !serverMessage.includes('Error en la petición') && !serverMessage.includes('Internal') && serverMessage.length > 5) {
+    return serverMessage;
+  }
+
+  if (!status) {
+    return 'No se pudo conectar con el servidor. Verifica tu conexión a internet e intenta de nuevo.';
+  }
+
+  switch (status) {
+    case 400: return serverMessage || 'Los datos enviados no son correctos. Revisa la información e intenta de nuevo.';
+    case 401: return 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.';
+    case 403: return 'No tienes permisos para realizar esta acción. Contacta al administrador.';
+    case 404: return 'El recurso solicitado no fue encontrado. Es posible que haya sido eliminado o movido.';
+    case 409: return serverMessage || 'Ya existe un registro con esa información. Verifica los datos ingresados.';
+    case 422: return serverMessage || 'Algunos datos ingresados no son válidos. Revisa el formulario e intenta de nuevo.';
+    case 429: return 'Demasiadas solicitudes. Espera un momento antes de intentar de nuevo.';
+    case 500: return 'Ocurrió un error interno en el servidor. Intenta de nuevo en unos minutos.';
+    case 502:
+    case 503:
+    case 504: return 'El servidor no está disponible temporalmente. Intenta de nuevo en unos minutos.';
+    default: return serverMessage || 'Ocurrió un error inesperado. Por favor, intenta de nuevo.';
+  }
+}
+
 export class ApiService {
   private static getHeaders(isPublicPath = false) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -47,11 +77,16 @@ export class ApiService {
 
   static async post(path: string, body: unknown): Promise<any> {
     const isPublic = PUBLIC_PATHS.includes(path);
-    let res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      headers: this.getHeaders(isPublic),
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        method: 'POST',
+        headers: this.getHeaders(isPublic),
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error(mensajeAmigable(null));
+    }
 
     if (res.status === 401 && !isPublic) {
       const refreshed = await this.tryRefreshToken();
@@ -63,13 +98,13 @@ export class ApiService {
         });
       } else {
         this.handle401();
-        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+        throw new Error('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
       }
     }
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-      throw new Error(errorData.message || `Error en la petición: ${res.status}`);
+      const errorData = await res.json().catch(() => ({ message: '' }));
+      throw new Error(mensajeAmigable(res.status, errorData.message));
     }
 
     return res.json();
@@ -77,10 +112,15 @@ export class ApiService {
 
   static async get(path: string): Promise<any> {
     const isPublic = PUBLIC_PATHS.includes(path);
-    let res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'GET',
-      headers: this.getHeaders(isPublic),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        method: 'GET',
+        headers: this.getHeaders(isPublic),
+      });
+    } catch {
+      throw new Error(mensajeAmigable(null));
+    }
 
     if (res.status === 401 && !isPublic) {
       const refreshed = await this.tryRefreshToken();
@@ -91,24 +131,29 @@ export class ApiService {
         });
       } else {
         this.handle401();
-        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+        throw new Error('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
       }
     }
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-      throw new Error(errorData.message || `Error en la petición: ${res.status}`);
+      const errorData = await res.json().catch(() => ({ message: '' }));
+      throw new Error(mensajeAmigable(res.status, errorData.message));
     }
 
     return res.json();
   }
 
   static async patch(path: string, body: unknown): Promise<any> {
-    let res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'PATCH',
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error(mensajeAmigable(null));
+    }
 
     if (res.status === 401) {
       const refreshed = await this.tryRefreshToken();
@@ -120,13 +165,13 @@ export class ApiService {
         });
       } else {
         this.handle401();
-        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+        throw new Error('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
       }
     }
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-      throw new Error(errorData.message || `Error en la petición: ${res.status}`);
+      const errorData = await res.json().catch(() => ({ message: '' }));
+      throw new Error(mensajeAmigable(res.status, errorData.message));
     }
 
     const text = await res.text();
@@ -134,11 +179,16 @@ export class ApiService {
   }
 
   static async delete(path: string, body?: unknown): Promise<any> {
-    let res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'DELETE',
-      headers: this.getHeaders(),
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+    } catch {
+      throw new Error(mensajeAmigable(null));
+    }
 
     if (res.status === 401) {
       const refreshed = await this.tryRefreshToken();
@@ -150,13 +200,13 @@ export class ApiService {
         });
       } else {
         this.handle401();
-        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+        throw new Error('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
       }
     }
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-      throw new Error(errorData.message || `Error en la petición: ${res.status}`);
+      const errorData = await res.json().catch(() => ({ message: '' }));
+      throw new Error(mensajeAmigable(res.status, errorData.message));
     }
 
     const text = await res.text();
@@ -164,11 +214,16 @@ export class ApiService {
   }
 
   static async put(path: string, body: unknown): Promise<any> {
-    let res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error(mensajeAmigable(null));
+    }
 
     if (res.status === 401) {
       const refreshed = await this.tryRefreshToken();
@@ -180,13 +235,13 @@ export class ApiService {
         });
       } else {
         this.handle401();
-        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+        throw new Error('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
       }
     }
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-      throw new Error(errorData.message || `Error en la petición: ${res.status}`);
+      const errorData = await res.json().catch(() => ({ message: '' }));
+      throw new Error(mensajeAmigable(res.status, errorData.message));
     }
 
     return res.json();
@@ -199,11 +254,16 @@ export class ApiService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    let res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+    } catch {
+      throw new Error(mensajeAmigable(null));
+    }
 
     if (res.status === 401) {
       const refreshed = await this.tryRefreshToken();
@@ -217,13 +277,13 @@ export class ApiService {
         });
       } else {
         this.handle401();
-        throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+        throw new Error('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
       }
     }
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ message: 'Error desconocido' }));
-      throw new Error(errorData.message || `Error en la petición: ${res.status}`);
+      const errorData = await res.json().catch(() => ({ message: '' }));
+      throw new Error(mensajeAmigable(res.status, errorData.message));
     }
 
     return res.json();

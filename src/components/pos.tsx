@@ -115,9 +115,14 @@ export default function PosComponent() {
   const cargarProductos = async () => {
     try {
       const res = await ApiService.get("/pos/productos-disponibles");
-      setProductos(res);
+      if (Array.isArray(res)) {
+        setProductos(res);
+      } else {
+        setProductos([]);
+      }
     } catch (err) {
       console.error("Error al cargar productos POS:", err);
+      setProductos([]);
     }
   };
 

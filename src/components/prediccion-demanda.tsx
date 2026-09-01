@@ -62,7 +62,13 @@ export default function PrediccionDemandaComponent() {
     try {
       const res = await ApiService.get(`/ml/prediccion?dias=${dias}`);
       if (res) {
-        setPrediccion(res);
+        if (res.error || res.success === false) {
+          setErrorMsg(res.mensaje || res.error || "Aún no hay suficientes ventas para generar la proyección.");
+          setPrediccion(null);
+        } else {
+          setPrediccion(res);
+          setErrorMsg("");
+        }
       }
     } catch (err: any) {
       console.warn("No se pudo obtener la predicción ML:", err);
@@ -86,10 +92,14 @@ export default function PrediccionDemandaComponent() {
   const handleReentrenar = async () => {
     setReentrenando(true);
     try {
-      await ApiService.post("/ml/reentrenamiento", {});
-      showToast("Modelo IA reentrenado exitosamente", "success");
-      await cargarEstadoModelo();
-      await cargarPrediccion(horizonte);
+      const result = await ApiService.post("/ml/reentrenamiento", {});
+      if (result?.success === false) {
+        showToast(result.mensaje || result.error || "No se pudo reentrenar el modelo", "error");
+      } else {
+        showToast("Modelo IA reentrenado exitosamente", "success");
+        await cargarEstadoModelo();
+        await cargarPrediccion(horizonte);
+      }
     } catch (err: any) {
       showToast("No se pudo reentrenar el modelo: " + (err.message || "Error de conexión"), "error");
     } finally {
