@@ -21,6 +21,9 @@ import {
   TrendingUp,
   AlertTriangle,
   Printer,
+  User,
+  FileText,
+  Search,
 } from "lucide-react";
 
 interface CajaEstado {
@@ -73,6 +76,18 @@ export default function PosComponent() {
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TARJETA" | "TRANSFERENCIA">("EFECTIVO");
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [ventaExitosa, setVentaExitosa] = useState(false);
+
+  // Tipo de Comprobante & Datos de Facturación
+  const [tipoComprobante, setTipoComprobante] = useState<"CONSUMIDOR_FINAL" | "FACTURA">("CONSUMIDOR_FINAL");
+  const [clienteFactura, setClienteFactura] = useState({
+    cedula: "",
+    nombre: "",
+    apellido: "",
+    email: "",
+    telefono: "",
+    direccion: "",
+  });
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
 
   // Calculadora de Vuelto & Ticket
   const [pagaCon, setPagaCon] = useState("");
@@ -174,12 +189,44 @@ export default function PosComponent() {
     setItemsVenta(itemsVenta.filter((_, i) => i !== index));
   };
 
+  const buscarClientePorCedula = async (ident: string) => {
+    const cleanIdent = ident.trim();
+    if (!cleanIdent || cleanIdent.length < 5) return;
+    try {
+      setBuscandoCliente(true);
+      const res = await ApiService.get(`/clientes?busqueda=${encodeURIComponent(cleanIdent)}`);
+      const lista = res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(lista) && lista.length > 0) {
+        const c = lista[0];
+        setClienteFactura((prev) => ({
+          ...prev,
+          cedula: c.cedula || c.ruc || cleanIdent,
+          nombre: c.nombre || prev.nombre,
+          apellido: c.apellido || prev.apellido,
+          email: c.email || prev.email,
+          telefono: c.telefono || prev.telefono,
+          direccion: c.direccion || prev.direccion,
+        }));
+        showToast(`Cliente encontrado: ${c.nombre} ${c.apellido || ''}`, "success");
+      }
+    } catch {
+      // Ignorar si es un cliente nuevo no registrado
+    } finally {
+      setBuscandoCliente(false);
+    }
+  };
+
   const subtotalVenta = itemsVenta.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0);
   const valorDescuento = Math.min(subtotalVenta, Math.max(0, parseFloat(descuentoVenta) || 0));
   const totalVenta = Math.max(0, subtotalVenta - valorDescuento);
 
   const handleRegistrarVenta = async () => {
     if (itemsVenta.length === 0) return;
+    if (tipoComprobante === "FACTURA" && !clienteFactura.nombre.trim()) {
+      showToast("Por favor ingresa la Razón Social / Nombre del cliente para la Factura", "error");
+      return;
+    }
+
     try {
       setProcesandoVenta(true);
       // Si hay descuento global, distribuirlo proporcionalmente en los precios unitarios
@@ -187,6 +234,16 @@ export default function PosComponent() {
 
       await ApiService.post("/pos/venta-directa", {
         metodoPago,
+        tipoComprobante,
+        clienteData: tipoComprobante === "FACTURA" ? {
+          cedula: clienteFactura.cedula.trim(),
+          ruc: clienteFactura.cedula.trim(),
+          nombre: clienteFactura.nombre.trim(),
+          apellido: clienteFactura.apellido.trim(),
+          email: clienteFactura.email.trim(),
+          telefono: clienteFactura.telefono.trim(),
+          direccion: clienteFactura.direccion.trim(),
+        } : undefined,
         lineas: itemsVenta.map((i) => ({
           productId: i.productId,
           serieId: i.serieId,
@@ -199,8 +256,18 @@ export default function PosComponent() {
       setVentaExitosa(true);
 
       // Generar ticket térmico
+      const nombreComercial = negocioInfo?.nombre || "CALZADO COMERCIAL";
       const ticketData = {
         fecha: new Date().toLocaleString("es-EC"),
+        tipoComprobante,
+        clienteNombre: tipoComprobante === "FACTURA"
+          ? `${clienteFactura.nombre} ${clienteFactura.apellido}`.trim()
+          : "Consumidor Final",
+        clienteIdentificacion: tipoComprobante === "FACTURA"
+          ? (clienteFactura.cedula.trim() || "9999999999")
+          : "9999999999",
+        clienteEmail: tipoComprobante === "FACTURA" ? clienteFactura.email.trim() : "",
+        clienteDireccion: tipoComprobante === "FACTURA" ? clienteFactura.direccion.trim() : "",
         items: [...itemsVenta],
         subtotal: subtotalVenta,
         descuento: valorDescuento,
@@ -208,7 +275,12 @@ export default function PosComponent() {
         metodoPago,
         pagaCon: metodoPago === "EFECTIVO" ? (parseFloat(pagaCon) || totalVenta) : totalVenta,
         vuelto: metodoPago === "EFECTIVO" ? Math.max(0, (parseFloat(pagaCon) || totalVenta) - totalVenta) : 0,
-        negocio: negocioInfo || { nombre: "NEXORA CALZADO", ruc: "1800000000001", direccion: "Cevallos, Tungurahua" },
+        negocio: {
+          nombre: nombreComercial,
+          ruc: negocioInfo?.ruc || "1800000000001",
+          direccion: negocioInfo?.direccion || "Cevallos, Tungurahua",
+          telefono: negocioInfo?.telefono || "",
+        },
       };
       setUltimoTicket(ticketData);
       setTicketModalOpen(true);
@@ -216,6 +288,16 @@ export default function PosComponent() {
       setItemsVenta([]);
       setDescuentoVenta("");
       setPagaCon("");
+      if (tipoComprobante === "FACTURA") {
+        setClienteFactura({
+          cedula: "",
+          nombre: "",
+          apellido: "",
+          email: "",
+          telefono: "",
+          direccion: "",
+        });
+      }
       await cargarEstadoCaja();
       await cargarProductos();
       setTimeout(() => setVentaExitosa(false), 3000);
@@ -504,6 +586,133 @@ export default function PosComponent() {
                 </div>
               </div>
 
+              {/* Tipo de Comprobante: Consumidor Final vs Factura con Datos */}
+              <div className="space-y-2 p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+                <label className="text-[11px] font-bold text-slate-300 uppercase flex items-center gap-1.5">
+                  <FileText size={13} className="text-emerald-400" />
+                  Comprobante:
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setTipoComprobante("CONSUMIDOR_FINAL")}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all ${
+                      tipoComprobante === "CONSUMIDOR_FINAL"
+                        ? "bg-emerald-600 text-white border-transparent shadow-xs"
+                        : "bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200"
+                    }`}
+                  >
+                    <User size={13} />
+                    Consumidor Final
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoComprobante("FACTURA")}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all ${
+                      tipoComprobante === "FACTURA"
+                        ? "bg-emerald-600 text-white border-transparent shadow-xs"
+                        : "bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200"
+                    }`}
+                  >
+                    <FileText size={13} />
+                    Factura con Datos
+                  </button>
+                </div>
+
+                {/* Formulario de Factura si está seleccionado */}
+                {tipoComprobante === "FACTURA" && (
+                  <div className="space-y-2 pt-2 border-t border-slate-800 text-xs">
+                    <div>
+                      <div className="flex items-center justify-between pb-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Cédula / RUC:</label>
+                        {buscandoCliente && <span className="text-[10px] text-emerald-400 animate-pulse">Buscando...</span>}
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          maxLength={13}
+                          placeholder="Ej: 1801234567"
+                          value={clienteFactura.cedula}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setClienteFactura((prev) => ({ ...prev, cedula: val }));
+                            if (val.length === 10 || val.length === 13) {
+                              buscarClientePorCedula(val);
+                            }
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-emerald-500 font-mono pr-8"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => buscarClientePorCedula(clienteFactura.cedula)}
+                          className="absolute right-1.5 top-1.5 p-1 text-slate-400 hover:text-emerald-400"
+                          title="Buscar cliente en base de datos"
+                        >
+                          <Search size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">Nombre / Razón Social *:</label>
+                        <input
+                          type="text"
+                          placeholder="Nombres o Razón Social"
+                          value={clienteFactura.nombre}
+                          onChange={(e) => setClienteFactura((prev) => ({ ...prev, nombre: e.target.value }))}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">Apellido:</label>
+                        <input
+                          type="text"
+                          placeholder="Apellidos"
+                          value={clienteFactura.apellido}
+                          onChange={(e) => setClienteFactura((prev) => ({ ...prev, apellido: e.target.value }))}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">Email (para Factura SRI):</label>
+                        <input
+                          type="email"
+                          placeholder="cliente@email.com"
+                          value={clienteFactura.email}
+                          onChange={(e) => setClienteFactura((prev) => ({ ...prev, email: e.target.value }))}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">Teléfono:</label>
+                        <input
+                          type="text"
+                          placeholder="0999999999"
+                          value={clienteFactura.telefono}
+                          onChange={(e) => setClienteFactura((prev) => ({ ...prev, telefono: e.target.value }))}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">Dirección:</label>
+                      <input
+                        type="text"
+                        placeholder="Dirección del cliente"
+                        value={clienteFactura.direccion}
+                        onChange={(e) => setClienteFactura((prev) => ({ ...prev, direccion: e.target.value }))}
+                        className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Método de Pago */}
               <div className="flex gap-2">
                 {[
@@ -751,10 +960,39 @@ export default function PosComponent() {
             {/* Cuerpo del Ticket Térmico */}
             <div className="p-5 font-mono text-xs overflow-y-auto space-y-3 bg-white" id="ticket-pos-print">
               <div className="text-center space-y-0.5 border-b border-dashed pb-3">
-                <h2 className="font-black text-sm">{ultimoTicket.negocio?.nombre || "NEXORA CALZADO"}</h2>
-                <p className="text-[10px] text-slate-600">RUC: {ultimoTicket.negocio?.ruc || "1800000000001"}</p>
+                <h2 className="font-black text-sm uppercase">{ultimoTicket.negocio?.nombre || "LOCAL COMERCIAL"}</h2>
+                {ultimoTicket.negocio?.ruc && (
+                  <p className="text-[10px] text-slate-600">RUC: {ultimoTicket.negocio.ruc}</p>
+                )}
                 <p className="text-[10px] text-slate-600">{ultimoTicket.negocio?.direccion || "Cevallos, Tungurahua"}</p>
+                {ultimoTicket.negocio?.telefono && (
+                  <p className="text-[10px] text-slate-600">Tel: {ultimoTicket.negocio.telefono}</p>
+                )}
                 <p className="text-[10px] text-slate-500 pt-1">{ultimoTicket.fecha}</p>
+              </div>
+
+              {/* Información de Comprobante y Cliente */}
+              <div className="space-y-0.5 border-b border-dashed pb-2 text-[10px] text-slate-700">
+                <div className="flex justify-between font-bold">
+                  <span>COMPROBANTE:</span>
+                  <span className="text-slate-900">{ultimoTicket.tipoComprobante === "FACTURA" ? "FACTURA CON DATOS" : "NOTA DE VENTA"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold">CLIENTE:</span>
+                  <span className="truncate max-w-[65%] text-slate-900">{ultimoTicket.clienteNombre || "Consumidor Final"}</span>
+                </div>
+                {ultimoTicket.clienteIdentificacion && ultimoTicket.clienteIdentificacion !== "9999999999" && (
+                  <div className="flex justify-between">
+                    <span className="font-bold">C.I. / RUC:</span>
+                    <span>{ultimoTicket.clienteIdentificacion}</span>
+                  </div>
+                )}
+                {ultimoTicket.clienteEmail && (
+                  <div className="flex justify-between">
+                    <span className="font-bold">EMAIL:</span>
+                    <span className="truncate max-w-[65%]">{ultimoTicket.clienteEmail}</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1 border-b border-dashed pb-3">
@@ -809,8 +1047,8 @@ export default function PosComponent() {
               </div>
 
               <div className="text-center text-[10px] text-slate-500 pt-1 space-y-0.5">
-                <p>¡Gracias por su compra!</p>
-                <p>NEXORA · Sistema de Gestión de Calzado</p>
+                <p>¡Gracias por su compra y preferencia!</p>
+                <p className="font-bold text-slate-700">{ultimoTicket.negocio?.nombre || "Local Comercial"}</p>
               </div>
             </div>
 
