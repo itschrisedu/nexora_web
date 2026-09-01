@@ -28,7 +28,7 @@ interface ComercialProps {
   userPermissions?: { permiteCambiarPrecio?: boolean; rol?: string };
 }
 
-type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'ENTREGADO' | 'CANCELADO';
+type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'EN_ESPERA_STOCK' | 'ENTREGADO' | 'CANCELADO';
 
 interface Pedido {
   id: string;
@@ -45,10 +45,11 @@ interface Pedido {
 }
 
 const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: React.ReactNode }> = {
-  PENDIENTE:       { label: 'Pendiente',      color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',     icon: <Clock size={12} /> },
-  EN_PREPARACION:  { label: 'En Preparación', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',        icon: <Package size={12} /> },
-  ENTREGADO:       { label: 'Entregado',      color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20', icon: <CheckCircle size={12} /> },
-  CANCELADO:       { label: 'Anulado',        color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',        icon: <XCircle size={12} /> },
+  PENDIENTE:       { label: 'Pendiente',        color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',       icon: <Clock size={12} /> },
+  EN_PREPARACION:  { label: 'En Preparación',   color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',          icon: <Package size={12} /> },
+  EN_ESPERA_STOCK: { label: 'Espera de Stock',   color: 'bg-orange-500/10 text-orange-600 border-orange-500/20',    icon: <Clock size={12} /> },
+  ENTREGADO:       { label: 'Entregado',        color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20', icon: <CheckCircle size={12} /> },
+  CANCELADO:       { label: 'Anulado',          color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',          icon: <XCircle size={12} /> },
 };
 
 export default function ComercialComponent({ online, userRole, userPermissions }: ComercialProps) {
