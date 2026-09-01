@@ -57,6 +57,7 @@ interface ItemVenta {
   tallaNumero: number;
   nombre: string;
   color: string;
+  imageUrl?: string;
   cantidad: number;
   precioUnitario: number;
 }
@@ -88,6 +89,20 @@ export default function PosComponent() {
     direccion: "",
   });
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+
+  // Detalle de Pago (Transferencia o Tarjeta)
+  const [detalleTransferencia, setDetalleTransferencia] = useState({
+    banco: "Banco Pichincha",
+    numeroComprobante: "",
+  });
+
+  const [detalleTarjeta, setDetalleTarjeta] = useState({
+    tipoTarjeta: "DÉBITO" as "DÉBITO" | "CRÉDITO",
+    marcaTarjeta: "VISA",
+    numeroVoucher: "",
+    numeroAutorizacion: "",
+    lote: "",
+  });
 
   // Calculadora de Vuelto & Ticket
   const [pagaCon, setPagaCon] = useState("");
@@ -178,6 +193,7 @@ export default function PosComponent() {
           tallaNumero: talla.numero,
           nombre: `${prod.modelName} (${prod.color})`,
           color: prod.color,
+          imageUrl: prod.imageUrl,
           cantidad: 1,
           precioUnitario: prod.salePrice,
         },
@@ -232,9 +248,25 @@ export default function PosComponent() {
       // Si hay descuento global, distribuirlo proporcionalmente en los precios unitarios
       const factorDescuento = subtotalVenta > 0 ? (totalVenta / subtotalVenta) : 1;
 
+      const detallePagoPayload = metodoPago === "TRANSFERENCIA"
+        ? {
+            banco: detalleTransferencia.banco.trim(),
+            numeroComprobante: detalleTransferencia.numeroComprobante.trim(),
+          }
+        : metodoPago === "TARJETA"
+        ? {
+            tipoTarjeta: detalleTarjeta.tipoTarjeta,
+            marcaTarjeta: detalleTarjeta.marcaTarjeta,
+            numeroVoucher: detalleTarjeta.numeroVoucher.trim(),
+            numeroAutorizacion: detalleTarjeta.numeroAutorizacion.trim(),
+            lote: detalleTarjeta.lote.trim(),
+          }
+        : undefined;
+
       await ApiService.post("/pos/venta-directa", {
         metodoPago,
         tipoComprobante,
+        detallePago: detallePagoPayload,
         clienteData: tipoComprobante === "FACTURA" ? {
           cedula: clienteFactura.cedula.trim(),
           ruc: clienteFactura.cedula.trim(),
@@ -273,6 +305,7 @@ export default function PosComponent() {
         descuento: valorDescuento,
         total: totalVenta,
         metodoPago,
+        detallePago: detallePagoPayload,
         pagaCon: metodoPago === "EFECTIVO" ? (parseFloat(pagaCon) || totalVenta) : totalVenta,
         vuelto: metodoPago === "EFECTIVO" ? Math.max(0, (parseFloat(pagaCon) || totalVenta) - totalVenta) : 0,
         negocio: {
@@ -340,9 +373,9 @@ export default function PosComponent() {
           <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto">
             <Lock size={40} className="text-amber-500" />
           </div>
-          <h2 className="text-2xl font-bold text-[var(--card-foreground)]">Apertura de Caja POS</h2>
+          <h2 className="text-2xl font-bold text-[var(--card-foreground)]">Apertura de Caja & Venta Rápida</h2>
           <p className="text-sm text-[var(--muted-foreground)]">
-            Ingrese el monto de efectivo inicial para comenzar el turno de ventas en mostrador.
+            Ingrese el monto de efectivo inicial para comenzar el turno de atención y ventas en tienda.
           </p>
           <div>
             <label className="block text-xs text-[var(--muted-foreground)] mb-1 text-left font-medium">Monto Inicial (USD)</label>
@@ -368,7 +401,7 @@ export default function PosComponent() {
     );
   }
 
-  // ─── Vista: POS Activo ──────────────────
+  // ─── Vista: Caja Activa & Venta Rápida ──────────────────
   return (
     <div className="space-y-6">
       {/* Header con resumen de caja */}
@@ -379,6 +412,7 @@ export default function PosComponent() {
               <Store className="text-emerald-600 dark:text-emerald-400" size={22} />
             </div>
             <div>
+              <h2 className="font-bold text-base text-[var(--card-foreground)]">Caja & Venta Rápida</h2>
               <p className="text-xs text-[var(--muted-foreground)] font-medium">
                 Caja abierta desde {caja.fechaApertura ? new Date(caja.fechaApertura).toLocaleTimeString("es-EC") : 'Turno actual'}
               </p>
@@ -421,47 +455,82 @@ export default function PosComponent() {
 
       {/* Layout POS: Productos + Ticket */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Panel Izquierdo: Búsqueda de Productos */}
+        {/* Panel Izquierdo: Catálogo de Productos con Imagen */}
         <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 space-y-4">
           <input
             type="text"
-            placeholder="🔍 Buscar calzado por nombre o código..."
+            placeholder="🔍 Buscar calzado por modelo, color o código de barras..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-emerald-500"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[55vh] overflow-y-auto pr-1">
-            {productosFiltrados.slice(0, 20).map((prod) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-h-[58vh] overflow-y-auto pr-1">
+            {productosFiltrados.slice(0, 30).map((prod) => (
               <div
                 key={prod.id}
-                className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl p-3 hover:border-[#0F172A] transition-all"
+                className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3 hover:border-emerald-500/60 hover:shadow-sm transition-all flex flex-col justify-between gap-2.5"
               >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h4 className="font-bold text-sm text-[var(--card-foreground)]">{prod.modelName}</h4>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      {prod.color} | {prod.serieNombre} | <span className="font-mono">{prod.baseCode}</span>
-                    </p>
+                {/* Cabecera del Calzado con Imagen de la Variante */}
+                <div className="flex items-start gap-3">
+                  <div className="w-16 h-16 rounded-xl bg-slate-900/10 dark:bg-slate-800 border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center relative">
+                    {prod.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={prod.imageUrl}
+                        alt={`${prod.modelName} ${prod.color}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-400 p-1 text-center">
+                        <ShoppingBag size={18} />
+                        <span className="text-[8px] font-mono mt-0.5 uppercase tracking-tighter truncate max-w-full">{prod.color.slice(0, 6)}</span>
+                      </div>
+                    )}
                   </div>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">${prod.salePrice.toFixed(2)}</span>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-bold text-sm text-[var(--card-foreground)] truncate" title={prod.modelName}>
+                        {prod.modelName}
+                      </h4>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm ml-1 shrink-0">
+                        ${prod.salePrice.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--muted-foreground)] flex items-center gap-1 mt-0.5 truncate">
+                      <span className="font-medium text-slate-300">{prod.color}</span>
+                      <span>·</span>
+                      <span className="truncate">{prod.serieNombre}</span>
+                    </p>
+                    <span className="inline-block mt-1 font-mono text-[10px] bg-[var(--muted)] px-1.5 py-0.2 rounded text-[var(--muted-foreground)]">
+                      {prod.baseCode}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {prod.tallas.map((t) => (
-                    <button
-                      key={t.tallaId}
-                      disabled={t.cantidad <= 0}
-                      onClick={() => handleAgregarItem(prod, t)}
-                      className={`px-2 py-1 text-[11px] rounded-lg font-semibold transition-all ${
-                        t.cantidad > 0
-                          ? "bg-[var(--card)] text-[var(--foreground)] hover:bg-emerald-600 hover:text-white border border-[var(--border)]"
-                          : "bg-[var(--muted)] text-[var(--muted-foreground)] cursor-not-allowed border border-[var(--border)]"
-                      }`}
-                      title={`${t.cantidad} disponibles`}
-                    >
-                      T{t.numero} ({t.cantidad})
-                    </button>
-                  ))}
+
+                {/* Tallas con Botones de Selección */}
+                <div className="pt-2 border-t border-[var(--border)]/70">
+                  <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block mb-1">
+                    Tallas Disponibles:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {prod.tallas.map((t) => (
+                      <button
+                        key={t.tallaId}
+                        disabled={t.cantidad <= 0}
+                        onClick={() => handleAgregarItem(prod, t)}
+                        className={`px-2 py-1 text-xs rounded-lg font-bold transition-all ${
+                          t.cantidad > 0
+                            ? "bg-[var(--card)] text-[var(--foreground)] hover:bg-emerald-600 hover:text-white border border-[var(--border)] active:scale-95 cursor-pointer shadow-2xs"
+                            : "bg-[var(--muted)]/40 text-[var(--muted-foreground)]/40 border border-transparent cursor-not-allowed text-[11px]"
+                        }`}
+                        title={t.cantidad > 0 ? `${t.cantidad} pares disponibles` : "Sin existencias"}
+                      >
+                        T{t.numero} <span className="text-[9px] font-normal opacity-80">({t.cantidad})</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}
@@ -485,11 +554,21 @@ export default function PosComponent() {
                 {itemsVenta.map((item, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-xs"
+                    className="flex items-center justify-between p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-xs gap-2.5"
                   >
-                    <div className="flex-1">
-                      <span className="font-semibold text-slate-200">{item.nombre}</span>
-                      <span className="text-slate-500 ml-1">T{item.tallaNumero}</span>
+                    {/* Miniatura de la variante */}
+                    <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700/60 overflow-hidden shrink-0 flex items-center justify-center">
+                      {item.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={item.imageUrl} alt={item.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        <ShoppingBag size={14} className="text-slate-400" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate font-semibold text-slate-200">{item.nombre}</div>
+                      <span className="text-slate-400 text-[11px]">Talla {item.tallaNumero}</span>
                       <div className="flex items-center gap-2 mt-1">
                         <button
                           onClick={() => {
@@ -501,7 +580,7 @@ export default function PosComponent() {
                         >
                           <Minus size={12} />
                         </button>
-                        <span className="font-mono text-slate-200">{item.cantidad}</span>
+                        <span className="font-mono text-slate-200 font-bold">{item.cantidad}</span>
                         <button
                           onClick={() => {
                             const n = [...itemsVenta];
@@ -514,13 +593,13 @@ export default function PosComponent() {
                         </button>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-emerald-400">
+                    <div className="text-right shrink-0">
+                      <span className="font-bold text-emerald-400 text-xs">
                         ${(item.precioUnitario * item.cantidad).toFixed(2)}
                       </span>
                       <button
                         onClick={() => handleRemoverItem(idx)}
-                        className="block mt-1 text-slate-600 hover:text-rose-400"
+                        className="block mt-1 text-slate-500 hover:text-rose-400 ml-auto"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -777,6 +856,108 @@ export default function PosComponent() {
                 </div>
               )}
 
+              {/* Detalle de Pago para Transferencia */}
+              {metodoPago === "TRANSFERENCIA" && (
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-2 text-xs">
+                  <label className="text-[11px] font-bold text-blue-400 uppercase flex items-center gap-1">
+                    <ArrowRightLeft size={13} />
+                    Detalle de Transferencia:
+                  </label>
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">Banco / Cooperativa:</label>
+                    <select
+                      value={detalleTransferencia.banco}
+                      onChange={(e) => setDetalleTransferencia((prev) => ({ ...prev, banco: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-blue-500 font-semibold"
+                    >
+                      <option value="Banco Pichincha">Banco Pichincha</option>
+                      <option value="Banco Guayaquil">Banco Guayaquil</option>
+                      <option value="Produbanco">Produbanco / Promerica</option>
+                      <option value="Banco del Pacífico">Banco del Pacífico</option>
+                      <option value="Banco Bolivariano">Banco Bolivariano</option>
+                      <option value="Banco Internacional">Banco Internacional</option>
+                      <option value="Coop. San Francisco">Coop. San Francisco</option>
+                      <option value="Coop. Mushuc Runa">Coop. Mushuc Runa</option>
+                      <option value="Coop. 29 de Octubre">Coop. 29 de Octubre</option>
+                      <option value="Coop. Oscus">Coop. Oscus</option>
+                      <option value="DeUna / Billetera Digital">DeUna / Billetera Digital</option>
+                      <option value="Otro Banco/Coop">Otro Banco / Cooperativa</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">N° Comprobante / Referencia:</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: 9832145 o # TRX"
+                      value={detalleTransferencia.numeroComprobante}
+                      onChange={(e) => setDetalleTransferencia((prev) => ({ ...prev, numeroComprobante: e.target.value }))}
+                      className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Detalle de Pago para Tarjeta */}
+              {metodoPago === "TARJETA" && (
+                <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl space-y-2 text-xs">
+                  <label className="text-[11px] font-bold text-cyan-400 uppercase flex items-center gap-1">
+                    <CreditCard size={13} />
+                    Detalle de Cobro con Tarjeta:
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">Tipo:</label>
+                      <select
+                        value={detalleTarjeta.tipoTarjeta}
+                        onChange={(e) => setDetalleTarjeta((prev) => ({ ...prev, tipoTarjeta: e.target.value as any }))}
+                        className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-cyan-500 font-semibold"
+                      >
+                        <option value="DÉBITO">DÉBITO</option>
+                        <option value="CRÉDITO">CRÉDITO</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">Franquicia / Red:</label>
+                      <select
+                        value={detalleTarjeta.marcaTarjeta}
+                        onChange={(e) => setDetalleTarjeta((prev) => ({ ...prev, marcaTarjeta: e.target.value }))}
+                        className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-cyan-500 font-semibold"
+                      >
+                        <option value="VISA">VISA</option>
+                        <option value="MASTERCARD">MASTERCARD</option>
+                        <option value="DINERS">DINERS CLUB</option>
+                        <option value="DISCOVER">DISCOVER</option>
+                        <option value="AMEX">AMERICAN EXPRESS</option>
+                        <option value="OTRA">OTRA</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">N° Voucher / Recibo:</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: 004812"
+                        value={detalleTarjeta.numeroVoucher}
+                        onChange={(e) => setDetalleTarjeta((prev) => ({ ...prev, numeroVoucher: e.target.value }))}
+                        className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold uppercase block pb-0.5">N° Autorización / Lote:</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: AUT-9234"
+                        value={detalleTarjeta.numeroAutorizacion}
+                        onChange={(e) => setDetalleTarjeta((prev) => ({ ...prev, numeroAutorizacion: e.target.value }))}
+                        className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handleRegistrarVenta}
                 disabled={procesandoVenta}
@@ -931,7 +1112,7 @@ export default function PosComponent() {
             <div className="p-4 bg-slate-100 border-b flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Printer size={18} className="text-slate-700" />
-                <span className="font-bold text-xs uppercase tracking-wider text-slate-700">Comprobante de Venta POS</span>
+                <span className="font-bold text-xs uppercase tracking-wider text-slate-700">Ticket de Venta en Tienda</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex bg-slate-200 rounded-lg p-0.5 text-[10px] font-bold">
@@ -1030,8 +1211,44 @@ export default function PosComponent() {
                 </div>
                 <div className="flex justify-between text-slate-600 text-[11px]">
                   <span>Forma de Pago:</span>
-                  <span>{ultimoTicket.metodoPago}</span>
+                  <span className="font-bold text-slate-900">{ultimoTicket.metodoPago}</span>
                 </div>
+                {ultimoTicket.metodoPago === "TRANSFERENCIA" && ultimoTicket.detallePago && (
+                  <div className="text-[10px] text-slate-600 bg-slate-50 border border-slate-200 p-1.5 rounded space-y-0.5 mt-1">
+                    {ultimoTicket.detallePago.banco && (
+                      <div className="flex justify-between">
+                        <span>Banco / Coop:</span>
+                        <span className="font-semibold text-slate-900">{ultimoTicket.detallePago.banco}</span>
+                      </div>
+                    )}
+                    {ultimoTicket.detallePago.numeroComprobante && (
+                      <div className="flex justify-between">
+                        <span>N° Comprobante / Ref:</span>
+                        <span className="font-mono font-bold text-slate-900">#{ultimoTicket.detallePago.numeroComprobante}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {ultimoTicket.metodoPago === "TARJETA" && ultimoTicket.detallePago && (
+                  <div className="text-[10px] text-slate-600 bg-slate-50 border border-slate-200 p-1.5 rounded space-y-0.5 mt-1">
+                    <div className="flex justify-between">
+                      <span>Tipo / Franquicia:</span>
+                      <span className="font-semibold text-slate-900">{ultimoTicket.detallePago.tipoTarjeta} {ultimoTicket.detallePago.marcaTarjeta}</span>
+                    </div>
+                    {ultimoTicket.detallePago.numeroVoucher && (
+                      <div className="flex justify-between">
+                        <span>N° Voucher:</span>
+                        <span className="font-mono font-bold text-slate-900">#{ultimoTicket.detallePago.numeroVoucher}</span>
+                      </div>
+                    )}
+                    {ultimoTicket.detallePago.numeroAutorizacion && (
+                      <div className="flex justify-between">
+                        <span>Autorización / Lote:</span>
+                        <span className="font-mono text-slate-900">{ultimoTicket.detallePago.numeroAutorizacion}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {ultimoTicket.metodoPago === "EFECTIVO" && (
                   <>
                     <div className="flex justify-between text-slate-600 text-[11px]">
