@@ -69,6 +69,7 @@ export default function PosComponent() {
   const [productos, setProductos] = useState<ProductoBusqueda[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [itemsVenta, setItemsVenta] = useState<ItemVenta[]>([]);
+  const [descuentoVenta, setDescuentoVenta] = useState("");
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TARJETA" | "TRANSFERENCIA">("EFECTIVO");
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [ventaExitosa, setVentaExitosa] = useState(false);
@@ -168,12 +169,17 @@ export default function PosComponent() {
     setItemsVenta(itemsVenta.filter((_, i) => i !== index));
   };
 
-  const totalVenta = itemsVenta.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0);
+  const subtotalVenta = itemsVenta.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0);
+  const valorDescuento = Math.min(subtotalVenta, Math.max(0, parseFloat(descuentoVenta) || 0));
+  const totalVenta = Math.max(0, subtotalVenta - valorDescuento);
 
   const handleRegistrarVenta = async () => {
     if (itemsVenta.length === 0) return;
     try {
       setProcesandoVenta(true);
+      // Si hay descuento global, distribuirlo proporcionalmente en los precios unitarios
+      const factorDescuento = subtotalVenta > 0 ? (totalVenta / subtotalVenta) : 1;
+
       await ApiService.post("/pos/venta-directa", {
         metodoPago,
         lineas: itemsVenta.map((i) => ({
@@ -181,7 +187,7 @@ export default function PosComponent() {
           serieId: i.serieId,
           tallaId: i.tallaId,
           cantidad: i.cantidad,
-          precioUnitario: i.precioUnitario,
+          precioUnitario: Number((i.precioUnitario * factorDescuento).toFixed(2)),
         })),
       });
       showToast("Venta registrada exitosamente", "success");
@@ -191,6 +197,8 @@ export default function PosComponent() {
       const ticketData = {
         fecha: new Date().toLocaleString("es-EC"),
         items: [...itemsVenta],
+        subtotal: subtotalVenta,
+        descuento: valorDescuento,
         total: totalVenta,
         metodoPago,
         pagaCon: metodoPago === "EFECTIVO" ? (parseFloat(pagaCon) || totalVenta) : totalVenta,
@@ -201,6 +209,7 @@ export default function PosComponent() {
       setTicketModalOpen(true);
 
       setItemsVenta([]);
+      setDescuentoVenta("");
       setPagaCon("");
       await cargarEstadoCaja();
       await cargarProductos();
@@ -438,9 +447,56 @@ export default function PosComponent() {
           {/* Footer del Ticket */}
           {itemsVenta.length > 0 && (
             <div className="pt-4 border-t border-slate-700/50 space-y-3 mt-4">
-              <div className="flex justify-between items-center text-lg font-black text-white">
-                <span>TOTAL:</span>
-                <span className="text-emerald-400">${totalVenta.toFixed(2)}</span>
+              {/* Desglose Subtotal, Descuento y Total */}
+              <div className="space-y-1.5 p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
+                <div className="flex justify-between text-slate-400">
+                  <span>Subtotal ({itemsVenta.reduce((s, i) => s + i.cantidad, 0)} pares):</span>
+                  <span className="font-semibold text-slate-200">${subtotalVenta.toFixed(2)}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+                  <span className="text-amber-400 font-semibold flex items-center gap-1">
+                    🎁 Descuento ($):
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={descuentoVenta}
+                      onChange={(e) => setDescuentoVenta(e.target.value)}
+                      className="w-20 px-2 py-0.5 bg-slate-900 border border-slate-700 rounded text-right font-bold text-amber-400 text-xs focus:outline-none focus:border-amber-500"
+                    />
+                    {/* Botones rápidos de descuento % */}
+                    <button
+                      type="button"
+                      onClick={() => setDescuentoVenta((subtotalVenta * 0.05).toFixed(2))}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 rounded text-[10px] font-bold cursor-pointer"
+                    >
+                      5%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDescuentoVenta((subtotalVenta * 0.10).toFixed(2))}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 rounded text-[10px] font-bold cursor-pointer"
+                    >
+                      10%
+                    </button>
+                  </div>
+                </div>
+
+                {valorDescuento > 0 && (
+                  <div className="flex justify-between text-amber-400 text-[11px] font-bold">
+                    <span>Rebaja aplicada:</span>
+                    <span>-${valorDescuento.toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center text-base font-black text-white pt-1 border-t border-slate-700">
+                  <span>TOTAL A COBRAR:</span>
+                  <span className="text-emerald-400 text-lg">${totalVenta.toFixed(2)}</span>
+                </div>
               </div>
 
               {/* Método de Pago */}
@@ -713,7 +769,19 @@ export default function PosComponent() {
               </div>
 
               <div className="space-y-1 border-b border-dashed pb-3 text-xs">
-                <div className="flex justify-between font-black text-sm">
+                {ultimoTicket.descuento > 0 && (
+                  <>
+                    <div className="flex justify-between text-slate-600 text-[11px]">
+                      <span>Subtotal:</span>
+                      <span>${ultimoTicket.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-600 font-bold text-[11px]">
+                      <span>Descuento aplicado:</span>
+                      <span>-${ultimoTicket.descuento.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between font-black text-sm pt-0.5">
                   <span>TOTAL:</span>
                   <span>${ultimoTicket.total.toFixed(2)}</span>
                 </div>

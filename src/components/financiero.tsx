@@ -16,6 +16,7 @@ import {
   CreditCard,
   History,
   X,
+  ArrowLeft,
   ArrowDownRight,
   ArrowUpRight,
   TrendingUp,
@@ -1736,29 +1737,39 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   {/* Método de Pago */}
                   <div>
                     <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1">
-                      Método de Pago *
+                      Método de Liquidación / Abono *
                     </label>
                     <select
                       value={metodoAbono}
                       onChange={(e) => setMetodoAbono(e.target.value)}
                       className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] transition-all"
                     >
-                      <option value="EFECTIVO">Efectivo</option>
-                      <option value="TRANSFERENCIA">Transferencia Bancaria</option>
-                      <option value="DEPOSITO">Depósito Bancario</option>
-                      <option value="CHEQUE">Cheque</option>
+                      <option value="EFECTIVO">💵 Efectivo</option>
+                      <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
+                      <option value="DEPOSITO">💳 Depósito Bancario</option>
+                      <option value="CHEQUE">📑 Cheque</option>
+                      <option value="DESCUENTO_COMERCIAL">🎁 Descuento / Rebaja (Retención de Mercadería)</option>
                     </select>
                   </div>
 
-                  {/* Referencia / Comprobante — solo si NO es EFECTIVO */}
+                  {metodoAbono === 'DESCUENTO_COMERCIAL' && (
+                    <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-800 space-y-1">
+                      <span className="font-bold flex items-center gap-1">💡 Descuento de Retención / Fidelización</span>
+                      <p>
+                        Este monto rebajará el saldo del cliente por concepto de descuento comercial acordado, evitando la devolución física del calzado a bodega.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Referencia / Justificación — solo si NO es EFECTIVO */}
                   {metodoAbono !== 'EFECTIVO' && (
                     <div>
                       <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1">
-                        N° Comprobante / Referencia / Banco *
+                        {metodoAbono === 'DESCUENTO_COMERCIAL' ? 'Motivo / Justificación del Descuento *' : 'N° Comprobante / Referencia / Banco *'}
                       </label>
                       <input
                         type="text"
-                        placeholder="Ej. Transf #12948 Banco Pichincha"
+                        placeholder={metodoAbono === 'DESCUENTO_COMERCIAL' ? 'Ej. Descuento por retención de mercadería / Bonificación acordada' : 'Ej. Transf #12948 Banco Pichincha'}
                         value={notasAbono}
                         onChange={(e) => setNotasAbono(e.target.value)}
                         className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] transition-all"
@@ -1769,10 +1780,18 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   <button
                     onClick={handleRegistrarAbono}
                     disabled={savingAbono || !montoAbono || !online}
-                    className="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    className={`w-full py-3 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer ${
+                      metodoAbono === 'DESCUENTO_COMERCIAL'
+                        ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 shadow-amber-500/20'
+                        : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 shadow-emerald-500/20'
+                    }`}
                   >
                     {savingAbono ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                    <span>{savingAbono ? 'Guardando...' : 'Confirmar Abono'}</span>
+                    <span>
+                      {savingAbono
+                        ? 'Procesando...'
+                        : (metodoAbono === 'DESCUENTO_COMERCIAL' ? 'Aplicar Descuento a la Deuda' : 'Confirmar Abono')}
+                    </span>
                   </button>
                 </div>
               )}
@@ -1853,12 +1872,27 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowHistorialModal(false)}
-                className="p-1.5 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowHistorialModal(false);
+                    setShowCuentaModal(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted)]/80 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-[var(--border)]"
+                  title="Volver a la gestión de cobro"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Volver a Cobros</span>
+                </button>
+                <button
+                  onClick={() => setShowHistorialModal(false)}
+                  className="p-1.5 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  title="Cerrar ventana"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-5 overflow-y-auto flex-1">
@@ -2102,10 +2136,22 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
               )}
             </div>
 
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex justify-end">
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-between gap-2">
               <button
+                type="button"
+                onClick={() => {
+                  setShowHistorialModal(false);
+                  setShowCuentaModal(true);
+                }}
+                className="px-4 py-2 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <ArrowLeft size={14} />
+                <span>Volver a Cobros</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowHistorialModal(false)}
-                className="px-5 py-2 bg-[#0F172A] text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors"
+                className="px-5 py-2 bg-[#0F172A] text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Cerrar Historial
               </button>
@@ -2129,16 +2175,54 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   <p className="text-[11px] text-slate-300">Cliente: <strong className="text-white">{carteraSeleccionada.clienteNombre}</strong> (C.I: {carteraSeleccionada.clienteCedula})</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowDevolucionModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDevolucionModal(false);
+                    setShowCuentaModal(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white/10 text-slate-200 hover:text-white hover:bg-white/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10"
+                  title="Volver a la gestión de cobro"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Volver a Cobros</span>
+                </button>
+                <button
+                  onClick={() => setShowDevolucionModal(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Cerrar ventana"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {/* Formulario */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+              {/* Tarjeta de Sugerencia Comercial / Descuento de Retención */}
+              <div className="p-3.5 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="font-extrabold text-xs text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                    💡 ¿Deseas ofrecer un Descuento de Retención?
+                  </span>
+                  <p className="text-[11px] text-amber-800 dark:text-amber-400">
+                    Aplica una rebaja comercial sobre la deuda del cliente para que conserve el calzado y evitar el reingreso físico a bodega.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDevolucionModal(false);
+                    setMetodoAbono('DESCUENTO_COMERCIAL');
+                    setNotasAbono('Descuento de retención acordado para evitar devolución de calzado');
+                    setShowCuentaModal(true);
+                  }}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-xs shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  🎁 Aplicar Descuento
+                </button>
+              </div>
               {/* 1. Selector de Modelos VENDIDOS A ESTE CLIENTE */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -2188,11 +2272,11 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                           (p.serieNombre && p.serieNombre.toLowerCase().includes(q))
                         );
                       })
-                      .map((p) => {
+                      .map((p, idx) => {
                         const isSelected = productoSeleccionadoDevolucionObj?.id === p.id;
                         return (
                           <button
-                            key={p.id}
+                            key={p.id ? `prod-dev-${p.id}` : `prod-dev-idx-${idx}`}
                             type="button"
                             onClick={() => handleSeleccionarProductoDevolucion(p)}
                             className={`p-2 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
@@ -2356,9 +2440,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                         Curva de Tallas Distribuidas ({productoSeleccionadoDevolucionObj.serieNombre || 'Serie'}):
                       </span>
                       <div className="flex flex-wrap gap-1.5">
-                        {productoSeleccionadoDevolucionObj.tallas.map((t: any) => (
+                        {productoSeleccionadoDevolucionObj.tallas.map((t: any, idx: number) => (
                           <span
-                            key={t.id || t.numeroTalla}
+                            key={t.id ? `curva-${t.id}` : `curva-talla-${t.numeroTalla || t.numero || idx}`}
                             className="px-2 py-0.5 bg-emerald-500/10 text-emerald-800 rounded-md border border-emerald-500/20 text-[10px] font-bold"
                           >
                             T{t.numeroTalla || t.numero}: {t.stock || 1} par
@@ -2382,12 +2466,12 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                         { id: 't40', numeroTalla: 40 },
                         { id: 't41', numeroTalla: 41 },
                         { id: 't42', numeroTalla: 42 },
-                      ]).map((t: any) => {
+                      ]).map((t: any, idx: number) => {
                         const tallaVal = t.id || String(t.numeroTalla || t.numero);
                         const isTallaSelected = (devolucionTallaId === tallaVal || devolucionTallaId === String(t.numeroTalla));
                         return (
                           <button
-                            key={t.id || t.numeroTalla}
+                            key={t.id ? `talla-btn-${t.id}` : `talla-btn-${t.numeroTalla || t.numero || idx}`}
                             type="button"
                             onClick={() => setDevolucionTallaId(tallaVal)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
@@ -2550,8 +2634,19 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
             <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex gap-2">
               <button
                 type="button"
+                onClick={() => {
+                  setShowDevolucionModal(false);
+                  setShowCuentaModal(true);
+                }}
+                className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <ArrowLeft size={14} />
+                <span>Volver a Cobros</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowDevolucionModal(false)}
-                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-xs font-bold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                className="px-3 py-2.5 border border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
@@ -2651,12 +2746,27 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowFacturaModal(false)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <X size={18} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowFacturaModal(false);
+                      setShowCuentaModal(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white/10 text-slate-200 hover:text-white hover:bg-white/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10"
+                    title="Volver a la gestión de cobro"
+                  >
+                    <ArrowLeft size={14} />
+                    <span>Volver a Cobros</span>
+                  </button>
+                  <button
+                    onClick={() => setShowFacturaModal(false)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Cerrar ventana"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
 
               {/* Pestañas */}
@@ -3165,10 +3275,22 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
             <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
-                  onClick={() => setShowFacturaModal(false)}
-                  className="flex-1 sm:flex-none px-5 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    setShowFacturaModal(false);
+                    setShowCuentaModal(true);
+                  }}
+                  className="flex-1 sm:flex-none px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                 >
-                  Cerrar
+                  <ArrowLeft size={14} />
+                  <span>Volver a Cobros</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowFacturaModal(false)}
+                  className="flex-1 sm:flex-none px-4 py-2.5 border border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Cerrar Todo
                 </button>
                 {/* Botón Imprimir / Guardar PDF */}
                 {tabFactura === 'PREVISUALIZAR' && (

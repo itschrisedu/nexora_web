@@ -237,11 +237,13 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [showEditProduct, setShowEditProduct] = useState(false);
   const [editProduct, setEditProduct] = useState<Producto | null>(null);
   const [editProductColor, setEditProductColor] = useState("");
+  const [editProductSerieId, setEditProductSerieId] = useState("");
   const [editProductImage, setEditProductImage] = useState<string | null>(null);
   const [editProductImageChanged, setEditProductImageChanged] = useState(false);
   const [editProductCosto, setEditProductCosto] = useState("");
   const [editProductVenta, setEditProductVenta] = useState("");
   const [editProductTallas, setEditProductTallas] = useState<{ tallaId: string; numero: number; cantidad: number }[]>([]);
+  const [newTallaNumeroInput, setNewTallaNumeroInput] = useState("");
 
   // ── Estado para modal de Edición del Modelo Base ──
   const [showEditModel, setShowEditModel] = useState(false);
@@ -765,14 +767,51 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setEditProductImageChanged(false);
     setEditProductCosto(String(p.precioCosto));
     setEditProductVenta(String(p.precioVenta));
+    setEditProductSerieId((p.serie as any)?.id || (p as any).serieId || "");
     const tallasData = (p.tallas || (p as any).stockPorTalla || []).map((t: any) => ({
-      tallaId: t.tallaId,
+      tallaId: t.tallaId || t.id,
       numero: t.numero,
       cantidad: t.cantidad ?? t.disponible ?? 0,
     }));
     setEditProductTallas(tallasData);
+    setNewTallaNumeroInput("");
     setError("");
     setShowEditProduct(true);
+  };
+
+  const handleChangeEditSerie = (newSerieId: string) => {
+    setEditProductSerieId(newSerieId);
+    const selectedSerie = series.find(s => s.id === newSerieId);
+    if (selectedSerie && selectedSerie.tallas) {
+      const existingMap: Record<number, number> = {};
+      editProductTallas.forEach(t => { existingMap[t.numero] = t.cantidad; });
+
+      const newTallasList = selectedSerie.tallas.map(t => ({
+        tallaId: t.id,
+        numero: t.numero,
+        cantidad: existingMap[t.numero] ?? 0,
+      }));
+      setEditProductTallas(newTallasList);
+    }
+  };
+
+  const handleAddCustomTallaToEdit = () => {
+    const num = parseInt(newTallaNumeroInput);
+    if (isNaN(num) || num < 10 || num > 60) {
+      setError("Ingresa un número de talla válido (ej: 38, 39, 44).");
+      return;
+    }
+    if (editProductTallas.some(t => t.numero === num)) {
+      setError(`La talla #${num} ya está en la lista.`);
+      return;
+    }
+    setEditProductTallas(prev => [...prev, { tallaId: "", numero: num, cantidad: 0 }].sort((a, b) => a.numero - b.numero));
+    setNewTallaNumeroInput("");
+    setError("");
+  };
+
+  const handleRemoveTallaFromEdit = (numero: number) => {
+    setEditProductTallas(prev => prev.filter(t => t.numero !== numero));
   };
 
   const handleEditProductFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -820,10 +859,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
       await ApiService.put(`/inventario/productos/${editProduct.id}`, {
         color: editProductColor.trim(),
         imageUrl: finalImageUrl || undefined,
+        serieId: editProductSerieId || undefined,
         costPrice: costo,
         salePrice: venta,
         tallas: editProductTallas.map(t => ({
-          tallaId: t.tallaId,
+          tallaId: t.tallaId || undefined,
+          numero: t.numero,
           cantidad: t.cantidad,
         })),
       });
@@ -1224,12 +1265,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                 </button>
                               )}
                               <button onClick={() => openEditProduct(p)}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-blue-600 border border-blue-500/30 rounded-lg hover:bg-blue-500/10 transition-colors">
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs">
                                 <Edit2 size={12} /><span>Editar Variante</span>
-                              </button>
-                              <button onClick={() => openPrice(p)}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#0F172A] border border-[#0F172A]/30 rounded-lg hover:bg-[#0F172A]/10 transition-colors">
-                                <DollarSign size={12} /><span>Ajustar Precios</span>
                               </button>
                             </div>
                           </div>
@@ -1967,9 +2004,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
             <div className="p-5 border-b border-[var(--border)] flex items-center justify-between shrink-0">
               <div>
-                <h3 className="font-bold text-base">Editar Variante</h3>
+                <h3 className="font-bold text-base">Editar Variante de Calzado</h3>
                 <p className="text-xs text-[var(--muted-foreground)]">
-                  {editProduct.codigo} · {editProduct.serie?.nombre ? getNombreSerie(editProduct.serie.nombre) : ""}
+                  {editProduct.codigo} · Modifica color, serie, numeración, stock, precios e imagen
                 </p>
               </div>
               <button onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
@@ -2012,39 +2049,110 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   className={INPUT} required placeholder="Ej: Negro, Café, Miel..." />
               </div>
 
-              {/* Precios */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Lbl t="Precio Costo ($)" req />
-                  <input type="number" step="0.01" min="0.01" value={editProductCosto}
-                    onChange={e => setEditProductCosto(e.target.value)} className={INPUT} required />
-                </div>
-                <div>
-                  <Lbl t="Precio Venta ($)" req />
-                  <input type="number" step="0.01" min="0.01" value={editProductVenta}
-                    onChange={e => setEditProductVenta(e.target.value)} className={INPUT} required />
-                </div>
+              {/* Serie Asociada (Modificar Serie / Numeración) */}
+              <div>
+                <Lbl t="Serie de Numeración" req />
+                <select
+                  value={editProductSerieId}
+                  onChange={(e) => handleChangeEditSerie(e.target.value)}
+                  className={INPUT}
+                >
+                  <option value="">-- Seleccionar Serie --</option>
+                  {series.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {getNombreSerie(s.nombre)} {s.tallas && s.tallas.length > 0 ? `(${s.tallas[0].numero}-${s.tallas[s.tallas.length - 1].numero})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Stock por Tallas */}
-              {editProductTallas.length > 0 && (
-                <div>
-                  <Lbl t="Stock por Talla (pares)" />
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-1">
+              {/* Stock por Tallas / Numeración */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Lbl t="Numeración y Stock (pares por número)" />
+                  <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                    Total: {editProductTallas.reduce((acc, t) => acc + (t.cantidad || 0), 0)} pares
+                  </span>
+                </div>
+
+                {editProductTallas.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl">
                     {editProductTallas.sort((a, b) => a.numero - b.numero).map((t, i) => (
-                      <div key={t.tallaId} className="flex flex-col items-center gap-1">
-                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">T{t.numero}</span>
-                        <input type="number" min="0" value={t.cantidad}
-                          onChange={e => {
-                            const val = parseInt(e.target.value) || 0;
-                            setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: val } : tt));
-                          }}
-                          className="w-full px-2 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-lg text-xs text-center focus:outline-none focus:border-[#0F172A]" />
+                      <div key={t.tallaId || `t-${t.numero}`} className="p-2 bg-[var(--card)] border border-[var(--border)] rounded-lg flex flex-col justify-between gap-1 shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-[var(--foreground)]">Talla #{t.numero}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTallaFromEdit(t.numero)}
+                            className="text-slate-400 hover:text-red-500 transition-colors p-0.5"
+                            title="Quitar esta talla de la variante"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={t.cantidad}
+                            onChange={e => {
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: val } : tt));
+                            }}
+                            className="w-full px-2 py-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded text-xs text-center font-bold focus:outline-none focus:border-blue-600"
+                            placeholder="0"
+                          />
+                          <span className="text-[10px] text-[var(--muted-foreground)] font-medium">pares</span>
+                        </div>
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-xs text-[var(--muted-foreground)] italic p-2 border border-dashed rounded-lg text-center">
+                    No hay tallas asignadas. Selecciona una serie o añade tallas abajo.
+                  </p>
+                )}
+
+                {/* Formulario rápido para añadir talla adicional a la numeración */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="number"
+                    min="10"
+                    max="60"
+                    placeholder="N° Talla (ej: 44)"
+                    value={newTallaNumeroInput}
+                    onChange={(e) => setNewTallaNumeroInput(e.target.value)}
+                    className="w-32 px-3 py-1.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-blue-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomTallaToEdit}
+                    className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-600 hover:text-white rounded-xl text-xs font-bold border border-blue-500/30 flex items-center gap-1 transition-all"
+                  >
+                    <Plus size={13} />
+                    <span>Añadir Talla</span>
+                  </button>
                 </div>
-              )}
+              </div>
+
+              {/* Precios Unificados */}
+              <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-3">
+                <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+                  Ajuste de Precios
+                </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Lbl t="Precio Costo ($)" req />
+                    <input type="number" step="0.01" min="0.01" value={editProductCosto}
+                      onChange={e => setEditProductCosto(e.target.value)} className={INPUT} required />
+                  </div>
+                  <div>
+                    <Lbl t="Precio Venta ($)" req />
+                    <input type="number" step="0.01" min="0.01" value={editProductVenta}
+                      onChange={e => setEditProductVenta(e.target.value)} className={INPUT} required />
+                  </div>
+                </div>
+              </div>
 
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
@@ -2057,7 +2165,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   Cancelar
                 </button>
                 <button type="submit" disabled={saving}
-                  className="px-4 py-2.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
+                  className="px-5 py-2.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                   <span>Guardar Cambios</span>
                 </button>

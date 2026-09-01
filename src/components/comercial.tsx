@@ -115,10 +115,14 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   // Modal para Generar Orden a Proveedor desde Pedido Especial
   const [showSupplierOrderModal, setShowSupplierOrderModal] = useState(false);
   const [supplierOrderProductData, setSupplierOrderProductData] = useState<any>(null);
+  const [supplierOrderModalType, setSupplierOrderModalType] = useState<'SERIE_COMPLETA' | 'NUMERACION'>('SERIE_COMPLETA');
+  const [supplierOrderSubtipoSerie, setSupplierOrderSubtipoSerie] = useState<'MEDIA_DOCENA' | 'DOCENA'>('MEDIA_DOCENA');
+  const [supplierOrderCantSeries, setSupplierOrderCantSeries] = useState(1);
+  const [supplierOrderTallasMap, setSupplierOrderTallasMap] = useState<Record<string, number>>({});
+  const [supplierOrderObservaciones, setSupplierOrderObservaciones] = useState('');
   const [listaProveedores, setListaProveedores] = useState<any[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
-  const [supplierOrderCost, setSupplierOrderCost] = useState('');
-  const [supplierOrderQuantity, setSupplierOrderQuantity] = useState(1);
+  const [supplierOrderCost, setSupplierOrderCost] = useState('15.00');
   const [savingSupplierOrder, setSavingSupplierOrder] = useState(false);
 
   const [canalEntrada, setCanalEntrada] = useState<'VENTA_DIRECTA' | 'POS' | 'CATALOGO_DIGITAL'>('VENTA_DIRECTA');
@@ -219,8 +223,34 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
   const handleAbrirOrdenProveedor = (item: any) => {
     setSupplierOrderProductData(item);
-    setSupplierOrderQuantity(item.totalPares || 12);
+    
+    // Determinar si es venta por serie completa o numeración
+    const esMediaDocena = item.subtipoSerie === 'MEDIA_DOCENA';
+    const esDocena = item.subtipoSerie === 'DOCENA';
+    const esSerieCompleta = item.tipoVenta === 'SERIE_COMPLETA' || item.tipoVenta === 'SERIE_ESPECIAL' || esMediaDocena || esDocena;
+
+    setSupplierOrderModalType(esSerieCompleta ? 'SERIE_COMPLETA' : 'NUMERACION');
+    setSupplierOrderSubtipoSerie(esDocena ? 'DOCENA' : 'MEDIA_DOCENA');
+    setSupplierOrderCantSeries(1);
+
+    // Mapear tallas si vienen líneas específicas
+    const mapTallas: Record<string, number> = {};
+    if (item.lineas && Array.isArray(item.lineas)) {
+      item.lineas.forEach((l: any) => {
+        const key = `Talla #${l.numeroTalla || l.tallaNumero || 38}`;
+        mapTallas[key] = (mapTallas[key] || 0) + l.cantidad;
+      });
+    } else {
+      // Tallas estándar por defecto si no vienen
+      [38, 39, 40, 41, 42, 43].forEach(num => {
+        mapTallas[`Talla #${num}`] = 0;
+      });
+    }
+    setSupplierOrderTallasMap(mapTallas);
+
     setSupplierOrderCost(String(item.costPrice || (Number(item.precioUnitario) * 0.6).toFixed(2) || '15.00'));
+    setSupplierOrderObservaciones('');
+
     if (listaProveedores.length > 0 && !selectedSupplierId) {
       setSelectedSupplierId(listaProveedores[0].id);
     }
@@ -233,19 +263,47 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       showToast('Selecciona un proveedor para emitir la orden.', 'warning');
       return;
     }
+
+    const paresTotales = supplierOrderModalType === 'SERIE_COMPLETA'
+      ? (supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * supplierOrderCantSeries
+      : Object.values(supplierOrderTallasMap).reduce((a, b) => a + (b || 0), 0);
+
+    if (paresTotales <= 0) {
+      showToast('La cantidad de pares debe ser mayor a 0.', 'warning');
+      return;
+    }
+
     setSavingSupplierOrder(true);
     try {
+      let detalleNumeracion = '';
+      if (supplierOrderModalType === 'SERIE_COMPLETA') {
+        detalleNumeracion = `Serie Completa: ${supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? '½ Docena (6 pares)' : '1 Docena (12 pares)'} x ${supplierOrderCantSeries} pedido(s)`;
+      } else {
+        const tallasDesglose = Object.entries(supplierOrderTallasMap)
+          .filter(([_, qty]) => qty > 0)
+          .map(([key, qty]) => `${key}: ${qty} pares`)
+          .join(', ');
+        detalleNumeracion = `Por Numeración: ${tallasDesglose}`;
+      }
+
+      const notaFinal = [
+        `Modelo: ${supplierOrderProductData.modelName} (${supplierOrderProductData.color}) - Serie: ${supplierOrderProductData.serieNombre || 'Estándar'}`,
+        detalleNumeracion,
+        supplierOrderObservaciones.trim() ? `Observaciones: ${supplierOrderObservaciones.trim()}` : '',
+      ].filter(Boolean).join(' | ');
+
       await ApiService.post('/proveedores/ordenes-compra', {
         supplierId: selectedSupplierId,
+        observaciones: notaFinal,
         lines: [
           {
             productId: supplierOrderProductData.productId || (supplierOrderProductData as any).id,
-            cantidadPedida: Number(supplierOrderQuantity) || 1,
+            cantidadPedida: paresTotales,
             precioCosto: parseFloat(supplierOrderCost) || 10,
           },
         ],
       });
-      showToast('¡Orden de compra generada exitosamente para el proveedor!', 'success');
+      showToast('¡Orden de compra y fabricación enviada al proveedor exitosamente!', 'success');
       setShowSupplierOrderModal(false);
       setSupplierOrderProductData(null);
     } catch (err: any) {
@@ -1973,15 +2031,15 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       {/* ── MODAL GENERAR ORDEN A PROVEEDOR ── */}
       {showSupplierOrderModal && supplierOrderProductData && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between bg-purple-500/10">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between bg-purple-500/10 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-700 flex items-center justify-center">
                   <Truck size={18} />
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-[var(--foreground)]">Orden de Fabricación / Compra</h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">Emitir pedido a proveedor</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">Especifica curva, numeración y observaciones para el proveedor</p>
                 </div>
               </div>
               <button
@@ -1995,7 +2053,8 @@ export default function ComercialComponent({ online, userRole, userPermissions }
               </button>
             </div>
 
-            <form onSubmit={handleCrearOrdenProveedor} className="p-5 space-y-4">
+            <form onSubmit={handleCrearOrdenProveedor} className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Resumen del Artículo */}
               <div className="p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-1">
                 <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">Artículo Solicitado</span>
                 <p className="text-xs font-black text-[var(--foreground)]">
@@ -2006,6 +2065,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 </p>
               </div>
 
+              {/* Proveedor */}
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
                   Proveedor Asignado *
@@ -2027,21 +2087,154 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                    Cantidad Total (Pares) *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={supplierOrderQuantity}
-                    onChange={(e) => setSupplierOrderQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
-                    required
-                  />
+              {/* Modalidad de Pedido a Proveedor: Serie Completa vs Numeración */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
+                  Modalidad de Pedido al Proveedor *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSupplierOrderModalType('SERIE_COMPLETA')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      supplierOrderModalType === 'SERIE_COMPLETA'
+                        ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
+                    }`}
+                  >
+                    <Package size={13} />
+                    <span>Serie Completa / Curva</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSupplierOrderModalType('NUMERACION')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      supplierOrderModalType === 'NUMERACION'
+                        ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
+                    }`}
+                  >
+                    <span>👟 Por Numeración</span>
+                  </button>
                 </div>
+              </div>
 
+              {/* Configuración de Serie Completa */}
+              {supplierOrderModalType === 'SERIE_COMPLETA' ? (
+                <div className="p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Curva de Serie
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSupplierOrderSubtipoSerie('MEDIA_DOCENA')}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold border text-center transition-all ${
+                          supplierOrderSubtipoSerie === 'MEDIA_DOCENA'
+                            ? 'bg-purple-600 text-white border-transparent'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                        }`}
+                      >
+                        ½ Media Docena (6 pares)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSupplierOrderSubtipoSerie('DOCENA')}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold border text-center transition-all ${
+                          supplierOrderSubtipoSerie === 'DOCENA'
+                            ? 'bg-purple-600 text-white border-transparent'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                        }`}
+                      >
+                        1 Docena (12 pares)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <label className="text-xs font-semibold text-[var(--muted-foreground)]">
+                      Cantidad de {supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}:
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setSupplierOrderCantSeries(Math.max(1, supplierOrderCantSeries - 1))}
+                        className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        value={supplierOrderCantSeries}
+                        onChange={(e) => setSupplierOrderCantSeries(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSupplierOrderCantSeries(supplierOrderCantSeries + 1)}
+                        className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-2 bg-purple-500/10 rounded-lg text-[11px] font-semibold text-purple-900 flex justify-between">
+                    <span>Pares Totales a Fabricar:</span>
+                    <span className="font-black font-mono">
+                      {(supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * supplierOrderCantSeries} pares
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Configuración Por Numeración Específica */
+                <div className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-2">
+                  <span className="text-xs font-bold text-[var(--foreground)] block">
+                    👟 Asigna la cantidad de pares por cada número de talla:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {Object.entries(supplierOrderTallasMap).map(([key, qty]) => (
+                      <div key={key} className="p-2 bg-[var(--card)] border border-[var(--border)] rounded-lg flex items-center justify-between shadow-xs">
+                        <span className="text-xs font-bold">{key}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setSupplierOrderTallasMap({ ...supplierOrderTallasMap, [key]: Math.max(0, qty - 1) })}
+                            className="w-6 h-6 rounded bg-[var(--muted)]/40 hover:bg-[var(--muted)] flex items-center justify-center font-bold text-xs"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="0"
+                            value={qty}
+                            onChange={(e) => setSupplierOrderTallasMap({ ...supplierOrderTallasMap, [key]: Math.max(0, parseInt(e.target.value) || 0) })}
+                            className="w-10 h-6 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setSupplierOrderTallasMap({ ...supplierOrderTallasMap, [key]: qty + 1 })}
+                            className="w-6 h-6 rounded bg-[var(--muted)]/40 hover:bg-[var(--muted)] flex items-center justify-center font-bold text-xs"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-2 bg-purple-500/10 rounded-lg text-[11px] font-semibold text-purple-900 flex justify-between">
+                    <span>Pares Totales:</span>
+                    <span className="font-black font-mono">
+                      {Object.values(supplierOrderTallasMap).reduce((a, b) => a + (b || 0), 0)} pares
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Costo Estimado */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
                     Costo Estimado c/u ($) *
@@ -2056,13 +2249,32 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     required
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                    Total Orden Compra ($)
+                  </label>
+                  <div className="w-full px-3 py-2 bg-purple-500/10 border border-purple-500/25 rounded-xl text-xs font-black text-purple-900 flex items-center">
+                    ${((supplierOrderModalType === 'SERIE_COMPLETA'
+                        ? (supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * supplierOrderCantSeries
+                        : Object.values(supplierOrderTallasMap).reduce((a, b) => a + (b || 0), 0)
+                      ) * (parseFloat(supplierOrderCost) || 0)).toFixed(2)}
+                  </div>
+                </div>
               </div>
 
-              <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center justify-between text-xs">
-                <span className="text-[var(--muted-foreground)]">Total Orden Compra:</span>
-                <span className="font-black text-purple-800 text-sm">
-                  ${((supplierOrderQuantity || 0) * (parseFloat(supplierOrderCost) || 0)).toFixed(2)}
-                </span>
+              {/* Observaciones para el Proveedor (Opcional) */}
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                  Observaciones / Especificaciones para el Proveedor (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ej: Suela de caucho color beige, empaque individual en cajas con etiqueta de marca, entrega urgente para el viernes..."
+                  value={supplierOrderObservaciones}
+                  onChange={(e) => setSupplierOrderObservaciones(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] focus:outline-none focus:border-purple-600 placeholder:text-[var(--muted-foreground)]"
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -2079,10 +2291,10 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 <button
                   type="submit"
                   disabled={savingSupplierOrder || !selectedSupplierId}
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {savingSupplierOrder ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
-                  <span>Enviar Orden</span>
+                  <span>Enviar Orden al Proveedor</span>
                 </button>
               </div>
             </form>
