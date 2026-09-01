@@ -1966,7 +1966,15 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                                   let refCode = refMatch ? refMatch[1].trim() : null;
                                   if (refCode && !refCode.startsWith('#')) refCode = `#${refCode}`;
                                   if (refCode) refCode = refCode.slice(0, 7).toUpperCase();
-                                  const detalle = detalleMatch ? detalleMatch[1].trim() : null;
+                                  
+                                  let detalle = detalleMatch ? detalleMatch[1].trim() : null;
+                                  if (detalle) {
+                                    detalle = detalle
+                                      .replace(/\b1\s+pares\b/gi, '1 par')
+                                      .replace(/^faltante:?\s*/i, 'Déficit pedido: ')
+                                      .replace(/\+\s*12\s*stock/i, '+ 12 pares p/ stock')
+                                      .replace(/\+\s*12\s*pares\s*stock/i, '+ 12 pares p/ stock');
+                                  }
 
                                   return (
                                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
