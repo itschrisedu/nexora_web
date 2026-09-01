@@ -24,6 +24,8 @@ import {
   User,
   FileText,
   Search,
+  Loader2,
+  ShoppingBag,
 } from "lucide-react";
 
 interface CajaEstado {
@@ -65,7 +67,9 @@ interface ItemVenta {
 export default function PosComponent() {
   const { showToast } = useToast();
   const [caja, setCaja] = useState<CajaEstado>({ abierta: false });
-  const [loadingCaja, setLoadingCaja] = useState(true);
+  const [loadingInicial, setLoadingInicial] = useState(true);
+  const [abriendoCaja, setAbriendoCaja] = useState(false);
+  const [cerrandoCaja, setCerrandoCaja] = useState(false);
   const [montoApertura, setMontoApertura] = useState("0");
   const [modalAperturaOpen, setModalAperturaOpen] = useState(false);
 
@@ -118,9 +122,16 @@ export default function PosComponent() {
   const [resultadoCierre, setResultadoCierre] = useState<any>(null);
 
   useEffect(() => {
-    cargarEstadoCaja();
-    cargarProductos();
-    cargarNegocioInfo();
+    const inicializar = async () => {
+      setLoadingInicial(true);
+      await Promise.allSettled([
+        cargarEstadoCaja(),
+        cargarProductos(),
+        cargarNegocioInfo(),
+      ]);
+      setLoadingInicial(false);
+    };
+    inicializar();
   }, []);
 
   const cargarNegocioInfo = async () => {
@@ -132,13 +143,27 @@ export default function PosComponent() {
 
   const cargarEstadoCaja = async () => {
     try {
-      setLoadingCaja(true);
       const res = await ApiService.get("/pos/caja/estado");
-      setCaja(res);
+      if (res?.abierta && res.caja) {
+        setCaja({
+          abierta: true,
+          sesionId: res.caja.id,
+          montoInicial: res.caja.montoInicial,
+          totalVentas: res.caja.totalVentas,
+          totalEfectivo: res.caja.ventasEfectivo,
+          totalTarjeta: res.caja.ventasTarjeta,
+          totalTransferencia: res.caja.ventasTransferencia,
+          montoEsperadoEfectivo: res.caja.montoEsperadoEfectivo,
+          fechaApertura: res.caja.fechaApertura,
+        });
+      } else if (res?.abierta) {
+        setCaja(res);
+      } else {
+        setCaja({ abierta: false });
+      }
     } catch (err) {
       console.error("Error al cargar estado de caja:", err);
-    } finally {
-      setLoadingCaja(false);
+      setCaja({ abierta: false });
     }
   };
 
@@ -159,16 +184,17 @@ export default function PosComponent() {
   const handleAbrirCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      setLoadingCaja(true);
+      setAbriendoCaja(true);
       await ApiService.post("/pos/caja/abrir", {
         montoInicial: parseFloat(montoApertura) || 0,
       });
       showToast("Caja abierta exitosamente", "success");
       await cargarEstadoCaja();
+      await cargarProductos();
     } catch (err: any) {
       showToast("Error al abrir caja: " + err.message, "error");
     } finally {
-      setLoadingCaja(false);
+      setAbriendoCaja(false);
     }
   };
 
@@ -344,7 +370,7 @@ export default function PosComponent() {
   const handleCerrarCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      setLoadingCaja(true);
+      setCerrandoCaja(true);
       const resultado = await ApiService.post("/pos/caja/cerrar", {
         montoRealEfectivo: parseFloat(montoRealEfectivo) || 0,
         notas: notasCierre,
@@ -355,7 +381,7 @@ export default function PosComponent() {
     } catch (err: any) {
       showToast("Error al cerrar caja: " + err.message, "error");
     } finally {
-      setLoadingCaja(false);
+      setCerrandoCaja(false);
     }
   };
 
@@ -365,11 +391,23 @@ export default function PosComponent() {
       p.baseCode?.toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  // ─── Vista: Cargando Estado Inicial ──────────────────
+  if (loadingInicial) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[55vh] gap-3">
+        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <p className="text-xs text-[var(--muted-foreground)] font-medium">
+          Verificando estado de caja y catálogo de tienda...
+        </p>
+      </div>
+    );
+  }
+
   // ─── Vista: Caja Cerrada ──────────────────
   if (!caja.abierta) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-3xl p-10 max-w-md w-full text-center space-y-6">
+        <form onSubmit={handleAbrirCaja} className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-3xl p-10 max-w-md w-full text-center space-y-6">
           <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto">
             <Lock size={40} className="text-amber-500" />
           </div>
@@ -383,20 +421,30 @@ export default function PosComponent() {
               type="number"
               min="0"
               step="0.01"
+              required
               value={montoApertura}
               onChange={(e) => setMontoApertura(e.target.value)}
               className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-lg text-center font-mono text-emerald-600 dark:text-emerald-400 focus:outline-none focus:border-emerald-500"
             />
           </div>
           <button
-            onClick={handleAbrirCaja}
-            disabled={loadingCaja}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
+            type="submit"
+            disabled={abriendoCaja}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold py-3 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Unlock size={18} />
-            {loadingCaja ? "Abriendo..." : "Abrir Caja y Comenzar Turno"}
+            {abriendoCaja ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>Abriendo caja...</span>
+              </>
+            ) : (
+              <>
+                <Unlock size={18} />
+                <span>Abrir Caja y Comenzar Turno</span>
+              </>
+            )}
           </button>
-        </div>
+        </form>
       </div>
     );
   }
@@ -1093,11 +1141,20 @@ export default function PosComponent() {
 
                 <button
                   type="submit"
-                  disabled={loadingCaja}
-                  className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-3 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2"
+                  disabled={cerrandoCaja}
+                  className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-3 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Lock size={16} />
-                  {loadingCaja ? "Cerrando..." : "Realizar Arqueo y Cerrar Caja"}
+                  {cerrandoCaja ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Cerrando caja y calculando arqueo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={16} />
+                      <span>Realizar Arqueo y Cerrar Caja</span>
+                    </>
+                  )}
                 </button>
               </form>
             )}
