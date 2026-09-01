@@ -255,3 +255,243 @@ export async function compartirFacturaPdf(
 
   return { metodo: "DOWNLOAD_WHATSAPP" };
 }
+
+// ══════════════════════════════════════════
+// GENERACIÓN DE PDF PARA ÓRDENES DE COMPRA
+// ══════════════════════════════════════════
+
+export interface OrdenCompraPdfData {
+  emisor: {
+    nombre: string;
+    ruc: string;
+    direccion: string;
+    telefono?: string;
+    email?: string;
+  };
+  orden: {
+    numero: string;
+    fecha: string;
+    estado: string;
+    observaciones?: string;
+  };
+  proveedor: {
+    nombre: string;
+    ruc: string;
+    contacto?: string;
+    direccion?: string;
+    email?: string;
+  };
+  lineas: {
+    modelo: string;
+    marca?: string;
+    color?: string;
+    codigo: string;
+    imageUrl?: string;
+    cantidadPares: number;
+    precioCosto: number;
+    subtotal: number;
+    observacion?: string;
+  }[];
+  totales: {
+    totalPares: number;
+    totalPagar: number;
+  };
+}
+
+export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 15;
+
+  // ── Encabezado / Empresa ──
+  doc.setFillColor(15, 23, 42); // Slate 900
+  doc.roundedRect(12, y, pageWidth - 24, 34, 2, 2, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text(data.emisor.nombre || "COMERCIAL DE CALZADO", 18, y + 8);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(203, 213, 225);
+  doc.text(`RUC: ${data.emisor.ruc || "1804884664001"}`, 18, y + 15);
+  doc.text(`Dirección: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 20);
+  if (data.emisor.telefono) {
+    doc.text(`Teléfono / Contacto: ${data.emisor.telefono}`, 18, y + 25);
+  }
+
+  // Cuadro Número de Orden (derecha)
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(pageWidth - 75, y + 4, 58, 26, 1.5, 1.5, "F");
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("ORDEN DE COMPRA", pageWidth - 46, y + 11, { align: "center" });
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(180, 83, 9); // Amber 700
+  doc.text(`No. ${data.orden.numero}`, pageWidth - 46, y + 17, { align: "center" });
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Fecha: ${data.orden.fecha}`, pageWidth - 46, y + 23, { align: "center" });
+
+  y += 38;
+
+  // ── Datos del Proveedor ──
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(12, y, pageWidth - 24, 24, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text("PROVEEDOR / TALLER DE PRODUCCIÓN", 16, y + 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Razón Social: ${data.proveedor.nombre}`, 16, y + 11);
+  doc.text(`RUC / C.I: ${data.proveedor.ruc}`, 16, y + 16);
+  if (data.proveedor.contacto) {
+    doc.text(`Teléfono / Contacto: ${data.proveedor.contacto}`, 16, y + 21);
+  }
+
+  doc.text(`Dirección: ${data.proveedor.direccion || "No especificada"}`, pageWidth / 2 + 10, y + 11);
+  doc.text(`Email: ${data.proveedor.email || "No registrado"}`, pageWidth / 2 + 10, y + 16);
+  doc.text(`Estado: ${data.orden.estado}`, pageWidth / 2 + 10, y + 21);
+
+  y += 28;
+
+  // ── Observaciones Generales ──
+  if (data.orden.observaciones) {
+    doc.setFillColor(254, 243, 199); // Amber 100
+    doc.setDrawColor(251, 191, 36);
+    doc.roundedRect(12, y, pageWidth - 24, 11, 1.5, 1.5, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(146, 64, 14);
+    doc.text("OBSERVACIONES / ESPECIFICACIONES DE ENTREGA:", 16, y + 4.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(data.orden.observaciones, 16, y + 8.5);
+    y += 15;
+  }
+
+  // ── Tabla de Modelos Solicitados ──
+  doc.setFillColor(15, 23, 42);
+  doc.rect(12, y, pageWidth - 24, 7, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("MODELO / PRODUCTO", 16, y + 4.5);
+  doc.text("CANTIDAD", pageWidth - 75, y + 4.5, { align: "center" });
+  doc.text("P. COSTO", pageWidth - 48, y + 4.5, { align: "right" });
+  doc.text("SUBTOTAL", pageWidth - 16, y + 4.5, { align: "right" });
+
+  y += 7;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+
+  data.lineas.forEach((line, i) => {
+    const rowHeight = line.observacion ? 11 : 7.5;
+    if (i % 2 === 1) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(12, y, pageWidth - 24, rowHeight, "F");
+    }
+    doc.setDrawColor(241, 245, 249);
+    doc.line(12, y + rowHeight, pageWidth - 12, y + rowHeight);
+
+    const docenas = (line.cantidadPares / 12).toFixed(1);
+    const textoPares = line.cantidadPares >= 12
+      ? `${line.cantidadPares} pares (${docenas} doc.)`
+      : line.cantidadPares === 6
+      ? `6 pares (½ docena)`
+      : `${line.cantidadPares} pares`;
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`${line.marca ? line.marca + " " : ""}${line.modelo} (${line.codigo}${line.color ? " - " + line.color : ""})`, 16, y + 4.5);
+    
+    if (line.observacion) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(7);
+      doc.setTextColor(180, 83, 9);
+      doc.text(`Nota: ${line.observacion}`, 16, y + 8.5);
+      doc.setFontSize(8);
+      doc.setTextColor(15, 23, 42);
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.text(textoPares, pageWidth - 75, y + 4.5, { align: "center" });
+    doc.text(`$${Number(line.precioCosto).toFixed(2)}`, pageWidth - 48, y + 4.5, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.text(`$${Number(line.subtotal).toFixed(2)}`, pageWidth - 16, y + 4.5, { align: "right" });
+
+    y += rowHeight;
+  });
+
+  y += 5;
+
+  // ── Totales y Firmas ──
+  const startTotalsX = pageWidth - 85;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(startTotalsX, y, 73, 20, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text("TOTAL PARES PEDIDOS:", startTotalsX + 4, y + 6);
+  doc.setFont("helvetica", "bold");
+  doc.text(`${data.totales.totalPares} pares`, startTotalsX + 69, y + 6, { align: "right" });
+
+  doc.setDrawColor(203, 213, 225);
+  doc.line(startTotalsX + 4, y + 9, startTotalsX + 69, y + 9);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("VALOR TOTAL ORDEN:", startTotalsX + 4, y + 15);
+  doc.setTextColor(180, 83, 9);
+  doc.text(`$${data.totales.totalPagar.toFixed(2)}`, startTotalsX + 69, y + 15, { align: "right" });
+
+  // Espacios de firmas
+  y += 28;
+  doc.setDrawColor(148, 163, 184);
+  doc.line(20, y + 12, 80, y + 12);
+  doc.line(pageWidth - 80, y + 12, pageWidth - 20, y + 12);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Autorizado por (Comprador)", 50, y + 16, { align: "center" });
+  doc.text("Recibido por (Proveedor)", pageWidth - 50, y + 16, { align: "center" });
+
+  // Footer
+  y += 24;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text("Documento oficial de Orden de Compra emitido electrónicamente", pageWidth / 2, y, { align: "center" });
+
+  return doc;
+}
+
+export function descargarOrdenCompraPdf(data: OrdenCompraPdfData): void {
+  const doc = generarOrdenCompraPdfDoc(data);
+  const fileName = `Orden_Compra_${data.orden.numero}.pdf`;
+  doc.save(fileName);
+}
+

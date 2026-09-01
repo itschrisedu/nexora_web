@@ -35,11 +35,18 @@ import {
   Filter,
   Layers,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Image as ImageIcon,
   Save,
   Ban,
+  Download,
+  Share2,
+  Printer,
+  MessageCircle,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
+import { descargarOrdenCompraPdf, OrdenCompraPdfData } from '../services/pdf-factura.service';
 
 interface ProveedoresProps {
   online: boolean;
@@ -77,7 +84,9 @@ interface OrdenCompraLine {
     codigo: string;
     color?: string;
     imageUrl?: string;
+    fotoUrl?: string;
     serie?: string;
+    tallas?: Array<{ id?: string; talla?: number | string; sizeNumber?: number | string; stock?: number; cantidad?: number; ratio?: number; cantidadSerie?: number }>;
   };
 }
 
@@ -98,6 +107,8 @@ interface OrdenCompra {
     razonSocial: string;
     ruc: string;
     contacto?: string;
+    direccion?: string;
+    email?: string;
   };
 }
 
@@ -112,8 +123,10 @@ interface SupplierPayment {
   notas?: string;
   createdAt: string;
   supplier?: {
+    id?: string;
     nombre: string;
     ruc: string;
+    contacto?: string;
   };
 }
 
@@ -130,6 +143,107 @@ interface EntradaMercancia {
   supplierOrder?: { numero: number };
 }
 
+// Función auxiliar para obtener la URL de imagen limpia
+function obtenerFotoProducto(prod: any): string {
+  if (!prod) return '';
+  return prod.fotoUrl || prod.imageUrl || prod.model?.imageUrl || prod.images?.[0] || '';
+}
+
+// Cálculo del ratio de curva de una talla
+function getCurvaRatio(talla: any, tallas: any[] = []): number {
+  if (talla.ratio && talla.ratio > 0) return talla.ratio;
+  if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
+  const positive = tallas.map((x: any) => x.cantidad || x.stock || 1).filter((q: number) => q > 0);
+  const minQ = positive.length > 0 ? Math.min(...positive) : 1;
+  return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
+}
+
+// Consolidación de líneas con distribución exacta de tallas
+function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos: any[] = []) {
+  const map = new Map<string, {
+    productId: string;
+    nombre: string;
+    marca: string;
+    codigo: string;
+    color: string;
+    imageUrl: string;
+    serie: string;
+    cantidadPedida: number;
+    precioCosto: number;
+    subtotal: number;
+    observacionLinea?: string;
+    ids: string[];
+    tallasDesglose: Array<{ talla: string | number; cantidad: number }>;
+  }>();
+
+  lines.forEach((l) => {
+    const key = l.productId || l.id || Math.random().toString();
+    const existing = map.get(key);
+    const subtotal = l.subtotal || (l.cantidadPedida * l.precioCosto);
+    const prodCat = catalogoProductos.find((p) => p.id === l.productId);
+    const foto = obtenerFotoProducto(l.producto) || obtenerFotoProducto(prodCat);
+
+    if (existing) {
+      existing.cantidadPedida += l.cantidadPedida;
+      existing.subtotal += subtotal;
+      if (l.observacionLinea && !existing.observacionLinea) {
+        existing.observacionLinea = l.observacionLinea;
+      }
+      if (l.id) existing.ids.push(l.id);
+
+      // Recalcular tallas con la nueva cantidad total
+      const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
+      if (Array.isArray(prodTallas) && prodTallas.length > 0) {
+        const sumRatios = prodTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, prodTallas), 0);
+        const factor = sumRatios > 0 ? existing.cantidadPedida / sumRatios : 1;
+        existing.tallasDesglose = prodTallas.map((t: any) => ({
+          talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
+          cantidad: Math.max(1, Math.round(getCurvaRatio(t, prodTallas) * factor)),
+        }));
+      }
+    } else {
+      let tallasCalc: Array<{ talla: string | number; cantidad: number }> = [];
+      const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
+
+      if (Array.isArray(prodTallas) && prodTallas.length > 0) {
+        const sumRatios = prodTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, prodTallas), 0);
+        const factor = sumRatios > 0 ? l.cantidadPedida / sumRatios : 1;
+        tallasCalc = prodTallas.map((t: any) => ({
+          talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
+          cantidad: Math.max(1, Math.round(getCurvaRatio(t, prodTallas) * factor)),
+        }));
+      } else {
+        const tallasEstandar = [34, 35, 36, 37, 38];
+        const ratios = [1, 1, 2, 1, 1]; // 6 pares = 1 media docena
+        const sumRatios = ratios.reduce((a, b) => a + b, 0);
+        const factor = l.cantidadPedida / sumRatios;
+        tallasCalc = tallasEstandar.map((t, i) => ({
+          talla: t,
+          cantidad: Math.max(1, Math.round(ratios[i] * factor)),
+        }));
+      }
+
+      map.set(key, {
+        productId: l.productId,
+        nombre: l.producto?.nombre || prodCat?.nombre || prodCat?.name || 'Calzado de Cuero',
+        marca: l.producto?.marca || prodCat?.marca || prodCat?.brand || '',
+        codigo: l.producto?.codigo || prodCat?.codigo || prodCat?.code || '',
+        color: l.producto?.color || prodCat?.color || '',
+        imageUrl: foto,
+        serie: l.producto?.serie || prodCat?.serie?.name || 'Serie Estándar',
+        cantidadPedida: l.cantidadPedida,
+        precioCosto: Number(l.precioCosto),
+        subtotal: subtotal,
+        observacionLinea: l.observacionLinea,
+        ids: l.id ? [l.id] : [],
+        tallasDesglose: tallasCalc,
+      });
+    }
+  });
+
+  return Array.from(map.values());
+}
+
 export default function ProveedoresComponent({ online, userRole }: ProveedoresProps) {
   const { showToast } = useToast();
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -140,13 +254,18 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'proveedores' | 'ordenes' | 'ingreso' | 'pagos'>('proveedores');
 
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Filtros y búsquedas
+  // Filtros de órdenes por estado
   const [searchQuery, setSearchQuery] = useState('');
-  const [filtroEstadoOrden, setFiltroEstadoOrden] = useState<string>('TODOS');
+  const [filtroEstadoOrden, setFiltroEstadoOrden] = useState<string>('BORRADOR');
+
+  // Control de acordeones desplegables para numeración
+  const [modelosExpandidos, setModelosExpandidos] = useState<Record<string, boolean>>({});
+
+  const toggleExpandModelo = (key: string) => {
+    setModelosExpandidos((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Modales
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -155,13 +274,13 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [selectedOrder, setSelectedOrder] = useState<OrdenCompra | null>(null);
   const [editingOrder, setEditingOrder] = useState(false);
 
-  // Modal Cuenta Corriente / Master-Detail Proveedor
+  // Modal Cuenta Corriente
   const [showCuentaModal, setShowCuentaModal] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [cuentaCorrienteData, setCuentaCorrienteData] = useState<any | null>(null);
   const [loadingCuenta, setLoadingCuenta] = useState(false);
 
-  // Modal Registrar Pago / Abono
+  // Modal Pagos
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentSupplierId, setPaymentSupplierId] = useState('');
   const [paymentOrderId, setPaymentOrderId] = useState('');
@@ -181,26 +300,47 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   // Form: Nueva Orden
   const [orderSupplierId, setOrderSupplierId] = useState('');
   const [orderObservaciones, setOrderObservaciones] = useState('');
-  const [orderEstadoInicial, setOrderEstadoInicial] = useState<'BORRADOR' | 'PENDIENTE'>('BORRADOR');
-  const [orderLines, setOrderLines] = useState<Array<{ productId: string; cantidadPedida: number; precioCosto: number; observacionLinea?: string }>>([
-    { productId: '', cantidadPedida: 1, precioCosto: 0, observacionLinea: '' },
-  ]);
 
-  // Form: Nuevo Ingreso
+  // Selector Interactivo de Modelos con Curva exacta
+  const [busquedaModelo, setBusquedaModelo] = useState('');
+  const [showDropdownModelo, setShowDropdownModelo] = useState(false);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<any | null>(null);
+  const [subtipoCurva, setSubtipoCurva] = useState<'MEDIA_DOCENA' | 'DOCENA'>('MEDIA_DOCENA');
+  const [cantidadCurvas, setCantidadCurvas] = useState<number>(2); // Por defecto 2 medias docenas = 12 pares
+  const [precioCostoInput, setPrecioCostoInput] = useState<number>(0);
+  const [observacionItemInput, setObservacionItemInput] = useState<string>('');
+
+  const [orderLines, setOrderLines] = useState<Array<{
+    productId: string;
+    cantidadPedida: number;
+    precioCosto: number;
+    observacionLinea?: string;
+    producto?: any;
+    tallasDesglose?: Array<{ talla: string | number; cantidad: number }>;
+  }>>([]);
+
+  // Form: Recepción de Mercancía
   const [entrySupplierId, setEntrySupplierId] = useState('');
   const [entryOrderId, setEntryOrderId] = useState('');
   const [entryObservaciones, setEntryObservaciones] = useState('');
-  const [entryLines, setEntryLines] = useState<Array<{
+  const [entryModelos, setEntryModelos] = useState<Array<{
     productId: string;
-    tallaId: string;
-    cantidadIngresada: number;
-    cantidadEsperada?: number;
-    diferencia?: number;
+    nombre: string;
+    marca: string;
+    codigo: string;
+    color: string;
+    fotoUrl: string;
+    serieNombre: string;
     precioCosto: number;
     observacionLinea?: string;
-  }>>([
-    { productId: '', tallaId: '', cantidadIngresada: 1, cantidadEsperada: 1, diferencia: 0, precioCosto: 0, observacionLinea: '' },
-  ]);
+    tallas: Array<{
+      tallaId: string;
+      sizeNumber: string | number;
+      cantidadIngresada: number;
+      cantidadEsperada: number;
+      diferencia: number;
+    }>;
+  }>>([]);
 
   useEffect(() => {
     loadData();
@@ -208,7 +348,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
   const loadData = async () => {
     setLoading(true);
-    setErrorMsg('');
     try {
       let prods = [];
       try {
@@ -220,7 +359,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       } catch (e) {
         prods = await db.productos.toArray();
       }
-      setProductos(prods);
+      setProductos(prods || []);
 
       if (online) {
         const [prvs, ords, pgs, ents] = await Promise.all([
@@ -236,27 +375,24 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       }
     } catch (err: any) {
       console.error('Error al cargar datos de proveedores:', err);
-      setErrorMsg(err.message || 'Error al conectar con el servidor.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Métricas Globales de Cabecera ──────────────────────
   const metrics = useMemo(() => {
     const totalDeuda = proveedores.reduce((acc, p) => acc + (p.saldoPendiente || 0), 0);
     const totalPagado = proveedores.reduce((acc, p) => acc + (p.totalPagado || 0), 0);
     const totalCompras = proveedores.reduce((acc, p) => acc + (p.totalCompras || 0), 0);
-    const ordenesActivas = ordenes.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'BORRADOR').length;
+    const ordenesActivas = ordenes.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'BORRADOR' || o.estado === 'RECIBIDA_PARCIAL').length;
 
     return { totalDeuda, totalPagado, totalCompras, ordenesActivas };
   }, [proveedores, ordenes]);
 
-  // ── Registrar Proveedor ──────────────────────
   const handleCreateProveedor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ruc || !razonSocial) {
-      showToast('El RUC y la Razón Social son campos obligatorios.', 'error');
+      showToast('El RUC y la Razón Social son obligatorios.', 'error');
       return;
     }
 
@@ -270,7 +406,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         email: email || undefined,
       });
 
-      showToast('Proveedor registrado con éxito.', 'success');
+      showToast('Proveedor registrado correctamente.', 'success');
       setShowSupplierModal(false);
       resetSupplierForm();
       loadData();
@@ -289,7 +425,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     setEmail('');
   };
 
-  // ── Ver Detalle de Orden ──────────────────────
   const handleVerDetalleOrden = async (orderId: string) => {
     try {
       const order = await ApiService.get(`/proveedores/ordenes-compra/${orderId}`);
@@ -301,44 +436,108 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  // ── Crear Orden de Compra ────────────────────
-  const handleAddOrderLine = () => {
-    setOrderLines([...orderLines, { productId: '', cantidadPedida: 1, precioCosto: 0, observacionLinea: '' }]);
-  };
+  // Cálculo de pares totales y distribución al agregar modelo
+  const paresCalculados = useMemo(() => {
+    const base = subtipoCurva === 'MEDIA_DOCENA' ? 6 : 12;
+    return (cantidadCurvas || 1) * base;
+  }, [subtipoCurva, cantidadCurvas]);
 
-  const handleRemoveOrderLine = (index: number) => {
-    if (orderLines.length === 1) return;
-    setOrderLines(orderLines.filter((_, i) => i !== index));
-  };
-
-  const handleOrderLineChange = (index: number, field: string, value: any) => {
-    const updated = [...orderLines];
-    if (field === 'productId') {
-      updated[index].productId = value;
-      const prod = productos.find((p) => p.id === value);
-      if (prod) {
-        updated[index].precioCosto = Number(prod.precioCosto || prod.costPrice || 0);
-      }
-    } else if (field === 'cantidadPedida') {
-      updated[index].cantidadPedida = parseInt(value) || 1;
-    } else if (field === 'precioCosto') {
-      updated[index].precioCosto = parseFloat(value) || 0;
-    } else if (field === 'observacionLinea') {
-      updated[index].observacionLinea = value;
+  const distribucionPreview = useMemo(() => {
+    if (!productoSeleccionado) return [];
+    const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
+    
+    if (prodTallas.length > 0) {
+      return prodTallas.map((t: any) => {
+        const ratio = getCurvaRatio(t, prodTallas);
+        const factor = ratio * (subtipoCurva === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadCurvas || 1);
+        return {
+          talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre,
+          cantidad: factor,
+        };
+      });
     }
-    setOrderLines(updated);
+
+    // Curva estándar
+    const ratios = [1, 1, 2, 1, 1]; // 6 pares base
+    const tallas = [34, 35, 36, 37, 38];
+    return tallas.map((t, i) => ({
+      talla: t,
+      cantidad: ratios[i] * (subtipoCurva === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadCurvas || 1),
+    }));
+  }, [productoSeleccionado, subtipoCurva, cantidadCurvas]);
+
+  // Agregar Modelo a la orden
+  const handleAgregarModeloAOrden = (isEditingExisting: boolean = false) => {
+    if (!productoSeleccionado) {
+      showToast('Seleccione un modelo de calzado.', 'error');
+      return;
+    }
+
+    if (paresCalculados <= 0) {
+      showToast('La cantidad de pares debe ser mayor a 0.', 'error');
+      return;
+    }
+
+    if (precioCostoInput <= 0) {
+      showToast('El precio de costo debe ser mayor a $0.00.', 'error');
+      return;
+    }
+
+    const foto = obtenerFotoProducto(productoSeleccionado);
+    const nuevaLinea = {
+      productId: productoSeleccionado.id,
+      cantidadPedida: paresCalculados,
+      precioCosto: precioCostoInput,
+      subtotal: paresCalculados * precioCostoInput,
+      observacionLinea: observacionItemInput || undefined,
+      tallasDesglose: distribucionPreview,
+      producto: {
+        id: productoSeleccionado.id,
+        nombre: productoSeleccionado.nombre || productoSeleccionado.name || 'Calzado',
+        marca: productoSeleccionado.marca || productoSeleccionado.brand || '',
+        codigo: productoSeleccionado.codigo || productoSeleccionado.code || '',
+        color: productoSeleccionado.color || '',
+        imageUrl: foto,
+        fotoUrl: foto,
+        serie: productoSeleccionado.serie?.name || productoSeleccionado.serieNombre || 'Serie Estándar',
+        tallas: productoSeleccionado.tallas,
+      },
+    };
+
+    if (isEditingExisting && selectedOrder) {
+      const lineasActuales = [...(selectedOrder.lines || []), nuevaLinea];
+      setSelectedOrder({ ...selectedOrder, lines: lineasActuales });
+    } else {
+      setOrderLines([...orderLines, nuevaLinea]);
+    }
+
+    setProductoSeleccionado(null);
+    setBusquedaModelo('');
+    setCantidadCurvas(2);
+    setPrecioCostoInput(0);
+    setObservacionItemInput('');
+    showToast(`Modelo agregado a la orden (${paresCalculados} pares).`, 'success');
   };
 
-  const handleCreateOrder = async (e: React.FormEvent) => {
+  const handleRemoveOrderLine = (index: number, isEditingExisting: boolean = false) => {
+    if (isEditingExisting && selectedOrder) {
+      const lineas = selectedOrder.lines?.filter((_, i) => i !== index) || [];
+      setSelectedOrder({ ...selectedOrder, lines: lineas });
+    } else {
+      setOrderLines(orderLines.filter((_, i) => i !== index));
+    }
+  };
+
+  // Crear Orden en BORRADOR (Acumulativa)
+  const handleCrearOrden = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!orderSupplierId) {
       showToast('Seleccione un proveedor.', 'error');
       return;
     }
 
-    const invalid = orderLines.some((l) => !l.productId || l.cantidadPedida < 1 || l.precioCosto <= 0);
-    if (invalid) {
-      showToast('Complete todas las filas con cantidades y precios de costo válidos.', 'error');
+    if (orderLines.length === 0) {
+      showToast('Agregue al menos un modelo a la orden.', 'error');
       return;
     }
 
@@ -347,7 +546,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       await ApiService.post('/proveedores/ordenes-compra', {
         supplierId: orderSupplierId,
         observaciones: orderObservaciones || undefined,
-        estado: orderEstadoInicial,
+        estado: 'BORRADOR', // SIEMPRE BORRADOR HASTA QUE SE PRESIONE ENVIAR
         lines: orderLines.map((l) => ({
           productId: l.productId,
           cantidadPedida: l.cantidadPedida,
@@ -356,11 +555,12 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         })),
       });
 
-      showToast(`Orden de compra creada exitosamente (${orderEstadoInicial === 'BORRADOR' ? 'Borrador editable' : 'Enviada al proveedor'}).`, 'success');
+      showToast('Borrador de orden guardado. Se acumulará hasta que decidas enviarla al proveedor.', 'success');
       setShowOrderModal(false);
       setOrderSupplierId('');
       setOrderObservaciones('');
-      setOrderLines([{ productId: '', cantidadPedida: 1, precioCosto: 0, observacionLinea: '' }]);
+      setOrderLines([]);
+      setFiltroEstadoOrden('BORRADOR');
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Error al crear la orden de compra.', 'error');
@@ -369,14 +569,18 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  // ── Guardar Edición de Orden Existente ────────────────────
   const handleGuardarEdicionOrden = async () => {
     if (!selectedOrder) return;
+    if (!selectedOrder.lines || selectedOrder.lines.length === 0) {
+      showToast('La orden debe tener al menos un producto.', 'error');
+      return;
+    }
+
     setSaving(true);
     try {
       await ApiService.put(`/proveedores/ordenes-compra/${selectedOrder.id}`, {
         observaciones: selectedOrder.observaciones,
-        lines: selectedOrder.lines?.map((l) => ({
+        lines: selectedOrder.lines.map((l) => ({
           productId: l.productId,
           cantidadPedida: l.cantidadPedida,
           precioCosto: l.precioCosto,
@@ -384,23 +588,25 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         })),
       });
 
-      showToast('Orden de compra actualizada correctamente.', 'success');
+      showToast('Orden actualizada correctamente.', 'success');
       setEditingOrder(false);
       handleVerDetalleOrden(selectedOrder.id);
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Error al guardar los cambios de la orden.', 'error');
+      showToast(err.message || 'Error al guardar los cambios.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Confirmar / Enviar Orden ────────────────────
-  const handleConfirmarEnvioOrden = async (orderId: string) => {
+  // Botón EXPLÍCITO para ENVIAR la orden y cambiar estado a ENVIADA
+  const handleEnviarYGenerarPDF = async (orderId: string) => {
     setSaving(true);
     try {
       await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/confirmar`, {});
-      showToast('Orden confirmada y enviada al proveedor.', 'success');
+      showToast('¡Orden de compra enviada al proveedor exitosamente! Estado: ENVIADA', 'success');
+      await handleDescargarPDFOrden(orderId);
+
       if (selectedOrder && selectedOrder.id === orderId) {
         handleVerDetalleOrden(orderId);
       }
@@ -412,7 +618,58 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  // ── Cancelar Orden ────────────────────
+  const handleDescargarPDFOrden = async (orderId: string) => {
+    try {
+      const order = await ApiService.get(`/proveedores/ordenes-compra/${orderId}`);
+      if (!order) return;
+
+      const lineasConsolidadas = consolidarLineasOrden(order.lines || [], productos);
+
+      const pdfData: OrdenCompraPdfData = {
+        emisor: {
+          nombre: "LOCAL COMERCIAL DE CALZADO",
+          ruc: "1804884664001",
+          direccion: "Cevallos, Tungurahua, Ecuador",
+          telefono: "0998765432",
+          email: "pedidos@calzadocevallos.com",
+        },
+        orden: {
+          numero: `OC-${String(order.numero).padStart(4, '0')}`,
+          fecha: new Date(order.createdAt).toLocaleDateString('es-EC'),
+          estado: order.estado === 'PENDIENTE' ? 'ENVIADA' : order.estado,
+          observaciones: order.observaciones,
+        },
+        proveedor: {
+          nombre: order.supplier?.razonSocial || order.supplier?.nombre || 'Proveedor',
+          ruc: order.supplier?.ruc || '9999999999001',
+          contacto: order.supplier?.contacto,
+          direccion: order.supplier?.direccion,
+          email: order.supplier?.email,
+        },
+        lineas: lineasConsolidadas.map((l) => ({
+          modelo: l.nombre,
+          marca: l.marca,
+          color: l.color,
+          codigo: l.codigo,
+          imageUrl: l.imageUrl,
+          cantidadPares: l.cantidadPedida,
+          precioCosto: l.precioCosto,
+          subtotal: l.subtotal,
+          observacion: l.observacionLinea,
+        })),
+        totales: {
+          totalPares: lineasConsolidadas.reduce((acc, l) => acc + l.cantidadPedida, 0),
+          totalPagar: Number(order.total),
+        },
+      };
+
+      descargarOrdenCompraPdf(pdfData);
+      showToast('PDF de Orden de Compra descargado.', 'success');
+    } catch (e: any) {
+      showToast('No se pudo generar el documento PDF.', 'error');
+    }
+  };
+
   const handleCancelarOrden = async (orderId: string) => {
     if (!confirm('¿Está seguro de que desea cancelar esta orden de compra?')) return;
     setSaving(true);
@@ -428,74 +685,127 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  // ── Auto-llenar al seleccionar Orden en Ingreso ────────────────
+  const handleIrARecepcionDesdeOrden = (order: OrdenCompra) => {
+    setShowOrderDetailModal(false);
+    setActiveTab('ingreso');
+    setEntrySupplierId(order.supplierId);
+    handleSelectOrderForEntry(order.id);
+  };
+
   const handleSelectOrderForEntry = async (orderId: string) => {
     setEntryOrderId(orderId);
     if (!orderId) {
-      setEntryLines([{ productId: '', tallaId: '', cantidadIngresada: 1, cantidadEsperada: 1, diferencia: 0, precioCosto: 0, observacionLinea: '' }]);
+      setEntryModelos([]);
       return;
     }
 
     try {
       const order = await ApiService.get(`/proveedores/ordenes-compra/${orderId}`);
       if (order && order.lines && order.lines.length > 0) {
-        const linesAuto: any[] = [];
-        order.lines.forEach((l: any) => {
-          const prod = productos.find((p) => p.id === l.productId);
-          const firstTalla = prod?.tallas?.[0] || prod?.stockByTalla?.[0]?.talla;
-          linesAuto.push({
-            productId: l.productId,
-            tallaId: firstTalla?.id || '',
-            cantidadIngresada: l.cantidadPedida,
-            cantidadEsperada: l.cantidadPedida,
+        const consolidados = consolidarLineasOrden(order.lines, productos);
+        const modelosData: typeof entryModelos = [];
+
+        consolidados.forEach((c) => {
+          const prodCat = productos.find((p) => p.id === c.productId);
+          const foto = c.imageUrl || obtenerFotoProducto(prodCat);
+
+          const tallasArr = (c.tallasDesglose || []).map((td: any) => ({
+            tallaId: String(td.talla),
+            sizeNumber: td.talla,
+            cantidadIngresada: td.cantidad,
+            cantidadEsperada: td.cantidad,
             diferencia: 0,
-            precioCosto: l.precioCosto,
-            observacionLinea: l.observacionLinea || '',
+          }));
+
+          modelosData.push({
+            productId: c.productId,
+            nombre: c.nombre,
+            marca: c.marca,
+            codigo: c.codigo,
+            color: c.color,
+            fotoUrl: foto,
+            serieNombre: c.serie,
+            precioCosto: c.precioCosto,
+            observacionLinea: c.observacionLinea || '',
+            tallas: tallasArr,
           });
         });
-        setEntryLines(linesAuto);
+
+        setEntryModelos(modelosData);
         if (order.observaciones) {
           setEntryObservaciones(`Ref. Orden OC-${String(order.numero).padStart(4, '0')}: ${order.observaciones}`);
         }
       }
     } catch (e) {
-      console.warn('Error al auto-llenar líneas desde orden:', e);
+      console.warn('Error al auto-llenar modelos desde orden:', e);
     }
   };
 
-  // ── Líneas de Recepción ────────────────
-  const handleAddEntryLine = () => {
-    setEntryLines([...entryLines, { productId: '', tallaId: '', cantidadIngresada: 1, cantidadEsperada: 1, diferencia: 0, precioCosto: 0, observacionLinea: '' }]);
-  };
-
-  const handleRemoveEntryLine = (index: number) => {
-    if (entryLines.length === 1) return;
-    setEntryLines(entryLines.filter((_, i) => i !== index));
-  };
-
-  const handleEntryLineChange = (index: number, field: string, value: any) => {
-    const updated = [...entryLines];
-    if (field === 'productId') {
-      updated[index].productId = value;
-      updated[index].tallaId = '';
-      const prod = productos.find((p) => p.id === value);
-      if (prod) {
-        updated[index].precioCosto = Number(prod.precioCosto || prod.costPrice || 0);
-      }
-    } else if (field === 'tallaId') {
-      updated[index].tallaId = value;
-    } else if (field === 'cantidadIngresada') {
-      const ingresada = parseInt(value) || 0;
-      updated[index].cantidadIngresada = ingresada;
-      if (updated[index].cantidadEsperada !== undefined) {
-        updated[index].diferencia = ingresada - updated[index].cantidadEsperada!;
-      }
-    } else if (field === 'precioCosto') {
-      updated[index].precioCosto = parseFloat(value) || 0;
-    } else if (field === 'observacionLinea') {
-      updated[index].observacionLinea = value;
+  const handleAddEntryModeloExtra = () => {
+    if (!productoSeleccionado) {
+      showToast('Seleccione un modelo para agregar a la recepción.', 'error');
+      return;
     }
-    setEntryLines(updated);
+    const foto = obtenerFotoProducto(productoSeleccionado);
+    const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
+    
+    let tallasInit: Array<{
+      tallaId: string;
+      sizeNumber: string | number;
+      cantidadIngresada: number;
+      cantidadEsperada: number;
+      diferencia: number;
+    }> = [];
+
+    if (prodTallas.length > 0) {
+      tallasInit = prodTallas.map((t: any) => ({
+        tallaId: t.id || String(t.sizeNumber || t.talla),
+        sizeNumber: t.sizeNumber || t.talla || t.numero || '38',
+        cantidadIngresada: 2,
+        cantidadEsperada: 0,
+        diferencia: 2,
+      }));
+    } else {
+      tallasInit = [34, 35, 36, 37, 38].map((t) => ({
+        tallaId: String(t),
+        sizeNumber: t,
+        cantidadIngresada: 2,
+        cantidadEsperada: 0,
+        diferencia: 2,
+      }));
+    }
+
+    setEntryModelos([
+      ...entryModelos,
+      {
+        productId: productoSeleccionado.id,
+        nombre: productoSeleccionado.nombre || productoSeleccionado.name || 'Calzado Extra',
+        marca: productoSeleccionado.marca || productoSeleccionado.brand || '',
+        codigo: productoSeleccionado.codigo || productoSeleccionado.code || '',
+        color: productoSeleccionado.color || '',
+        fotoUrl: foto,
+        serieNombre: productoSeleccionado.serie?.name || 'Serie Estándar',
+        precioCosto: Number(productoSeleccionado.precioCosto || productoSeleccionado.costPrice || 10),
+        observacionLinea: 'Modelo extra no pedido',
+        tallas: tallasInit,
+      },
+    ]);
+
+    setProductoSeleccionado(null);
+    setBusquedaModelo('');
+    showToast('Modelo adicional agregado a la recepción.', 'success');
+  };
+
+  const handleUpdateTallaQty = (modeloIdx: number, tallaIdx: number, val: number) => {
+    const updated = [...entryModelos];
+    const item = updated[modeloIdx].tallas[tallaIdx];
+    item.cantidadIngresada = val;
+    item.diferencia = val - item.cantidadEsperada;
+    setEntryModelos(updated);
+  };
+
+  const handleRemoveEntryModelo = (idx: number) => {
+    setEntryModelos(entryModelos.filter((_, i) => i !== idx));
   };
 
   const handleCreateEntry = async (e: React.FormEvent) => {
@@ -505,14 +815,29 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       return;
     }
 
-    const invalid = entryLines.some((l) => !l.productId || !l.tallaId || l.cantidadIngresada < 1 || l.precioCosto <= 0);
-    if (invalid) {
-      showToast('Asegúrese de seleccionar modelo, talla, cantidad y costo en todas las filas.', 'error');
+    if (entryModelos.length === 0) {
+      showToast('Agregue al menos un modelo a la recepción.', 'error');
       return;
     }
 
-    // Comprobar diferencias
-    const hayFaltantes = entryLines.some((l) => (l.diferencia !== undefined && l.diferencia < 0));
+    const flatLines: any[] = [];
+    let hayFaltantes = false;
+
+    entryModelos.forEach((m) => {
+      m.tallas.forEach((t) => {
+        if (t.diferencia < 0) hayFaltantes = true;
+        flatLines.push({
+          productId: m.productId,
+          tallaId: t.tallaId || 'TALLA_STANDAR',
+          cantidadIngresada: t.cantidadIngresada,
+          cantidadEsperada: t.cantidadEsperada,
+          diferencia: t.diferencia,
+          precioCosto: m.precioCosto,
+          observacionLinea: m.observacionLinea || undefined,
+        });
+      });
+    });
+
     const estadoCalculado = hayFaltantes ? 'CON_DIFERENCIAS' : 'COMPLETA';
 
     setSaving(true);
@@ -522,36 +847,27 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         supplierOrderId: entryOrderId || undefined,
         observaciones: entryObservaciones || undefined,
         estado: estadoCalculado,
-        lines: entryLines.map((l) => ({
-          productId: l.productId,
-          tallaId: l.tallaId,
-          cantidadIngresada: l.cantidadIngresada,
-          cantidadEsperada: l.cantidadEsperada,
-          diferencia: l.diferencia,
-          precioCosto: l.precioCosto,
-          observacionLinea: l.observacionLinea || undefined,
-        })),
+        lines: flatLines,
       });
 
       showToast(
         hayFaltantes
-          ? 'Mercancía ingresada con diferencias registradas. Se actualizó el stock y el saldo por pagar.'
-          : 'Ingreso de mercancía registrado con éxito. Stock físico y saldo actualizados.',
+          ? 'Mercancía ingresada con faltantes. La orden queda como Parcial de saldo pendiente.'
+          : 'Recepción completada exitosamente. Stock físico actualizado.',
         'success'
       );
       setEntrySupplierId('');
       setEntryOrderId('');
       setEntryObservaciones('');
-      setEntryLines([{ productId: '', tallaId: '', cantidadIngresada: 1, cantidadEsperada: 1, diferencia: 0, precioCosto: 0, observacionLinea: '' }]);
+      setEntryModelos([]);
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Error al registrar la entrada de bodega.', 'error');
+      showToast(err.message || 'Error al registrar la recepción.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Cuenta Corriente / Historial del Proveedor ────────────────
   const handleAbrirCuentaCorriente = async (supplierId: string) => {
     setSelectedSupplierId(supplierId);
     setLoadingCuenta(true);
@@ -566,7 +882,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  // ── Registrar Pago a Proveedor ────────────────
   const handleAbrirModalPago = (supplierId: string, orderId?: string, sugeridoMonto?: number) => {
     setPaymentSupplierId(supplierId);
     setPaymentOrderId(orderId || '');
@@ -597,7 +912,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         supplierOrderId: paymentOrderId || undefined,
       });
 
-      showToast('Pago registrado correctamente. Estado de cuenta actualizado.', 'success');
+      showToast('Pago registrado correctamente.', 'success');
       setShowPaymentModal(false);
       if (showCuentaModal && selectedSupplierId === paymentSupplierId) {
         handleAbrirCuentaCorriente(paymentSupplierId);
@@ -610,21 +925,27 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  const getTallasForProduct = (productId: string) => {
-    const prod = productos.find((p) => p.id === productId);
-    if (!prod) return [];
-    if (Array.isArray(prod.tallas)) return prod.tallas;
-    if (Array.isArray(prod.stockByTalla)) {
-      return prod.stockByTalla.map((st: any) => ({
-        id: st.tallaId || st.talla?.id,
-        talla: st.talla?.sizeNumber || st.talla?.name || 'Única',
-        stock: st.quantity ?? 0,
-      }));
+  const handleEnviarPagoWhatsApp = (p: SupplierPayment) => {
+    const telefono = p.supplier?.contacto || '';
+    let numLimpio = telefono.replace(/\D/g, "");
+    if (numLimpio.startsWith("09") && numLimpio.length === 10) {
+      numLimpio = "593" + numLimpio.substring(1);
+    } else if (numLimpio.startsWith("0") && numLimpio.length === 10) {
+      numLimpio = "593" + numLimpio.substring(1);
     }
-    return [];
+
+    const prov = proveedores.find((pr) => pr.id === p.supplierId);
+    const saldo = prov?.saldoPendiente ?? 0;
+
+    const mensaje = `*COMPROBANTE DE PAGO A PROVEEDOR*\n\nEstimado/a *${p.supplier?.nombre || 'Proveedor'}*,\n\nLe confirmamos que se ha registrado un pago a su favor:\n\n💵 *Monto:* $${Number(p.monto).toFixed(2)}\n💳 *Método:* ${p.metodo}${p.banco ? ` (${p.banco})` : ''}\n📄 *Comprobante / Ref:* ${p.comprobante || 'N/A'}\n📅 *Fecha:* ${new Date(p.createdAt).toLocaleDateString('es-EC')}\n${p.notas ? `📝 *Concepto:* ${p.notas}\n` : ''}\n💼 *Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Comprobante emitido automáticamente._`;
+
+    const waUrl = numLimpio
+      ? `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`
+      : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+    window.open(waUrl, "_blank");
   };
 
-  // Filtrado de proveedores
   const proveedoresFiltrados = useMemo(() => {
     if (!searchQuery) return proveedores;
     const q = searchQuery.toLowerCase();
@@ -637,10 +958,16 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     );
   }, [proveedores, searchQuery]);
 
-  // Filtrado de órdenes
+  // Pestañas de Órdenes
   const ordenesFiltradas = useMemo(() => {
     return ordenes.filter((o) => {
-      const matchEstado = filtroEstadoOrden === 'TODOS' || o.estado === filtroEstadoOrden;
+      let matchEstado = true;
+      if (filtroEstadoOrden === 'BORRADOR') matchEstado = o.estado === 'BORRADOR';
+      else if (filtroEstadoOrden === 'PENDIENTE') matchEstado = o.estado === 'PENDIENTE';
+      else if (filtroEstadoOrden === 'RECIBIDA_PARCIAL') matchEstado = o.estado === 'RECIBIDA_PARCIAL';
+      else if (filtroEstadoOrden === 'RECIBIDA') matchEstado = o.estado === 'RECIBIDA';
+      else if (filtroEstadoOrden === 'CANCELADA') matchEstado = o.estado === 'CANCELADA';
+
       const matchSearch =
         !searchQuery ||
         `OC-${String(o.numero).padStart(4, '0')}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -652,7 +979,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
   return (
     <div className="space-y-6">
-      {/* ══════ HEADER SUPERIOR & KPIs DE PROVEEDORES ══════ */}
+      {/* ══════ HEADER SUPERIOR & KPIs ══════ */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold tracking-tight flex items-center gap-2.5">
@@ -660,7 +987,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             Proveedores & Cuentas por Pagar
           </h2>
           <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-            Órdenes de compra, control de entregas, diferencias de mercancía y estado de cuenta financiero
+            Órdenes de compra acumulativas por docenas, verificación de recepciones y estados de cuenta
           </p>
         </div>
 
@@ -677,14 +1004,15 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               onClick={() => {
                 setOrderSupplierId('');
                 setOrderObservaciones('');
-                setOrderEstadoInicial('BORRADOR');
-                setOrderLines([{ productId: '', cantidadPedida: 1, precioCosto: 0, observacionLinea: '' }]);
+                setOrderLines([]);
+                setProductoSeleccionado(null);
+                setBusquedaModelo('');
                 setShowOrderModal(true);
               }}
               className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm border border-slate-700"
             >
               <Plus size={14} className="text-amber-400" />
-              <span>Emitir Orden de Compra</span>
+              <span>Emitir Orden de Compra (Borrador)</span>
             </button>
           </div>
         )}
@@ -727,17 +1055,17 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-1.5 shadow-sm">
           <div className="flex items-center justify-between text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-            <span>Órdenes en Tránsito</span>
+            <span>Borradores y Enviadas</span>
             <Clock size={14} className="text-amber-500" />
           </div>
           <div className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">
             {metrics.ordenesActivas} <span className="text-xs font-normal text-[var(--muted-foreground)]">órdenes</span>
           </div>
-          <p className="text-[10px] text-[var(--muted-foreground)]">Borradores y pendientes de entrega</p>
+          <p className="text-[10px] text-[var(--muted-foreground)]">Acumulándose o en tránsito</p>
         </div>
       </div>
 
-      {/* ══════ TABS DE NAVEGACIÓN ══════ */}
+      {/* ══════ TABS PRINCIPALES ══════ */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-2">
         <div className="flex gap-2">
           {([
@@ -761,7 +1089,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           ))}
         </div>
 
-        {/* Buscador Contextual */}
         <div className="relative w-full sm:w-64">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
           <input
@@ -774,16 +1101,15 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         </div>
       </div>
 
-      {/* LOADING */}
       {loading && (
         <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
           <Loader2 className="animate-spin text-[#0F172A] dark:text-amber-400 mb-2" size={32} />
-          <span className="text-xs">Cargando información de proveedores...</span>
+          <span className="text-xs">Cargando información...</span>
         </div>
       )}
 
       {/* ══════════════════════════════════════════
-          PESTAÑA 1: PROVEEDORES & ESTADO DE CUENTA
+          PESTAÑA 1: PROVEEDORES & DEUDAS
          ══════════════════════════════════════════ */}
       {!loading && activeTab === 'proveedores' && (
         proveedoresFiltrados.length === 0 ? (
@@ -804,7 +1130,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4 hover:shadow-md transition-all relative flex flex-col justify-between"
                 >
                   <div className="space-y-3">
-                    {/* Encabezado Card */}
                     <div className="flex justify-between items-start gap-3">
                       <div>
                         <h4 className="font-extrabold text-sm text-[var(--foreground)] line-clamp-1">{p.razonSocial || p.nombre}</h4>
@@ -821,7 +1146,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       </span>
                     </div>
 
-                    {/* Datos de contacto */}
                     <div className="space-y-1.5 text-xs text-[var(--muted-foreground)] border-t border-[var(--border)] pt-3">
                       {p.contacto && (
                         <div className="flex items-center gap-2">
@@ -843,7 +1167,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       )}
                     </div>
 
-                    {/* Resumen Financiero Proveedor */}
                     <div className="grid grid-cols-2 gap-2 bg-[var(--muted)]/40 p-2.5 rounded-xl text-xs border border-[var(--border)]">
                       <div>
                         <span className="text-[10px] text-[var(--muted-foreground)] block">Total Facturado</span>
@@ -856,7 +1179,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     </div>
                   </div>
 
-                  {/* Acciones */}
                   <div className="pt-3 border-t border-[var(--border)] flex items-center gap-2">
                     <button
                       onClick={() => handleAbrirCuentaCorriente(p.id)}
@@ -884,33 +1206,37 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       )}
 
       {/* ══════════════════════════════════════════
-          PESTAÑA 2: ÓRDENES DE COMPRA
+          PESTAÑA 2: ÓRDENES DE COMPRA (Pestañas Ordenadas)
          ══════════════════════════════════════════ */}
       {!loading && activeTab === 'ordenes' && (
         <div className="space-y-4">
-          {/* Filtros de Estado */}
+          {/* Barra de Filtros: Borradores por defecto, Enviadas, Parciales, Recibidas, Canceladas, Todas */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-bold text-[var(--muted-foreground)] flex items-center gap-1 mr-1">
-              <Filter size={12} /> Estado:
-            </span>
-            {['TODOS', 'BORRADOR', 'PENDIENTE', 'RECIBIDA_PARCIAL', 'RECIBIDA', 'CANCELADA'].map((st) => (
+            {[
+              { key: 'BORRADOR', label: 'Pendientes (Borradores del Día)' },
+              { key: 'PENDIENTE', label: 'Enviadas al Proveedor' },
+              { key: 'RECIBIDA_PARCIAL', label: 'Parciales' },
+              { key: 'RECIBIDA', label: 'Recibidas' },
+              { key: 'CANCELADA', label: 'Canceladas' },
+              { key: 'TODOS', label: 'Todas las Órdenes' },
+            ].map((st) => (
               <button
-                key={st}
-                onClick={() => setFiltroEstadoOrden(st)}
-                className={`px-3 py-1 rounded-lg font-bold transition-all text-xs ${
-                  filtroEstadoOrden === st
-                    ? 'bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900'
-                    : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                key={st.key}
+                onClick={() => setFiltroEstadoOrden(st.key)}
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all text-xs border ${
+                  filtroEstadoOrden === st.key
+                    ? 'bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900 border-transparent shadow-sm'
+                    : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
                 }`}
               >
-                {st === 'TODOS' ? 'Todos' : st === 'BORRADOR' ? 'Borradores' : st === 'PENDIENTE' ? 'Pendientes' : st === 'RECIBIDA_PARCIAL' ? 'Parciales' : st === 'RECIBIDA' ? 'Recibidas' : 'Canceladas'}
+                {st.label}
               </button>
             ))}
           </div>
 
           {ordenesFiltradas.length === 0 ? (
             <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
-              No hay órdenes de compra registradas con los filtros seleccionados.
+              No hay órdenes de compra en esta pestaña ({filtroEstadoOrden === 'BORRADOR' ? 'No hay borradores pendientes' : filtroEstadoOrden}).
             </div>
           ) : (
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
@@ -920,94 +1246,112 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     <tr>
                       <th className="px-5 py-3.5">N° Orden</th>
                       <th className="px-4 py-3.5">Proveedor</th>
-                      <th className="px-4 py-3.5">Productos / Miniaturas</th>
+                      <th className="px-4 py-3.5">Modelo / Curva</th>
                       <th className="px-4 py-3.5 text-center">Estado</th>
                       <th className="px-4 py-3.5 text-right">Monto Total</th>
-                      <th className="px-4 py-3.5 text-right">Fecha Emisión</th>
+                      <th className="px-4 py-3.5 text-right">Fecha</th>
                       <th className="px-5 py-3.5 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
-                    {ordenesFiltradas.map((o) => (
-                      <tr key={o.id} className="hover:bg-[var(--muted)]/30 transition-colors">
-                        <td className="px-5 py-3.5 font-bold font-mono text-[var(--foreground)]">
-                          OC-{String(o.numero).padStart(4, '0')}
-                        </td>
-                        <td className="px-4 py-3.5 font-semibold text-xs text-[var(--foreground)]">
-                          {o.supplier?.nombre || o.supplier?.razonSocial || 'Proveedor'}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            {o.lines && o.lines.slice(0, 3).map((l, idx) => (
-                              <div
-                                key={idx}
-                                className="w-8 h-8 rounded-lg bg-[var(--muted)] border border-[var(--border)] overflow-hidden flex items-center justify-center relative group"
-                                title={l.producto?.nombre || 'Producto'}
-                              >
-                                {l.producto?.imageUrl ? (
+                    {ordenesFiltradas.map((o) => {
+                      const lineasConsolidadas = consolidarLineasOrden(o.lines || [], productos);
+                      const firstModel = lineasConsolidadas[0];
+                      const totalPares = lineasConsolidadas.reduce((acc, l) => acc + l.cantidadPedida, 0);
+
+                      return (
+                        <tr key={o.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                          <td className="px-5 py-3.5 font-bold font-mono text-[var(--foreground)]">
+                            OC-{String(o.numero).padStart(4, '0')}
+                          </td>
+                          <td className="px-4 py-3.5 font-semibold text-xs text-[var(--foreground)]">
+                            {o.supplier?.nombre || o.supplier?.razonSocial || 'Proveedor'}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-10 h-10 rounded-lg bg-[var(--muted)] border border-[var(--border)] overflow-hidden flex items-center justify-center shrink-0">
+                                {firstModel?.imageUrl ? (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={l.producto.imageUrl} alt="" className="w-full h-full object-cover" />
+                                  <img src={firstModel.imageUrl} alt="" className="w-full h-full object-cover" />
                                 ) : (
-                                  <Package size={12} className="text-[var(--muted-foreground)]" />
+                                  <Package size={16} className="text-[var(--muted-foreground)]" />
                                 )}
                               </div>
-                            ))}
-                            {(o.lines?.length || 0) > 3 && (
-                              <span className="text-[10px] font-bold text-[var(--muted-foreground)] bg-[var(--muted)] px-1.5 py-0.5 rounded">
-                                +{(o.lines?.length || 0) - 3}
-                              </span>
-                            )}
-                            <span className="text-[11px] text-[var(--muted-foreground)] ml-1">
-                              ({o.totalLineas || o.lines?.length || 0} modelos)
+                              <div>
+                                <span className="font-bold text-xs block truncate max-w-[170px]">
+                                  {firstModel?.nombre || 'Calzado'}
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)]">
+                                  {totalPares} pares ({ (totalPares / 12).toFixed(1) } doc.)
+                                  {lineasConsolidadas.length > 1 && ` • +${lineasConsolidadas.length - 1} modelo(s) más`}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${
+                              o.estado === 'BORRADOR'
+                                ? 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20'
+                                : o.estado === 'PENDIENTE'
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                                : o.estado === 'RECIBIDA_PARCIAL'
+                                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                                : o.estado === 'RECIBIDA'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                            }`}>
+                              {o.estado === 'BORRADOR' && <Edit3 size={10} />}
+                              {o.estado === 'PENDIENTE' && <Clock size={10} />}
+                              {o.estado === 'RECIBIDA' && <CheckCircle size={10} />}
+                              {o.estado === 'BORRADOR' ? 'Borrador' : o.estado === 'PENDIENTE' ? 'Enviada' : o.estado}
                             </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${
-                            o.estado === 'BORRADOR'
-                              ? 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20'
-                              : o.estado === 'PENDIENTE'
-                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                              : o.estado === 'RECIBIDA_PARCIAL'
-                              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-                              : o.estado === 'RECIBIDA'
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                          }`}>
-                            {o.estado === 'BORRADOR' && <Edit3 size={10} />}
-                            {o.estado === 'PENDIENTE' && <Clock size={10} />}
-                            {o.estado === 'RECIBIDA' && <CheckCircle size={10} />}
-                            {o.estado}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-right font-bold text-[#0F172A] dark:text-amber-400 font-mono text-sm">
-                          ${Number(o.total).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3.5 text-right text-[11px] text-[var(--muted-foreground)]">
-                          {new Date(o.createdAt).toLocaleDateString('es-EC')}
-                        </td>
-                        <td className="px-5 py-3.5 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => handleVerDetalleOrden(o.id)}
-                              className="p-1.5 bg-[var(--muted)] hover:bg-[#0F172A] hover:text-white rounded-lg transition-colors text-[var(--foreground)]"
-                              title="Ver Detalle / Editar"
-                            >
-                              <Eye size={13} />
-                            </button>
-                            {o.estado === 'BORRADOR' && (
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-bold text-[#0F172A] dark:text-amber-400 font-mono text-sm">
+                            ${Number(o.total).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3.5 text-right text-[11px] text-[var(--muted-foreground)]">
+                            {new Date(o.createdAt).toLocaleDateString('es-EC')}
+                          </td>
+                          <td className="px-5 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
                               <button
-                                onClick={() => handleConfirmarEnvioOrden(o.id)}
-                                className="p-1.5 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-600 rounded-lg transition-colors"
-                                title="Confirmar y Enviar al Proveedor"
+                                onClick={() => handleVerDetalleOrden(o.id)}
+                                className="p-1.5 bg-[var(--muted)] hover:bg-[#0F172A] hover:text-white rounded-lg transition-colors text-[var(--foreground)]"
+                                title="Ver Detalle / Modificar / Enviar"
                               >
-                                <Send size={13} />
+                                <Eye size={13} />
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {o.estado === 'BORRADOR' && (
+                                <button
+                                  onClick={() => handleEnviarYGenerarPDF(o.id)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                                  title="Enviar Orden al Proveedor"
+                                >
+                                  <Send size={11} />
+                                  <span>Enviar</span>
+                                </button>
+                              )}
+                              {(o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL') && (
+                                <button
+                                  onClick={() => handleIrARecepcionDesdeOrden(o)}
+                                  className="p-1.5 bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-600 rounded-lg transition-colors"
+                                  title="Recibir Mercancía en Bodega"
+                                >
+                                  <Package size={13} />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDescargarPDFOrden(o.id)}
+                                className="p-1.5 bg-[var(--muted)] hover:bg-emerald-600 hover:text-white rounded-lg transition-colors text-[var(--foreground)]"
+                                title="Descargar PDF"
+                              >
+                                <Download size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1029,7 +1373,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   <span>Recepción y Verificación de Mercancía</span>
                 </h4>
                 <p className="text-[11px] text-[var(--muted-foreground)]">
-                  Compara los pares pedidos vs recibidos y registra observaciones por lote
+                  Carga la orden de compra y despliega las tallas de cada modelo para registrar los pares que ingresan
                 </p>
               </div>
             </div>
@@ -1046,7 +1390,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     onChange={(e) => {
                       setEntrySupplierId(e.target.value);
                       setEntryOrderId('');
-                      setEntryLines([{ productId: '', tallaId: '', cantidadIngresada: 1, cantidadEsperada: 1, diferencia: 0, precioCosto: 0, observacionLinea: '' }]);
+                      setEntryModelos([]);
                     }}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   >
@@ -1061,7 +1405,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Vincular a Orden de Compra (Auto-llenar)
+                    Vincular Orden de Compra (Carga Automática)
                   </label>
                   <select
                     disabled={!entrySupplierId}
@@ -1069,204 +1413,275 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     onChange={(e) => handleSelectOrderForEntry(e.target.value)}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A] disabled:opacity-50"
                   >
-                    <option value="">Ingreso Manual Directo (Sin orden)</option>
+                    <option value="">Ingreso Manual Directo</option>
                     {ordenes
                       .filter((o) => o.supplierId === entrySupplierId && (o.estado === 'PENDIENTE' || o.estado === 'BORRADOR' || o.estado === 'RECIBIDA_PARCIAL'))
                       .map((o) => (
                         <option key={o.id} value={o.id}>
-                          OC-{String(o.numero).padStart(4, '0')} (${Number(o.total).toFixed(2)}) - {o.estado}
+                          OC-{String(o.numero).padStart(4, '0')} (${Number(o.total).toFixed(2)}) - {o.estado === 'PENDIENTE' ? 'ENVIADA' : o.estado}
                         </option>
                       ))}
                   </select>
                 </div>
               </div>
 
-              {/* Observaciones generales de la entrega */}
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Observaciones Generales de la Entrega / Guía de Remisión
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Guía N° 001-928. Furgón llegó a las 10:00 AM, bultos completos."
+                  placeholder="Ej. Guía N° 001-928. Bultos revisados en recepción."
                   value={entryObservaciones}
                   onChange={(e) => setEntryObservaciones(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
-              {/* Líneas de Mercancía */}
-              <div className="space-y-3 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Detalle de Modelos & Tallas a Ingresar
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleAddEntryLine}
-                    className="flex items-center gap-1 text-xs text-[#0F172A] dark:text-amber-400 font-bold hover:opacity-80"
-                  >
-                    <Plus size={13} />
-                    <span>Agregar Fila</span>
-                  </button>
-                </div>
+              {/* Buscador de modelos extra */}
+              <div className="p-4 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                  ¿Entregaron modelos adicionales fuera de la orden?
+                </span>
 
-                <div className="space-y-3">
-                  {entryLines.map((line, index) => {
-                    const prod = productos.find((p) => p.id === line.productId);
-                    const dif = line.diferencia ?? 0;
+                {productoSeleccionado ? (
+                  <div className="flex items-center justify-between p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl">
+                    <div className="flex items-center gap-3">
+                      {obtenerFotoProducto(productoSeleccionado) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-10 h-10 object-cover rounded-lg border" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center font-bold">👟</div>
+                      )}
+                      <div>
+                        <span className="font-bold text-xs block">{productoSeleccionado.nombre || productoSeleccionado.name}</span>
+                        <span className="text-[10px] text-[var(--muted-foreground)]">
+                          {productoSeleccionado.marca} • {productoSeleccionado.color} ({productoSeleccionado.codigo})
+                        </span>
+                      </div>
+                    </div>
 
-                    return (
-                      <div
-                        key={index}
-                        className={`p-3.5 rounded-xl border space-y-2.5 transition-colors ${
-                          dif < 0
-                            ? 'bg-rose-500/5 border-rose-500/30'
-                            : dif > 0
-                            ? 'bg-blue-500/5 border-blue-500/30'
-                            : 'bg-[var(--muted)]/20 border-[var(--border)]'
-                        }`}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddEntryModeloExtra}
+                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700"
                       >
-                        <div className="flex flex-col sm:flex-row gap-3 items-end">
-                          {/* Miniatura imagen si existe */}
-                          {prod?.imageUrl && (
-                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--muted)] border border-[var(--border)] shrink-0 hidden sm:block">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={prod.imageUrl} alt="" className="w-full h-full object-cover" />
+                        + Agregar a Recepción
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProductoSeleccionado(null)}
+                        className="text-xs font-bold text-rose-500 hover:underline"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Buscar modelo adicional con foto (nombre, código, color)..."
+                      value={busquedaModelo}
+                      onChange={(e) => {
+                        setBusquedaModelo(e.target.value);
+                        setShowDropdownModelo(true);
+                      }}
+                      onFocus={() => setShowDropdownModelo(true)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                    />
+                    {showDropdownModelo && busquedaModelo.trim().length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto">
+                        {productos
+                          .filter((p) => {
+                            const q = busquedaModelo.toLowerCase().trim();
+                            return (
+                              (p.nombre && p.nombre.toLowerCase().includes(q)) ||
+                              (p.name && p.name.toLowerCase().includes(q)) ||
+                              (p.codigo && p.codigo.toLowerCase().includes(q)) ||
+                              (p.color && p.color.toLowerCase().includes(q))
+                            );
+                          })
+                          .map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setProductoSeleccionado(p);
+                                setShowDropdownModelo(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--muted)] border-b border-[var(--border)] last:border-none flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-2">
+                                {obtenerFotoProducto(p) && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
+                                )}
+                                <div>
+                                  <span className="font-bold block">{p.nombre || p.name}</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)]">{p.marca} • {p.color}</span>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Lista de Modelos en Recepción con Acordeón */}
+              <div className="space-y-3 pt-2">
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">
+                  Modelos a Recepcionar ({entryModelos.length})
+                </span>
+
+                {entryModelos.length === 0 ? (
+                  <p className="text-center text-[var(--muted-foreground)] py-6 bg-[var(--muted)]/20 rounded-xl">
+                    Seleccione una orden de compra o busque modelos para ingresar a bodega.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {entryModelos.map((m, mIdx) => {
+                      const totalParesModelo = m.tallas.reduce((acc, t) => acc + t.cantidadIngresada, 0);
+                      const isExpanded = modelosExpandidos[`recepcion_${mIdx}`] ?? true;
+
+                      return (
+                        <div
+                          key={mIdx}
+                          className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm"
+                        >
+                          <div
+                            onClick={() => toggleExpandModelo(`recepcion_${mIdx}`)}
+                            className="p-3.5 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/50 cursor-pointer flex items-center justify-between gap-3 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center">
+                                {m.fotoUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={m.fotoUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package size={18} className="text-[var(--muted-foreground)]" />
+                                )}
+                              </div>
+                              <div>
+                                <h5 className="font-bold text-xs text-[var(--foreground)]">{m.nombre}</h5>
+                                <p className="text-[10px] text-[var(--muted-foreground)]">
+                                  {m.marca} • {m.color} • {m.serieNombre}
+                                </p>
+                              </div>
                             </div>
-                          )}
 
-                          <div className="flex-1 w-full">
-                            <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Modelo / Calzado</label>
-                            <select
-                              required
-                              value={line.productId}
-                              onChange={(e) => handleEntryLineChange(index, 'productId', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs focus:outline-none focus:border-[#0F172A]"
-                            >
-                              <option value="">Seleccione modelo</option>
-                              {productos.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.nombre || p.name} ({p.marca || p.brand} - {p.codigo || p.code})
-                                </option>
-                              ))}
-                            </select>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <span className="font-extrabold text-xs text-[#0F172A] dark:text-amber-400 font-mono block">
+                                  {totalParesModelo} pares ({ (totalParesModelo / 12).toFixed(1) } doc.)
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)]">
+                                  ${m.precioCosto.toFixed(2)} c/u
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveEntryModelo(mIdx);
+                                }}
+                                className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                                title="Quitar modelo"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                              <div className="p-1 text-[var(--muted-foreground)]">
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="w-full sm:w-28">
-                            <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Talla</label>
-                            <select
-                              required
-                              disabled={!line.productId}
-                              value={line.tallaId}
-                              onChange={(e) => handleEntryLineChange(index, 'tallaId', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs focus:outline-none focus:border-[#0F172A] disabled:opacity-50"
-                            >
-                              <option value="">Elegir Talla</option>
-                              {getTallasForProduct(line.productId).map((t: any) => (
-                                <option key={t.id} value={t.id}>
-                                  Nro {t.talla || t.numero} ({t.stock} disp.)
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          {isExpanded && (
+                            <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] space-y-3">
+                              <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase block">
+                                Pares Recibidos por Numeración:
+                              </span>
+                              <div className="flex flex-wrap gap-2.5">
+                                {m.tallas.map((t, tIdx) => {
+                                  const dif = t.diferencia;
 
-                          {entryOrderId && (
-                            <div className="w-full sm:w-20">
-                              <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Esperados</label>
+                                  return (
+                                    <div
+                                      key={tIdx}
+                                      className={`p-2 rounded-xl border flex items-center gap-2 ${
+                                        dif < 0
+                                          ? 'bg-rose-500/5 border-rose-500/30'
+                                          : dif > 0
+                                          ? 'bg-blue-500/5 border-blue-500/30'
+                                          : 'bg-[var(--muted)]/20 border-[var(--border)]'
+                                      }`}
+                                    >
+                                      <span className="font-extrabold text-xs text-[var(--foreground)] font-mono">
+                                        T{t.sizeNumber}
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={t.cantidadIngresada}
+                                        onChange={(e) => handleUpdateTallaQty(mIdx, tIdx, parseInt(e.target.value) || 0)}
+                                        className="w-12 px-1.5 py-1 text-center font-bold text-xs bg-[var(--card)] border rounded-lg font-mono"
+                                      />
+                                      {t.cantidadEsperada > 0 && (
+                                        <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                          / {t.cantidadEsperada} esp.
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
                               <input
-                                type="number"
-                                readOnly
-                                value={line.cantidadEsperada ?? '-'}
-                                className="w-full px-2.5 py-1.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-xs font-mono text-[var(--muted-foreground)] text-center cursor-not-allowed"
+                                type="text"
+                                placeholder="Observación específica de este modelo (ej. faltó 1 par talla 36)"
+                                value={m.observacionLinea || ''}
+                                onChange={(e) => {
+                                  const updated = [...entryModelos];
+                                  updated[mIdx].observacionLinea = e.target.value;
+                                  setEntryModelos(updated);
+                                }}
+                                className="w-full px-2.5 py-1 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg text-[11px] focus:outline-none focus:border-[#0F172A]"
                               />
                             </div>
                           )}
-
-                          <div className="w-full sm:w-24">
-                            <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Recibidos *</label>
-                            <input
-                              type="number"
-                              min="1"
-                              required
-                              value={line.cantidadIngresada}
-                              onChange={(e) => handleEntryLineChange(index, 'cantidadIngresada', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold focus:outline-none focus:border-[#0F172A] text-center"
-                            />
-                          </div>
-
-                          <div className="w-full sm:w-24">
-                            <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Costo Unit ($)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              required
-                              value={line.precioCosto}
-                              onChange={(e) => handleEntryLineChange(index, 'precioCosto', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0F172A]"
-                            />
-                          </div>
-
-                          {entryLines.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveEntryLine(index)}
-                              className="p-2 border border-[var(--border)] hover:border-rose-500 hover:text-rose-500 text-[var(--muted-foreground)] rounded-lg transition-colors bg-[var(--card)] sm:mb-0.5"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          )}
                         </div>
-
-                        {/* Campo de observación por línea si faltan o sobran pares */}
-                        <div className="flex items-center gap-2 pt-1">
-                          {entryOrderId && dif !== 0 && (
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
-                              dif < 0 ? 'bg-rose-500/20 text-rose-600' : 'bg-blue-500/20 text-blue-600'
-                            }`}>
-                              {dif < 0 ? `Faltan ${Math.abs(dif)} pares` : `Excedente +${dif} pares`}
-                            </span>
-                          )}
-                          <input
-                            type="text"
-                            placeholder="Observación de este producto (ej. hebilla defectuosa, cambio de color acordado)"
-                            value={line.observacionLinea || ''}
-                            onChange={(e) => handleEntryLineChange(index, 'observacionLinea', e.target.value)}
-                            className="flex-1 px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-[11px] placeholder:text-[var(--muted-foreground)]/60 focus:outline-none focus:border-[#0F172A]"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Total y Botón de Envío */}
               <div className="pt-4 border-t border-[var(--border)] flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div className="text-xs">
                   <span className="text-[var(--muted-foreground)]">Total Cargamento: </span>
                   <span className="font-extrabold text-[#0F172A] dark:text-amber-400 font-mono text-base ml-1">
-                    ${entryLines.reduce((sum, l) => sum + (l.cantidadIngresada * l.precioCosto), 0).toFixed(2)}
+                    ${entryModelos.reduce((sum, m) => sum + m.tallas.reduce((s, t) => s + (t.cantidadIngresada * m.precioCosto), 0), 0).toFixed(2)}
                   </span>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={saving || !online}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 border border-slate-700"
+                  disabled={saving || !online || entryModelos.length === 0}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 border border-slate-700 disabled:opacity-50"
                 >
                   {saving ? (
-                    <><Loader2 size={14} className="animate-spin" /><span>Guardando Ingreso...</span></>
+                    <><Loader2 size={14} className="animate-spin" /><span>Guardando...</span></>
                   ) : (
-                    <><CheckCircle size={14} className="text-emerald-400" /><span>Registrar Ingreso & Actualizar Stock</span></>
+                    <><CheckCircle size={14} className="text-emerald-400" /><span>Confirmar Recepción & Actualizar Stock</span></>
                   )}
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Panel Lateral Informativo y Últimos Ingresos */}
           <div className="space-y-4">
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3">
               <h5 className="font-extrabold text-xs flex items-center gap-2 text-[#0F172A] dark:text-amber-400">
@@ -1274,51 +1689,25 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 <span>Control de Entrada a Bodega</span>
               </h5>
               <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                Al confirmar la recepción, el sistema incrementa automáticamente el inventario físico por modelo y talla.
+                Al recepcionar la mercancía, el sistema incrementa automáticamente el inventario físico por modelo y talla.
               </p>
               <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                Si vinculas una orden con faltantes, la orden pasará a estado <strong>RECIBIDA PARCIAL</strong> y el saldo pendiente con el proveedor se ajustará únicamente por lo efectivamente recibido.
+                Si la orden tiene faltantes, queda en estado <strong>RECIBIDA PARCIAL</strong> para controlar lo pendiente por entregar.
               </p>
-            </div>
-
-            {/* Últimas Recepciones */}
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3">
-              <h5 className="font-extrabold text-xs flex items-center gap-2 text-[var(--foreground)]">
-                <History size={14} />
-                <span>Últimos Ingresos Registrados</span>
-              </h5>
-              {entradas.length === 0 ? (
-                <p className="text-[11px] text-[var(--muted-foreground)]">No hay ingresos registrados aún.</p>
-              ) : (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {entradas.slice(0, 5).map((e) => (
-                    <div key={e.id} className="p-2.5 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-xs space-y-1">
-                      <div className="flex justify-between font-bold">
-                        <span>ENT-{String(e.numero).padStart(4, '0')}</span>
-                        <span className="font-mono text-emerald-600">${Number(e.total).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
-                        <span>{e.supplier?.nombre || 'Proveedor'}</span>
-                        <span>{new Date(e.fechaIngreso).toLocaleDateString('es-EC')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
       )}
 
       {/* ══════════════════════════════════════════
-          PESTAÑA 4: HISTORIAL DE PAGOS A PROVEEDORES
+          PESTAÑA 4: HISTORIAL DE PAGOS
          ══════════════════════════════════════════ */}
       {!loading && activeTab === 'pagos' && (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm space-y-4 p-5">
           <div className="flex justify-between items-center">
             <h3 className="font-extrabold text-sm flex items-center gap-2">
               <DollarSign size={16} className="text-emerald-500" />
-              <span>Bitácora Consolidada de Pagos & Abonos a Proveedores</span>
+              <span>Bitácora de Pagos & Abonos a Proveedores</span>
             </h3>
           </div>
 
@@ -1336,7 +1725,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     <th className="px-4 py-3">Método</th>
                     <th className="px-4 py-3">Banco / Comprobante</th>
                     <th className="px-4 py-3">Notas / Concepto</th>
-                    <th className="px-5 py-3 text-right">Monto Pagado</th>
+                    <th className="px-4 py-3 text-right">Monto Pagado</th>
+                    <th className="px-5 py-3 text-center">WhatsApp</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -1361,8 +1751,18 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       <td className="px-4 py-3 text-[11px] text-[var(--muted-foreground)] truncate max-w-xs">
                         {p.notas || 'Abono directo a cuenta'}
                       </td>
-                      <td className="px-5 py-3 text-right font-extrabold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                      <td className="px-4 py-3 text-right font-extrabold text-emerald-600 dark:text-emerald-400 font-mono text-sm">
                         ${Number(p.monto).toFixed(2)}
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <button
+                          onClick={() => handleEnviarPagoWhatsApp(p)}
+                          className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-600 text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 mx-auto"
+                          title="Enviar Comprobante al WhatsApp del Proveedor"
+                        >
+                          <MessageCircle size={12} />
+                          <span>Notificar</span>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1374,15 +1774,14 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       )}
 
       {/* ══════════════════════════════════════════
-          MODAL: DETALLE / EDICIÓN DE ORDEN DE COMPRA
+          MODAL: DETALLE DE ORDEN (Con Botón Enviar Explícito)
          ══════════════════════════════════════════ */}
       {showOrderDetailModal && selectedOrder && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            {/* Header Modal */}
             <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900 rounded-xl font-bold">
+                <div className="p-2.5 bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900 rounded-2xl font-bold">
                   <FileText size={18} />
                 </div>
                 <div>
@@ -1397,36 +1796,43 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                         ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                         : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                     }`}>
-                      {selectedOrder.estado}
+                      {selectedOrder.estado === 'BORRADOR' ? 'Borrador (Acumulándose)' : selectedOrder.estado === 'PENDIENTE' ? 'Enviada al Proveedor' : selectedOrder.estado}
                     </span>
                   </h3>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    Proveedor: <strong>{selectedOrder.supplier?.nombre || selectedOrder.supplier?.razonSocial}</strong> ({selectedOrder.supplier?.ruc})
+                    Proveedor: <strong>{selectedOrder.supplier?.razonSocial || selectedOrder.supplier?.nombre}</strong> ({selectedOrder.supplier?.ruc})
                   </p>
                 </div>
               </div>
 
-              <button
-                onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
-                className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDescargarPDFOrden(selectedOrder.id)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <Download size={13} />
+                  <span>PDF Orden</span>
+                </button>
+                <button
+                  onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
+                  className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
-            {/* Contenido Scrollable */}
             <div className="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
-              {/* Observaciones generales */}
               <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl p-4 space-y-1.5">
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                  Observaciones Generales de la Orden
+                  Observaciones / Términos de Entrega
                 </label>
                 {editingOrder ? (
                   <textarea
                     rows={2}
                     value={selectedOrder.observaciones || ''}
                     onChange={(e) => setSelectedOrder({ ...selectedOrder, observaciones: e.target.value })}
-                    placeholder="Instrucciones al proveedor, términos de entrega, personalizaciones generales..."
+                    placeholder="Instrucciones al proveedor..."
                     className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   />
                 ) : (
@@ -1436,11 +1842,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 )}
               </div>
 
-              {/* Lista de Productos con Imagen */}
+              {/* Lista de Modelos Consolidados con Acordeón Desplegable de Numeración */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Modelos Solicitados ({selectedOrder.lines?.length || 0})
+                    Modelos Solicitados ({consolidarLineasOrden(selectedOrder.lines || [], productos).length})
                   </span>
                   {(selectedOrder.estado === 'BORRADOR' || selectedOrder.estado === 'PENDIENTE') && (
                     <button
@@ -1448,114 +1854,156 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       className="flex items-center gap-1 text-xs font-bold text-[#0F172A] dark:text-amber-400 hover:opacity-80"
                     >
                       <Edit3 size={13} />
-                      <span>{editingOrder ? 'Cancelar Edición' : 'Modificar Orden'}</span>
+                      <span>{editingOrder ? 'Finalizar Edición' : 'Modificar Orden (Pares / Docenas)'}</span>
                     </button>
                   )}
                 </div>
 
                 <div className="space-y-3">
-                  {selectedOrder.lines?.map((line, idx) => (
-                    <div
-                      key={idx}
-                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden flex items-center justify-center shrink-0">
-                          {line.producto?.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={line.producto.imageUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <ImageIcon size={18} className="text-[var(--muted-foreground)]" />
-                          )}
-                        </div>
-                        <div>
-                          <h5 className="font-bold text-xs text-[var(--foreground)]">
-                            {line.producto?.nombre || 'Producto'}
-                          </h5>
-                          <div className="flex gap-2 text-[10px] text-[var(--muted-foreground)]">
-                            <span>Cód: {line.producto?.codigo}</span>
-                            {line.producto?.color && <span>• Color: {line.producto.color}</span>}
-                          </div>
-                          {/* Nota de línea */}
-                          {editingOrder ? (
-                            <input
-                              type="text"
-                              value={line.observacionLinea || ''}
-                              onChange={(e) => {
-                                const newLines = [...(selectedOrder.lines || [])];
-                                newLines[idx].observacionLinea = e.target.value;
-                                setSelectedOrder({ ...selectedOrder, lines: newLines });
-                              }}
-                              placeholder="Observación del modelo (ej. cambio de suela)"
-                              className="mt-1 px-2 py-0.5 bg-[var(--muted)] border border-[var(--border)] rounded text-[10px] w-full"
-                            />
-                          ) : (
-                            line.observacionLinea && (
-                              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 italic">
-                                Nota: {line.observacionLinea}
-                              </p>
-                            )
-                          )}
-                        </div>
-                      </div>
+                  {consolidarLineasOrden(selectedOrder.lines || [], productos).map((line, idx) => {
+                    const docenas = (line.cantidadPedida / 12).toFixed(1);
+                    const isExpanded = modelosExpandidos[`orden_${idx}`] ?? true;
 
-                      {/* Cantidad y Costos */}
-                      <div className="flex items-center gap-4 self-end sm:self-center">
-                        {editingOrder ? (
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <span className="text-[9px] text-[var(--muted-foreground)] block">Pares</span>
-                              <input
-                                type="number"
-                                min="1"
-                                value={line.cantidadPedida}
-                                onChange={(e) => {
-                                  const newLines = [...(selectedOrder.lines || [])];
-                                  newLines[idx].cantidadPedida = parseInt(e.target.value) || 1;
-                                  setSelectedOrder({ ...selectedOrder, lines: newLines });
-                                }}
-                                className="w-16 px-2 py-1 bg-[var(--muted)] border border-[var(--border)] rounded text-xs text-center font-bold font-mono"
-                              />
+                    return (
+                      <div
+                        key={idx}
+                        className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm transition-all"
+                      >
+                        <div
+                          onClick={() => toggleExpandModelo(`orden_${idx}`)}
+                          className="p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer hover:bg-[var(--muted)]/30 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden flex items-center justify-center shrink-0">
+                              {line.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={line.imageUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon size={18} className="text-[var(--muted-foreground)]" />
+                              )}
                             </div>
                             <div>
-                              <span className="text-[9px] text-[var(--muted-foreground)] block">Costo ($)</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                value={line.precioCosto}
-                                onChange={(e) => {
-                                  const newLines = [...(selectedOrder.lines || [])];
-                                  newLines[idx].precioCosto = parseFloat(e.target.value) || 0;
-                                  setSelectedOrder({ ...selectedOrder, lines: newLines });
-                                }}
-                                className="w-20 px-2 py-1 bg-[var(--muted)] border border-[var(--border)] rounded text-xs font-mono"
-                              />
+                              <h5 className="font-bold text-xs text-[var(--foreground)]">{line.nombre}</h5>
+                              <div className="flex gap-2 text-[10px] text-[var(--muted-foreground)]">
+                                <span>Cód: {line.codigo}</span>
+                                {line.color && <span>• Color: {line.color}</span>}
+                                {line.serie && <span>• Serie: {line.serie}</span>}
+                              </div>
+                              {line.observacionLinea && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 italic">
+                                  Nota: {line.observacionLinea}
+                                </p>
+                              )}
                             </div>
                           </div>
-                        ) : (
-                          <div className="text-right">
-                            <span className="text-[10px] text-[var(--muted-foreground)] block">
-                              {line.cantidadPedida} pares × ${Number(line.precioCosto).toFixed(2)}
+
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            {editingOrder ? (
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedLines = [...(selectedOrder.lines || [])];
+                                    const target = updatedLines.find((l) => l.productId === line.productId);
+                                    if (target) target.cantidadPedida += 12;
+                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                  }}
+                                  className="px-2 py-1 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[10px] font-bold rounded"
+                                  title="Agregar 1 docena más (+12 pares)"
+                                >
+                                  +1 doc
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedLines = [...(selectedOrder.lines || [])];
+                                    const target = updatedLines.find((l) => l.productId === line.productId);
+                                    if (target) target.cantidadPedida += 6;
+                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                  }}
+                                  className="px-2 py-1 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[10px] font-bold rounded"
+                                  title="Agregar media docena (+6 pares)"
+                                >
+                                  +½ doc
+                                </button>
+
+                                <div>
+                                  <span className="text-[9px] text-[var(--muted-foreground)] block text-center">Pares</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={line.cantidadPedida}
+                                    onChange={(e) => {
+                                      const updatedLines = [...(selectedOrder.lines || [])];
+                                      const target = updatedLines.find((l) => l.productId === line.productId);
+                                      if (target) target.cantidadPedida = parseInt(e.target.value) || 1;
+                                      setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                    }}
+                                    className="w-16 px-2 py-1 bg-[var(--muted)] border border-[var(--border)] rounded text-xs text-center font-bold font-mono"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedLines = (selectedOrder.lines || []).filter((l) => l.productId !== line.productId);
+                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                  }}
+                                  className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                                  title="Quitar modelo"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-right">
+                                <span className="text-[10px] text-[var(--muted-foreground)] block">
+                                  {line.cantidadPedida} pares ({docenas} doc.) × ${Number(line.precioCosto).toFixed(2)}
+                                </span>
+                                <span className="font-extrabold text-[#0F172A] dark:text-amber-400 font-mono text-sm">
+                                  ${(line.cantidadPedida * line.precioCosto).toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="p-1 text-[var(--muted-foreground)]">
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Despliegue de Chips de Numeración exacta calculada */}
+                        {isExpanded && (
+                          <div className="px-4 py-3 bg-[var(--muted)]/20 border-t border-[var(--border)] flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1">
+                              Numeración Solicitada:
                             </span>
-                            <span className="font-extrabold text-[#0F172A] dark:text-amber-400 font-mono text-sm">
-                              ${(line.cantidadPedida * line.precioCosto).toFixed(2)}
-                            </span>
+                            {line.tallasDesglose?.map((td, tIdx) => (
+                              <div
+                                key={tIdx}
+                                className="px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold shadow-2xs flex items-center gap-1"
+                              >
+                                <span className="text-[var(--foreground)] font-extrabold">T{td.talla}</span>
+                                <span className="text-[10px] text-[var(--muted-foreground)]">({td.cantidad})</span>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Footer Modal con Acciones de Negocio */}
+            {/* Footer Modal con Botones */}
             <div className="p-6 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap justify-between items-center gap-3 shrink-0">
               <div className="text-sm">
                 <span className="text-[var(--muted-foreground)]">Total de la Orden: </span>
                 <span className="font-black text-[#0F172A] dark:text-amber-400 font-mono text-lg ml-1">
-                  ${selectedOrder.lines?.reduce((sum, l) => sum + (l.cantidadPedida * l.precioCosto), 0).toFixed(2)}
+                  ${consolidarLineasOrden(selectedOrder.lines || [], productos).reduce((sum, l) => sum + (l.cantidadPedida * l.precioCosto), 0).toFixed(2)}
+                </span>
+                <span className="text-xs text-[var(--muted-foreground)] ml-2 font-mono">
+                  ({consolidarLineasOrden(selectedOrder.lines || [], productos).reduce((sum, l) => sum + l.cantidadPedida, 0)} pares totales)
                 </span>
               </div>
 
@@ -1571,14 +2019,24 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   </button>
                 )}
 
-                {selectedOrder.estado === 'BORRADOR' && !editingOrder && (
+                {selectedOrder.estado === 'BORRADOR' && (
                   <button
-                    onClick={() => handleConfirmarEnvioOrden(selectedOrder.id)}
+                    onClick={() => handleEnviarYGenerarPDF(selectedOrder.id)}
                     disabled={saving}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm"
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-md transition-transform hover:scale-105"
                   >
-                    <Send size={13} />
-                    <span>Enviar al Proveedor</span>
+                    <Send size={14} />
+                    <span>Enviar Orden de Compra al Proveedor</span>
+                  </button>
+                )}
+
+                {(selectedOrder.estado === 'PENDIENTE' || selectedOrder.estado === 'RECIBIDA_PARCIAL') && (
+                  <button
+                    onClick={() => handleIrARecepcionDesdeOrden(selectedOrder)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Package size={13} />
+                    <span>Recibir Mercancía</span>
                   </button>
                 )}
 
@@ -1604,7 +2062,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       {showCuentaModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            {/* Header Modal */}
             <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-emerald-600 text-white rounded-2xl font-bold">
@@ -1631,11 +2088,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             {loadingCuenta ? (
               <div className="p-16 flex flex-col items-center justify-center text-[var(--muted-foreground)] space-y-2">
                 <Loader2 size={28} className="animate-spin text-[#0F172A] dark:text-amber-400" />
-                <span className="text-xs">Cargando movimientos y balance...</span>
+                <span className="text-xs">Cargando balance...</span>
               </div>
             ) : cuentaCorrienteData ? (
               <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
-                {/* KPIs Estado de Cuenta */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-4 space-y-1">
                     <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Total Facturado</span>
@@ -1657,11 +2113,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   </div>
                 </div>
 
-                {/* Botón registrar abono */}
                 <div className="flex justify-between items-center">
                   <h4 className="font-extrabold text-sm flex items-center gap-2 text-[var(--foreground)]">
                     <History size={16} />
-                    <span>Línea de Tiempo de Movimientos (Entregas & Pagos)</span>
+                    <span>Línea de Tiempo de Movimientos</span>
                   </h4>
                   <button
                     onClick={() => handleAbrirModalPago(selectedSupplierId!, undefined, cuentaCorrienteData.resumen.saldoPendiente)}
@@ -1672,7 +2127,6 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   </button>
                 </div>
 
-                {/* Timeline Cronológico */}
                 <div className="space-y-3">
                   {cuentaCorrienteData.movimientos.length === 0 ? (
                     <p className="text-center text-[var(--muted-foreground)] py-8">No hay movimientos registrados para este proveedor.</p>
@@ -1713,15 +2167,37 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                             </div>
                           </div>
 
-                          <div className="text-right self-end sm:self-center">
-                            <span className={`font-black font-mono text-sm ${
-                              isPago ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#0F172A] dark:text-amber-400'
-                            }`}>
-                              {isPago ? `-$${Number(mov.monto).toFixed(2)}` : `+$${Number(mov.monto).toFixed(2)}`}
-                            </span>
-                            <span className="text-[10px] text-[var(--muted-foreground)] block font-mono">
-                              {new Date(mov.fecha).toLocaleDateString('es-EC')}
-                            </span>
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            <div className="text-right">
+                              <span className={`font-black font-mono text-sm ${
+                                isPago ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#0F172A] dark:text-amber-400'
+                              }`}>
+                                {isPago ? `-$${Number(mov.monto).toFixed(2)}` : `+$${Number(mov.monto).toFixed(2)}`}
+                              </span>
+                              <span className="text-[10px] text-[var(--muted-foreground)] block font-mono">
+                                {new Date(mov.fecha).toLocaleDateString('es-EC')}
+                              </span>
+                            </div>
+
+                            {isPago && (
+                              <button
+                                onClick={() => handleEnviarPagoWhatsApp({
+                                  id: mov.id,
+                                  supplierId: selectedSupplierId!,
+                                  monto: mov.monto,
+                                  metodo: mov.metodo || 'TRANSFERENCIA',
+                                  banco: mov.banco,
+                                  comprobante: mov.comprobante,
+                                  notas: mov.descripcion,
+                                  createdAt: mov.fecha,
+                                  supplier: cuentaCorrienteData.supplier,
+                                })}
+                                className="p-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors"
+                                title="Enviar Comprobante por WhatsApp"
+                              >
+                                <MessageCircle size={14} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -1735,7 +2211,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       )}
 
       {/* ══════════════════════════════════════════
-          MODAL: REGISTRAR PAGO / ABONO A PROVEEDOR
+          MODAL: REGISTRAR PAGO A PROVEEDOR
          ══════════════════════════════════════════ */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1840,22 +2316,22 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       )}
 
       {/* ══════════════════════════════════════════
-          MODAL: CREAR NUEVA ORDEN DE COMPRA
+          MODAL: EMITIR NUEVA ORDEN (Borrador con Curva Exacta)
          ══════════════════════════════════════════ */}
       {showOrderModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
               <h3 className="font-extrabold text-base flex items-center gap-2">
                 <FileText className="text-[#0F172A] dark:text-amber-400" size={18} />
-                <span>Emitir Orden de Compra a Proveedor</span>
+                <span>Emitir Orden de Compra a Proveedor (Borrador)</span>
               </h3>
               <button onClick={() => setShowOrderModal(false)} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateOrder} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+            <form onSubmit={handleCrearOrden} className="p-6 space-y-5 overflow-y-auto flex-1 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
@@ -1878,16 +2354,12 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Estado Inicial de la Orden
+                    Estado Inicial
                   </label>
-                  <select
-                    value={orderEstadoInicial}
-                    onChange={(e) => setOrderEstadoInicial(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-                  >
-                    <option value="BORRADOR">Guardar como Borrador (Permite editar)</option>
-                    <option value="PENDIENTE">Confirmar y Enviar al Proveedor</option>
-                  </select>
+                  <div className="px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-xs text-[var(--muted-foreground)] font-semibold flex items-center gap-2">
+                    <Clock size={14} className="text-amber-500" />
+                    <span>Borrador (Acumulativo durante el día)</span>
+                  </div>
                 </div>
               </div>
 
@@ -1897,126 +2369,298 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Entrega urgente antes del fin de mes, empaque en cajas individuales..."
+                  placeholder="Ej. Entrega antes del fin de mes, empacar en cajas individuales..."
                   value={orderObservaciones}
                   onChange={(e) => setOrderObservaciones(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
-              {/* Detalle Orden */}
-              <div className="space-y-3 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Modelos a Solicitar
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleAddOrderLine}
-                    className="flex items-center gap-1 text-xs text-[#0F172A] dark:text-amber-400 font-bold hover:opacity-80"
-                  >
-                    <Plus size={13} />
-                    <span>Agregar Fila</span>
-                  </button>
-                </div>
+              {/* Selector de Modelos con Curva Exacta */}
+              <div className="p-4 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                  Seleccionar Modelo de Calzado & Curva
+                </span>
 
-                <div className="space-y-3">
-                  {orderLines.map((line, index) => {
-                    const prod = productos.find((p) => p.id === line.productId);
+                {productoSeleccionado ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl gap-3">
+                    <div className="flex items-center gap-3">
+                      {obtenerFotoProducto(productoSeleccionado) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-12 h-12 object-cover rounded-lg border shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-lg shrink-0">👟</div>
+                      )}
+                      <div>
+                        <div className="font-extrabold text-sm text-[var(--foreground)]">
+                          {productoSeleccionado.nombre || productoSeleccionado.name} — {productoSeleccionado.color}
+                        </div>
+                        <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                          Marca: {productoSeleccionado.marca} • Cód: {productoSeleccionado.codigo} • Serie: {productoSeleccionado.serie?.name || 'Estándar'}
+                        </div>
+                      </div>
+                    </div>
 
-                    return (
-                      <div key={index} className="bg-[var(--muted)]/20 p-3.5 rounded-2xl border border-[var(--border)] space-y-2.5">
-                        <div className="flex flex-col sm:flex-row gap-3 items-end">
-                          {prod?.imageUrl && (
-                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--muted)] border border-[var(--border)] shrink-0 hidden sm:block">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={prod.imageUrl} alt="" className="w-full h-full object-cover" />
-                            </div>
-                          )}
+                    <button
+                      type="button"
+                      onClick={() => setProductoSeleccionado(null)}
+                      className="text-xs font-bold text-rose-500 hover:underline shrink-0"
+                    >
+                      Cambiar Modelo
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Escribe para buscar modelo con foto (ej. Samba, Mocasín)..."
+                      value={busquedaModelo}
+                      onChange={(e) => {
+                        setBusquedaModelo(e.target.value);
+                        setShowDropdownModelo(true);
+                      }}
+                      onFocus={() => setShowDropdownModelo(true)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    />
 
-                          <div className="flex-1 w-full">
-                            <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Modelo / Calzado</label>
-                            <select
-                              required
-                              value={line.productId}
-                              onChange={(e) => handleOrderLineChange(index, 'productId', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs focus:outline-none focus:border-[#0F172A]"
+                    {showDropdownModelo && busquedaModelo.trim().length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto">
+                        {productos
+                          .filter((p) => {
+                            const q = busquedaModelo.toLowerCase().trim();
+                            return (
+                              (p.nombre && p.nombre.toLowerCase().includes(q)) ||
+                              (p.name && p.name.toLowerCase().includes(q)) ||
+                              (p.codigo && p.codigo.toLowerCase().includes(q)) ||
+                              (p.color && p.color.toLowerCase().includes(q)) ||
+                              (p.marca && p.marca.toLowerCase().includes(q))
+                            );
+                          })
+                          .map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setProductoSeleccionado(p);
+                                setPrecioCostoInput(Number(p.precioCosto || p.costPrice || 0));
+                                setShowDropdownModelo(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--muted)] border-b border-[var(--border)] last:border-none flex items-center justify-between"
                             >
-                              <option value="">Seleccione producto</option>
-                              {productos.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.nombre || p.name} ({p.marca || p.brand} - {p.codigo || p.code})
-                                </option>
-                              ))}
-                            </select>
+                              <div className="flex items-center gap-2.5">
+                                {obtenerFotoProducto(p) && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
+                                )}
+                                <div>
+                                  <span className="font-bold block">{p.nombre || p.name}</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)]">{p.marca} • {p.color} ({p.codigo})</span>
+                                </div>
+                              </div>
+                              <span className="font-mono text-emerald-600 font-bold">${Number(p.precioCosto || p.costPrice || 0).toFixed(2)}</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Configuración de Curva Exacta */}
+                {productoSeleccionado && (
+                  <div className="p-3 bg-[var(--card)] rounded-xl border border-[var(--border)] space-y-3">
+                    <div>
+                      <span className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Seleccionar Curva de Serie:</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSubtipoCurva('MEDIA_DOCENA')}
+                          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                            subtipoCurva === 'MEDIA_DOCENA'
+                              ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                              : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]'
+                          }`}
+                        >
+                          ½ Media Docena (6 pares)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubtipoCurva('DOCENA')}
+                          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                            subtipoCurva === 'DOCENA'
+                              ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                              : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]'
+                          }`}
+                        >
+                          1 Docena (12 pares)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-xs font-bold text-[var(--foreground)]">
+                        {subtipoCurva === 'MEDIA_DOCENA' ? '¿Cuántas medias docenas?:' : '¿Cuántas docenas?:'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setCantidadCurvas(Math.max(1, cantidadCurvas - 1))}
+                          className="w-8 h-8 rounded-lg border bg-[var(--muted)] flex items-center justify-center font-bold text-xs"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          value={cantidadCurvas}
+                          onChange={(e) => setCantidadCurvas(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 h-8 text-center font-bold text-xs bg-[var(--card)] border rounded-lg font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCantidadCurvas(cantidadCurvas + 1)}
+                          className="w-8 h-8 rounded-lg border bg-[var(--muted)] flex items-center justify-center font-bold text-xs"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span className="text-xs font-black text-emerald-600">
+                        = {paresCalculados} pares ({ (paresCalculados / 12).toFixed(1) } doc.)
+                      </span>
+                    </div>
+
+                    {/* Previsualización idéntica de la distribución de curva */}
+                    <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
+                          DISTRIBUCIÓN DE CURVA ({subtipoCurva === 'MEDIA_DOCENA' ? 'MEDIA DOCENA' : 'DOCENA COMPLETA'}):
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
+                          Serie: {distribucionPreview.map((d: any) => `${d.cantidad}/${d.talla}`).join(', ')}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {distribucionPreview.map((d: any, i: number) => (
+                          <div key={i} className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs flex items-center gap-1.5">
+                            <span className="font-bold text-emerald-700">T{d.talla}:</span>
+                            <span className="font-black text-emerald-900 dark:text-emerald-300 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">
+                              {d.cantidad} pares
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Precio Costo Unit ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={precioCostoInput}
+                          onChange={(e) => setPrecioCostoInput(parseFloat(e.target.value) || 0)}
+                          className="w-full px-3 py-1.5 bg-[var(--card)] border rounded-lg text-xs font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Observación del Modelo</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Hebilla dorada..."
+                          value={observacionItemInput}
+                          onChange={(e) => setObservacionItemInput(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-[var(--card)] border rounded-lg text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAgregarModeloAOrden(false)}
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5"
+                    >
+                      <Plus size={14} />
+                      <span>Agregar a la Orden ({paresCalculados} pares)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Modelos en la Orden */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                  Modelos en esta Orden ({orderLines.length})
+                </span>
+
+                {orderLines.length === 0 ? (
+                  <p className="text-center text-[var(--muted-foreground)] py-4 bg-[var(--muted)]/20 rounded-xl">
+                    Aún no has agregado ningún modelo a la orden.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {orderLines.map((line, idx) => {
+                      const docenas = (line.cantidadPedida / 12).toFixed(1);
+
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-[var(--muted)] border overflow-hidden shrink-0 flex items-center justify-center">
+                              {line.producto?.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={line.producto.imageUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <Package size={16} className="text-[var(--muted-foreground)]" />
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-bold text-xs block">{line.producto?.nombre}</span>
+                              <span className="text-[10px] text-[var(--muted-foreground)]">
+                                {line.cantidadPedida} pares ({docenas} doc.) × ${line.precioCosto.toFixed(2)}
+                                {line.observacionLinea && ` • Nota: ${line.observacionLinea}`}
+                              </span>
+                            </div>
                           </div>
 
-                          <div className="w-full sm:w-20">
-                            <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Cantidad</label>
-                            <input
-                              type="number"
-                              min="1"
-                              required
-                              value={line.cantidadPedida}
-                              onChange={(e) => handleOrderLineChange(index, 'cantidadPedida', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold text-center focus:outline-none focus:border-[#0F172A]"
-                            />
-                          </div>
-
-                          <div className="w-full sm:w-24">
-                            <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Costo Unit ($)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              required
-                              value={line.precioCosto}
-                              onChange={(e) => handleOrderLineChange(index, 'precioCosto', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono focus:outline-none focus:border-[#0F172A]"
-                            />
-                          </div>
-
-                          {orderLines.length > 1 && (
+                          <div className="flex items-center gap-3">
+                            <span className="font-extrabold font-mono text-sm text-[#0F172A] dark:text-amber-400">
+                              ${(line.cantidadPedida * line.precioCosto).toFixed(2)}
+                            </span>
                             <button
                               type="button"
-                              onClick={() => handleRemoveOrderLine(index)}
-                              className="p-2 border border-[var(--border)] hover:border-rose-500 hover:text-rose-500 text-[var(--muted-foreground)] rounded-lg transition-colors bg-[var(--card)]"
+                              onClick={() => handleRemoveOrderLine(idx, false)}
+                              className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-lg"
                             >
                               <Trash2 size={13} />
                             </button>
-                          )}
+                          </div>
                         </div>
-
-                        {/* Observación por línea */}
-                        <div>
-                          <input
-                            type="text"
-                            placeholder="Observación o especificación especial de este modelo (opcional)"
-                            value={line.observacionLinea || ''}
-                            onChange={(e) => handleOrderLineChange(index, 'observacionLinea', e.target.value)}
-                            className="w-full px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-[11px] placeholder:text-[var(--muted-foreground)]/60 focus:outline-none focus:border-[#0F172A]"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 border-t border-[var(--border)] flex items-center justify-between">
                 <div className="text-xs">
-                  <span className="text-[var(--muted-foreground)]">Total Estimado: </span>
+                  <span className="text-[var(--muted-foreground)]">Total de la Orden: </span>
                   <span className="font-black text-[#0F172A] dark:text-amber-400 font-mono text-base ml-1">
                     ${orderLines.reduce((sum, l) => sum + (l.cantidadPedida * l.precioCosto), 0).toFixed(2)}
+                  </span>
+                  <span className="text-xs text-[var(--muted-foreground)] ml-2 font-mono">
+                    ({orderLines.reduce((sum, l) => sum + l.cantidadPedida, 0)} pares)
                   </span>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || orderLines.length === 0}
                   className="px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700"
                 >
-                  {saving ? 'Guardando...' : orderEstadoInicial === 'BORRADOR' ? 'Guardar Borrador' : 'Emitir Orden'}
+                  {saving ? 'Guardando...' : 'Guardar Borrador de Orden'}
                 </button>
               </div>
             </form>
