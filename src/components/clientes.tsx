@@ -6,8 +6,9 @@ import { db } from "../db/local-db";
 import {
   Plus, Search, Loader2, Users, Edit2, CheckCircle,
   AlertCircle, X, RefreshCw, Phone, Mail, MapPin, User, CreditCard,
-  Award, DollarSign, TrendingUp, ShieldAlert, FileText
+  Award, DollarSign, TrendingUp, ShieldAlert, FileText, Star
 } from "lucide-react";
+import { getClienteReputacion } from "../utils/cliente-reputacion";
 
 interface ClientesProps {
   online: boolean;
@@ -340,47 +341,58 @@ export default function ClientesComponent({ online }: ClientesProps) {
                   <th className="text-left px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider hidden lg:table-cell">Contacto</th>
                   <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Score</th>
                   <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Nivel</th>
+                  <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Reputación</th>
                   <th className="text-right px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {filtered.map(c => (
-                  <tr key={c.id} onClick={() => setSelected(c)}
-                    className={`hover:bg-[var(--muted)]/20 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-[#0F172A]/5" : ""}`}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#0F172A]/10 text-[#0F172A] flex items-center justify-center text-xs font-bold shrink-0">
-                          {(c.nombre || "?").charAt(0).toUpperCase()}
+                {filtered.map(c => {
+                  const rep = getClienteReputacion(c);
+
+                  return (
+                    <tr key={c.id} onClick={() => setSelected(c)}
+                      className={`hover:bg-[var(--muted)]/20 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-[#0F172A]/5" : ""}`}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#0F172A]/10 text-[#0F172A] flex items-center justify-center text-xs font-bold shrink-0">
+                            {(c.nombre || "?").charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm">{c.nombre} {c.apellido || ""}</div>
+                            {c.direccion && <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[160px]">{c.direccion}</div>}
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-semibold text-sm">{c.nombre} {c.apellido || ""}</div>
-                          {c.direccion && <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[160px]">{c.direccion}</div>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <span className="text-xs font-mono text-[var(--muted-foreground)]">{c.cedula || c.ruc || "—"}</span>
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      <div className="text-xs font-semibold text-[var(--foreground)]">{c.telefono || "—"}</div>
-                      {c.email && <div className="text-[10px] text-[var(--muted-foreground)]">{c.email}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`font-bold text-sm ${scoreColor(Number(c.score ?? c.scoringCredito ?? 100))}`}>{Number(c.score ?? c.scoringCredito ?? 100)}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${nivelColor(c.nivelCredito || "SIN_CREDITO")}`}>
-                        {(c.nivelCredito || "SIN_CREDITO").replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={e => { e.stopPropagation(); setSelected(c); openEdit(c); }}
-                        className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[#0F172A] hover:bg-[#0F172A]/10 transition-colors">
-                        <Edit2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <span className="text-xs font-mono text-[var(--muted-foreground)]">{c.cedula || c.ruc || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <div className="text-xs font-semibold text-[var(--foreground)]">{c.telefono || "—"}</div>
+                        {c.email && <div className="text-[10px] text-[var(--muted-foreground)]">{c.email}</div>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`font-bold text-sm ${scoreColor(Number(c.score ?? c.scoringCredito ?? 100))}`}>{Number(c.score ?? c.scoringCredito ?? 100)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${nivelColor(c.nivelCredito || "SIN_CREDITO")}`}>
+                          {(c.nivelCredito || "SIN_CREDITO").replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] border ${rep.badgeClass}`} title={rep.descripcion}>
+                          <span>{rep.icon}</span>
+                          <span>{rep.label}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={e => { e.stopPropagation(); setSelected(c); openEdit(c); }}
+                          className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[#0F172A] hover:bg-[#0F172A]/10 transition-colors">
+                          <Edit2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             <div className="px-4 py-3 border-t border-[var(--border)] text-xs text-[var(--muted-foreground)]">
@@ -405,6 +417,20 @@ export default function ClientesComponent({ online }: ClientesProps) {
                 </div>
               </div>
             </div>
+
+            {/* Insignia de Perfil y Reputación */}
+            {(() => {
+              const rep = getClienteReputacion(selected);
+              return (
+                <div className={`p-3 rounded-xl border flex items-start gap-2.5 ${rep.badgeClass}`}>
+                  <span className="text-xl shrink-0 mt-0.5">{rep.icon}</span>
+                  <div>
+                    <div className="text-xs font-black">{rep.label}</div>
+                    <div className="text-[10px] opacity-90 mt-0.5 leading-tight">{rep.descripcion}</div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="space-y-2 text-xs text-[var(--muted-foreground)]">
               {selected.telefono && <div className="flex items-center gap-2"><Phone size={13} />{selected.telefono}</div>}

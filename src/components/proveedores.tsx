@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { useToast } from './ui/toast';
 import { descargarOrdenCompraPdf, OrdenCompraPdfData } from '../services/pdf-factura.service';
+import { getClienteReputacion } from '../utils/cliente-reputacion';
 
 interface ProveedoresProps {
   online: boolean;
@@ -267,6 +268,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [pagos, setPagos] = useState<SupplierPayment[]>([]);
   const [entradas, setEntradas] = useState<EntradaMercancia[]>([]);
   const [productos, setProductos] = useState<any[]>([]);
+  const [clientesList, setClientesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'proveedores' | 'ordenes' | 'ingreso' | 'pagos'>('proveedores');
 
@@ -378,16 +380,21 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       setProductos(prods || []);
 
       if (online) {
-        const [prvs, ords, pgs, ents] = await Promise.all([
+        const [prvs, ords, pgs, ents, clis] = await Promise.all([
           ApiService.get('/proveedores'),
           ApiService.get('/proveedores/ordenes-compra'),
           ApiService.get('/proveedores/pagos/todos'),
           ApiService.get('/proveedores/entradas'),
+          ApiService.get('/clientes').catch(() => []),
         ]);
         setProveedores(prvs || []);
         setOrdenes(ords || []);
         setPagos(pgs || []);
         setEntradas(ents || []);
+        setClientesList(Array.isArray(clis) ? clis : []);
+      } else {
+        const localClis = await db.clientes.toArray();
+        setClientesList(localClis || []);
       }
     } catch (err: any) {
       console.error('Error al cargar datos de proveedores:', err);
@@ -1934,19 +1941,72 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                                 {line.color && <span>• Color: {line.color}</span>}
                                 {line.serie && <span>• Serie: {line.serie}</span>}
                               </div>
-                              {line.observacionLinea && (
-                                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                  {line.observacionLinea.includes('Cliente:') ? (
-                                    <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-md text-[10px] font-bold flex items-center gap-1">
-                                      <span>👤 {line.observacionLinea}</span>
-                                    </span>
-                                  ) : (
+                              {line.observacionLinea && (() => {
+                                const obs = line.observacionLinea;
+                                if (obs.includes('Cliente:') || obs.includes('Ref Pedido:')) {
+                                  const clienteMatch = obs.match(/Cliente:\s*([^|]+)/i);
+                                  const refMatch = obs.match(/Ref Pedido:\s*(#?[a-z0-9]+)/i) || obs.match(/(#[a-f0-9]{4,8})/i);
+                                  const detalleMatch = obs.match(/\(([^)]+)\)/i);
+
+                                  const rawClientName = clienteMatch ? clienteMatch[1].trim() : null;
+                                  const foundClient = rawClientName
+                                    ? clientesList.find((c) => {
+                                        const full = `${c.nombre || ''} ${c.apellido || ''}`.trim().toLowerCase();
+                                        const raw = rawClientName.toLowerCase();
+                                        return full.includes(raw) || (c.nombre && raw.includes(c.nombre.toLowerCase()));
+                                      })
+                                    : null;
+
+                                  const fullClientName = foundClient
+                                    ? `${foundClient.nombre || ''} ${foundClient.apellido || ''}`.trim()
+                                    : rawClientName;
+
+                                  const rep = getClienteReputacion(foundClient);
+
+                                  let refCode = refMatch ? refMatch[1].trim() : null;
+                                  if (refCode && !refCode.startsWith('#')) refCode = `#${refCode}`;
+                                  if (refCode) refCode = refCode.slice(0, 7).toUpperCase();
+                                  const detalle = detalleMatch ? detalleMatch[1].trim() : null;
+
+                                  return (
+                                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                      {fullClientName && (
+                                        <span className="px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-2xs">
+                                          <span>👤</span>
+                                          <span className="text-blue-500/80 font-normal">Cliente:</span>
+                                          <span className="font-extrabold">{fullClientName}</span>
+                                          {foundClient && (
+                                            <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] border ${rep.badgeClass}`} title={rep.descripcion}>
+                                              {rep.icon} {rep.label}
+                                            </span>
+                                          )}
+                                        </span>
+                                      )}
+                                      {refCode && (
+                                        <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1 font-mono shadow-2xs">
+                                          <span>📦</span>
+                                          <span className="text-purple-500/80 font-normal">Pedido:</span>
+                                          <span className="font-extrabold">{refCode}</span>
+                                        </span>
+                                      )}
+                                      {detalle && (
+                                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-2xs">
+                                          <span>⚡</span>
+                                          <span>{detalle}</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="mt-1.5">
                                     <p className="text-[10px] text-amber-600 dark:text-amber-400 italic">
-                                      Nota: {line.observacionLinea}
+                                      Nota: {obs}
                                     </p>
-                                  )}
-                                </div>
-                              )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
 

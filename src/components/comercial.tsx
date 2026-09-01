@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
+import { getClienteReputacion } from '../utils/cliente-reputacion';
 
 interface ComercialProps {
   online: boolean;
@@ -73,12 +74,12 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   const [editingOrderNumero, setEditingOrderNumero] = useState<string>('');
 
   // Búsqueda de clientes con Debounce de 3 segundos
-  const [listaClientes, setListaClientes] = useState<{ id: string; nombre: string; cedula?: string; telefono?: string }[]>([]);
+  const [listaClientes, setListaClientes] = useState<any[]>([]);
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [busquedaDebounced, setBusquedaDebounced] = useState('');
   const [esperandoDebounce, setEsperandoDebounce] = useState(false);
   const [showDropdownCliente, setShowDropdownCliente] = useState(false);
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<{ id: string; nombre: string; cedula?: string } | null>(null);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<any | null>(null);
 
   // Catálogo de Productos y Líneas de Pedido
   const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
@@ -409,9 +410,18 @@ export default function ComercialComponent({ online, userRole, userPermissions }
           setListaClientes(
             data.map((c: any) => ({
               id: c.id,
-              nombre: `${c.nombre || ''} ${c.apellido || ''}`.trim(),
+              nombre: `${c.nombre || ''} ${c.apellido || ''}`.trim() || c.nombre || 'Cliente',
               cedula: c.cedula || c.ruc || '',
               telefono: c.telefono || '',
+              score: c.score ?? c.scoringCredito ?? 100,
+              nivelCredito: c.nivelCredito || 'SIN_CREDITO',
+              totalCompras: c.totalCompras || 0,
+              comprasSinAtraso: c.comprasSinAtraso || 0,
+              atrasoConsecutivo: c.atrasoConsecutivo || 0,
+              limiteCredito: Number(c.limiteCredito || 0),
+              creditoUtilizado: Number(c.creditoUtilizado || 0),
+              creditoDisponible: Number(c.creditoDisponible || 0),
+              activo: c.activo !== false,
             }))
           );
         }
@@ -423,6 +433,15 @@ export default function ComercialComponent({ online, userRole, userPermissions }
             nombre: c.nombre,
             cedula: c.cedula,
             telefono: c.telefono,
+            score: c.score || 100,
+            nivelCredito: c.nivelCredito || 'SIN_CREDITO',
+            totalCompras: 0,
+            comprasSinAtraso: 0,
+            atrasoConsecutivo: 0,
+            limiteCredito: Number(c.limiteCredito || 0),
+            creditoUtilizado: 0,
+            creditoDisponible: Number(c.cupoDisponible || 0),
+            activo: true,
           }))
         );
       }
@@ -899,7 +918,6 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                   const cfg = ESTADO_CONFIG[p.estado] || { label: p.estado, color: 'bg-slate-500/10 text-slate-600', icon: <Clock size={12} /> };
                   const isUpdating = updatingId === p.id;
                   const isExpanded = pedidoExpandidoId === p.id;
-
                   return (
                     <Fragment key={p.id}>
                       <tr
@@ -910,8 +928,24 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                           {isExpanded ? <ChevronUp size={14} className="text-[#0F172A]" /> : <ChevronDown size={14} className="text-[var(--muted-foreground)]" />}
                           #{getNumeroPedido(p, idx)}
                         </td>
-                        <td className="px-6 py-4 text-xs font-semibold text-[var(--foreground)]">
-                          {p.clienteNombre || (p.clientId ? p.clientId.slice(0, 8).toUpperCase() : 'Consumidor Final')}
+                        <td className="px-6 py-4">
+                          {(() => {
+                            const cliObj = listaClientes.find((c) => c.id === p.clientId);
+                            const nombreCompleto = cliObj?.nombre || p.clienteNombre || (p.clientId ? p.clientId.slice(0, 8).toUpperCase() : 'Consumidor Final');
+                            const rep = getClienteReputacion(cliObj);
+
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <span className="font-bold text-xs text-[var(--foreground)]">{nombreCompleto}</span>
+                                {cliObj && (
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border w-fit ${rep.badgeClass}`} title={rep.descripcion}>
+                                    <span>{rep.icon}</span>
+                                    <span>{rep.label}</span>
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>
@@ -976,116 +1010,62 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                 </button>
                               </>
                             ) : (
-                              <span className="text-[11px] font-medium text-[var(--muted-foreground)]">Cerrado</span>
+                              <span className="text-xs text-[var(--muted-foreground)]">Finalizado</span>
                             )}
                           </div>
                         </td>
                       </tr>
 
-                      {/* Fila expandible con detalle del pedido */}
+                      {/* Fila expandible con detalle */}
                       {isExpanded && (
-                        <tr className="bg-[var(--muted)]/20">
+                        <tr className="bg-[#0F172A]/5">
                           <td colSpan={7} className="px-6 py-4">
-                            <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-3">
-                              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-[var(--border)] pb-2">
-                                <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-[var(--foreground)]">
                                   📦 Detalle de Artículos Solicitados — {getNumeroPedido(p, idx)}
                                 </span>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="text-xs font-bold text-[var(--muted-foreground)]">
-                                    Cliente: <strong className="text-[var(--foreground)]">{p.clienteNombre}</strong>
-                                  </span>
+                                {online && p.clientId && (
                                   <button
-                                    onClick={() => handleEnviarConfirmacionWhatsApp(p)}
-                                    className="px-3 py-1 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-bold transition-all border border-emerald-500/20 flex items-center gap-1.5 shadow-xs cursor-pointer"
-                                    title="Enviar mensaje de confirmación de pedido al WhatsApp del cliente"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEnviarConfirmacionWhatsApp(p);
+                                    }}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+                                    title="Notificar recepción del pedido al cliente por WhatsApp"
                                   >
                                     <MessageCircle size={13} />
-                                    <span>Confirmar por WhatsApp</span>
+                                    <span>Notificar por WhatsApp</span>
                                   </button>
-                                  {(p.estado === 'PENDIENTE' || p.estado === 'EN_PREPARACION' || p.estado === 'EN_ESPERA_STOCK') && (
-                                    <button
-                                      onClick={() => handleAbrirEditarPedido(p)}
-                                      className="px-3 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold transition-all border border-amber-500/20 flex items-center gap-1.5 shadow-sm cursor-pointer"
-                                    >
-                                      ✏️ Editar Pedido
-                                    </button>
-                                  )}
-                                </div>
+                                )}
                               </div>
-
-                              {p.lines && p.lines.length > 0 ? (
-                                <div className="space-y-2">
-                                  {(() => {
-                                    // Agrupar por productId
-                                    const grupos: { [key: string]: any[] } = {};
-                                    p.lines.forEach((l: any) => {
-                                      const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
-                                      if (!grupos[key]) grupos[key] = [];
-                                      grupos[key].push(l);
-                                    });
-
-                                    return Object.entries(grupos).map(([key, lineas]) => {
-                                      const item = lineas[0];
-                                      const totalPares = lineas.reduce((sum, l) => sum + l.cantidad, 0);
-                                      const subtotal = lineas.reduce((sum, l) => sum + l.subtotal, 0);
-
-                                      return (
-                                        <div key={key} className="p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl flex items-center justify-between gap-3">
-                                          <div className="flex items-center gap-3">
-                                            {item.imageUrl ? (
-                                              <img src={item.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
-                                            ) : (
-                                              <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center text-sm shrink-0">👟</div>
-                                            )}
-                                            <div>
-                                              <div className="flex items-center gap-2">
-                                                <span className="font-bold text-xs text-[var(--foreground)]">
-                                                  {item.modelName} ({item.color})
-                                                </span>
-                                                {(item.serieNombre?.includes('[Bajo Pedido]') || item.tipoVenta === 'SERIE_ESPECIAL' || item.esPedidoEspecial) && (
-                                                  <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 border border-purple-500/20 rounded text-[9px] font-black">
-                                                    ⭐ Bajo Pedido / Fabricación
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <div className="text-[10px] text-[var(--muted-foreground)]">
-                                                Serie: {item.serieNombre || 'Estándar'}
-                                              </div>
-                                              <div className="flex flex-wrap gap-1 mt-1">
-                                                {lineas.map((l, idx) => (
-                                                  <span key={idx} className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded text-[10px] font-bold">
-                                                    T{l.numeroTalla}: {l.cantidad}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          </div>
-
-                                          <div className="text-right">
-                                            <div className="text-xs font-bold">{totalPares} pares</div>
-                                            <div className="text-[10px] text-[var(--muted-foreground)]">${Number(item.precioUnitario).toFixed(2)} c/u</div>
-                                            <div className="text-xs font-black text-emerald-600">${subtotal.toFixed(2)}</div>
-                                            {online && (
-                                              <button
-                                                type="button"
-                                                onClick={() => handleAbrirOrdenProveedor({ ...item, totalPares })}
-                                                className="mt-1.5 px-2.5 py-1 bg-purple-600/10 hover:bg-purple-600 text-purple-700 hover:text-white rounded-lg text-[10px] font-bold border border-purple-500/25 flex items-center gap-1 transition-all ml-auto"
-                                                title="Generar orden de compra a proveedor para este modelo/serie"
-                                              >
-                                                <Truck size={11} />
-                                                <span>Pedir a Proveedor</span>
-                                              </button>
-                                            )}
-                                          </div>
-                                        </div>
-                                      );
-                                    });
-                                  })()}
-                                </div>
-                              ) : (
-                                <p className="text-xs text-[var(--muted-foreground)] italic">Cargando desglose de productos del pedido...</p>
-                              )}
+                              <div className="space-y-1 text-xs">
+                                {p.lines && p.lines.length > 0 ? (
+                                  p.lines.map((l: any, lineIdx: number) => (
+                                    <div
+                                      key={lineIdx}
+                                      className="flex justify-between items-center py-1 border-b border-[var(--border)] last:border-none"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-[var(--foreground)]">
+                                          {l.modelName || 'Calzado'} ({l.color || ''})
+                                        </span>
+                                        <span className="text-[var(--muted-foreground)]">
+                                          · Talla {l.numeroTalla || l.tallaNumero || 38} ({l.serieNombre || 'Serie'})
+                                        </span>
+                                        <span className="text-[10px] px-1.5 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded font-mono">
+                                          {l.tipoVenta === 'SERIE_COMPLETA' ? 'Serie' : 'Por Talla'}
+                                        </span>
+                                      </div>
+                                      <div className="font-mono font-bold">
+                                        {l.cantidad} pares × ${Number(l.precioUnitario).toFixed(2)} = ${(l.cantidad * Number(l.precioUnitario)).toFixed(2)}
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <span className="text-[var(--muted-foreground)]">Sin líneas de detalle</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -1099,44 +1079,29 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         </div>
       )}
 
-      {/* Modal Nuevo Pedido (Completo con Selección de Producto, Modelo, Talla y Debounce de 3s) */}
+      {/* MODAL CREAR / EDITAR PEDIDO */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-5 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/20">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header Modal */}
+            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
               <div>
-                <h3 className="font-extrabold text-base flex items-center gap-2">
-                  {editingOrderId ? (
-                    <>
-                      <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-md text-xs font-bold">EDICIÓN</span>
-                      Editar Pedido #{editingOrderNumero || 'Pedido'}
-                    </>
-                  ) : (
-                    'Crear Nuevo Pedido Completo'
-                  )}
+                <h3 className="font-bold text-lg text-[var(--foreground)]">
+                  {editingOrderId ? `Editar Pedido #${editingOrderNumero || editingOrderId.slice(0, 6).toUpperCase()}` : 'Registrar Nuevo Pedido'}
                 </h3>
                 <p className="text-xs text-[var(--muted-foreground)]">
-                  {editingOrderId
-                    ? 'Agrega nuevos modelos/tallas, incrementa cantidades o elimina ítems de este pedido'
-                    : 'Selecciona el cliente, tipo de pago y añade los productos con sus tallas'}
+                  {editingOrderId ? 'Modifica los datos del pedido y líneas de calzado' : 'Selecciona el cliente y agrega las series o tallas'}
                 </p>
               </div>
               <button
-                onClick={() => {
-                  setShowModal(false);
-                  setEditingOrderId(null);
-                  setEditingOrderNumero('');
-                  setLineasPedido([]);
-                  setClienteSeleccionado(null);
-                  setClientId('');
-                  setBusquedaCliente('');
-                }}
-                className="p-1.5 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
+                onClick={() => setShowModal(false)}
+                className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
+            {/* Body Modal */}
             <div className="p-6 space-y-5 overflow-y-auto flex-1">
               {!online && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs rounded-xl flex items-center gap-2">
@@ -1150,26 +1115,54 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative sm:col-span-2">
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Cliente *</label>
-                    {clienteSeleccionado ? (
-                      <div className="flex items-center justify-between p-3 bg-[#0F172A]/10 border border-[#0F172A]/30 rounded-xl">
-                        <div>
-                          <div className="font-bold text-sm text-[var(--foreground)]">{clienteSeleccionado.nombre}</div>
-                          {clienteSeleccionado.cedula && <div className="text-[10px] text-[var(--muted-foreground)]">C.I / RUC: {clienteSeleccionado.cedula}</div>}
+                    {clienteSeleccionado ? (() => {
+                      const repSel = getClienteReputacion(clienteSeleccionado);
+
+                      return (
+                        <div className="p-3 bg-[#0F172A]/5 border border-[var(--border)] rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-9 h-9 rounded-full bg-[#0F172A]/10 text-[#0F172A] flex items-center justify-center text-sm font-black">
+                                {(clienteSeleccionado.nombre || '?').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-sm text-[var(--foreground)]">{clienteSeleccionado.nombre}</div>
+                                {clienteSeleccionado.cedula && <div className="text-[10px] text-[var(--muted-foreground)]">C.I / RUC: {clienteSeleccionado.cedula}</div>}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setClienteSeleccionado(null);
+                                setClientId('');
+                                setBusquedaCliente('');
+                                setBusquedaDebounced('');
+                              }}
+                              className="text-xs font-semibold text-red-500 hover:underline"
+                            >
+                              Cambiar
+                            </button>
+                          </div>
+
+                          {/* Alerta / Insignia de Reputación del Cliente */}
+                          <div className={`px-3 py-2 rounded-lg border flex items-center justify-between text-xs ${repSel.badgeClass}`}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{repSel.icon}</span>
+                              <div>
+                                <span className="font-extrabold block">{repSel.label}</span>
+                                <span className="text-[10px] opacity-80">{repSel.descripcion}</span>
+                              </div>
+                            </div>
+                            {clienteSeleccionado.creditoDisponible !== undefined && clienteSeleccionado.creditoDisponible > 0 && (
+                              <div className="text-right">
+                                <span className="text-[9px] opacity-75 block">Cupo Crédito:</span>
+                                <span className="font-extrabold font-mono text-xs">${Number(clienteSeleccionado.creditoDisponible).toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setClienteSeleccionado(null);
-                            setClientId('');
-                            setBusquedaCliente('');
-                            setBusquedaDebounced('');
-                          }}
-                          className="text-xs font-semibold text-red-500 hover:underline"
-                        >
-                          Cambiar
-                        </button>
-                      </div>
-                    ) : (
+                      );
+                    })() : (
                       <div>
                         <div className="relative">
                           <input
@@ -1194,7 +1187,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                         </div>
 
                         {showDropdownCliente && busquedaCliente.trim().length > 0 && (
-                          <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto">
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto">
                             {listaClientes
                               .filter((c) => {
                                 const q = (busquedaDebounced || busquedaCliente).toLowerCase().trim();
@@ -1206,24 +1199,31 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                 );
                               })
                               .slice(0, 10)
-                              .map((c) => (
-                                <button
-                                  key={c.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setClientId(c.id);
-                                    setClienteSeleccionado(c);
-                                    setShowDropdownCliente(false);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex justify-between items-center"
-                                >
-                                  <div>
-                                    <span className="font-bold block text-[var(--foreground)]">{c.nombre}</span>
-                                    {c.cedula && <span className="text-[10px] text-[var(--muted-foreground)]">C.I: {c.cedula}</span>}
-                                  </div>
-                                  {c.telefono && <span className="text-[10px] text-[var(--muted-foreground)]">{c.telefono}</span>}
-                                </button>
-                              ))}
+                              .map((c) => {
+                                const repItem = getClienteReputacion(c);
+
+                                return (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setClientId(c.id);
+                                      setClienteSeleccionado(c);
+                                      setShowDropdownCliente(false);
+                                    }}
+                                    className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex justify-between items-center gap-2"
+                                  >
+                                    <div>
+                                      <span className="font-bold block text-[var(--foreground)]">{c.nombre}</span>
+                                      {c.cedula && <span className="text-[10px] text-[var(--muted-foreground)]">C.I: {c.cedula}</span>}
+                                    </div>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border ${repItem.badgeClass}`}>
+                                      <span>{repItem.icon}</span>
+                                      <span>{repItem.label}</span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             {busquedaDebounced.trim().length > 0 &&
                               listaClientes.filter((c) => {
                                 const q = busquedaDebounced.toLowerCase().trim();
