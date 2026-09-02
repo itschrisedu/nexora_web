@@ -140,6 +140,65 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
   const [productoSeleccionadoObj, setProductoSeleccionadoObj] = useState<any | null>(null);
 
+  // Consulta de Stock Inter-Sucursal en Punto de Venta
+  const [stockInterSucursalResult, setStockInterSucursalResult] = useState<any[]>([]);
+  const [loadingInterSucursal, setLoadingInterSucursal] = useState(false);
+
+  useEffect(() => {
+    const checkInterSucursalStock = async () => {
+      if (!productoSeleccionadoObj || !online) {
+        setStockInterSucursalResult([]);
+        return;
+      }
+      try {
+        setLoadingInterSucursal(true);
+        const res = await ApiService.get(
+          `/configuracion/stock-inter-sucursal?search=${encodeURIComponent(productoSeleccionadoObj.modelName)}`
+        );
+        if (Array.isArray(res)) {
+          setStockInterSucursalResult(res);
+        } else {
+          setStockInterSucursalResult([]);
+        }
+      } catch {
+        setStockInterSucursalResult([]);
+      } finally {
+        setLoadingInterSucursal(false);
+      }
+    };
+    checkInterSucursalStock();
+  }, [productoSeleccionadoObj, online]);
+
+  const handleAgregarInterSucursal = (sucursalStockInfo: any) => {
+    if (!productoSeleccionadoObj) return;
+
+    const lineasInter: any[] = [];
+    (sucursalStockInfo.tallasDisponibles || []).forEach((t: any) => {
+      if (t.cantidad > 0) {
+        lineasInter.push({
+          productId: productoSeleccionadoObj.id,
+          modelName: `${productoSeleccionadoObj.modelName} [Origen: ${sucursalStockInfo.sucursalNombre}]`,
+          color: productoSeleccionadoObj.color,
+          serieNombre: `${productoSeleccionadoObj.serieNombre || 'Serie'} (Despacho Inter-Sucursal Urgente)`,
+          imageUrl: productoSeleccionadoObj.imageUrl,
+          tallaId: `t-${t.talla}`,
+          numeroTalla: t.talla,
+          cantidad: 1,
+          precioUnitario: Number(precioItem) || Number(sucursalStockInfo.precioVenta) || 15,
+          tipoVenta: 'TALLA_ESPECIFICA' as const,
+        });
+      }
+    });
+
+    if (lineasInter.length === 0) {
+      showToast('No hay tallas con stock disponible en esta sucursal.', 'warning');
+      return;
+    }
+
+    setLineasPedido([...lineasPedido, ...lineasInter]);
+    showToast(`¡Calzado agregado con origen ${sucursalStockInfo.sucursalNombre}!`, 'success');
+  };
+
   const [ultimoPrecioCliente, setUltimoPrecioCliente] = useState<number | null>(null);
   const [fechaUltimaVenta, setFechaUltimaVenta] = useState<string | null>(null);
 
@@ -1863,6 +1922,52 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                       ) : (
                         <p className="text-xs text-[var(--muted-foreground)]">Selecciona un modelo arriba para cargar sus tallas.</p>
                       )}
+                    </div>
+                  )}
+
+                  {/* Alerta de Stock Inter-Sucursal */}
+                  {productoSeleccionadoObj && (
+                    <div className="sm:col-span-2">
+                      {loadingInterSucursal ? (
+                        <div className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl text-xs text-[var(--muted-foreground)] flex items-center gap-2">
+                          <span className="animate-spin">⌛</span> Consultando disponibilidad en otras sucursales...
+                        </div>
+                      ) : stockInterSucursalResult.length > 0 ? (
+                        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                              <span>⚡ Disponibilidad Inter-Sucursal (Otras Sucursales)</span>
+                            </span>
+                            <span className="text-[10px] bg-amber-500/20 text-amber-900 px-2.5 py-0.5 rounded-full font-bold">
+                              {stockInterSucursalResult.length} sucursal(es) con stock
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-amber-900">
+                            Si no dispones de stock en esta sucursal, puedes realizar un <strong>Despacho Inter-Sucursal Urgente</strong>. El cliente no percibirá la diferencia y el sistema mantendrá los cuadres de caja independientes.
+                          </p>
+                          <div className="grid grid-cols-1 gap-2">
+                            {stockInterSucursalResult.map((res: any) => (
+                              <div key={res.sucursalId} className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl gap-2 text-xs">
+                                <div>
+                                  <span className="font-extrabold text-[var(--foreground)] block">{res.sucursalNombre}</span>
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10px] text-[var(--muted-foreground)]">
+                                    <span>Color: <strong className="text-[var(--foreground)]">{res.color}</strong></span>
+                                    <span>• Total: <strong className="text-emerald-700">{res.stockTotal} pares</strong></span>
+                                    <span>({res.tallasDisponibles.map((t: any) => `#${t.talla}: ${t.cantidad}p`).join(', ')})</span>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAgregarInterSucursal(res)}
+                                  className="px-3 py-1.5 bg-[#0F172A] hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shrink-0 shadow-xs flex items-center justify-center gap-1"
+                                >
+                                  <span>📦 Despachar de {res.sucursalNombre}</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   )}
 

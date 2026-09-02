@@ -6,7 +6,7 @@ import {
   User, UserPlus, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
   RefreshCw, CheckCircle, AlertCircle, Building2, Store,
   Users, KeyRound, Search, Share2, Edit2, MapPin, X,
-  Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2
+  Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2, Eye, EyeOff
 } from 'lucide-react';
 
 interface UsuariosProps {
@@ -102,6 +102,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPasswordAddUser, setShowPasswordAddUser] = useState(false);
   const [rol, setRol] = useState<'ROL_VENDEDOR' | 'ROL_BODEGUERO' | 'ROL_ADMIN'>('ROL_VENDEDOR');
   const [permiteCambiarPrecio, setPermiteCambiarPrecio] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -110,6 +111,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [resettingUser, setResettingUser] = useState<UserListItem | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
   // ─── STOCK INTER-SUCURSAL ───
@@ -1277,16 +1279,30 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Contraseña Temporal</label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-                />
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">Contraseña Inicial de Acceso *</label>
+                <p className="text-[10px] text-[var(--muted-foreground)] mb-1.5 leading-tight">
+                  Contraseña inicial que usará el colaborador para iniciar sesión. Funcionará permanentemente hasta que el colaborador decida cambiarla o el Administrador la reseteé.
+                </p>
+                <div className="relative">
+                  <input
+                    type={showPasswordAddUser ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full px-3 py-2 pr-10 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordAddUser(!showPasswordAddUser)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+                    tabIndex={-1}
+                    title={showPasswordAddUser ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPasswordAddUser ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -1484,16 +1500,27 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
             </div>
             <form onSubmit={handleResetPassword} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nueva Contraseña</label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-                />
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nueva Contraseña *</label>
+                <div className="relative">
+                  <input
+                    type={showPasswordReset ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full px-3 py-2 pr-10 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordReset(!showPasswordReset)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+                    tabIndex={-1}
+                    title={showPasswordReset ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPasswordReset ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-2">

@@ -14,6 +14,8 @@ import {
   RefreshCw,
   Download,
   KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 import { useToast } from "./ui/toast";
@@ -51,6 +53,7 @@ export default function SriComponent() {
   // Firma P12
   const [fileP12, setFileP12] = useState<File | null>(null);
   const [passwordP12, setPasswordP12] = useState("");
+  const [showPasswordP12, setShowPasswordP12] = useState(false);
   const [uploadingFirma, setUploadingFirma] = useState(false);
 
   // Listado de Facturas
@@ -343,13 +346,22 @@ export default function SriComponent() {
                   <div className="relative">
                     <KeyRound className="absolute left-3 top-3 text-[var(--muted-foreground)]" size={16} />
                     <input
-                      type="password"
+                      type={showPasswordP12 ? "text" : "password"}
                       placeholder="••••••••••••"
                       value={passwordP12}
                       onChange={(e) => setPasswordP12(e.target.value)}
-                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl pl-9 pr-10 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordP12(!showPasswordP12)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+                      tabIndex={-1}
+                      title={showPasswordP12 ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showPasswordP12 ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
                 </div>
 
