@@ -42,6 +42,7 @@ import { ToastProvider } from '@/components/ui/toast';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
+const DashboardComponent = dynamic(() => import('@/components/dashboard'), { ssr: false });
 const ClientesComponent = dynamic(() => import('@/components/clientes'), { ssr: false });
 const ComercialComponent = dynamic(() => import('@/components/comercial'), { ssr: false });
 const FinancieroComponent = dynamic(() => import('@/components/financiero'), { ssr: false });
@@ -103,6 +104,8 @@ function MainApp() {
   const [loading, setLoading] = useState(false);
   const [vistaActual, setVistaActual] = useState<Vista>('dashboard');
   const [user, setUser] = useState<any>(null);
+  const [sucursales, setSucursales] = useState<any[]>([]);
+  const [activeSucursalId, setActiveSucursalId] = useState<string>('TODAS');
 
   const [stats, setStats] = useState({
     totalSales: 0,
@@ -122,6 +125,9 @@ function MainApp() {
     if (initialTheme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
 
+    const savedSucursal = localStorage.getItem('activeSucursalId');
+    if (savedSucursal) setActiveSucursalId(savedSucursal);
+
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token) { 
@@ -130,10 +136,28 @@ function MainApp() {
         setUser(JSON.parse(storedUser));
       }
       fetchStats();
+      fetchSucursales();
       fetchBusinessBranding();
       GeolocationService.captureAndReportLocation();
     }
   }, []);
+
+  const fetchSucursales = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/sucursales').catch(() => null);
+      if (Array.isArray(data) && data.length > 0) {
+        setSucursales(data);
+      } else {
+        const storedUser = localStorage.getItem('user');
+        const parsed = storedUser ? JSON.parse(storedUser) : null;
+        setSucursales([
+          { id: parsed?.tenantId || 'matriz', name: parsed?.tenantName || 'Matriz Principal', isMatriz: true, active: true },
+        ]);
+      }
+    } catch (err) {
+      console.warn('Cargando sucursales de la empresa:', err);
+    }
+  };
 
   const [businessLogo, setBusinessLogo] = useState<string>('');
 
@@ -197,6 +221,7 @@ function MainApp() {
       }
       setIsLoggedIn(true);
       fetchStats();
+      fetchSucursales();
       fetchBusinessBranding();
     } catch (err: any) {
       setLoginError(err.message || 'Error de conexión con el servidor');
@@ -463,9 +488,41 @@ function MainApp() {
 
         {/* Navbar superior (Fijo arriba) */}
         <header className="h-16 shrink-0 border-b border-[var(--border)] bg-white dark:bg-slate-900 px-8 flex items-center justify-between z-30 shadow-sm">
-          <h1 className="text-xl font-black text-[#0F172A] dark:text-white tracking-tight">
-            {NAV_ITEMS.find((n) => n.id === vistaActual)?.label ?? 'Panel de Control'}
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-black text-[#0F172A] dark:text-white tracking-tight">
+              {NAV_ITEMS.find((n) => n.id === vistaActual)?.label ?? 'Panel de Control'}
+            </h1>
+
+            {/* Conmutador / Indicador de Sucursal Activa */}
+            {user?.rol && user?.rol !== 'ROL_SUPER_ADMIN' && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl text-xs">
+                <MapPin size={14} className="text-amber-500 shrink-0" />
+                {user?.rol === 'ROL_ADMIN' ? (
+                  <select
+                    value={activeSucursalId}
+                    onChange={(e) => {
+                      setActiveSucursalId(e.target.value);
+                      localStorage.setItem('activeSucursalId', e.target.value);
+                    }}
+                    className="bg-transparent font-bold text-[var(--foreground)] focus:outline-none cursor-pointer"
+                    title="Navegar entre sucursales con 1 clic"
+                  >
+                    <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
+                    {sucursales.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.isMatriz ? '🏢 Matriz: ' : '🏪 Sucursal: '} {s.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="font-bold text-[var(--foreground)]">
+                    📍 {sucursales.find((s) => s.id === activeSucursalId)?.name || 'Sucursal Asignada'}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-4">
             {online
               ? <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><Wifi size={13} className="animate-pulse" /><span>Online</span></div>
@@ -510,7 +567,16 @@ function MainApp() {
             user?.rol === 'ROL_SUPER_ADMIN' ? (
               <SuperAdminDashboard online={online} onNavigateToTenants={() => setVistaActual('super-admin')} />
             ) : (
-              <DashboardView stats={stats} />
+              <DashboardComponent
+                online={online}
+                userRole={user?.rol}
+                activeSucursalId={activeSucursalId}
+                onSucursalChange={(id) => {
+                  setActiveSucursalId(id);
+                  localStorage.setItem('activeSucursalId', id);
+                }}
+                sucursales={sucursales}
+              />
             )
           )}
           {vistaActual === 'reportes' && <ReportesComponent />}
