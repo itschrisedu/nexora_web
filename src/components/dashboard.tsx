@@ -346,7 +346,7 @@ export default function DashboardComponent({
                   <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative h-full justify-end">
                     {/* Tooltip Hover */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 bg-[#0F172A] text-white text-[10px] font-bold py-1 px-2.5 rounded-lg pointer-events-none shadow-lg z-20 whitespace-nowrap">
-                      ${item.monto.toFixed(2)} ({item.pares} pares)
+                      ${Number(item.monto || 0).toFixed(2)} ({item.pares || 0} pares)
                     </div>
 
                     {/* Barra con gradiente */}
@@ -396,7 +396,7 @@ export default function DashboardComponent({
                     {item.metodo}
                   </span>
                   <span className="font-bold text-[var(--foreground)]">
-                    ${item.total.toFixed(2)} ({item.porcentaje}%)
+                    ${Number(item.total || 0).toFixed(2)} ({item.porcentaje || 0}%)
                   </span>
                 </div>
                 <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
@@ -443,7 +443,7 @@ export default function DashboardComponent({
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-xs font-black text-[var(--foreground)]">{m.pares} pares</div>
-                  <div className="text-[10px] text-emerald-600 font-bold">${m.total.toFixed(2)}</div>
+                  <div className="text-[10px] text-emerald-600 font-bold">${Number(m.total || 0).toFixed(2)}</div>
                 </div>
               </div>
             ))}
