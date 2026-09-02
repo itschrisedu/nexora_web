@@ -92,8 +92,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   // ─── PERSONAL ───
   const [users, setUsers] = useState<UserListItem[]>([]);
-  const [searchPersonal, setSearchPersonal] = useState('');
+  const [searchPersonalQuery, setSearchPersonalQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedTenantForNewUser, setSelectedTenantForNewUser] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
 
@@ -224,6 +225,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         password,
         rol,
         permiteCambiarPrecio,
+        tenantId: selectedTenantForNewUser || undefined,
       });
 
       setSuccessMsg('Colaborador registrado con éxito.');
@@ -233,7 +235,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setPassword('');
       setRol('ROL_VENDEDOR');
       setPermiteCambiarPrecio(false);
+      setSelectedTenantForNewUser('');
       loadUsers();
+      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
 
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
@@ -263,6 +267,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setShowEditModal(false);
       setEditingUser(null);
       loadUsers();
+      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al actualizar colaborador.');
@@ -282,6 +287,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         permiteCambiarPrecio: user.permiteCambiarPrecio,
       });
       loadUsers();
+      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al cambiar estado.');
     }
@@ -298,6 +304,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         permiteCambiarPrecio: !user.permiteCambiarPrecio,
       });
       loadUsers();
+      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al modificar permisos de precio.');
     }
@@ -631,7 +638,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
           {/* ─── PANEL MASTER-DETAIL: Personal de la Sucursal seleccionada ─── */}
           {selectedSucursalId && (
             <div className="mt-6 p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Users size={16} className="text-[#0F172A]" />
                   <h3 className="font-bold text-sm text-[var(--foreground)]">
@@ -641,14 +648,26 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     {personalSucursal.length} colaboradores
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setSelectedSucursalId(null); setPersonalSucursal([]); }}
-                  className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors"
-                  title="Cerrar panel"
-                >
-                  <X size={14} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTenantForNewUser(selectedSucursalId);
+                      setShowAddModal(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm"
+                  >
+                    <Plus size={13} /> Nuevo Colaborador en esta Sucursal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedSucursalId(null); setPersonalSucursal([]); }}
+                    className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors"
+                    title="Cerrar panel"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
 
               {loadingPersonalSuc ? (
@@ -667,6 +686,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                         <th className="p-3">Colaborador</th>
                         <th className="p-3">Rol</th>
                         <th className="p-3 text-center">Estado</th>
+                        <th className="p-3 text-center">Modificar Precios</th>
                         <th className="p-3 text-right">Acciones</th>
                       </tr>
                     </thead>
@@ -687,17 +707,54 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                             </span>
                           </td>
                           <td className="p-3 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                              user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                            }`}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleActive(user)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                                user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
+                              }`}
+                            >
                               {user.activo ? 'Activo' : 'Inactivo'}
-                            </span>
+                            </button>
                           </td>
-                          <td className="p-3 text-right">
+                          <td className="p-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePermisoPrecio(user)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                                user.permiteCambiarPrecio ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                              }`}
+                            >
+                              {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
+                            </button>
+                          </td>
+                          <td className="p-3 text-right space-x-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingUser(user);
+                                setShowEditModal(true);
+                              }}
+                              className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
+                              title="Editar Colaborador"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setResettingUser(user);
+                                setShowResetPasswordModal(true);
+                              }}
+                              className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors"
+                              title="Resetear Contraseña"
+                            >
+                              <KeyRound size={14} />
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleOpenTransfer(user)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 text-[10px] font-bold transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 text-[10px] font-bold transition-colors"
                               title="Transferir a otra sucursal"
                             >
                               <ArrowRightLeft size={12} /> Transferir
@@ -717,7 +774,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       {/* ═══ TAB 2: PERSONAL Y PERMISOS ═══ */}
       {tabActiva === 'personal' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-base font-bold text-[var(--foreground)]">Colaboradores y Permisos</h2>
               <p className="text-xs text-[var(--muted-foreground)]">
@@ -725,16 +782,26 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:w-64">
+                <Search size={15} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
+                <input
+                  type="text"
+                  value={searchPersonalQuery}
+                  onChange={(e) => setSearchPersonalQuery(e.target.value)}
+                  placeholder="Buscar por nombre, cedula o correo..."
+                  className="w-full pl-9 pr-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
               <button
                 onClick={loadUsers}
-                className="p-2 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors"
+                className="p-2 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors shrink-0"
                 title="Refrescar Lista"
               >
                 <RefreshCw size={15} />
               </button>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+                className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all shrink-0"
               >
                 <Plus size={15} /> Nuevo Colaborador
               </button>
@@ -753,7 +820,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {users.map((user) => (
+                {users
+                  .filter((user) => {
+                    if (!searchPersonalQuery.trim()) return true;
+                    const q = searchPersonalQuery.toLowerCase().trim();
+                    return (
+                      user.nombre.toLowerCase().includes(q) ||
+                      user.email.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((user) => (
                   <tr key={user.id} className="hover:bg-[var(--muted)]/20 transition-colors">
                     <td className="p-3.5">
                       <div className="font-bold text-sm text-[var(--foreground)]">{user.nombre}</div>
@@ -1223,6 +1299,22 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   <option value="ROL_VENDEDOR">Vendedor</option>
                   <option value="ROL_BODEGUERO">Bodeguero</option>
                   <option value="ROL_ADMIN">Administrador</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada</label>
+                <select
+                  value={selectedTenantForNewUser}
+                  onChange={(e) => setSelectedTenantForNewUser(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                >
+                  <option value="">Sucursal Actual / Matriz</option>
+                  {sucursales.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 
