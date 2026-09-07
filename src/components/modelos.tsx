@@ -6,7 +6,7 @@ import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary
 import {
   Plus, Search, Loader2, ImageIcon, Package, Edit2, Edit3, Trash2, AlertTriangle,
   DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette,
-  Layers, Boxes
+  Layers, Boxes, Truck
 } from "lucide-react";
 
 interface ModelosProps {
@@ -38,6 +38,16 @@ interface Producto {
   activo: boolean;
 }
 
+interface SupplierInfo {
+  id: string;
+  razonSocial: string;
+  ruc?: string;
+  contacto?: string;
+  isPrimary?: boolean;
+  isMostFrequent?: boolean;
+  totalOrdenes?: number;
+}
+
 interface ModeloAgrupado {
   id: string;
   baseCode: string;
@@ -45,6 +55,10 @@ interface ModeloAgrupado {
   brand: string;
   material?: string;
   active: boolean;
+  supplierId?: string;
+  supplier?: { id: string; razonSocial: string; ruc?: string };
+  alternateSupplierIds?: string[];
+  suppliers?: SupplierInfo[];
   products: Producto[];
 }
 
@@ -253,6 +267,19 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [editModelBrand, setEditModelBrand] = useState("");
   const [editModelBaseCode, setEditModelBaseCode] = useState("");
   const [editModelMaterial, setEditModelMaterial] = useState("");
+  const [editModelSupplierId, setEditModelSupplierId] = useState("");
+  const [editModelAlternateIds, setEditModelAlternateIds] = useState<string[]>([]);
+
+  // ── Estado para Proveedor Alternos en Creación ──
+  const [createAlternateIds, setCreateAlternateIds] = useState<string[]>([]);
+
+  // ── Estado para mini-formulario de agregar proveedor rápido ──
+  const [showQuickSupplier, setShowQuickSupplier] = useState(false);
+  const [qsRuc, setQsRuc] = useState("");
+  const [qsRazonSocial, setQsRazonSocial] = useState("");
+  const [qsContacto, setQsContacto] = useState("");
+  const [qsSaving, setQsSaving] = useState(false);
+  const [qsContext, setQsContext] = useState<'create' | 'edit'>('create');
 
   useEffect(() => { loadData(); }, [online]);
 
@@ -294,12 +321,56 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setBrand("");
     setMaterial("");
     setSupplierId("");
+    setCreateAlternateIds([]);
     setColors([{ color: "", foto: null }]);
     setSerieIds([]);
     setSeriesPrices({});
     setCustomTallas({});
     setStockInicial("1");
     setError("");
+  };
+
+  // ── Crear proveedor rápido desde modal catálogo ──
+  const handleQuickCreateSupplier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qsRuc.trim() || !qsRazonSocial.trim()) {
+      setError("RUC y Razón Social del proveedor son obligatorios.");
+      return;
+    }
+    setQsSaving(true);
+    try {
+      const res = await ApiService.post("/proveedores", {
+        ruc: qsRuc.trim(),
+        razonSocial: qsRazonSocial.trim(),
+        contacto: qsContacto.trim() || undefined,
+      });
+      const newId = res.id;
+      // Recargar lista de proveedores
+      const provs = await ApiService.get("/proveedores");
+      if (Array.isArray(provs)) setListaProveedores(provs);
+      // Auto-seleccionar como principal si no hay uno, o como alterno
+      if (qsContext === 'create') {
+        if (!supplierId) {
+          setSupplierId(newId);
+        } else {
+          setCreateAlternateIds(prev => [...prev, newId]);
+        }
+      } else {
+        if (!editModelSupplierId) {
+          setEditModelSupplierId(newId);
+        } else {
+          setEditModelAlternateIds(prev => [...prev, newId]);
+        }
+      }
+      setSuccess(`Proveedor "${qsRazonSocial.trim()}" creado y asignado.`);
+      setShowQuickSupplier(false);
+      setQsRuc(""); setQsRazonSocial(""); setQsContacto("");
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al crear el proveedor.");
+    } finally {
+      setQsSaving(false);
+    }
   };
 
   const handleFoto = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -715,6 +786,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         seriesPrices: seriesPricesMap,
         customTallas,
         supplierId: supplierId || undefined,
+        alternateSupplierIds: createAlternateIds.filter(Boolean),
       });
 
       setSuccess("Modelo y sus variantes creados exitosamente.");
@@ -889,6 +961,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setEditModelBrand(m.brand);
     setEditModelBaseCode(m.baseCode);
     setEditModelMaterial(m.material || "");
+    setEditModelSupplierId(m.supplierId || "");
+    setEditModelAlternateIds(m.alternateSupplierIds || []);
     setError("");
     setShowEditModel(true);
   };
@@ -910,6 +984,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
         brand: editModelBrand.trim(),
         baseCode: editModelBaseCode.trim(),
         material: editModelMaterial.trim() || undefined,
+        supplierId: editModelSupplierId || null,
+        alternateSupplierIds: editModelAlternateIds.filter(Boolean),
       });
 
       setSuccess("Modelo actualizado exitosamente.");
@@ -1121,7 +1197,18 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           <span className="px-2 py-0.5 bg-red-500/15 text-red-500 rounded-lg text-[10px] font-bold">Deshabilitado</span>
                         )}
                       </div>
-                      <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{m.brand} · {uniqueColors.length} colores disponibles</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <p className="text-xs text-[var(--muted-foreground)]">{m.brand} · {uniqueColors.length} colores</p>
+                        {m.supplier && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
+                            <Truck size={10} />
+                            {m.supplier.razonSocial}
+                            {(m.alternateSupplierIds?.length || 0) > 0 && (
+                              <span className="text-[9px] font-normal opacity-70">+{m.alternateSupplierIds!.length}</span>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1321,10 +1408,44 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 </div>
 
                 <div>
-                  <Lbl t="Proveedor Asignado (para Órdenes de Compra Automáticas)" />
-                  <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className={INPUT}>
-                    <option value="">-- Sin Proveedor Asignado --</option>
-                    {listaProveedores.map(p => (
+                  <Lbl t="Proveedor Principal (Órdenes de Compra Automáticas)" />
+                  <div className="flex gap-2">
+                    <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className={`${INPUT} flex-1`}>
+                      <option value="">-- Sin Proveedor Asignado --</option>
+                      {listaProveedores.map(p => (
+                        <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => { setQsContext('create'); setShowQuickSupplier(true); }}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors">
+                      <Plus size={12} /><span>Nuevo</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Proveedores Alternos */}
+                <div>
+                  <Lbl t="Proveedores Alternos (Suplencia / Alta Demanda)" />
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {createAlternateIds.map(altId => {
+                      const prov = listaProveedores.find(p => p.id === altId);
+                      return prov ? (
+                        <span key={altId} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
+                          <Truck size={10} />{prov.razonSocial}
+                          <button type="button" onClick={() => setCreateAlternateIds(prev => prev.filter(x => x !== altId))}
+                            className="text-rose-500 hover:text-rose-700 ml-0.5"><X size={10} /></button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                  <select value="" onChange={e => {
+                    const val = e.target.value;
+                    if (val && !createAlternateIds.includes(val) && val !== supplierId) {
+                      setCreateAlternateIds(prev => [...prev, val]);
+                    }
+                  }} className={INPUT}>
+                    <option value="">-- Agregar proveedor alterno --</option>
+                    {listaProveedores.filter(p => p.id !== supplierId && !createAlternateIds.includes(p.id)).map(p => (
                       <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
                     ))}
                   </select>
@@ -2224,7 +2345,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* ── MODAL EDITAR MODELO BASE ── */}
       {showEditModel && editModel && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-blue-400 font-bold">
@@ -2243,7 +2364,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateModel} className="p-5 space-y-4">
+            <form onSubmit={handleUpdateModel} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
                 <Lbl t="Nombre del Modelo" req />
                 <input type="text" value={editModelName} onChange={e => setEditModelName(e.target.value)}
@@ -2263,6 +2384,51 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 <Lbl t="Material (Opcional)" />
                 <input type="text" value={editModelMaterial} onChange={e => setEditModelMaterial(e.target.value)}
                   className={INPUT} placeholder="Ej: Cuero genuino" />
+              </div>
+
+              {/* ── Proveedor Principal ── */}
+              <div>
+                <Lbl t="Proveedor Principal" />
+                <div className="flex gap-2">
+                  <select value={editModelSupplierId} onChange={e => setEditModelSupplierId(e.target.value)} className={`${INPUT} flex-1`}>
+                    <option value="">-- Sin Proveedor --</option>
+                    {listaProveedores.map(p => (
+                      <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => { setQsContext('edit'); setShowQuickSupplier(true); }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors">
+                    <Plus size={12} /><span>Nuevo</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Proveedores Alternos ── */}
+              <div>
+                <Lbl t="Proveedores Alternos (Suplencia / Alta Demanda)" />
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {editModelAlternateIds.map(altId => {
+                    const prov = listaProveedores.find(p => p.id === altId);
+                    return prov ? (
+                      <span key={altId} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
+                        <Truck size={10} />{prov.razonSocial}
+                        <button type="button" onClick={() => setEditModelAlternateIds(prev => prev.filter(x => x !== altId))}
+                          className="text-rose-500 hover:text-rose-700 ml-0.5"><X size={10} /></button>
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+                <select value="" onChange={e => {
+                  const val = e.target.value;
+                  if (val && !editModelAlternateIds.includes(val) && val !== editModelSupplierId) {
+                    setEditModelAlternateIds(prev => [...prev, val]);
+                  }
+                }} className={INPUT}>
+                  <option value="">-- Agregar proveedor alterno --</option>
+                  {listaProveedores.filter(p => p.id !== editModelSupplierId && !editModelAlternateIds.includes(p.id)).map(p => (
+                    <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+                  ))}
+                </select>
               </div>
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">

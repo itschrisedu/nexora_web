@@ -440,7 +440,7 @@ export default function CatalogoDigitalComponent() {
                   Seleccione Talla Disponible:
                 </label>
                 <div className="grid grid-cols-4 gap-2">
-                  {varianteSeleccionada.tallas.map((st) => (
+                  {[...varianteSeleccionada.tallas].sort((a, b) => (Number(a.numero) || 0) - (Number(b.numero) || 0)).map((st) => (
                     <button
                       key={st.tallaId}
                       disabled={st.cantidad === 0}

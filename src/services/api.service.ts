@@ -62,7 +62,7 @@ export class ApiService {
       const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: refreshToken }),
+        body: JSON.stringify({ refreshToken, token: refreshToken }),
       });
       if (res.ok) {
         const data = await res.json();

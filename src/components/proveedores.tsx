@@ -179,6 +179,7 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
     observacionLinea?: string;
     ids: string[];
     tallasDesglose: Array<{ talla: string | number; cantidad: number }>;
+    reordenAutomatica?: boolean;
   }>();
 
   lines.forEach((l) => {
@@ -206,11 +207,16 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
         // Recalcular tallas con la nueva cantidad total
         const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
         if (Array.isArray(prodTallas) && prodTallas.length > 0) {
-          const sumRatios = prodTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, prodTallas), 0);
+          const sortedProdTallas = [...prodTallas].sort((a: any, b: any) => {
+            const numA = Number(a.numero ?? a.sizeNumber ?? a.talla ?? a.nombre) || 0;
+            const numB = Number(b.numero ?? b.sizeNumber ?? b.talla ?? b.nombre) || 0;
+            return numA - numB;
+          });
+          const sumRatios = sortedProdTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, sortedProdTallas), 0);
           const factor = sumRatios > 0 ? existing.cantidadPedida / sumRatios : 1;
-          existing.tallasDesglose = prodTallas.map((t: any) => ({
+          existing.tallasDesglose = sortedProdTallas.map((t: any) => ({
             talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
-            cantidad: Math.round(getCurvaRatio(t, prodTallas) * factor),
+            cantidad: Math.round(getCurvaRatio(t, sortedProdTallas) * factor),
           }));
         }
       }
@@ -224,11 +230,16 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
         const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
 
         if (Array.isArray(prodTallas) && prodTallas.length > 0) {
-          const sumRatios = prodTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, prodTallas), 0);
+          const sortedProdTallas = [...prodTallas].sort((a: any, b: any) => {
+            const numA = Number(a.numero ?? a.sizeNumber ?? a.talla ?? a.nombre) || 0;
+            const numB = Number(b.numero ?? b.sizeNumber ?? b.talla ?? b.nombre) || 0;
+            return numA - numB;
+          });
+          const sumRatios = sortedProdTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, sortedProdTallas), 0);
           const factor = sumRatios > 0 ? l.cantidadPedida / sumRatios : 1;
-          tallasCalc = prodTallas.map((t: any) => ({
+          tallasCalc = sortedProdTallas.map((t: any) => ({
             talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
-            cantidad: Math.round(getCurvaRatio(t, prodTallas) * factor),
+            cantidad: Math.round(getCurvaRatio(t, sortedProdTallas) * factor),
           }));
         } else {
           const tallasEstandar = [34, 35, 36, 37, 38];
@@ -256,6 +267,7 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
         observacionLinea: l.observacionLinea,
         ids: l.id ? [l.id] : [],
         tallasDesglose: tallasCalc,
+        reordenAutomatica: (l.producto as any)?.reordenAutomatica ?? prodCat?.reordenAutomatica ?? true,
       });
     }
   });
@@ -278,7 +290,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
   // Filtros de órdenes por estado
   const [searchQuery, setSearchQuery] = useState('');
-  const [filtroEstadoOrden, setFiltroEstadoOrden] = useState<string>('BORRADOR');
+  const [filtroEstadoOrden, setFiltroEstadoOrden] = useState<string>('PENDIENTE');
 
   // Control de acordeones desplegables para numeración
   const [modelosExpandidos, setModelosExpandidos] = useState<Record<string, boolean>>({});
@@ -488,7 +500,12 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
     
     if (prodTallas.length > 0) {
-      return prodTallas.map((t: any) => {
+      const sortedTallas = [...prodTallas].sort((a: any, b: any) => {
+        const numA = Number(a.numero ?? a.sizeNumber ?? a.talla ?? a.nombre) || 0;
+        const numB = Number(b.numero ?? b.sizeNumber ?? b.talla ?? b.nombre) || 0;
+        return numA - numB;
+      });
+      return sortedTallas.map((t: any) => {
         const ratio = getCurvaRatio(t, prodTallas);
         const factor = ratio * (subtipoCurva === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadCurvas || 1);
         return {
@@ -774,6 +791,27 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Error al cancelar la orden.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelarYBloquearReorden = async (orderId: string) => {
+    if (!confirm(
+      '¿Está seguro de CANCELAR esta orden y marcar que los calzados YA NO SE VENDEN?\\n\\n' +
+      '• La orden de compra quedará CANCELADA.\\n' +
+      '• El sistema NO volverá a generar órdenes automáticas para estos modelos aunque se queden sin stock.\\n' +
+      '• Siempre podrás volver a realizar un pedido manualmente si lo requieres en el futuro.'
+    )) return;
+
+    setSaving(true);
+    try {
+      await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/cancelar-y-desactivar-reorden`, {});
+      showToast('Orden cancelada y reorden automática desactivada (Producto marcado como "Ya no se vende").', 'success');
+      setShowOrderDetailModal(false);
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Error al cancelar y bloquear reorden.', 'error');
     } finally {
       setSaving(false);
     }
@@ -1321,23 +1359,30 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           {/* Barra de Filtros: Borradores por defecto, Enviadas, Parciales, Recibidas, Canceladas, Todas */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {[
-              { key: 'BORRADOR', label: 'Pendientes (Borradores del Día)' },
-              { key: 'PENDIENTE', label: 'Enviadas al Proveedor' },
-              { key: 'RECIBIDA_PARCIAL', label: 'Parciales' },
-              { key: 'RECIBIDA', label: 'Recibidas' },
-              { key: 'CANCELADA', label: 'Canceladas' },
-              { key: 'TODOS', label: 'Todas las Órdenes' },
+              { key: 'PENDIENTE', label: 'Pendientes / Enviadas', count: ordenes.filter((o) => o.estado === 'PENDIENTE').length },
+              { key: 'BORRADOR', label: 'Borradores del Día', count: ordenes.filter((o) => o.estado === 'BORRADOR').length },
+              { key: 'RECIBIDA_PARCIAL', label: 'Parciales', count: ordenes.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
+              { key: 'RECIBIDA', label: 'Recibidas', count: ordenes.filter((o) => o.estado === 'RECIBIDA').length },
+              { key: 'CANCELADA', label: 'Canceladas', count: ordenes.filter((o) => o.estado === 'CANCELADA').length },
+              { key: 'TODOS', label: 'Todas las Órdenes', count: ordenes.length },
             ].map((st) => (
               <button
                 key={st.key}
                 onClick={() => setFiltroEstadoOrden(st.key)}
-                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all text-xs border ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold transition-all text-xs border ${
                   filtroEstadoOrden === st.key
                     ? 'bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900 border-transparent shadow-sm'
                     : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'
                 }`}
               >
-                {st.label}
+                <span>{st.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  filtroEstadoOrden === st.key
+                    ? 'bg-white/20 text-white dark:bg-black/20 dark:text-slate-900'
+                    : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                }`}>
+                  {st.count}
+                </span>
               </button>
             ))}
           </div>
@@ -1456,6 +1501,15 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               >
                                 <Download size={13} />
                               </button>
+                              {(o.estado === 'PENDIENTE' || o.estado === 'BORRADOR') && (
+                                <button
+                                  onClick={() => handleCancelarYBloquearReorden(o.id)}
+                                  className="p-1.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-600 rounded-lg transition-colors border border-rose-500/20"
+                                  title="🚫 Cancelar y No Volver a Generar Automáticamente (Producto ya no se vende)"
+                                >
+                                  <Ban size={13} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2031,7 +2085,14 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               )}
                             </div>
                             <div>
-                              <h5 className="font-bold text-xs text-[var(--foreground)]">{line.nombre}</h5>
+                              <div className="flex items-center gap-2">
+                                <h5 className="font-bold text-xs text-[var(--foreground)]">{line.nombre}</h5>
+                                {line.reordenAutomatica === false && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                    🚫 Ya no se vende (Auto-reorden desactivada)
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex gap-2 text-[10px] text-[var(--muted-foreground)]">
                                 <span>Cód: {line.codigo}</span>
                                 {line.color && <span>• Color: {line.color}</span>}
@@ -2283,14 +2344,26 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 </button>
 
                 {(selectedOrder.estado === 'BORRADOR' || selectedOrder.estado === 'PENDIENTE') && !editingOrder && (
-                  <button
-                    onClick={() => handleCancelarOrden(selectedOrder.id)}
-                    disabled={saving}
-                    className="px-3.5 py-2.5 border border-rose-500/30 text-rose-600 hover:bg-rose-500/10 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Ban size={13} />
-                    <span>Cancelar</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleCancelarOrden(selectedOrder.id)}
+                      disabled={saving}
+                      className="px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 text-[var(--muted-foreground)] hover:bg-[var(--muted)] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Cancelar solo esta orden puntual"
+                    >
+                      <X size={13} />
+                      <span>Cancelar Orden</span>
+                    </button>
+                    <button
+                      onClick={() => handleCancelarYBloquearReorden(selectedOrder.id)}
+                      disabled={saving}
+                      className="px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white border border-rose-500/30 text-rose-600 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Cancelar orden y desactivar reorden automática de estos productos (ya no se venden)"
+                    >
+                      <Ban size={13} />
+                      <span>🚫 No Volver a Generar (Ya no se vende)</span>
+                    </button>
+                  </>
                 )}
               </div>
 

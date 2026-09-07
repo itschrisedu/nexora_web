@@ -451,7 +451,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
               salePrice: Number(v.salePrice || 0),
               modelName: modelo.name,
               serieNombre: v.serieNombre,
-              tallas: v.tallas || [],
+              tallas: (v.tallas || []).slice().sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0)),
             });
           });
         });
@@ -512,8 +512,14 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
   const handleSeleccionarProducto = (pObj: any) => {
     if (pObj) {
+      const tallasSorted = (pObj.tallas || []).slice().sort((a: any, b: any) => {
+        const numA = Number(a.numero ?? a.nombre) || 0;
+        const numB = Number(b.numero ?? b.nombre) || 0;
+        return numA - numB;
+      });
+      const pObjSorted = { ...pObj, tallas: tallasSorted };
       setSelectedProductId(pObj.id);
-      setProductoSeleccionadoObj(pObj);
+      setProductoSeleccionadoObj(pObjSorted);
       setShowDropdownModelo(false);
       setBusquedaModelo('');
       // Usar salePrice del catálogo como precio base siempre
@@ -566,7 +572,8 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
       };
 
-      const lineasSerie = prodObj.tallas.map((t: any) => {
+      const sortedTallas = [...prodObj.tallas].sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0));
+      const lineasSerie = sortedTallas.map((t: any) => {
         const ratio = getCurvaRatio(t, prodObj.tallas);
         const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
         return {
@@ -603,7 +610,8 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         ? serieSeleccionada.nombre.replace(/_/g, ' ')
         : 'Serie Especial';
 
-      const lineasSerieEspecial = tallasSerie.map((t: any) => {
+      const sortedTallasSerie = [...tallasSerie].sort((a: any, b: any) => (Number(a.numero) || 0) - (Number(b.numero) || 0));
+      const lineasSerieEspecial = sortedTallasSerie.map((t: any) => {
         const factor = (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
         return {
           productId: prodObj.id,
@@ -646,6 +654,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         }
       });
 
+      lineasNumeracion.sort((a, b) => (Number(a.numeroTalla) || 0) - (Number(b.numeroTalla) || 0));
       if (lineasNumeracion.length === 0) {
         showToast('Por favor asigna al menos una talla con cantidad mayor a 0.', 'warning');
         return;
@@ -1711,27 +1720,31 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                     Distribución de Curva ({subtipoSerie === 'MEDIA_DOCENA' ? 'Media Docena' : 'Docena Completa'}):
                                   </span>
                                   <span className="text-[10px] font-black text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/20 font-mono">
-                                    Serie: {productoSeleccionadoObj.tallas.map((t: any) => {
-                                      const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
-                                      const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
-                                      return `${factor}/${t.numero ?? t.nombre}`;
-                                    }).join(', ')}
+                                    Serie: {[...productoSeleccionadoObj.tallas]
+                                      .sort((a, b) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0))
+                                      .map((t: any) => {
+                                        const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
+                                        const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+                                        return `${factor}/${t.numero ?? t.nombre}`;
+                                      }).join(', ')}
                                   </span>
                                 </div>
 
                                 <div className="flex flex-wrap gap-2">
-                                  {productoSeleccionadoObj.tallas.map((t: any) => {
-                                    const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
-                                    const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
-                                    const stockTalla = t.cantidad ?? t.stock ?? 0;
-                                    return (
-                                      <div key={t.tallaId} className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs shadow-2xs">
-                                        <span className="font-extrabold text-xs font-mono text-[var(--foreground)]">T{t.numero ?? t.nombre}</span>
-                                        <span className="font-bold text-xs text-emerald-600 font-mono">({factor} pares)</span>
-                                        <span className="text-[10px] text-[var(--muted-foreground)] font-medium">disp: {stockTalla}</span>
-                                      </div>
-                                    );
-                                  })}
+                                  {[...productoSeleccionadoObj.tallas]
+                                    .sort((a, b) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0))
+                                    .map((t: any) => {
+                                      const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
+                                      const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+                                      const stockTalla = t.cantidad ?? t.stock ?? 0;
+                                      return (
+                                        <div key={t.tallaId} className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs shadow-2xs">
+                                          <span className="font-extrabold text-xs font-mono text-[var(--foreground)]">T{t.numero ?? t.nombre}</span>
+                                          <span className="font-bold text-xs text-emerald-600 font-mono">({factor} pares)</span>
+                                          <span className="text-[10px] text-[var(--muted-foreground)] font-medium">disp: {stockTalla}</span>
+                                        </div>
+                                      );
+                                    })}
                                 </div>
                               </>
                             );
@@ -1860,7 +1873,9 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
                       {productoSeleccionadoObj && productoSeleccionadoObj.tallas ? (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                          {productoSeleccionadoObj.tallas.map((t: any) => {
+                          {[...productoSeleccionadoObj.tallas]
+                            .sort((a, b) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0))
+                            .map((t: any) => {
                             const cantActual = tallaCantidadesMap[t.tallaId] || 0;
                             const stockBodega = t.cantidad ?? t.stock ?? 0;
                             const excedeStock = cantActual > stockBodega;

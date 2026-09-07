@@ -563,7 +563,7 @@ export default function PosComponent() {
                     Tallas Disponibles:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {prod.tallas.map((t) => (
+                    {[...prod.tallas].sort((a, b) => (Number(a.numero) || 0) - (Number(b.numero) || 0)).map((t) => (
                       <button
                         key={t.tallaId}
                         disabled={t.cantidad <= 0}
