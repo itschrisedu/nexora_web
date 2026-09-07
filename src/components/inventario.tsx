@@ -5,12 +5,15 @@ import { db } from "../db/local-db";
 import { ApiService } from "../services/api.service";
 import {
   Search, Loader2, Package, TrendingUp, TrendingDown,
-  RefreshCw, AlertTriangle, X, CheckCircle, AlertCircle, ImageIcon
+  RefreshCw, AlertTriangle, X, CheckCircle, AlertCircle, ImageIcon,
+  ArrowRightLeft, Building2
 } from "lucide-react";
 
 interface InventarioProps {
   online: boolean;
   userRole?: string;
+  activeSucursalId?: string;
+  sucursales?: { id: string; name: string; isMatriz: boolean }[];
 }
 
 interface Talla {
@@ -48,14 +51,14 @@ function Lbl({ t, req }: { t: string; req?: boolean }) {
   );
 }
 
-export default function InventarioComponent({ online, userRole }: InventarioProps) {
+export default function InventarioComponent({ online, userRole, activeSucursalId, sucursales }: InventarioProps) {
   const [products, setProducts] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Producto | null>(null);
   const [success, setSuccess] = useState("");
 
-  // Modal movimiento
+  // Modal movimiento (Entrada / Salida)
   const [showMovModal, setShowMovModal] = useState(false);
   const [movType, setMovType] = useState<"entrada" | "salida">("entrada");
   const [movProd, setMovProd] = useState<Producto | null>(null);
@@ -64,6 +67,16 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
   const [movMotivo, setMovMotivo] = useState("");
   const [movError, setMovError] = useState("");
   const [movSaving, setMovSaving] = useState(false);
+
+  // Modal transferencia inter-sucursal
+  const [showTransfModal, setShowTransfModal] = useState(false);
+  const [transfProd, setTransfProd] = useState<Producto | null>(null);
+  const [transfTallaId, setTransfTallaId] = useState("");
+  const [transfDestinoId, setTransfDestinoId] = useState("");
+  const [transfCantidad, setTransfCantidad] = useState("1");
+  const [transfMotivo, setTransfMotivo] = useState("");
+  const [transfError, setTransfError] = useState("");
+  const [transfSaving, setTransfSaving] = useState(false);
 
   // Multiformato (Pares Sueltos vs Serie Completa)
   const [ingresoFormato, setIngresoFormato] = useState<"suelto" | "serie">("suelto");
@@ -74,7 +87,7 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
   const isBodeguero = userRole === "ROL_BODEGUERO";
   const canMove = isAdmin || isBodeguero;
 
-  useEffect(() => { loadProducts(); }, [online]);
+  useEffect(() => { loadProducts(); }, [online, activeSucursalId]);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -189,6 +202,68 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
     }
   };
 
+  const openTransferencia = (p: Producto) => {
+    setTransfProd(p);
+    const primerTallaConStock = p.tallas?.find(t => (t.stock ?? t.cantidad ?? t.disponible ?? 0) > 0) || p.tallas?.[0];
+    setTransfTallaId(primerTallaConStock?.id || "");
+    const otrasSucursales = (sucursales || []).filter(s => s.id !== activeSucursalId);
+    setTransfDestinoId(otrasSucursales[0]?.id || "");
+    setTransfCantidad("1");
+    setTransfMotivo("Despacho para exhibición y venta en mostrador");
+    setTransfError("");
+    setShowTransfModal(true);
+  };
+
+  const handleTransferencia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!transfProd) return;
+    setTransfError("");
+
+    if (!transfDestinoId) {
+      setTransfError("Selecciona la sucursal de destino.");
+      return;
+    }
+    if (!transfTallaId) {
+      setTransfError("Selecciona la talla a despachar.");
+      return;
+    }
+    const cant = parseInt(transfCantidad);
+    if (!cant || cant <= 0) {
+      setTransfError("Ingresa una cantidad de pares mayor a cero.");
+      return;
+    }
+    const tallaObj = transfProd.tallas?.find(t => t.id === transfTallaId);
+    const stockActual = tallaObj ? (tallaObj.stock ?? tallaObj.cantidad ?? tallaObj.disponible ?? 0) : 0;
+    if (cant > stockActual) {
+      setTransfError(`Stock insuficiente. Solo dispones de ${stockActual} pares en esta talla.`);
+      return;
+    }
+    if (!transfMotivo.trim()) {
+      setTransfError("Ingresa el motivo del despacho.");
+      return;
+    }
+
+    setTransfSaving(true);
+    try {
+      const res = await ApiService.post("/inventario/transferir-stock", {
+        destinoTenantId: transfDestinoId,
+        productId: transfProd.id,
+        tallaId: transfTallaId,
+        cantidad: cant,
+        motivo: transfMotivo.trim(),
+      });
+      setSuccess(res?.message || `Despacho de ${cant} pares registrado exitosamente.`);
+      setShowTransfModal(false);
+      setTransfProd(null);
+      loadProducts();
+      setTimeout(() => setSuccess(""), 5000);
+    } catch (err: any) {
+      setTransfError(err.message || "Error al realizar el despacho inter-sucursal.");
+    } finally {
+      setTransfSaving(false);
+    }
+  };
+
   const stockTotal = (p: Producto) => {
     const list = p.tallas || (p as any).stockPorTalla || [];
     return Array.isArray(list) ? list.reduce((s, t) => s + (t.stock ?? t.cantidad ?? t.disponible ?? 0), 0) : 0;
@@ -219,11 +294,16 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
   });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6">      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p className="text-xs text-[var(--muted-foreground)] font-medium">Control físico de existencias por modelo y talla en tiempo real</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-bold text-[var(--foreground)]">Control de Inventario</h2>
+            <span className="text-[11px] font-bold px-2.5 py-0.5 bg-[#0F172A]/10 dark:bg-white/10 text-[var(--foreground)] border border-[var(--border)] rounded-full">
+              📍 {activeSucursalId === 'TODAS' ? '🏢 Todas las Sucursales (Consolidado)' : sucursales?.find(s => s.id === activeSucursalId)?.name || 'Matriz Principal'}
+            </span>
+          </div>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium mt-0.5">Control físico de existencias por modelo y talla en tiempo real</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={loadProducts} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
@@ -245,12 +325,12 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
       {/* Grid de Productos */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 text-[var(--muted-foreground)]">
-          <Loader2 className="animate-spin text-[#0F172A] mb-2" size={32} />
+          <Loader2 className="animate-spin text-[#0F172A]" size={32} />
           <span className="text-sm">Cargando inventario...</span>
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="p-12 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
-          No se encontraron productos en el inventario.
+          No se encontraron productos en el inventario de esta sucursal.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -287,7 +367,7 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
                       })}
                     </div>
                     {selected?.id === p.id && (
-                      <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
+                      <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
                           <span>Costo: <strong>${Number(p.precioCosto).toFixed(2)}</strong></span>
                           <span>Venta: <strong className="text-[#0F172A]">${Number(p.precioVenta).toFixed(2)}</strong></span>
@@ -300,6 +380,11 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
                             <button onClick={(e) => { e.stopPropagation(); openMovimiento(p, "salida"); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-xs font-semibold hover:bg-red-500/20 transition-colors">
                               <TrendingDown size={13} /> Salida
                             </button>
+                            {isAdmin && (sucursales || []).length > 1 && total > 0 && (
+                              <button onClick={(e) => { e.stopPropagation(); openTransferencia(p); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-xl text-xs font-semibold hover:bg-blue-500/20 transition-colors" title="Despachar pares a otra sucursal">
+                                <ArrowRightLeft size={13} /> Despachar
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -402,6 +487,122 @@ export default function InventarioComponent({ online, userRole }: InventarioProp
               )}
               <button type="submit" disabled={movSaving} className={`w-full py-3 text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 ${movType === "entrada" ? "bg-emerald-600" : "bg-red-500"}`}>
                 {movSaving ? <><Loader2 size={16} className="animate-spin" /> Registrando...</> : movType === "entrada" ? <><TrendingUp size={16} /> Registrar Entrada ({ingresoFormato === "serie" ? `${totalParesLote} pares` : "Pares sueltos"})</> : <><TrendingDown size={16} /> Registrar Salida</>}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TRANSFERENCIA INTER-SUCURSAL */}
+      {showTransfModal && transfProd && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-500/20 backdrop-blur-sm rounded-2xl border border-blue-400/30 font-bold text-blue-300">
+                  <ArrowRightLeft size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">
+                    Despacho / Transferencia a Sucursal
+                  </h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    {transfProd.nombre} · {transfProd.codigo}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTransfModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleTransferencia} className="p-5 space-y-4">
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-300">
+                <span>Transfiere pares físicos desde <strong>{activeSucursalId === 'TODAS' ? 'Matriz' : sucursales?.find(s => s.id === activeSucursalId)?.name || 'Matriz'}</strong> hacia otra sucursal del negocio. El stock se actualizará de inmediato en ambos locales.</span>
+              </div>
+
+              <div>
+                <Lbl t="Sucursal de Destino" req />
+                <select
+                  value={transfDestinoId}
+                  onChange={(e) => setTransfDestinoId(e.target.value)}
+                  className={INPUT}
+                >
+                  {(sucursales || [])
+                    .filter((s) => s.id !== activeSucursalId)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.isMatriz ? "🏢 Matriz: " : "🏪 Sucursal: "} {s.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <Lbl t="Talla a Despachar" req />
+                <select
+                  value={transfTallaId}
+                  onChange={(e) => setTransfTallaId(e.target.value)}
+                  className={INPUT}
+                >
+                  {transfProd.tallas?.map((t) => {
+                    const st = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+                    return (
+                      <option key={t.id} value={t.id} disabled={st === 0}>
+                        Talla {t.nombre || t.numero} (Disponible en origen: {st} pares) {st === 0 ? "— AGOTADO" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <Lbl t="Cantidad de Pares" req />
+                <input
+                  type="number"
+                  min="1"
+                  max={transfProd.tallas?.find(t => t.id === transfTallaId)?.stock || 999}
+                  value={transfCantidad}
+                  onChange={(e) => setTransfCantidad(e.target.value)}
+                  className={INPUT}
+                />
+              </div>
+
+              <div>
+                <Lbl t="Motivo / Guía Interna de Despacho" req />
+                <input
+                  type="text"
+                  value={transfMotivo}
+                  onChange={(e) => setTransfMotivo(e.target.value)}
+                  placeholder="Ej. Abastecimiento de mostrador para fin de semana"
+                  className={INPUT}
+                />
+              </div>
+
+              {transfError && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} /> {transfError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={transfSaving}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {transfSaving ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Despachando pares...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft size={16} /> Confirmar Despacho a Sucursal
+                  </>
+                )}
               </button>
             </form>
           </div>

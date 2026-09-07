@@ -36,9 +36,11 @@ function mensajeAmigable(status: number | null, serverMessage?: string): string 
 export class ApiService {
   private static getHeaders(isPublicPath = false) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const activeSucursalId = typeof window !== 'undefined' ? localStorage.getItem('activeSucursalId') : null;
     return {
       'Content-Type': 'application/json',
       ...(token && !isPublicPath ? { Authorization: `Bearer ${token}` } : {}),
+      ...(activeSucursalId ? { 'x-sucursal-id': activeSucursalId } : {}),
     };
   }
 

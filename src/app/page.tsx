@@ -543,7 +543,7 @@ function MainApp() {
         </header>
 
         {/* ─── VISTA ACTIVA (Scroll vertical independiente únicamente en el contenido) ─── */}
-        <section className="flex-1 min-h-0 overflow-y-auto p-8 space-y-8">
+        <section key={`${vistaActual}-${activeSucursalId}`} className="flex-1 min-h-0 overflow-y-auto p-8 space-y-8">
           {/* Alerta de datos offline pendientes */}
           {stats.pendingSyncCount > 0 && (
             <div className="p-4 border border-yellow-500/20 bg-yellow-500/5 text-yellow-600 rounded-xl flex items-center justify-between">
@@ -580,7 +580,14 @@ function MainApp() {
             )
           )}
           {vistaActual === 'reportes' && <ReportesComponent />}
-          {vistaActual === 'inventario' && <InventarioComponent online={online} userRole={user?.rol} />}
+          {vistaActual === 'inventario' && (
+            <InventarioComponent
+              online={online}
+              userRole={user?.rol}
+              activeSucursalId={activeSucursalId}
+              sucursales={sucursales}
+            />
+          )}
           {vistaActual === 'modelos' && <ModelosComponent online={online} />}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
           {vistaActual === 'comercial' && <ComercialComponent online={online} userRole={user?.rol} userPermissions={user} />}
