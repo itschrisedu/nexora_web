@@ -46,6 +46,13 @@ export class ApiService {
 
   private static handle401() {
     if (typeof window !== 'undefined') {
+      const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+      // Si está offline, NUNCA borrar la sesión ni redirigir al login;
+      // esto permite seguir navegando con los datos locales guardados en IndexedDB y caché.
+      if (!isOnline) {
+        console.warn('📡 Modo Offline: Se conserva la sesión para operar localmente.');
+        return;
+      }
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');

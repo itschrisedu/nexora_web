@@ -44,6 +44,13 @@ import {
 } from 'lucide-react';
 import { useToast } from './ui/toast';
 import { compartirFacturaPdf, generarFacturaPdfDoc } from '../services/pdf-factura.service';
+import {
+  generarComprobanteAbonoPdfDoc,
+  descargarComprobanteAbonoPdf,
+  compartirComprobanteAbonoPdf,
+  armarMensajeWhatsAppAbono,
+  ComprobanteAbonoPdfData,
+} from '../services/pdf-abono.service';
 
 interface FinancieroProps {
   online: boolean;
@@ -174,6 +181,17 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const [metodoAbono, setMetodoAbono] = useState('EFECTIVO');
   const [notasAbono, setNotasAbono] = useState('');
   const [savingAbono, setSavingAbono] = useState(false);
+  const [formatoEnvioAbono, setFormatoEnvioAbono] = useState<'PDF' | 'TEXTO'>('PDF'); // Por defecto PDF como pidió el usuario
+  const [autoEnviarWhatsAppAbono, setAutoEnviarWhatsAppAbono] = useState(true); // Envío automático por defecto
+  const [abonoExitoso, setAbonoExitoso] = useState<{
+    monto: number;
+    metodo: string;
+    fecha: string;
+    notas?: string;
+    numeroNota?: string;
+    dataAbono: ComprobanteAbonoPdfData;
+    telefonoCliente: string;
+  } | null>(null);
 
   // Modal Devolución Mejorado
   const [showDevolucionModal, setShowDevolucionModal] = useState(false);
@@ -425,18 +443,128 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     setAcordeonNotasAbierto(false);
     setMontoAbono('');
     setNotasAbono('');
+    setAbonoExitoso(null);
     setShowCuentaModal(true);
   };
 
   const handleEnviarWhatsAppTexto = (telefono: string, mensaje: string) => {
-    let numLimpio = telefono.replace(/\D/g, '');
+    let numLimpio = (telefono || '').replace(/\D/g, '');
+    if (!numLimpio || numLimpio === '0' || telefono === '—') {
+      showToast('El cliente no tiene un número telefónico válido para WhatsApp.', 'warning');
+      return;
+    }
     if (numLimpio.startsWith('09') && numLimpio.length === 10) {
       numLimpio = '593' + numLimpio.substring(1);
     } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
       numLimpio = '593' + numLimpio.substring(1);
     }
     const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-    window.open(url, '_blank');
+    
+    // Disparo inmediato para evitar bloqueo de popups del navegador
+    const win = window.open(url, '_blank');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      // Fallback seguro mediante enlace clicado en el DOM
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
+  const armarDatosComprobanteAbono = (
+    cartera: ClienteCartera,
+    abonoInfo: { monto: number; metodo: string; fecha?: string; notas?: string; numeroNota?: string }
+  ): ComprobanteAbonoPdfData => {
+    const hoy = new Date();
+    const hoyStr = hoy.toISOString().split('T')[0];
+    const fechaLegible = abonoInfo.fecha || hoy.toLocaleDateString('es-EC');
+    const horaLegible = hoy.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+
+    // Cobros/entregas de hoy
+    const cobrosDeHoy = cartera.cobros.filter((c) => c.createdAt && c.createdAt.startsWith(hoyStr));
+    const montoComprasHoy = cobrosDeHoy.reduce((sum, c) => sum + Number(c.montoOriginal || c.montoTotal || 0), 0);
+    const entregasHoy = cobrosDeHoy.map((c) => ({
+      nota: c.saleNote?.numero ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}` : (c.numeroCobro || 'Nota de Venta'),
+      monto: Number(c.montoOriginal || c.montoTotal || 0),
+    }));
+
+    // Saldos
+    const saldoRestante = Math.max(0, cartera.saldoTotalPendiente - abonoInfo.monto);
+    let saldoAnterior = saldoRestante + abonoInfo.monto - montoComprasHoy;
+    if (saldoAnterior < 0) saldoAnterior = 0;
+
+    const numRecibo = `REC-${hoy.getFullYear()}${(hoy.getMonth() + 1).toString().padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    return {
+      emisor: {
+        nombre: businessConfig?.nombre || 'CALZADO DE CUERO',
+        ruc: businessConfig?.ruc || '1804884664001',
+        direccion: businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador',
+        telefono: businessConfig?.telefono || '',
+        email: businessConfig?.email || '',
+      },
+      comprobante: {
+        numero: numRecibo,
+        fecha: fechaLegible,
+        hora: horaLegible,
+        formaPago: abonoInfo.metodo,
+        referencia: abonoInfo.notas,
+        notas: abonoInfo.notas,
+      },
+      cliente: {
+        nombre: cartera.clienteNombre,
+        cedula: cartera.clienteCedula || 'Consumidor Final',
+        telefono: cartera.clienteTelefono,
+        email: cartera.clienteEmail,
+        direccion: cartera.clienteDireccion,
+        nivelCredito: cartera.clienteNivel,
+      },
+      movimiento: {
+        numeroNota: abonoInfo.numeroNota,
+        saldoAnterior,
+        montoAbonado: abonoInfo.monto,
+        saldoRestante,
+        totalNotasPendientes: cartera.totalComprasPendientes,
+        entregasHoy: entregasHoy.length > 0 ? entregasHoy : undefined,
+      },
+    };
+  };
+
+  const handleEnviarComprobanteAbono = async (
+    cartera: ClienteCartera,
+    abonoInfo: { monto: number; metodo: string; fecha?: string; notas?: string; numeroNota?: string },
+    modo: 'PDF' | 'TEXTO' = 'PDF'
+  ) => {
+    if (!cartera.clienteTelefono) {
+      showToast('El cliente no tiene teléfono registrado.', 'warning');
+      return;
+    }
+
+    const dataAbono = armarDatosComprobanteAbono(cartera, abonoInfo);
+
+    if (modo === 'PDF') {
+      try {
+        const res = await compartirComprobanteAbonoPdf(dataAbono, cartera.clienteTelefono, false);
+        if (res.metodo === 'WEB_SHARE') {
+          showToast('Comprobante PDF enviado a WhatsApp exitosamente.', 'success');
+        } else {
+          showToast('Abriendo WhatsApp con los datos del comprobante para el cliente...', 'info');
+        }
+      } catch (err: any) {
+        console.error('Error al generar PDF de abono:', err);
+        // Fallback a texto si falla PDF
+        const msg = armarMensajeWhatsAppAbono(dataAbono, false);
+        handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
+      }
+    } else {
+      // Modo Texto
+      const msg = armarMensajeWhatsAppAbono(dataAbono, false);
+      handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
+      showToast('Mensaje de abono enviado por WhatsApp.', 'success');
+    }
   };
 
   const handleEnviarEstadoCuentaWhatsApp = (
@@ -450,7 +578,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
     const hoyStr = new Date().toISOString().split('T')[0];
     const hoyLegible = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
-    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+    const negocioNombre = businessConfig?.nombre || 'Administración de Cobros';
 
     // 1. Obtener el último abono (ya sea el recién ingresado o el último registrado en el historial)
     let ultimoAbono = abonoInfoParam;
@@ -545,6 +673,21 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
       return;
     }
 
+    // ─── PRE-APERTURA SÍNCRONA DE VENTANA (SOLO MODO TEXTO) ────────────
+    // Para modo TEXTO pre-abrimos la ventana para evitar bloqueos del navegador.
+    // Para modo PDF NO pre-abrimos ventana (se usa Web Share API directo, idéntico a Factura).
+    let ventanaWhatsApp: Window | null = null;
+    const telefonoCliente =
+      (carteraSeleccionada?.clienteTelefono && carteraSeleccionada.clienteTelefono !== '—')
+        ? carteraSeleccionada.clienteTelefono
+        : (cobroSeleccionado?.clienteTelefono && cobroSeleccionado.clienteTelefono !== '—')
+        ? cobroSeleccionado.clienteTelefono
+        : '';
+
+    if (autoEnviarWhatsAppAbono && telefonoCliente && formatoEnvioAbono === 'TEXTO') {
+      ventanaWhatsApp = window.open('about:blank', '_blank');
+    }
+
     setSavingAbono(true);
     try {
       // 1. Obtener notas con deuda ordenadas por antigüedad (FIFO: la más antigua primero)
@@ -576,19 +719,80 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
       showToast(`¡Abono de $${valor.toFixed(2)} registrado exitosamente vía ${metodoAbono}!`, 'success');
 
-      // Si el cliente tiene teléfono registrado, enviar comprobante de abono + estado de cuenta por WhatsApp
-      if (carteraSeleccionada?.clienteTelefono) {
-        handleEnviarEstadoCuentaWhatsApp(carteraSeleccionada, {
-          monto: valor,
-          metodo: metodoAbono,
-          fecha: new Date().toLocaleString('es-EC'),
-        });
+      // Nombre o número de nota asociada
+      const numNotaRef = cobroSeleccionado?.saleNote?.numero
+        ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+        : undefined;
+
+      const datosAbonoRegistrado = {
+        monto: valor,
+        metodo: metodoAbono,
+        fecha: new Date().toLocaleDateString('es-EC'),
+        notas: notasAbono.trim() || undefined,
+        numeroNota: numNotaRef,
+      };
+
+      const carteraParaEnvio = { ...carteraSeleccionada, clienteTelefono: telefonoCliente };
+      const dataAbono = armarDatosComprobanteAbono(carteraParaEnvio, datosAbonoRegistrado);
+
+      // Guardar el abono recién registrado para mostrar el bloque de acciones inmediatas (igual a Factura)
+      setAbonoExitoso({
+        monto: valor,
+        metodo: metodoAbono,
+        fecha: new Date().toLocaleDateString('es-EC'),
+        notas: notasAbono.trim() || undefined,
+        numeroNota: numNotaRef,
+        dataAbono,
+        telefonoCliente,
+      });
+
+      // Envío AUTOMÁTICO por WhatsApp
+      if (autoEnviarWhatsAppAbono && telefonoCliente) {
+        if (formatoEnvioAbono === 'PDF') {
+          // Intentar compartir vía Web Share API nativo (sin descargas forzadas, idéntico a Factura)
+          try {
+            const res = await compartirComprobanteAbonoPdf(dataAbono, telefonoCliente, false);
+            if (res.metodo === 'WEB_SHARE') {
+              showToast('Comprobante PDF compartido a WhatsApp.', 'success');
+            }
+          } catch (errShare: any) {
+            console.log('Interacción manual requerida por navegador para compartir archivo PDF:', errShare);
+          }
+        } else {
+          // Modo TEXTO: redirigir ventana pre-abierta a WhatsApp
+          const msg = armarMensajeWhatsAppAbono(dataAbono, false);
+          let numLimpio = telefonoCliente.replace(/\D/g, '');
+          if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+            numLimpio = '593' + numLimpio.substring(1);
+          } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+            numLimpio = '593' + numLimpio.substring(1);
+          }
+          const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(msg)}`;
+          if (ventanaWhatsApp && !ventanaWhatsApp.closed) {
+            ventanaWhatsApp.location.href = waUrl;
+          } else {
+            const a = document.createElement('a');
+            a.href = waUrl;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }
+          showToast('Mensaje de abono enviado por WhatsApp.', 'success');
+        }
+      } else if (autoEnviarWhatsAppAbono && !telefonoCliente) {
+        showToast('Abono registrado. El cliente no tiene teléfono para enviar WhatsApp.', 'info');
       }
 
       setMontoAbono('');
       setNotasAbono('');
       await loadCobros();
     } catch (err: any) {
+      // Si hubo error, cerrar la ventana pre-abierta para no dejar una pestaña vacía
+      if (ventanaWhatsApp && !ventanaWhatsApp.closed) {
+        ventanaWhatsApp.close();
+      }
       showToast(err.message || 'Error al registrar abono.', 'error');
     } finally {
       setSavingAbono(false);
@@ -1683,22 +1887,73 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   Abonos registrados a esta nota:
                 </span>
                 {cobroSeleccionado?.abonos && cobroSeleccionado.abonos.length > 0 ? (
-                  <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                     {cobroSeleccionado.abonos.map((a) => (
                       <div
                         key={a.id}
-                        className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs"
+                        className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs gap-2"
                       >
-                        <div>
-                          <span className="font-extrabold text-emerald-600">${Number(a.monto).toFixed(2)}</span>
-                          <span className="text-[10px] text-[var(--muted-foreground)] ml-2 font-semibold px-1.5 py-0.5 bg-emerald-500/10 rounded">
-                            {a.metodo}
-                          </span>
-                          {a.notas && <p className="text-[9px] text-[var(--muted-foreground)] italic mt-0.5">{a.notas}</p>}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-extrabold text-emerald-600">${Number(a.monto).toFixed(2)}</span>
+                            <span className="text-[10px] text-[var(--muted-foreground)] font-semibold px-1.5 py-0.5 bg-emerald-500/10 rounded">
+                              {a.metodo}
+                            </span>
+                            <span className="text-[10px] text-[var(--muted-foreground)]">
+                              {new Date(a.createdAt).toLocaleDateString('es-EC')}
+                            </span>
+                          </div>
+                          {a.notas && <p className="text-[9px] text-[var(--muted-foreground)] italic mt-0.5 truncate">{a.notas}</p>}
                         </div>
-                        <span className="text-[10px] text-[var(--muted-foreground)] shrink-0">
-                          {new Date(a.createdAt).toLocaleDateString('es-EC')}
-                        </span>
+
+                        {/* Botones de acción individual por abono: Descargar PDF y Enviar WhatsApp */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const dataAbono = armarDatosComprobanteAbono(carteraSeleccionada, {
+                                monto: Number(a.monto),
+                                metodo: a.metodo,
+                                fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
+                                notas: a.notas,
+                                numeroNota: cobroSeleccionado.saleNote?.numero
+                                  ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+                                  : cobroSeleccionado.numeroCobro,
+                              });
+                              descargarComprobanteAbonoPdf(dataAbono);
+                              showToast('Comprobante de abono PDF descargado.', 'success');
+                            }}
+                            className="p-1.5 rounded-lg bg-[var(--card)] hover:bg-emerald-500/10 text-emerald-600 border border-[var(--border)] hover:border-emerald-500/30 transition-colors cursor-pointer shadow-2xs"
+                            title="Descargar Comprobante PDF"
+                          >
+                            <Download size={13} />
+                          </button>
+
+                          {carteraSeleccionada.clienteTelefono && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleEnviarComprobanteAbono(
+                                  carteraSeleccionada,
+                                  {
+                                    monto: Number(a.monto),
+                                    metodo: a.metodo,
+                                    fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
+                                    notas: a.notas,
+                                    numeroNota: cobroSeleccionado.saleNote?.numero
+                                      ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+                                      : cobroSeleccionado.numeroCobro,
+                                  },
+                                  formatoEnvioAbono
+                                );
+                              }}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 transition-colors cursor-pointer shadow-2xs"
+                              title={`Enviar Comprobante por WhatsApp (${formatoEnvioAbono})`}
+                            >
+                              <MessageCircle size={13} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1708,6 +1963,59 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   </p>
                 )}
               </div>
+
+              {/* Tarjeta de Abono Recién Registrado con Acciones Rápidas (idéntico a Factura) */}
+              {abonoExitoso && (
+                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl space-y-2.5 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-xs">
+                      <CheckCircle size={16} />
+                      <span>¡Abono de ${abonoExitoso.monto.toFixed(2)} registrado exitosamente!</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAbonoExitoso(null)}
+                      className="text-[10px] font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-2 py-0.5 rounded-lg hover:bg-[var(--muted)]"
+                      title="Cerrar aviso"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Comprobante de Caja No. <strong className="text-[var(--foreground)]">{abonoExitoso.dataAbono.comprobante.numero}</strong> generado correctamente.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {abonoExitoso.telefonoCliente && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const res = await compartirComprobanteAbonoPdf(abonoExitoso.dataAbono, abonoExitoso.telefonoCliente, false);
+                          if (res.metodo === 'WEB_SHARE') {
+                            showToast('Comprobante PDF compartido a WhatsApp.', 'success');
+                          } else {
+                            showToast('Abriendo WhatsApp con el comprobante...', 'info');
+                          }
+                        }}
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <MessageCircle size={14} />
+                        <span>Enviar Comprobante PDF por WhatsApp</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        descargarComprobanteAbonoPdf(abonoExitoso.dataAbono);
+                        showToast('Comprobante PDF descargado.', 'success');
+                      }}
+                      className="px-3 py-2 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-[var(--border)] cursor-pointer"
+                    >
+                      <Download size={13} />
+                      <span>Guardar PDF</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Formulario para Registrar Nuevo Abono */}
               {cobroSeleccionado && Number(cobroSeleccionado.saldoPendiente) > 0 && (
@@ -1776,6 +2084,59 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     </div>
                   )}
 
+                  {/* Configuración de Envío de Comprobante por WhatsApp */}
+                  <div className="p-3 bg-slate-500/5 dark:bg-slate-800/20 border border-[var(--border)] rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                        <MessageCircle size={13} className="text-emerald-600" />
+                        <span>Formato del Comprobante:</span>
+                      </label>
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded border border-emerald-500/20">
+                        {formatoEnvioAbono === 'PDF' ? 'PDF (Por Defecto)' : 'Solo Texto'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormatoEnvioAbono('PDF')}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+                          formatoEnvioAbono === 'PDF'
+                            ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
+                        }`}
+                      >
+                        <FileCheck size={13} className={formatoEnvioAbono === 'PDF' ? 'text-emerald-400' : ''} />
+                        <span>📄 Archivo PDF (Oficial)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormatoEnvioAbono('TEXTO')}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+                          formatoEnvioAbono === 'TEXTO'
+                            ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
+                        }`}
+                      >
+                        <MessageCircle size={13} className={formatoEnvioAbono === 'TEXTO' ? 'text-emerald-400' : ''} />
+                        <span>💬 Solo Texto</span>
+                      </button>
+                    </div>
+
+                    <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={autoEnviarWhatsAppAbono}
+                        onChange={(e) => setAutoEnviarWhatsAppAbono(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="text-[11px] font-medium text-[var(--foreground)]">
+                        Enviar automáticamente al WhatsApp del cliente al confirmar
+                      </span>
+                    </label>
+                  </div>
+
                   <button
                     onClick={handleRegistrarAbono}
                     disabled={savingAbono || !montoAbono || !online}
@@ -1809,15 +2170,48 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                 <span>Emitir Factura Electrónica SRI</span>
               </button>
 
-              {carteraSeleccionada.clienteTelefono && (
+              {/* Acciones directas de Comprobante / Estado de Cuenta */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleEnviarEstadoCuentaWhatsApp(carteraSeleccionada)}
-                  className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    const dataAbono = armarDatosComprobanteAbono(carteraSeleccionada, {
+                      monto: 0,
+                      metodo: 'ESTADO_CUENTA',
+                      fecha: new Date().toLocaleDateString('es-EC'),
+                    });
+                    descargarComprobanteAbonoPdf(dataAbono);
+                    showToast('Comprobante PDF de cuenta generado y descargado.', 'success');
+                  }}
+                  className="py-2 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-[var(--border)] shadow-2xs cursor-pointer"
+                  title="Descargar Comprobante Oficial de Caja en PDF"
                 >
-                  <MessageCircle size={14} />
-                  <span>Enviar Estado de Cuenta por WhatsApp</span>
+                  <Download size={13} className="text-emerald-600" />
+                  <span>Descargar Comprobante PDF</span>
                 </button>
-              )}
+
+                {carteraSeleccionada.clienteTelefono && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleEnviarComprobanteAbono(
+                        carteraSeleccionada,
+                        {
+                          monto: 0,
+                          metodo: 'ESTADO_CUENTA',
+                          fecha: new Date().toLocaleDateString('es-EC'),
+                        },
+                        formatoEnvioAbono
+                      );
+                    }}
+                    className="py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer"
+                    title={`Enviar Comprobante por WhatsApp (${formatoEnvioAbono})`}
+                  >
+                    <MessageCircle size={13} />
+                    <span>Enviar a WhatsApp ({formatoEnvioAbono})</span>
+                  </button>
+                )}
+              </div>
 
               <button
                 onClick={() => {
@@ -2033,6 +2427,55 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                   <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-1">
                                     {m.metodo}
                                   </span>
+                                )}
+
+                                {/* Botones para generar PDF y WhatsApp en el historial */}
+                                {isAbono && carteraSeleccionada && (
+                                  <div className="flex items-center justify-end gap-1 mt-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const dataAbono = armarDatosComprobanteAbono(carteraSeleccionada, {
+                                          monto: Number(m.monto),
+                                          metodo: m.metodo || 'EFECTIVO',
+                                          fecha: new Date(m.fecha).toLocaleDateString('es-EC'),
+                                          notas: m.descripcion,
+                                        });
+                                        descargarComprobanteAbonoPdf(dataAbono);
+                                        showToast('Comprobante PDF descargado.', 'success');
+                                      }}
+                                      className="p-1 rounded bg-[var(--muted)]/40 hover:bg-emerald-500/10 text-emerald-600 border border-[var(--border)] text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer"
+                                      title="Descargar Comprobante PDF"
+                                    >
+                                      <Download size={11} />
+                                      <span>PDF</span>
+                                    </button>
+
+                                    {carteraSeleccionada.clienteTelefono && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEnviarComprobanteAbono(
+                                            carteraSeleccionada,
+                                            {
+                                              monto: Number(m.monto),
+                                              metodo: m.metodo || 'EFECTIVO',
+                                              fecha: new Date(m.fecha).toLocaleDateString('es-EC'),
+                                              notas: m.descripcion,
+                                            },
+                                            formatoEnvioAbono
+                                          );
+                                        }}
+                                        className="p-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer"
+                                        title={`Enviar Comprobante por WhatsApp (${formatoEnvioAbono})`}
+                                      >
+                                        <MessageCircle size={11} />
+                                        <span>WhatsApp</span>
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>

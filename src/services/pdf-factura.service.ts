@@ -199,7 +199,7 @@ export function generarFacturaPdfDoc(data: FacturaPdfData): jsPDF {
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text("Documento generado electrónicamente por NEXORA — Sistema de Gestión Comercial y Financiera", pageWidth / 2, y, { align: "center" });
+  doc.text(`Documento generado electrónicamente por ${data.emisor.nombre || "el establecimiento"} — Comprobante Tributario Oficial`, pageWidth / 2, y, { align: "center" });
 
   return doc;
 }
@@ -507,7 +507,7 @@ export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
-  doc.text("Documento oficial de Orden de Compra emitido electrónicamente por NEXORA", pageWidth / 2, y, { align: "center" });
+  doc.text(`Documento oficial de Orden de Compra emitido electrónicamente por ${data.emisor.nombre || "el comprador"}`, pageWidth / 2, y, { align: "center" });
 
   return doc;
 }
@@ -550,7 +550,7 @@ export async function compartirOrdenCompraPdf(
     if (l.numeracion) desglose += `\n  ↳ _${l.numeracion}_`;
   });
 
-  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe saludamos cordialmente de parte de *NEXORA*. Adjuntamos el documento oficial PDF de la orden de producción:\n\n📋 *ORDEN DE COMPRA ${data.orden.numero}*\n📅 *Fecha:* ${data.orden.fecha}\n\n👟 *DETALLE DE MODELOS Y NUMERACIÓN:*${desglose}\n\n📦 *TOTAL PARES:* ${data.totales.totalPares} pares\n💰 *VALOR TOTAL:* $${data.totales.totalPagar.toFixed(2)}\n\nPor favor confirmar recepción del documento PDF y fecha estimada de entrega. ¡Muchas gracias!`;
+  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe saludamos cordialmente de parte de *${data.emisor.nombre || "Gerencia de Compras"}*. Adjuntamos el documento oficial PDF de la orden de producción:\n\n📋 *ORDEN DE COMPRA ${data.orden.numero}*\n📅 *Fecha:* ${data.orden.fecha}\n\n👟 *DETALLE DE MODELOS Y NUMERACIÓN:*${desglose}\n\n📦 *TOTAL PARES:* ${data.totales.totalPares} pares\n💰 *VALOR TOTAL:* $${data.totales.totalPagar.toFixed(2)}\n\nPor favor confirmar recepción del documento PDF y fecha estimada de entrega. ¡Muchas gracias!`;
 
   // 1. Intentar Web Share API con archivo PDF adjunto
   if (
