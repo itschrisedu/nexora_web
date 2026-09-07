@@ -1747,7 +1747,6 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       <option value="EFECTIVO">💵 Efectivo</option>
                       <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
                       <option value="DEPOSITO">💳 Depósito Bancario</option>
-                      <option value="CHEQUE">📑 Cheque</option>
                       <option value="DESCUENTO_COMERCIAL">🎁 Descuento / Rebaja (Retención de Mercadería)</option>
                     </select>
                   </div>
