@@ -72,112 +72,103 @@ export default function DashboardComponent({
     try {
       let data = null;
       if (online) {
-        data = await ApiService.get(`/reportes/resumen-ejecutivo?periodo=${periodo}`).catch(() => null);
+        const sucParam = activeSucursalId ? `&sucursalId=${activeSucursalId}` : '';
+        data = await ApiService.get(`/reportes/resumen-ejecutivo?periodo=${periodo}${sucParam}`).catch(() => null);
       }
 
       if (data) {
-        const summary = data.resumenMetricas || {};
+        // Mapeo correcto de los campos que devuelve el backend (kpis, serieTemporal, etc.)
+        const kpisBackend = data.kpis || {};
         setKpis({
-          totalFacturado: summary.totalFacturado || 0,
-          totalParesVendidos: summary.totalParesVendidos || 0,
-          totalPedidos: summary.totalPedidos || 0,
-          clientesActivos: summary.totalClientes || 0,
-          creditoPendiente: summary.saldoCreditoVigente || 0,
-          stockBajoCount: summary.totalModelosConStockBajo || 0,
+          totalFacturado: Number(kpisBackend.totalIngresos || 0),
+          totalParesVendidos: Number(kpisBackend.totalParesVendidos || 0),
+          totalPedidos: Number(kpisBackend.totalPedidos || 0),
+          clientesActivos: Number(kpisBackend.saldoCarteraTotal || 0) > 0 ? 1 : 0,
+          creditoPendiente: Number(kpisBackend.saldoCarteraTotal || 0),
+          stockBajoCount: 0,
         });
 
-        // Gráfico de ventas temporales
-        if (Array.isArray(data.ventasPorPeriodo) && data.ventasPorPeriodo.length > 0) {
-          setVentasChart(data.ventasPorPeriodo);
-        } else {
-          setVentasChart(generarVentasMock(periodo));
-        }
-
-        // Gráfico métodos de pago
-        if (Array.isArray(data.metodosPago) && data.metodosPago.length > 0) {
-          const colores = ["#0F172A", "#10B981", "#F59E0B", "#6366F1"];
-          const totalGen = data.metodosPago.reduce((acc: number, item: any) => acc + (item.total || 0), 0) || 1;
-          setMetodosPago(
-            data.metodosPago.map((m: any, idx: number) => ({
-              metodo: m.metodo || "Efectivo",
-              total: m.total || 0,
-              porcentaje: Math.round(((m.total || 0) / totalGen) * 100),
-              color: colores[idx % colores.length],
+        // Gráfico de ventas temporales — campo real: serieTemporal
+        if (Array.isArray(data.serieTemporal) && data.serieTemporal.length > 0) {
+          setVentasChart(
+            data.serieTemporal.map((item: any) => ({
+              label: item.label || item.fechaKey || '',
+              monto: Number(item.ingresos || 0),
+              pares: Number(item.pares || 0),
             }))
           );
         } else {
-          setMetodosPago([
-            { metodo: "EFECTIVO", porcentaje: 55, total: 3450.0, color: "#0F172A" },
-            { metodo: "TRANSFERENCIA", porcentaje: 25, total: 1560.0, color: "#10B981" },
-            { metodo: "CRÉDITO DIRECTO", porcentaje: 15, total: 940.0, color: "#F59E0B" },
-            { metodo: "TARJETA", porcentaje: 5, total: 320.0, color: "#6366F1" },
-          ]);
+          setVentasChart([]);
         }
 
-        // Top modelos vendidos
-        if (Array.isArray(data.topModelos) && data.topModelos.length > 0) {
-          setTopModelos(data.topModelos.slice(0, 5));
+        // Métodos de pago — campo real: distribucionFormasPago
+        const formasPago = data.distribucionFormasPago;
+        if (formasPago && typeof formasPago === 'object') {
+          const colores: Record<string, string> = {
+            CONTADO: "#0F172A",
+            CREDITO: "#F59E0B",
+            EFECTIVO: "#10B981",
+            TRANSFERENCIA: "#6366F1",
+          };
+          const entries = Object.entries(formasPago) as [string, any][];
+          const totalGen = entries.reduce((acc, [, v]) => acc + Number(v?.monto || 0), 0) || 1;
+          const parsed = entries
+            .filter(([, v]) => Number(v?.count || 0) > 0)
+            .map(([metodo, v], idx) => ({
+              metodo: metodo === 'CREDITO' ? 'CRÉDITO DIRECTO' : metodo,
+              total: Number(v.monto || 0),
+              porcentaje: Math.round((Number(v.monto || 0) / totalGen) * 100),
+              color: colores[metodo] || ["#0F172A", "#10B981", "#F59E0B", "#6366F1"][idx % 4],
+            }));
+          setMetodosPago(parsed.length > 0 ? parsed : []);
         } else {
-          setTopModelos([
-            { id: "1", nombre: "Mocasín Cuero Real Ambateño", marca: "NEXORA CRAFT", pares: 42, total: 1890.0 },
-            { id: "2", nombre: "Bota Ejecutiva Dama Cuero Suave", marca: "CEVALLOS PREMIUM", pares: 35, total: 1750.0 },
-            { id: "3", nombre: "Calzado Formal Caballero Oxford", marca: "ARTESANAL", pares: 28, total: 1260.0 },
-            { id: "4", nombre: "Sandalia Casual Cuero Natural", marca: "CEVALLOS PREMIUM", pares: 21, total: 735.0 },
-            { id: "5", nombre: "Zapato Confort Anatómico", marca: "NEXORA CRAFT", pares: 18, total: 630.0 },
-          ]);
+          setMetodosPago([]);
         }
 
-        // Comparativo por sucursales si es Admin
+        // Top modelos vendidos — campo real: topModelos
+        if (Array.isArray(data.topModelos) && data.topModelos.length > 0) {
+          setTopModelos(
+            data.topModelos.slice(0, 5).map((m: any) => ({
+              id: m.productId || '',
+              nombre: m.modelName || 'Calzado de Cuero',
+              marca: m.serieNombre || m.color || 'Estándar',
+              pares: Number(m.pares || 0),
+              total: Number(m.ingresos || 0),
+            }))
+          );
+        } else {
+          setTopModelos([]);
+        }
+
+        // Comparativo por sucursales — campo real: ventasPorSucursal
         if (isAdmin) {
           if (Array.isArray(data.ventasPorSucursal) && data.ventasPorSucursal.length > 0) {
             setComparativoSucursales(data.ventasPorSucursal);
           } else {
-            setComparativoSucursales(
-              sucursales.map((s, idx) => ({
-                sucursalNombre: s.name,
-                total: idx === 0 ? 4850.0 : 2610.0,
-                porcentaje: idx === 0 ? 65 : 35,
-              }))
-            );
+            setComparativoSucursales([]);
           }
         }
       } else {
-        // Carga por defecto / offline inteligente
+        // Sin datos (offline o error) — mostrar estados vacíos, no datos falsos
         setKpis({
-          totalFacturado: 7460.0,
-          totalParesVendidos: 144,
-          totalPedidos: 57,
-          clientesActivos: 32,
-          creditoPendiente: 1240.0,
-          stockBajoCount: 3,
+          totalFacturado: 0,
+          totalParesVendidos: 0,
+          totalPedidos: 0,
+          clientesActivos: 0,
+          creditoPendiente: 0,
+          stockBajoCount: 0,
         });
-        setVentasChart(generarVentasMock(periodo));
-        setMetodosPago([
-          { metodo: "EFECTIVO", porcentaje: 55, total: 4100.0, color: "#0F172A" },
-          { metodo: "TRANSFERENCIA", porcentaje: 25, total: 1860.0, color: "#10B981" },
-          { metodo: "CRÉDITO DIRECTO", porcentaje: 15, total: 1120.0, color: "#F59E0B" },
-          { metodo: "TARJETA", porcentaje: 5, total: 380.0, color: "#6366F1" },
-        ]);
-        setTopModelos([
-          { id: "1", nombre: "Mocasín Cuero Real Ambateño", marca: "NEXORA CRAFT", pares: 42, total: 1890.0 },
-          { id: "2", nombre: "Bota Ejecutiva Dama Cuero Suave", marca: "CEVALLOS PREMIUM", pares: 35, total: 1750.0 },
-          { id: "3", nombre: "Calzado Formal Caballero Oxford", marca: "ARTESANAL", pares: 28, total: 1260.0 },
-          { id: "4", nombre: "Sandalia Casual Cuero Natural", marca: "CEVALLOS PREMIUM", pares: 21, total: 735.0 },
-          { id: "5", nombre: "Zapato Confort Anatómico", marca: "NEXORA CRAFT", pares: 18, total: 630.0 },
-        ]);
-        setComparativoSucursales(
-          sucursales.map((s, idx) => ({
-            sucursalNombre: s.name,
-            total: idx === 0 ? 4850.0 : 2610.0,
-            porcentaje: idx === 0 ? 65 : 35,
-          }))
-        );
+        setVentasChart([]);
+        setMetodosPago([]);
+        setTopModelos([]);
+        setComparativoSucursales([]);
       }
     } catch (err: any) {
       console.warn("Cargando dashboard modo resiliente:", err);
     } finally {
       setLoading(false);
     }
+
   };
 
   const generarVentasMock = (tipo: string) => {
@@ -284,8 +275,8 @@ export default function DashboardComponent({
           subtitle={`${kpis.totalPedidos} pedidos concretados`}
           icon={<DollarSign size={18} />}
           iconBg="bg-emerald-500/10 text-emerald-500 dark:bg-emerald-500/20"
-          trend="+14.2% vs periodo anterior"
-          trendPositive={true}
+          trend={kpis.totalFacturado > 0 ? `$${(kpis.totalFacturado / (kpis.totalPedidos || 1)).toFixed(2)} ticket promedio` : "Sin ventas en este periodo"}
+          trendPositive={kpis.totalFacturado > 0}
         />
         <KpiCard
           title="Calzado Vendido"
@@ -293,8 +284,8 @@ export default function DashboardComponent({
           subtitle="Rotación efectiva de stock"
           icon={<ShoppingBag size={18} />}
           iconBg="bg-blue-500/10 text-blue-500 dark:bg-blue-500/20"
-          trend="Alta demanda cuero local"
-          trendPositive={true}
+          trend={kpis.totalParesVendidos > 0 ? "Demanda activa en el periodo" : "Sin movimiento en este periodo"}
+          trendPositive={kpis.totalParesVendidos > 0}
         />
         <KpiCard
           title="Cartera por Cobrar"
@@ -339,39 +330,49 @@ export default function DashboardComponent({
 
           {/* Gráfico SVG de Barras Customizado */}
           <div className="pt-4 space-y-4">
-            <div className="h-64 w-full flex items-end justify-between gap-3 px-2 pb-2 border-b border-[var(--border)]">
-              {ventasChart.map((item, idx) => {
-                const heightPercent = Math.max(Math.round((item.monto / maxVentaChart) * 100), 8);
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative h-full justify-end">
-                    {/* Tooltip Hover */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 bg-[#0F172A] text-white text-[10px] font-bold py-1 px-2.5 rounded-lg pointer-events-none shadow-lg z-20 whitespace-nowrap">
-                      ${Number(item.monto || 0).toFixed(2)} ({item.pares || 0} pares)
-                    </div>
+            {ventasChart.length > 0 ? (
+              <>
+                <div className="h-64 w-full flex items-end justify-between gap-3 px-2 pb-2 border-b border-[var(--border)]">
+                  {ventasChart.map((item, idx) => {
+                    const heightPercent = Math.max(Math.round((item.monto / maxVentaChart) * 100), 8);
+                    return (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative h-full justify-end">
+                        {/* Tooltip Hover */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 bg-[#0F172A] text-white text-[10px] font-bold py-1 px-2.5 rounded-lg pointer-events-none shadow-lg z-20 whitespace-nowrap">
+                          ${Number(item.monto || 0).toFixed(2)} ({item.pares || 0} pares)
+                        </div>
 
-                    {/* Barra con gradiente */}
-                    <div
-                      style={{ height: `${heightPercent}%` }}
-                      className="w-full max-w-[48px] bg-gradient-to-t from-[#0F172A] to-slate-700 hover:from-amber-600 hover:to-amber-500 rounded-t-xl transition-all shadow-sm"
-                    />
+                        {/* Barra con gradiente */}
+                        <div
+                          style={{ height: `${heightPercent}%` }}
+                          className="w-full max-w-[48px] bg-gradient-to-t from-[#0F172A] to-slate-700 hover:from-amber-600 hover:to-amber-500 rounded-t-xl transition-all shadow-sm"
+                        />
 
-                    {/* Etiqueta Eje X */}
-                    <span className="text-[11px] font-semibold text-[var(--muted-foreground)] truncate max-w-full">
-                      {item.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                        {/* Etiqueta Eje X */}
+                        <span className="text-[11px] font-semibold text-[var(--muted-foreground)] truncate max-w-full">
+                          {item.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-2">
-              <span className="flex items-center gap-1.5 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#0F172A]" /> Ingresos totales en USD
-              </span>
-              <span className="font-bold text-[var(--foreground)]">
-                Promedio por tramo: ${Math.round(kpis.totalFacturado / (ventasChart.length || 1)).toLocaleString()}
-              </span>
-            </div>
+                <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-2">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#0F172A]" /> Ingresos totales en USD
+                  </span>
+                  <span className="font-bold text-[var(--foreground)]">
+                    Promedio por tramo: ${Math.round(kpis.totalFacturado / (ventasChart.length || 1)).toLocaleString()}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="h-64 w-full flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-3">
+                <BarChart3 size={40} className="opacity-20" />
+                <p className="text-sm font-bold">Sin datos de ventas en este periodo</p>
+                <p className="text-xs">Registra ventas desde el Punto de Venta para ver la evolucion aqui.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -388,25 +389,32 @@ export default function DashboardComponent({
           </div>
 
           <div className="space-y-4 my-auto">
-            {metodosPago.map((item, idx) => (
-              <div key={idx} className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[var(--foreground)] flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                    {item.metodo}
-                  </span>
-                  <span className="font-bold text-[var(--foreground)]">
-                    ${Number(item.total || 0).toFixed(2)} ({item.porcentaje || 0}%)
-                  </span>
+            {metodosPago.length > 0 ? (
+              metodosPago.map((item, idx) => (
+                <div key={idx} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[var(--foreground)] flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      {item.metodo}
+                    </span>
+                    <span className="font-bold text-[var(--foreground)]">
+                      ${Number(item.total || 0).toFixed(2)} ({item.porcentaje || 0}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${item.porcentaje}%`, backgroundColor: item.color }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${item.porcentaje}%`, backgroundColor: item.color }}
-                  />
-                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-[var(--muted-foreground)] gap-2">
+                <PieChart size={32} className="opacity-20" />
+                <p className="text-xs font-bold">Sin datos de pagos en este periodo</p>
               </div>
-            ))}
+            )}
           </div>
 
           <div className="p-3 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-[11px] text-[var(--muted-foreground)] flex items-center gap-2">
@@ -429,25 +437,32 @@ export default function DashboardComponent({
             <span className="text-xs font-semibold text-[var(--muted-foreground)]">Top 5</span>
           </div>
 
-          <div className="divide-y divide-[var(--border)]">
-            {topModelos.map((m, idx) => (
-              <div key={m.id || idx} className="py-3 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-[#0F172A] text-amber-400 font-black text-xs flex items-center justify-center shrink-0">
-                    #{idx + 1}
+          {topModelos.length > 0 ? (
+            <div className="divide-y divide-[var(--border)]">
+              {topModelos.map((m, idx) => (
+                <div key={m.id || idx} className="py-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-[#0F172A] text-amber-400 font-black text-xs flex items-center justify-center shrink-0">
+                      #{idx + 1}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[var(--foreground)] truncate">{m.nombre}</div>
+                      <div className="text-[10px] text-[var(--muted-foreground)] font-semibold">{m.marca}</div>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-[var(--foreground)] truncate">{m.nombre}</div>
-                    <div className="text-[10px] text-[var(--muted-foreground)] font-semibold">{m.marca}</div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-black text-[var(--foreground)]">{m.pares} pares</div>
+                    <div className="text-[10px] text-emerald-600 font-bold">${Number(m.total || 0).toFixed(2)}</div>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="text-xs font-black text-[var(--foreground)]">{m.pares} pares</div>
-                  <div className="text-[10px] text-emerald-600 font-bold">${Number(m.total || 0).toFixed(2)}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-[var(--muted-foreground)] gap-2">
+              <Award size={32} className="opacity-20 text-amber-500" />
+              <p className="text-xs font-bold">Sin modelos vendidos en este periodo</p>
+            </div>
+          )}
         </div>
 
         {/* COMPARATIVO POR SUCURSALES (SÓLO ADMINS) */}
@@ -461,27 +476,34 @@ export default function DashboardComponent({
               <span className="text-xs font-semibold text-[var(--muted-foreground)]">Red de Locales</span>
             </div>
 
-            <div className="space-y-4 pt-2">
-              {comparativoSucursales.map((s, idx) => (
-                <div key={idx} className="space-y-1.5 p-3 rounded-xl bg-[var(--muted)]/30 border border-[var(--border)]">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[var(--foreground)] flex items-center gap-2">
-                      <Store size={14} className="text-amber-500" />
-                      {s.sucursalNombre}
-                    </span>
-                    <span className="font-black text-[#0F172A] dark:text-amber-400">
-                      ${s.total.toLocaleString("es-EC", { minimumFractionDigits: 2 })} ({s.porcentaje}%)
-                    </span>
+            {comparativoSucursales.length > 0 ? (
+              <div className="space-y-4 pt-2">
+                {comparativoSucursales.map((s, idx) => (
+                  <div key={idx} className="space-y-1.5 p-3 rounded-xl bg-[var(--muted)]/30 border border-[var(--border)]">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <Store size={14} className="text-amber-500" />
+                        {s.sucursalNombre}
+                      </span>
+                      <span className="font-black text-[#0F172A] dark:text-amber-400">
+                        ${Number(s.total || 0).toLocaleString("es-EC", { minimumFractionDigits: 2 })} ({s.porcentaje || 0}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-slate-900 to-amber-600 rounded-full transition-all"
+                        style={{ width: `${s.porcentaje || 0}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2.5 bg-[var(--muted)] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-slate-900 to-amber-600 rounded-full transition-all"
-                      style={{ width: `${s.porcentaje}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-[var(--muted-foreground)] gap-2">
+                <Store size={32} className="opacity-20 text-amber-500" />
+                <p className="text-xs font-bold">Sin datos de ventas en las sucursales para este periodo</p>
+              </div>
+            )}
           </div>
         ) : (
           /* Vendedor / Bodeguero info card */

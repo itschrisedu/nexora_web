@@ -37,6 +37,7 @@ interface UserListItem {
   rol: 'ROL_ADMIN' | 'ROL_VENDEDOR' | 'ROL_BODEGUERO';
   activo: boolean;
   permiteCambiarPrecio?: boolean;
+  tenantId?: string;
   createdAt: string;
 }
 
@@ -263,6 +264,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         rol: editingUser.rol,
         activo: editingUser.activo,
         permiteCambiarPrecio: editingUser.permiteCambiarPrecio,
+        tenantId: editingUser.tenantId,
       });
 
       setSuccessMsg(`Colaborador "${editingUser.nombre}" actualizado.`);
@@ -551,12 +553,28 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 Organiza tus puntos de venta. Los inventarios y colaboradores están aislados por sucursal.
               </p>
             </div>
-            <button
-              onClick={() => setShowAddSucursalModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
-            >
-              <Plus size={15} /> Nueva Sucursal
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedSucursalId) {
+                    setSelectedTenantForNewUser(selectedSucursalId);
+                  } else if (sucursales.length > 0 && !selectedTenantForNewUser) {
+                    setSelectedTenantForNewUser(sucursales[0].id);
+                  }
+                  setShowAddModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm shrink-0 cursor-pointer"
+              >
+                <UserPlus size={16} /> Registrar Colaborador
+              </button>
+              <button
+                onClick={() => setShowAddSucursalModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+              >
+                <Plus size={15} /> Nueva Sucursal
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -815,6 +833,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
                 <tr>
                   <th className="p-3.5">Colaborador</th>
+                  <th className="p-3.5">Sucursal Asignada</th>
                   <th className="p-3.5">Rol Asignado</th>
                   <th className="p-3.5 text-center">Estado</th>
                   <th className="p-3.5 text-center">Modificar Precios</th>
@@ -836,6 +855,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     <td className="p-3.5">
                       <div className="font-bold text-sm text-[var(--foreground)]">{user.nombre}</div>
                       <div className="text-[11px] text-[var(--muted-foreground)]">{user.email}</div>
+                    </td>
+                    <td className="p-3.5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-500/10 text-[var(--foreground)] border border-slate-500/20">
+                        <Building2 size={12} className="text-amber-500" />
+                        {sucursales.find(s => s.id === user.tenantId)?.name || 'Matriz Principal'}
+                      </span>
                     </td>
                     <td className="p-3.5">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
@@ -1319,13 +1344,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada *</label>
                 <select
-                  value={selectedTenantForNewUser}
+                  value={selectedTenantForNewUser || (sucursales[0]?.id || '')}
                   onChange={(e) => setSelectedTenantForNewUser(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                 >
-                  <option value="">Sucursal Actual / Matriz</option>
                   {sucursales.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
@@ -1437,6 +1461,21 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     <option value="INACTIVO">Inactivo</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada</label>
+                <select
+                  value={editingUser.tenantId || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, tenantId: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                >
+                  {sucursales.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="pt-1">
