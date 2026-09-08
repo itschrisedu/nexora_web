@@ -375,13 +375,13 @@ export default function ClientesComponent({ online }: ClientesProps) {
     }
   };
 
-  // ── Generador de Mensajes de WhatsApp para Inactivos ──
+  // ── Generador de Mensajes de WhatsApp para Inactivos (Enfoque Mayorista) ──
   const abrirModalReactivacion = (cliente: ClienteInactivo) => {
     setClienteWhatsApp(cliente);
     const nombreCliente = `${cliente.nombre || ''}`.trim() || 'Estimado/a';
     
-    // Plantilla por defecto inspirada en faltaXhacer.tex
-    const msgDefault = `Hola ${nombreCliente}, ¿cómo estás? En ${businessNombre} nos tienes un poco abandonados 😅. ¡No te pierdas nuestras ofertas! En compras después de 6 pares tienes descuento especial en cada par 💸. ¡Tenemos nueva mercadería y modelos disponibles! ¿Qué par te llevas hoy? 👞✨`;
+    // Plantilla Mayorista por defecto (persuasiva para reactivar compras al por mayor)
+    const msgDefault = `¡Hola ${nombreCliente}! 👋 Te saludamos desde ${businessNombre}. Hace tiempito no renovamos el stock de tu negocio y queremos que sigas generando excelentes márgenes de ganancia 📈.\n\nNos acaba de salir una producción exclusiva de calzado en cuero 100% garantizado con altísima rotación comercial. En pedidos a partir de media docena (6 pares) o docenas completas, te activamos precio mayorista directo de fábrica + prioridad de despacho con Transporte Los Andes 🚚📦.\n\n¿Te comparto el catálogo mayorista con los modelos más pedidos para apartar tu lote antes de que se agote la producción semanal? 👞✨`;
     
     setMensajeWhatsAppCustom(msgDefault);
     setPlantillaSeleccionada('ABANDONO');
@@ -394,11 +394,11 @@ export default function ClientesComponent({ online }: ClientesProps) {
     const nombreCliente = `${clienteWhatsApp.nombre || ''}`.trim() || 'Estimado/a';
 
     if (tipo === 'ABANDONO') {
-      setMensajeWhatsAppCustom(`Hola ${nombreCliente}, ¿cómo estás? En ${businessNombre} nos tienes un poco abandonados 😅. ¡No te pierdas nuestras ofertas! En compras después de 6 pares tienes descuento especial en cada par 💸. ¡Tenemos nueva mercadería y modelos disponibles! ¿Qué par te llevas hoy? 👞✨`);
+      setMensajeWhatsAppCustom(`¡Hola ${nombreCliente}! 👋 Te saludamos desde ${businessNombre}. Hace tiempito no renovamos el stock de tu negocio y queremos que sigas generando excelentes márgenes de ganancia 📈.\n\nNos acaba de salir una producción exclusiva de calzado en cuero 100% garantizado con altísima rotación comercial. En pedidos a partir de media docena (6 pares) o docenas completas, te activamos precio mayorista directo de fábrica + prioridad de despacho con Transporte Los Andes 🚚📦.\n\n¿Te comparto el catálogo mayorista con los modelos más pedidos para apartar tu lote antes de que se agote la producción semanal? 👞✨`);
     } else if (tipo === 'DESCUENTO_6_PARES') {
-      setMensajeWhatsAppCustom(`¡Hola ${nombreCliente}! 👋 En ${businessNombre} queremos premiar tu fidelidad. Tenemos una promoción activa: a partir de 6 pares de calzado de cuero, llévate descuento directo por cada par 🎁. ¡Escríbenos para enviarte el catálogo digital con los modelos disponibles! 📲`);
+      setMensajeWhatsAppCustom(`Estimado/a ${nombreCliente}, ¡un gusto saludarte desde ${businessNombre}! 👞🔥 Los locales comerciales están teniendo gran salida con nuestra nueva línea de calzado de cuero para esta temporada.\n\nPara respaldar tu inventario, en tu próximo pedido por curvas o bultos (desde 6 pares) te garantizamos precio especial de fabricante y facilidades en tu compra 💼.\n\n¿Qué numeraciones y modelos necesitas para abastecer tu vitrina esta semana? ¡Escríbenos para enviarte el catálogo digital! 📲`);
     } else {
-      setMensajeWhatsAppCustom(`Hola ${nombreCliente} 👋, te saludamos de ${businessNombre}. Acabamos de recibir nueva mercadería en calzado de cuero 100% garantizado con precios de fábrica 👞🏭. ¿Deseas que te enviemos las fotos de los nuevos modelos de esta semana?`);
+      setMensajeWhatsAppCustom(`¡Hola ${nombreCliente}! ⚡ Solo por esta semana en ${businessNombre} abrimos cupos de producción con descuento especial por volumen a partir de 6 pares para nuestros clientes aliados.\n\nAprovecha precios directos de fábrica antes del reajuste de temporada 💸. ¡Asegura tu pedido antes de que se complete el despacho semanal!\n\n¿Revisamos tu pedido hoy mismo? 🚚💨`);
     }
   };
 
@@ -471,12 +471,12 @@ export default function ClientesComponent({ online }: ClientesProps) {
 
   const copiarMensajeDifusion = (promo: PromocionCupon) => {
     const textoDescuento = promo.tipoDescuento === 'PORCENTAJE'
-      ? `${Number(promo.valorDescuento)}% de descuento`
+      ? `${Number(promo.valorDescuento)}% de descuento directo`
       : promo.tipoDescuento === 'DESCUENTO_POR_PAR'
-      ? `$${Number(promo.valorDescuento).toFixed(2)} de descuento por par`
-      : `$${Number(promo.valorDescuento).toFixed(2)} de descuento directo`;
+      ? `$${Number(promo.valorDescuento).toFixed(2)} de descuento por cada par`
+      : `$${Number(promo.valorDescuento).toFixed(2)} de descuento en tu compra`;
 
-    const texto = promo.mensajePlantilla || `🎉 ¡PROMOCIÓN EXCLUSIVA EN ${businessNombre.toUpperCase()}! 🎉\n\nUsa el código promocional: *${promo.codigo}* y recibe ${textoDescuento} en tu compra de calzado de cuero a partir de ${promo.minimoPares} pares 👞💸.\n\n⚠️ ¡Válido únicamente para las primeras ${promo.maximoCanjes} personas! (Quedan ${promo.maximoCanjes - promo.canjesUsados} cupos disponibles).\n\n📲 ¡Envíanos tu pedido con el código antes de que se agoten los cupos!`;
+    const texto = promo.mensajePlantilla || `🏭 ¡PROMOCIÓN MAYORISTA EXCLUSIVA EN ${businessNombre.toUpperCase()}! 🏭\n\nEstimados clientes y distribuidores, activamos el código promocional: *${promo.codigo}*.\n\nRecibe ${textoDescuento} en pedidos al por mayor a partir de ${promo.minimoPares} pares de calzado de cuero legítimo 👞💸.\n\n⚡ ¡Válido únicamente para los primeros ${promo.maximoCanjes} comerciantes en confirmar su pedido! (Quedan ${promo.maximoCanjes - promo.canjesUsados} cupos disponibles con despacho prioritario por Transporte Los Andes 🚚📦).\n\n📲 ¡Responde este mensaje con tu pedido y el código antes de que se completen los cupos de producción!`;
 
     navigator.clipboard.writeText(texto);
     setCopiadoId(promo.id);
@@ -1264,42 +1264,45 @@ export default function ClientesComponent({ online }: ClientesProps) {
 
               {/* Selector de Plantilla */}
               <div>
-                <label className="block text-xs font-bold text-[var(--foreground)] mb-1.5">Seleccionar Plantilla de Mensaje:</label>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1.5">Seleccionar Enfoque Comercial (Venta al por Mayor):</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => aplicarPlantilla('ABANDONO')}
-                    className={`p-2 rounded-xl text-xs font-bold border transition-all text-left ${
+                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col gap-0.5 ${
                       plantillaSeleccionada === 'ABANDONO'
-                        ? 'bg-emerald-600 text-white border-transparent'
+                        ? 'bg-emerald-600 text-white border-transparent shadow-sm'
                         : 'bg-[var(--muted)]/30 border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                     }`}
                   >
-                    😅 Nos tienes abandonados (Fidelización)
+                    <span>📈 Lote Mayorista & Fidelidad</span>
+                    <span className="text-[10px] font-normal opacity-80">Reactivar stock por docenas / 6 pares</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => aplicarPlantilla('DESCUENTO_6_PARES')}
-                    className={`p-2 rounded-xl text-xs font-bold border transition-all text-left ${
+                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col gap-0.5 ${
                       plantillaSeleccionada === 'DESCUENTO_6_PARES'
-                        ? 'bg-emerald-600 text-white border-transparent'
+                        ? 'bg-emerald-600 text-white border-transparent shadow-sm'
                         : 'bg-[var(--muted)]/30 border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                     }`}
                   >
-                    💸 Descuento después de 6 pares
+                    <span>🔥 Curvas & Alta Rotación</span>
+                    <span className="text-[10px] font-normal opacity-80">Margen superior para revender</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => aplicarPlantilla('NUEVA_COLECCION')}
-                    className={`p-2 rounded-xl text-xs font-bold border transition-all text-left ${
+                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col gap-0.5 ${
                       plantillaSeleccionada === 'NUEVA_COLECCION'
-                        ? 'bg-emerald-600 text-white border-transparent'
+                        ? 'bg-emerald-600 text-white border-transparent shadow-sm'
                         : 'bg-[var(--muted)]/30 border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
                     }`}
                   >
-                    👞 Nuevos modelos disponibles
+                    <span>⚡ Cupos Limitados de Fábrica</span>
+                    <span className="text-[10px] font-normal opacity-80">Descuento por volumen antes de reajuste</span>
                   </button>
                 </div>
               </div>
