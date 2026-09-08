@@ -183,15 +183,6 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const [savingAbono, setSavingAbono] = useState(false);
   const [formatoEnvioAbono, setFormatoEnvioAbono] = useState<'PDF' | 'TEXTO'>('PDF'); // Por defecto PDF como pidió el usuario
   const [autoEnviarWhatsAppAbono, setAutoEnviarWhatsAppAbono] = useState(true); // Envío automático por defecto
-  const [abonoExitoso, setAbonoExitoso] = useState<{
-    monto: number;
-    metodo: string;
-    fecha: string;
-    notas?: string;
-    numeroNota?: string;
-    dataAbono: ComprobanteAbonoPdfData;
-    telefonoCliente: string;
-  } | null>(null);
 
   // Modal Devolución Mejorado
   const [showDevolucionModal, setShowDevolucionModal] = useState(false);
@@ -443,7 +434,6 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     setAcordeonNotasAbierto(false);
     setMontoAbono('');
     setNotasAbono('');
-    setAbonoExitoso(null);
     setShowCuentaModal(true);
   };
 
@@ -536,7 +526,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const handleEnviarComprobanteAbono = async (
     cartera: ClienteCartera,
     abonoInfo: { monto: number; metodo: string; fecha?: string; notas?: string; numeroNota?: string },
-    modo: 'PDF' | 'TEXTO' = 'PDF'
+    _modo?: 'PDF' | 'TEXTO'
   ) => {
     if (!cartera.clienteTelefono) {
       showToast('El cliente no tiene teléfono registrado.', 'warning');
@@ -544,26 +534,13 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     }
 
     const dataAbono = armarDatosComprobanteAbono(cartera, abonoInfo);
-
-    if (modo === 'PDF') {
-      try {
-        const res = await compartirComprobanteAbonoPdf(dataAbono, cartera.clienteTelefono, false);
-        if (res.metodo === 'WEB_SHARE') {
-          showToast('Comprobante PDF enviado a WhatsApp exitosamente.', 'success');
-        } else {
-          showToast('Abriendo WhatsApp con los datos del comprobante para el cliente...', 'info');
-        }
-      } catch (err: any) {
-        console.error('Error al generar PDF de abono:', err);
-        // Fallback a texto si falla PDF
-        const msg = armarMensajeWhatsAppAbono(dataAbono, false);
-        handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
-      }
-    } else {
-      // Modo Texto
+    try {
+      await compartirComprobanteAbonoPdf(dataAbono, cartera.clienteTelefono, false);
+      showToast('Abriendo WhatsApp con el comprobante oficial de abono...', 'info');
+    } catch (err: any) {
+      console.error('Error al generar envío de abono:', err);
       const msg = armarMensajeWhatsAppAbono(dataAbono, false);
       handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
-      showToast('Mensaje de abono enviado por WhatsApp.', 'success');
     }
   };
 
@@ -684,7 +661,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         ? cobroSeleccionado.clienteTelefono
         : '';
 
-    if (autoEnviarWhatsAppAbono && telefonoCliente && formatoEnvioAbono === 'TEXTO') {
+    if (autoEnviarWhatsAppAbono && telefonoCliente) {
       ventanaWhatsApp = window.open('about:blank', '_blank');
     }
 
@@ -735,52 +712,28 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
       const carteraParaEnvio = { ...carteraSeleccionada, clienteTelefono: telefonoCliente };
       const dataAbono = armarDatosComprobanteAbono(carteraParaEnvio, datosAbonoRegistrado);
 
-      // Guardar el abono recién registrado para mostrar el bloque de acciones inmediatas (igual a Factura)
-      setAbonoExitoso({
-        monto: valor,
-        metodo: metodoAbono,
-        fecha: new Date().toLocaleDateString('es-EC'),
-        notas: notasAbono.trim() || undefined,
-        numeroNota: numNotaRef,
-        dataAbono,
-        telefonoCliente,
-      });
-
-      // Envío AUTOMÁTICO por WhatsApp
+      // Envío AUTOMÁTICO por WhatsApp estandarizado
       if (autoEnviarWhatsAppAbono && telefonoCliente) {
-        if (formatoEnvioAbono === 'PDF') {
-          // Intentar compartir vía Web Share API nativo (sin descargas forzadas, idéntico a Factura)
-          try {
-            const res = await compartirComprobanteAbonoPdf(dataAbono, telefonoCliente, false);
-            if (res.metodo === 'WEB_SHARE') {
-              showToast('Comprobante PDF compartido a WhatsApp.', 'success');
-            }
-          } catch (errShare: any) {
-            console.log('Interacción manual requerida por navegador para compartir archivo PDF:', errShare);
-          }
-        } else {
-          // Modo TEXTO: redirigir ventana pre-abierta a WhatsApp
-          const msg = armarMensajeWhatsAppAbono(dataAbono, false);
-          let numLimpio = telefonoCliente.replace(/\D/g, '');
-          if (numLimpio.startsWith('09') && numLimpio.length === 10) {
-            numLimpio = '593' + numLimpio.substring(1);
-          } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
-            numLimpio = '593' + numLimpio.substring(1);
-          }
-          const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(msg)}`;
-          if (ventanaWhatsApp && !ventanaWhatsApp.closed) {
-            ventanaWhatsApp.location.href = waUrl;
-          } else {
-            const a = document.createElement('a');
-            a.href = waUrl;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          }
-          showToast('Mensaje de abono enviado por WhatsApp.', 'success');
+        const msg = armarMensajeWhatsAppAbono(dataAbono, false);
+        let numLimpio = telefonoCliente.replace(/\D/g, '');
+        if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+          numLimpio = '593' + numLimpio.substring(1);
+        } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+          numLimpio = '593' + numLimpio.substring(1);
         }
+        const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(msg)}`;
+        if (ventanaWhatsApp && !ventanaWhatsApp.closed) {
+          ventanaWhatsApp.location.href = waUrl;
+        } else {
+          const a = document.createElement('a');
+          a.href = waUrl;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        showToast('Comprobante oficial de abono enviado por WhatsApp.', 'success');
       } else if (autoEnviarWhatsAppAbono && !telefonoCliente) {
         showToast('Abono registrado. El cliente no tiene teléfono para enviar WhatsApp.', 'info');
       }
@@ -1964,58 +1917,6 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                 )}
               </div>
 
-              {/* Tarjeta de Abono Recién Registrado con Acciones Rápidas (idéntico a Factura) */}
-              {abonoExitoso && (
-                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl space-y-2.5 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-xs">
-                      <CheckCircle size={16} />
-                      <span>¡Abono de ${abonoExitoso.monto.toFixed(2)} registrado exitosamente!</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAbonoExitoso(null)}
-                      className="text-[10px] font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-2 py-0.5 rounded-lg hover:bg-[var(--muted)]"
-                      title="Cerrar aviso"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Comprobante de Caja No. <strong className="text-[var(--foreground)]">{abonoExitoso.dataAbono.comprobante.numero}</strong> generado correctamente.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    {abonoExitoso.telefonoCliente && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const res = await compartirComprobanteAbonoPdf(abonoExitoso.dataAbono, abonoExitoso.telefonoCliente, false);
-                          if (res.metodo === 'WEB_SHARE') {
-                            showToast('Comprobante PDF compartido a WhatsApp.', 'success');
-                          } else {
-                            showToast('Abriendo WhatsApp con el comprobante...', 'info');
-                          }
-                        }}
-                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                      >
-                        <MessageCircle size={14} />
-                        <span>Enviar Comprobante PDF por WhatsApp</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        descargarComprobanteAbonoPdf(abonoExitoso.dataAbono);
-                        showToast('Comprobante PDF descargado.', 'success');
-                      }}
-                      className="px-3 py-2 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-[var(--border)] cursor-pointer"
-                    >
-                      <Download size={13} />
-                      <span>Guardar PDF</span>
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Formulario para Registrar Nuevo Abono */}
               {cobroSeleccionado && Number(cobroSeleccionado.saldoPendiente) > 0 && (
@@ -2085,56 +1986,22 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   )}
 
                   {/* Configuración de Envío de Comprobante por WhatsApp */}
-                  <div className="p-3 bg-slate-500/5 dark:bg-slate-800/20 border border-[var(--border)] rounded-xl space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-[var(--foreground)] flex items-center gap-1.5">
-                        <MessageCircle size={13} className="text-emerald-600" />
-                        <span>Formato del Comprobante:</span>
-                      </label>
-                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded border border-emerald-500/20">
-                        {formatoEnvioAbono === 'PDF' ? 'PDF (Por Defecto)' : 'Solo Texto'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFormatoEnvioAbono('PDF')}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
-                          formatoEnvioAbono === 'PDF'
-                            ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
-                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
-                        }`}
-                      >
-                        <FileCheck size={13} className={formatoEnvioAbono === 'PDF' ? 'text-emerald-400' : ''} />
-                        <span>📄 Archivo PDF (Oficial)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setFormatoEnvioAbono('TEXTO')}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
-                          formatoEnvioAbono === 'TEXTO'
-                            ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
-                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
-                        }`}
-                      >
-                        <MessageCircle size={13} className={formatoEnvioAbono === 'TEXTO' ? 'text-emerald-400' : ''} />
-                        <span>💬 Solo Texto</span>
-                      </button>
-                    </div>
-
-                    <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+                  <div className="p-3 bg-slate-500/5 dark:bg-slate-800/20 border border-[var(--border)] rounded-xl space-y-1.5">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={autoEnviarWhatsAppAbono}
                         onChange={(e) => setAutoEnviarWhatsAppAbono(e.target.checked)}
                         className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                       />
-                      <span className="text-[11px] font-medium text-[var(--foreground)]">
-                        Enviar automáticamente al WhatsApp del cliente al confirmar
+                      <span className="text-[11px] font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                        <MessageCircle size={13} className="text-emerald-600" />
+                        <span>Enviar comprobante oficial por WhatsApp al confirmar</span>
                       </span>
                     </label>
+                    <p className="text-[10px] text-[var(--muted-foreground)] pl-5">
+                      Abre directamente el chat de WhatsApp con el desglose del abono, saldo anterior y saldo pendiente, sin descargas locales.
+                    </p>
                   </div>
 
                   <button
@@ -2205,10 +2072,10 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       );
                     }}
                     className="py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer"
-                    title={`Enviar Comprobante por WhatsApp (${formatoEnvioAbono})`}
+                    title="Enviar Comprobante por WhatsApp"
                   >
                     <MessageCircle size={13} />
-                    <span>Enviar a WhatsApp ({formatoEnvioAbono})</span>
+                    <span>Enviar a WhatsApp</span>
                   </button>
                 )}
               </div>
@@ -3300,21 +3167,17 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                           <span>Ver XML Firmado</span>
                         </a>
                       )}
-                      {/* Botón WhatsApp directo con archivo PDF */}
+                      {/* Botón WhatsApp directo con Factura Oficial */}
                       {facturaCliente.telefono && (
                         <button
                           onClick={async () => {
-                            const res = await compartirFacturaPdf(armarDatosPdf(), facturaCliente.telefono);
-                            if (res.metodo === 'WEB_SHARE') {
-                              showToast('Factura PDF compartida exitosamente.', 'success');
-                            } else {
-                              showToast('Se descargó el PDF y se abrió el chat de WhatsApp.', 'info');
-                            }
+                            await compartirFacturaPdf(armarDatosPdf(), facturaCliente.telefono);
+                            showToast('Abriendo WhatsApp con los datos oficiales de la Factura...', 'info');
                           }}
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                         >
                           <MessageCircle size={13} />
-                          <span>Enviar Factura PDF por WhatsApp</span>
+                          <span>Enviar Factura por WhatsApp</span>
                         </button>
                       )}
                     </div>
@@ -3731,21 +3594,17 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   </button>
                 )}
 
-                {/* Botón Compartir PDF directamente a WhatsApp */}
+                {/* Botón Compartir Factura directamente a WhatsApp */}
                 {facturaCliente.telefono && tabFactura === 'PREVISUALIZAR' && !facturaResultado && (
                   <button
                     onClick={async () => {
-                      const res = await compartirFacturaPdf(armarDatosPdf(), facturaCliente.telefono);
-                      if (res.metodo === 'WEB_SHARE') {
-                        showToast('Factura PDF enviada a WhatsApp.', 'success');
-                      } else {
-                        showToast('Se descargó el PDF y se abrió el chat de WhatsApp.', 'info');
-                      }
+                      await compartirFacturaPdf(armarDatosPdf(), facturaCliente.telefono);
+                      showToast('Abriendo WhatsApp con los datos oficiales de la Factura...', 'info');
                     }}
                     className="px-3.5 py-2.5 bg-emerald-500/15 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <MessageCircle size={14} />
-                    <span>Enviar Factura PDF</span>
+                    <span>Enviar Factura por WhatsApp</span>
                   </button>
                 )}
 

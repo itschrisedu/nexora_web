@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { generarUrlPublicaAbono } from './comprobante-url.service';
 
 export interface ComprobanteAbonoPdfData {
   emisor: {
@@ -328,14 +329,15 @@ export function descargarComprobanteAbonoPdf(data: ComprobanteAbonoPdfData): voi
   doc.save(`Recibo_Abono_${cleanNum}.pdf`);
 }
 
+
 /**
  * Genera el texto formal para WhatsApp
  */
-export function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, incluirDescargaPdf = true): string {
+export function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, incluirDescargaPdf = false): string {
   const nombreNegocio = data.emisor.nombre || 'Administración de Cobros';
   let msg = `Estimado/a *${data.cliente.nombre}*,\n\n`;
   msg += `Le saludamos de *${nombreNegocio}*. Confirmamos la recepción de su abono:\n\n`;
-  msg += `📋 *COMPROBANTE DE ABONO:* ${data.comprobante.numero}\n`;
+  msg += `📋 *COMPROBANTE DE ABONO No:* ${data.comprobante.numero}\n`;
   msg += `📅 *Fecha y Hora:* ${data.comprobante.fecha}${data.comprobante.hora ? ` a las ${data.comprobante.hora}` : ''}\n`;
   msg += `💳 *Método de Pago:* ${data.comprobante.formaPago}\n`;
   if (data.comprobante.referencia) {
@@ -351,13 +353,23 @@ export function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, incluir
   } else {
     msg += `📌 *SALDO PENDIENTE ACTUAL: $${data.movimiento.saldoRestante.toFixed(2)}*\n`;
   }
-  msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  if (incluirDescargaPdf) {
-    msg += `\n📄 _Adjuntamos a continuación su Comprobante Oficial en formato PDF para su respaldo y archivo digital._\n`;
+  // Enlace oficial al recibo digital (se adapta automáticamente al dominio desplegado)
+  try {
+    const urlRecibo = generarUrlPublicaAbono(data);
+    if (urlRecibo) {
+      msg += `🔗 *Ver o descargar comprobante digital oficial:*\n${urlRecibo}\n\n`;
+    }
+  } catch (e) {
+    // Si falla, el mensaje continúa con el detalle completo
   }
 
-  msg += `\n¡Agradecemos su puntualidad y confianza!\n*${nombreNegocio}*`;
+  if (incluirDescargaPdf) {
+    msg += `📄 _Adjuntamos a continuación su Comprobante Oficial para su archivo digital._\n\n`;
+  }
+
+  msg += `¡Agradecemos su puntualidad y confianza!\n*${nombreNegocio}*`;
   return msg;
 }
 
@@ -371,12 +383,6 @@ export async function compartirComprobanteAbonoPdf(
   telefono: string,
   descargarLocalmente: boolean = false
 ): Promise<{ metodo: 'WEB_SHARE' | 'DOWNLOAD_WHATSAPP' }> {
-  const doc = generarComprobanteAbonoPdfDoc(data);
-  const pdfBlob = doc.output('blob');
-  const cleanNum = data.comprobante.numero.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const fileName = `Recibo_Abono_${cleanNum}.pdf`;
-  const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
-
   let numLimpio = telefono.replace(/\D/g, '');
   if (numLimpio.startsWith('09') && numLimpio.length === 10) {
     numLimpio = '593' + numLimpio.substring(1);
@@ -386,34 +392,14 @@ export async function compartirComprobanteAbonoPdf(
 
   const mensajeTexto = armarMensajeWhatsAppAbono(data, false);
 
-  // 1. Envío DIRECTO del archivo PDF como tal (Web Share API nativo - exactamente igual que Factura)
-  if (
-    typeof navigator !== 'undefined' &&
-    navigator.canShare &&
-    navigator.canShare({ files: [pdfFile] })
-  ) {
-    try {
-      await navigator.share({
-        title: `Comprobante de Abono ${data.comprobante.numero}`,
-        text: mensajeTexto,
-        files: [pdfFile],
-      });
-      return { metodo: 'WEB_SHARE' };
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        console.warn('Error en navigator.share, procediendo a apertura WhatsApp:', err);
-      } else {
-        return { metodo: 'WEB_SHARE' };
-      }
-    }
-  }
-
-  // 2. Si se solicitó explícitamente guardar en el dispositivo:
+  // Si el usuario solicitó expresamente descargar el archivo en su equipo
   if (descargarLocalmente) {
-    doc.save(fileName);
+    const doc = generarComprobanteAbonoPdfDoc(data);
+    const cleanNum = data.comprobante.numero.replace(/[^a-zA-Z0-9_-]/g, '_');
+    doc.save(`Recibo_Abono_${cleanNum}.pdf`);
   }
 
-  // 3. Apertura garantizada de WhatsApp Web
+  // Apertura directa e inmediata de WhatsApp sin ventanas emergentes de Windows
   const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
   try {
     const win = window.open(waUrl, '_blank');

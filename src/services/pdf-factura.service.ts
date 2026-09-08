@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { generarUrlPublicaFactura, generarUrlPublicaOrden } from "./comprobante-url.service";
 
 export interface FacturaPdfData {
   emisor: {
@@ -212,11 +213,6 @@ export async function compartirFacturaPdf(
   data: FacturaPdfData,
   telefono: string
 ): Promise<{ metodo: "WEB_SHARE" | "DOWNLOAD_WHATSAPP" }> {
-  const doc = generarFacturaPdfDoc(data);
-  const pdfBlob = doc.output("blob");
-  const fileName = `Factura_${data.comprobante.numero.replace(/\s+/g, "_")}.pdf`;
-  const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
-
   let numLimpio = telefono.replace(/\D/g, "");
   if (numLimpio.startsWith("09") && numLimpio.length === 10) {
     numLimpio = "593" + numLimpio.substring(1);
@@ -224,34 +220,50 @@ export async function compartirFacturaPdf(
     numLimpio = "593" + numLimpio.substring(1);
   }
 
-  const mensajeTexto = `Estimado/a ${data.comprador.nombre},\n\nAdjuntamos su Factura Electrónica Oficial No. ${data.comprobante.numero}.\n\n💵 Total: $${data.totales.total.toFixed(2)}\n\n¡Gracias por su compra!\n${data.emisor.nombre}`;
-
-  // 1. Intentar Web Share API con archivo físico
-  if (
-    typeof navigator !== "undefined" &&
-    navigator.canShare &&
-    navigator.canShare({ files: [pdfFile] })
-  ) {
-    try {
-      await navigator.share({
-        title: `Factura ${data.comprobante.numero}`,
-        text: mensajeTexto,
-        files: [pdfFile],
-      });
-      return { metodo: "WEB_SHARE" };
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
-        console.warn("Error en navigator.share, usando fallback WhatsApp:", err);
-      } else {
-        return { metodo: "WEB_SHARE" };
-      }
+  const emisorNombre = data.emisor.nombre || "Facturación";
+  let itemsTexto = "";
+  if (Array.isArray(data.detalles)) {
+    data.detalles.slice(0, 8).forEach((it) => {
+      itemsTexto += `\n• ${it.cantidad}x ${it.descripcion} - $${Number(it.subtotal || it.cantidad * it.precioUnitario).toFixed(2)}`;
+    });
+    if (data.detalles.length > 8) {
+      itemsTexto += `\n... y ${data.detalles.length - 8} ítems adicionales`;
     }
   }
 
-  // 2. Fallback: Descarga automática del archivo PDF + apertura directa de WhatsApp Web
-  doc.save(fileName);
+  let urlDigital = "";
+  try {
+    urlDigital = generarUrlPublicaFactura(data);
+  } catch (e) {}
+
+  const subtotalFactura = (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0));
+  const ivaFactura = Number(data.totales?.iva15 || 0);
+  const totalFactura = Number(data.totales?.total || 0);
+
+  const mensajeTexto = `Estimado/a *${data.comprador.nombre}*,\n\nLe saludamos de *${emisorNombre}*. Adjuntamos el detalle de su Factura Electrónica Oficial:\n\n🧾 *FACTURA No:* ${data.comprobante.numero}\n📅 *Fecha:* ${data.comprobante.fecha}\n👤 *RUC/Cédula:* ${data.comprador.cedula}${itemsTexto ? `\n\n📦 *DETALLE DE COMPRA:*${itemsTexto}` : ""}\n\n━━━━━━━━━━━━━━━━━━━━━\n💵 *Subtotal:* $${subtotalFactura.toFixed(2)}\n📊 *IVA (15%):* $${ivaFactura.toFixed(2)}\n💰 *TOTAL FACTURA:* $${totalFactura.toFixed(2)}\n━━━━━━━━━━━━━━━━━━━━━\n${urlDigital ? `\n🔗 *Ver o descargar factura digital oficial:*\n${urlDigital}\n` : ""}\n¡Muchas gracias por su preferencia!\n*${emisorNombre}*`;
+
+  // Apertura directa a WhatsApp sin popups de Windows ni descargas en disco
   const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
-  window.open(waUrl, "_blank");
+  try {
+    const win = window.open(waUrl, "_blank");
+    if (!win || win.closed || typeof win.closed === "undefined") {
+      const a = document.createElement("a");
+      a.href = waUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  } catch (e) {
+    const a = document.createElement("a");
+    a.href = waUrl;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
 
   return { metodo: "DOWNLOAD_WHATSAPP" };
 }
@@ -532,11 +544,6 @@ export async function compartirOrdenCompraPdf(
   data: OrdenCompraPdfData,
   telefono: string
 ): Promise<{ metodo: "WEB_SHARE" | "DOWNLOAD_WHATSAPP" }> {
-  const doc = generarOrdenCompraPdfDoc(data);
-  const pdfBlob = doc.output("blob");
-  const fileName = `Orden_Compra_${data.orden.numero.replace(/\s+/g, "_")}.pdf`;
-  const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
-
   let numLimpio = telefono.replace(/\D/g, "");
   if (numLimpio.startsWith("09") && numLimpio.length === 10) {
     numLimpio = "593" + numLimpio.substring(1);
@@ -550,34 +557,35 @@ export async function compartirOrdenCompraPdf(
     if (l.numeracion) desglose += `\n  ↳ _${l.numeracion}_`;
   });
 
-  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe saludamos cordialmente de parte de *${data.emisor.nombre || "Gerencia de Compras"}*. Adjuntamos el documento oficial PDF de la orden de producción:\n\n📋 *ORDEN DE COMPRA ${data.orden.numero}*\n📅 *Fecha:* ${data.orden.fecha}\n\n👟 *DETALLE DE MODELOS Y NUMERACIÓN:*${desglose}\n\n📦 *TOTAL PARES:* ${data.totales.totalPares} pares\n💰 *VALOR TOTAL:* $${data.totales.totalPagar.toFixed(2)}\n\nPor favor confirmar recepción del documento PDF y fecha estimada de entrega. ¡Muchas gracias!`;
+  let urlDigital = "";
+  try {
+    urlDigital = generarUrlPublicaOrden(data);
+  } catch (e) {}
 
-  // 1. Intentar Web Share API con archivo PDF adjunto
-  if (
-    typeof navigator !== "undefined" &&
-    navigator.canShare &&
-    navigator.canShare({ files: [pdfFile] })
-  ) {
-    try {
-      await navigator.share({
-        title: `Orden de Compra ${data.orden.numero}`,
-        text: mensajeTexto,
-        files: [pdfFile],
-      });
-      return { metodo: "WEB_SHARE" };
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
-        console.warn("Error en navigator.share, usando fallback WhatsApp:", err);
-      } else {
-        return { metodo: "WEB_SHARE" };
-      }
-    }
-  }
+  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe saludamos cordialmente de parte de *${data.emisor.nombre || "Gerencia de Compras"}*. Confirmamos la emisión de la orden de producción:\n\n📋 *ORDEN DE COMPRA No:* ${data.orden.numero}\n📅 *Fecha:* ${data.orden.fecha}\n\n👟 *DETALLE DE MODELOS Y NUMERACIÓN:*${desglose}\n\n━━━━━━━━━━━━━━━━━━━━━\n📦 *TOTAL PARES:* ${data.totales.totalPares} pares\n💰 *VALOR TOTAL:* $${data.totales.totalPagar.toFixed(2)}\n━━━━━━━━━━━━━━━━━━━━━\n${urlDigital ? `\n🔗 *Ver o descargar orden oficial:*\n${urlDigital}\n` : ""}\nPor favor confirmar recepción del pedido y fecha estimada de entrega. ¡Muchas gracias!\n*${data.emisor.nombre}*`;
 
-  // 2. Fallback: Descarga automática del archivo PDF oficial + apertura directa de WhatsApp Web
-  doc.save(fileName);
+  // Apertura directa garantizada de WhatsApp Web / móvil
   const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
-  window.open(waUrl, "_blank");
+  try {
+    const win = window.open(waUrl, "_blank");
+    if (!win || win.closed || typeof win.closed === "undefined") {
+      const a = document.createElement("a");
+      a.href = waUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  } catch (e) {
+    const a = document.createElement("a");
+    a.href = waUrl;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
 
   return { metodo: "DOWNLOAD_WHATSAPP" };
 }

@@ -770,14 +770,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
     try {
       const pdfData = construirPdfData(order);
-      const res = await compartirOrdenCompraPdf(pdfData, telefono);
-      if (res.metodo === 'WEB_SHARE') {
-        showToast('Documento PDF de Orden de Compra enviado.', 'success');
-      } else {
-        showToast('Se descargó el archivo PDF oficial y se abrió WhatsApp.', 'info');
-      }
+      await compartirOrdenCompraPdf(pdfData, telefono);
+      showToast('Abriendo WhatsApp con la Orden de Compra oficial...', 'info');
     } catch (e: any) {
-      showToast('No se pudo compartir el archivo PDF de la orden.', 'error');
+      showToast('No se pudo enviar la orden de compra a WhatsApp.', 'error');
     }
   };
 
