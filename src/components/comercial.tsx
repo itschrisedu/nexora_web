@@ -146,9 +146,15 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   const [asumeFlete, setAsumeFlete] = useState<'CLIENTE' | 'EMPRESA'>('CLIENTE');
   const [costoEnvio, setCostoEnvio] = useState('5.00');
   const [guiaEnvio, setGuiaEnvio] = useState('');
-  const [courier, setCourier] = useState('Servientrega');
+  const [courier, setCourier] = useState('Transporte Los Andes');
   const [direccionEnvio, setDireccionEnvio] = useState('');
   const [ciudadEnvio, setCiudadEnvio] = useState('');
+
+  // Empresas de Transporte dinámicas
+  const [listaTransportes, setListaTransportes] = useState<any[]>([]);
+  const [showNuevoTransporteModal, setShowNuevoTransporteModal] = useState(false);
+  const [nuevoTransporteNombre, setNuevoTransporteNombre] = useState('');
+  const [guardandoTransporte, setGuardandoTransporte] = useState(false);
 
   // Modal independiente de Gestión de Envío de Pedido
   const [showModalEnvio, setShowModalEnvio] = useState(false);
@@ -157,7 +163,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   const [envioModalAsumeFlete, setEnvioModalAsumeFlete] = useState<'CLIENTE' | 'EMPRESA'>('CLIENTE');
   const [envioModalCostoEnvio, setEnvioModalCostoEnvio] = useState('5.00');
   const [envioModalGuiaEnvio, setEnvioModalGuiaEnvio] = useState('');
-  const [envioModalCourier, setEnvioModalCourier] = useState('Servientrega');
+  const [envioModalCourier, setEnvioModalCourier] = useState('Transporte Los Andes');
   const [envioModalDireccionEnvio, setEnvioModalDireccionEnvio] = useState('');
   const [envioModalCiudadEnvio, setEnvioModalCiudadEnvio] = useState('');
   const [savingEnvioModal, setSavingEnvioModal] = useState(false);
@@ -282,7 +288,50 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     loadBusinessConfig();
     loadSeriesConfig();
     loadListaProveedores();
+    loadTransportes();
   }, [online]);
+
+  const loadTransportes = async () => {
+    try {
+      if (online) {
+        const trs = await ApiService.get('/configuracion/transportes');
+        if (Array.isArray(trs) && trs.length > 0) {
+          setListaTransportes(trs);
+          const predet = trs.find((t: any) => t.esPredeterminada);
+          if (predet) {
+            setCourier(predet.nombre);
+            setEnvioModalCourier(predet.nombre);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error cargando empresas de transporte:', e);
+    }
+  };
+
+  const handleCrearNuevoTransporte = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevoTransporteNombre.trim()) {
+      showToast('Ingresa el nombre de la empresa de transporte.', 'warning');
+      return;
+    }
+    setGuardandoTransporte(true);
+    try {
+      await ApiService.post('/configuracion/transportes', {
+        nombre: nuevoTransporteNombre.trim(),
+      });
+      showToast(`¡Transporte "${nuevoTransporteNombre.trim()}" registrado exitosamente!`, 'success');
+      setCourier(nuevoTransporteNombre.trim());
+      setEnvioModalCourier(nuevoTransporteNombre.trim());
+      setNuevoTransporteNombre('');
+      setShowNuevoTransporteModal(false);
+      await loadTransportes();
+    } catch (err: any) {
+      showToast(err.message || 'Error al registrar el transporte', 'error');
+    } finally {
+      setGuardandoTransporte(false);
+    }
+  };
 
   const loadSeriesConfig = async () => {
     try {
@@ -1604,21 +1653,49 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                   <div className="pt-2 border-t border-[var(--border)]/60 space-y-3 animate-in fade-in duration-150">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                          Empresa de Transporte / Courier *
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
+                            Empresa de Transporte / Courier *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowNuevoTransporteModal(true)}
+                            className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-0.5"
+                          >
+                            <Plus size={10} /> Nuevo Transporte
+                          </button>
+                        </div>
                         <select
                           value={courier}
-                          onChange={(e) => setCourier(e.target.value)}
+                          onChange={(e) => {
+                            if (e.target.value === '__ADD_NEW__') {
+                              setShowNuevoTransporteModal(true);
+                            } else {
+                              setCourier(e.target.value);
+                            }
+                          }}
                           className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
                         >
-                          <option value="Servientrega">📦 Servientrega</option>
-                          <option value="Cooperativa Baños">🚌 Cooperativa Baños</option>
-                          <option value="Cooperativa Cevallos">🚌 Cooperativa Cevallos</option>
-                          <option value="Transportes Santa">🚌 Transportes Santa</option>
-                          <option value="Cooperativa Cita Express">🚌 Cooperativa Cita Express</option>
-                          <option value="Urbano Express">🚚 Urbano Express</option>
-                          <option value="Encomienda Provincial">🚛 Encomienda Provincial / Transporte Local</option>
+                          {listaTransportes.length > 0 ? (
+                            listaTransportes.map((t: any) => (
+                              <option key={t.id || t.nombre} value={t.nombre}>
+                                {t.nombre === 'Transporte Los Andes' ? '⭐ Transporte Los Andes (Predeterminada)' : t.esPredeterminada ? `⭐ ${t.nombre} (Predeterminada)` : `🚚 ${t.nombre}`}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="Transporte Los Andes">⭐ Transporte Los Andes (Predeterminada)</option>
+                              <option value="Servientrega">📦 Servientrega</option>
+                              <option value="Cooperativa Baños">🚌 Cooperativa Baños</option>
+                              <option value="Cooperativa Cevallos">🚌 Cooperativa Cevallos</option>
+                              <option value="Transportes Santa">🚌 Transportes Santa</option>
+                              <option value="Cooperativa Cita Express">🚌 Cooperativa Cita Express</option>
+                              <option value="Flota Pelileo">🚌 Flota Pelileo</option>
+                              <option value="Urbano Express">🚚 Urbano Express</option>
+                              <option value="Encomienda Provincial / Transporte">🚛 Encomienda Provincial / Transporte</option>
+                            </>
+                          )}
+                          <option value="__ADD_NEW__">➕ + Registrar Nuevo Transporte...</option>
                         </select>
                       </div>
 
@@ -2943,21 +3020,49 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl space-y-3.5 animate-in fade-in duration-150">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                        Empresa Courier / Transporte *
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
+                          Empresa Courier / Transporte *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowNuevoTransporteModal(true)}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-0.5"
+                        >
+                          <Plus size={10} /> Nuevo Transporte
+                        </button>
+                      </div>
                       <select
                         value={envioModalCourier}
-                        onChange={(e) => setEnvioModalCourier(e.target.value)}
+                        onChange={(e) => {
+                          if (e.target.value === '__ADD_NEW__') {
+                            setShowNuevoTransporteModal(true);
+                          } else {
+                            setEnvioModalCourier(e.target.value);
+                          }
+                        }}
                         className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
                       >
-                        <option value="Servientrega">📦 Servientrega</option>
-                        <option value="Cooperativa Baños">🚌 Cooperativa Baños</option>
-                        <option value="Cooperativa Cevallos">🚌 Cooperativa Cevallos</option>
-                        <option value="Transportes Santa">🚌 Transportes Santa</option>
-                        <option value="Cooperativa Cita Express">🚌 Cooperativa Cita Express</option>
-                        <option value="Urbano Express">🚚 Urbano Express</option>
-                        <option value="Encomienda Provincial">🚛 Encomienda Provincial / Transporte</option>
+                        {listaTransportes.length > 0 ? (
+                          listaTransportes.map((t: any) => (
+                            <option key={t.id || t.nombre} value={t.nombre}>
+                              {t.nombre === 'Transporte Los Andes' ? '⭐ Transporte Los Andes (Predeterminada)' : t.esPredeterminada ? `⭐ ${t.nombre} (Predeterminada)` : `🚚 ${t.nombre}`}
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="Transporte Los Andes">⭐ Transporte Los Andes (Predeterminada)</option>
+                            <option value="Servientrega">📦 Servientrega</option>
+                            <option value="Cooperativa Baños">🚌 Cooperativa Baños</option>
+                            <option value="Cooperativa Cevallos">🚌 Cooperativa Cevallos</option>
+                            <option value="Transportes Santa">🚌 Transportes Santa</option>
+                            <option value="Cooperativa Cita Express">🚌 Cooperativa Cita Express</option>
+                            <option value="Flota Pelileo">🚌 Flota Pelileo</option>
+                            <option value="Urbano Express">🚚 Urbano Express</option>
+                            <option value="Encomienda Provincial / Transporte">🚛 Encomienda Provincial / Transporte</option>
+                          </>
+                        )}
+                        <option value="__ADD_NEW__">➕ + Registrar Nuevo Transporte...</option>
                       </select>
                     </div>
 
@@ -3093,6 +3198,72 @@ export default function ComercialComponent({ online, userRole, userPermissions }
           </div>
         </div>
       )}
+
+      {/* ── MODAL AGREGAR NUEVA EMPRESA DE TRANSPORTE ── */}
+      {showNuevoTransporteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-white/10 rounded-xl text-blue-400">
+                  <Truck size={18} />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-white">Nueva Empresa de Transporte</h4>
+                  <p className="text-[10px] text-slate-300">Registra un nuevo courier o cooperativa de encomiendas</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNuevoTransporteModal(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCrearNuevoTransporte} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                  Nombre de la Empresa o Cooperativa *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Transporte Los Andes, Cooperativa Pelileo, Express..."
+                  value={nuevoTransporteNombre}
+                  onChange={(e) => setNuevoTransporteNombre(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-900 dark:text-blue-300">
+                💡 Esta empresa quedará guardada en el sistema para que todos los vendedores puedan seleccionarla en futuros envíos.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setShowNuevoTransporteModal(false)}
+                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoTransporte || !nuevoTransporteNombre.trim()}
+                  className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {guardandoTransporte ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                  <span>Guardar Transporte</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

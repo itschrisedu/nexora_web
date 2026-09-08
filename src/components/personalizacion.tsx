@@ -5,7 +5,8 @@ import { ApiService } from "../services/api.service";
 import { uploadToCloudinary } from "../services/cloudinary.service";
 import {
   Palette, Clock, MapPin, CheckCircle, AlertCircle,
-  Loader2, Shield, Lock, Building2, DollarSign
+  Loader2, Shield, Lock, Building2, DollarSign,
+  Truck, Star, Trash2, Plus, Phone
 } from "lucide-react";
 
 interface CreditLevelConfigItem {
@@ -14,6 +15,15 @@ interface CreditLevelConfigItem {
   comprasRequeridas: number;
   limiteDolares: number;
   plazoDias: number;
+}
+
+interface EmpresaTransporteItem {
+  id: string;
+  nombre: string;
+  telefono?: string;
+  direccion?: string;
+  esPredeterminada: boolean;
+  activo: boolean;
 }
 
 interface PersonalizacionProps {
@@ -56,6 +66,16 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
+  // Transportes state
+  const [transportes, setTransportes] = useState<EmpresaTransporteItem[]>([]);
+  const [loadingTransportes, setLoadingTransportes] = useState(false);
+  const [showModalTransporte, setShowModalTransporte] = useState(false);
+  const [nuevoTranspNombre, setNuevoTranspNombre] = useState("");
+  const [nuevoTranspTel, setNuevoTranspTel] = useState("");
+  const [nuevoTranspDir, setNuevoTranspDir] = useState("");
+  const [nuevoTranspPredet, setNuevoTranspPredet] = useState(false);
+  const [guardandoTransporte, setGuardandoTransporte] = useState(false);
+
   const [config, setConfig] = useState<BusinessConfig>({
     nombre: "",
     ruc: "",
@@ -87,7 +107,71 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
   useEffect(() => {
     loadConfig();
+    loadTransportes();
   }, [online]);
+
+  const loadTransportes = async () => {
+    try {
+      if (online) {
+        setLoadingTransportes(true);
+        const data = await ApiService.get("/configuracion/transportes");
+        if (Array.isArray(data)) {
+          setTransportes(data);
+        }
+      }
+    } catch (err) {
+      console.error("Error cargando empresas de transporte:", err);
+    } finally {
+      setLoadingTransportes(false);
+    }
+  };
+
+  const handleCrearTransporte = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevoTranspNombre.trim()) return;
+
+    try {
+      setGuardandoTransporte(true);
+      await ApiService.post("/configuracion/transportes", {
+        nombre: nuevoTranspNombre.trim(),
+        telefono: nuevoTranspTel.trim() || undefined,
+        direccion: nuevoTranspDir.trim() || undefined,
+        esPredeterminada: nuevoTranspPredet,
+      });
+      setNuevoTranspNombre("");
+      setNuevoTranspTel("");
+      setNuevoTranspDir("");
+      setNuevoTranspPredet(false);
+      setShowModalTransporte(false);
+      setSuccess("Empresa de transporte registrada con éxito.");
+      await loadTransportes();
+    } catch (err: any) {
+      setError(err.message || "Error al crear empresa de transporte.");
+    } finally {
+      setGuardandoTransporte(false);
+    }
+  };
+
+  const handleSetPredeterminada = async (id: string, nombre: string) => {
+    try {
+      await ApiService.patch(`/configuracion/transportes/${id}/predeterminada`, {});
+      setSuccess(`"${nombre}" establecida como empresa de transporte predeterminada.`);
+      await loadTransportes();
+    } catch (err: any) {
+      setError(err.message || "Error al cambiar empresa predeterminada.");
+    }
+  };
+
+  const handleDeleteTransporte = async (id: string, nombre: string) => {
+    if (!confirm(`¿Estás seguro de eliminar la empresa de transporte "${nombre}"?`)) return;
+    try {
+      await ApiService.delete(`/configuracion/transportes/${id}`);
+      setSuccess(`"${nombre}" eliminada correctamente.`);
+      await loadTransportes();
+    } catch (err: any) {
+      setError(err.message || "Error al eliminar empresa de transporte.");
+    }
+  };
 
   const loadConfig = async () => {
     setLoading(true);
@@ -580,6 +664,102 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </div>
         </div>
 
+        {/* SECCIÓN 7: EMPRESAS DE TRANSPORTE Y LOGÍSTICA DE ENVÍOS */}
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+            <div className="flex items-center gap-2">
+              <Truck className="text-[#0F172A] dark:text-amber-400" size={20} />
+              <div>
+                <h2 className="text-base font-bold text-[var(--foreground)]">7. Empresas de Transporte y Envíos (Logística de Despacho) 🚚</h2>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Administra las cooperativas y empresas de encomienda disponibles para los pedidos con envío interprovincial o local.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowModalTransporte(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm w-fit"
+            >
+              <Plus size={15} />
+              + Agregar Empresa de Transporte
+            </button>
+          </div>
+
+          {loadingTransportes ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="animate-spin text-[#0F172A]" size={24} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transportes.map((transp) => (
+                <div
+                  key={transp.id}
+                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
+                    transp.esPredeterminada
+                      ? "bg-amber-500/5 border-amber-500/30 shadow-sm"
+                      : "bg-[var(--muted)]/20 border-[var(--border)] hover:border-slate-400"
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 font-bold text-sm text-[var(--foreground)]">
+                        <Truck size={16} className={transp.esPredeterminada ? "text-amber-500" : "text-[var(--muted-foreground)]"} />
+                        <span>{transp.nombre}</span>
+                      </div>
+                      {transp.esPredeterminada && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                          <Star size={10} className="fill-amber-500 text-amber-500" />
+                          Predeterminada
+                        </span>
+                      )}
+                    </div>
+
+                    {transp.telefono && (
+                      <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
+                        <Phone size={12} />
+                        <span>{transp.telefono}</span>
+                      </div>
+                    )}
+                    {transp.direccion && (
+                      <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
+                        <MapPin size={12} />
+                        <span>{transp.direccion}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-[var(--border)]/60 text-xs">
+                    {!transp.esPredeterminada ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSetPredeterminada(transp.id, transp.nombre)}
+                        className="text-[11px] font-semibold text-[#0F172A] dark:text-amber-400 hover:underline flex items-center gap-1"
+                      >
+                        <Star size={12} />
+                        Marcar como Predeterminada
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                        <CheckCircle size={12} /> Opción por defecto
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTransporte(transp.id, transp.nombre)}
+                      className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors ml-auto"
+                      title="Eliminar Transporte"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-end">
           <button
             type="submit"
@@ -591,6 +771,100 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </button>
         </div>
       </form>
+
+      {/* MODAL CREAR NUEVA EMPRESA DE TRANSPORTE */}
+      {showModalTransporte && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+              <div className="flex items-center gap-2">
+                <Truck className="text-[#0F172A] dark:text-amber-400" size={20} />
+                <h3 className="text-base font-bold text-[var(--foreground)]">Nueva Empresa de Transporte</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowModalTransporte(false)}
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCrearTransporte} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                  Nombre de la Empresa / Cooperativa *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={nuevoTranspNombre}
+                  onChange={(e) => setNuevoTranspNombre(e.target.value)}
+                  placeholder="Ej: Transporte Los Andes, Flota Pelileo..."
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                  Teléfono / WhatsApp de Encomiendas (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={nuevoTranspTel}
+                  onChange={(e) => setNuevoTranspTel(e.target.value)}
+                  placeholder="Ej: 0987654321 / 032-876543"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                  Dirección de Terminal / Oficina (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={nuevoTranspDir}
+                  onChange={(e) => setNuevoTranspDir(e.target.value)}
+                  placeholder="Ej: Terminal Terrestre de Cevallos, Oficina 4"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="chkPredet"
+                  checked={nuevoTranspPredet}
+                  onChange={(e) => setNuevoTranspPredet(e.target.checked)}
+                  className="rounded border-amber-400 text-amber-500 focus:ring-amber-400 h-4 w-4"
+                />
+                <label htmlFor="chkPredet" className="text-xs font-bold text-[var(--foreground)] cursor-pointer">
+                  ⭐ Establecer como empresa predeterminada para todos los envíos
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setShowModalTransporte(false)}
+                  className="px-4 py-2 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoTransporte || !nuevoTranspNombre.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
+                >
+                  {guardandoTransporte ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                  Guardar Transporte
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
