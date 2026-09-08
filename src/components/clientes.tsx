@@ -56,6 +56,7 @@ interface PromocionCupon {
   minimoPares: number;
   maximoCanjes: number;
   canjesUsados: number;
+  aplicaPara?: 'AMBAS' | 'SOLO_CONTADO' | 'SOLO_CREDITO';
   fechaInicio: string;
   fechaFin?: string;
   activo: boolean;
@@ -150,6 +151,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
     valorDescuento: '10',
     minimoPares: '6',
     maximoCanjes: '10', // Ej: primeras 10 personas
+    aplicaPara: 'AMBAS' as 'AMBAS' | 'SOLO_CONTADO' | 'SOLO_CREDITO',
     fechaFin: '',
     mensajePlantilla: '',
   });
@@ -432,6 +434,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
         valorDescuento: parseFloat(promoForm.valorDescuento) || 10,
         minimoPares: parseInt(promoForm.minimoPares, 10) || 6,
         maximoCanjes: parseInt(promoForm.maximoCanjes, 10) || 10,
+        aplicaPara: promoForm.aplicaPara,
         fechaFin: promoForm.fechaFin || undefined,
         mensajePlantilla: promoForm.mensajePlantilla.trim() || undefined,
       });
@@ -445,6 +448,7 @@ export default function ClientesComponent({ online }: ClientesProps) {
         valorDescuento: '10',
         minimoPares: '6',
         maximoCanjes: '10',
+        aplicaPara: 'AMBAS',
         fechaFin: '',
         mensajePlantilla: '',
       });
@@ -1161,6 +1165,16 @@ export default function ClientesComponent({ online }: ClientesProps) {
                           <strong className="text-[var(--foreground)]">{p.minimoPares} pares de calzado</strong>
                         </div>
                         <div className="flex justify-between">
+                          <span>Condición de Pago:</span>
+                          <strong className="text-purple-700">
+                            {p.aplicaPara === 'SOLO_CONTADO' 
+                              ? '💵 Solo Contado' 
+                              : p.aplicaPara === 'SOLO_CREDITO'
+                              ? '💳 Solo Crédito'
+                              : '🟢 Contado y Crédito'}
+                          </strong>
+                        </div>
+                        <div className="flex justify-between">
                           <span>Cupo total:</span>
                           <strong className="text-[var(--foreground)]">Primeras {p.maximoCanjes} personas</strong>
                         </div>
@@ -1463,6 +1477,29 @@ export default function ClientesComponent({ online }: ClientesProps) {
                     className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
                   />
                 </div>
+              </div>
+
+              {/* Condición de Pago Permitida */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                  Condición de Pago Permitida *
+                </label>
+                <select
+                  value={promoForm.aplicaPara}
+                  onChange={(e) => setPromoForm({ ...promoForm, aplicaPara: e.target.value as any })}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
+                >
+                  <option value="AMBAS">🟢 Contado y Crédito (Ambas Modalidades)</option>
+                  <option value="SOLO_CONTADO">💵 Exclusivo para Pagos de Contado (Efectivo / Transferencia)</option>
+                  <option value="SOLO_CREDITO">💳 Exclusivo para Compras a Crédito</option>
+                </select>
+                <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
+                  {promoForm.aplicaPara === 'SOLO_CONTADO' 
+                    ? '💡 Incentiva la liquidez inmediata impidiendo que se aplique en ventas a crédito.'
+                    : promoForm.aplicaPara === 'SOLO_CREDITO'
+                    ? '💡 Exclusivo para clientes que compran por líneas de crédito autorizadas.'
+                    : '💡 Aplica para cualquier cliente independientemente de si paga al contado o a crédito.'}
+                </span>
               </div>
 
               <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-[11px] text-purple-900 dark:text-purple-300">

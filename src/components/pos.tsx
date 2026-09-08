@@ -82,6 +82,12 @@ export default function PosComponent() {
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [ventaExitosa, setVentaExitosa] = useState(false);
 
+  // Cupones de Campaña POS (Fase E2)
+  const [codigoCuponPOS, setCodigoCuponPOS] = useState("");
+  const [cuponAplicadoPOS, setCuponAplicadoPOS] = useState<any | null>(null);
+  const [validandoCuponPOS, setValidandoCuponPOS] = useState(false);
+  const [cuponErrorPOS, setCuponErrorPOS] = useState("");
+
   // Tipo de Comprobante & Datos de Facturación
   const [tipoComprobante, setTipoComprobante] = useState<"CONSUMIDOR_FINAL" | "FACTURA">("CONSUMIDOR_FINAL");
   const [clienteFactura, setClienteFactura] = useState({
@@ -258,6 +264,45 @@ export default function PosComponent() {
     }
   };
 
+  const handleAplicarCuponPOS = async () => {
+    if (!codigoCuponPOS.trim()) return;
+    if (itemsVenta.length === 0) {
+      setCuponErrorPOS("Agrega productos al carrito antes de aplicar el cupón.");
+      return;
+    }
+    setValidandoCuponPOS(true);
+    setCuponErrorPOS("");
+    try {
+      const totalPares = itemsVenta.reduce((sum, i) => sum + i.cantidad, 0);
+      const res = await ApiService.post("/clientes/promociones/validar", {
+        codigo: codigoCuponPOS.trim(),
+        totalPares,
+        totalMonto: subtotalVenta,
+        tipoPago: "CONTADO",
+      });
+      if (res.valido) {
+        setCuponAplicadoPOS(res);
+        setDescuentoVenta(String(res.descuentoCalculado || 0));
+        showToast(res.mensaje || "¡Cupón de descuento aplicado con éxito!", "success");
+      } else {
+        setCuponErrorPOS(res.mensaje || "El cupón no es válido.");
+        setCuponAplicadoPOS(null);
+      }
+    } catch (err: any) {
+      setCuponErrorPOS(err.message || "Error al validar cupón.");
+      setCuponAplicadoPOS(null);
+    } finally {
+      setValidandoCuponPOS(false);
+    }
+  };
+
+  const handleRemoverCuponPOS = () => {
+    setCuponAplicadoPOS(null);
+    setCodigoCuponPOS("");
+    setCuponErrorPOS("");
+    setDescuentoVenta("");
+  };
+
   const subtotalVenta = itemsVenta.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0);
   const valorDescuento = Math.min(subtotalVenta, Math.max(0, parseFloat(descuentoVenta) || 0));
   const totalVenta = Math.max(0, subtotalVenta - valorDescuento);
@@ -341,12 +386,27 @@ export default function PosComponent() {
           telefono: negocioInfo?.telefono || "",
         },
       };
+
+      // Si se aplicó cupón promocional, registrar el canje
+      if (cuponAplicadoPOS?.promocion?.codigo) {
+        try {
+          await ApiService.post("/clientes/promociones/canjear", {
+            codigo: cuponAplicadoPOS.promocion.codigo,
+          });
+        } catch (e) {
+          console.warn("Error canjeando cupón en POS:", e);
+        }
+      }
+
       setUltimoTicket(ticketData);
       setTicketModalOpen(true);
 
       setItemsVenta([]);
       setDescuentoVenta("");
       setPagaCon("");
+      setCuponAplicadoPOS(null);
+      setCodigoCuponPOS("");
+      setCuponErrorPOS("");
       if (tipoComprobante === "FACTURA") {
         setClienteFactura({
           cedula: "",
@@ -658,9 +718,56 @@ export default function PosComponent() {
             )}
           </div>
 
-          {/* Footer del Ticket */}
           {itemsVenta.length > 0 && (
-            <div className="pt-4 border-t border-slate-700/50 space-y-3 mt-4">
+            <div className="space-y-3 pt-3 border-t border-slate-800">
+              {/* Cupón Promocional de Campaña (Fase E2) */}
+              <div className="p-2.5 bg-purple-500/10 border border-purple-500/25 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-purple-300 flex items-center gap-1">
+                    🎟️ Cupón de Descuento:
+                  </span>
+                  {cuponAplicadoPOS && (
+                    <button
+                      type="button"
+                      onClick={handleRemoverCuponPOS}
+                      className="text-[10px] font-bold text-rose-400 hover:underline"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+
+                {!cuponAplicadoPOS ? (
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Ej: NEXORA10"
+                      value={codigoCuponPOS}
+                      onChange={(e) => setCodigoCuponPOS(e.target.value.toUpperCase())}
+                      className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono font-bold uppercase text-slate-200 focus:outline-none focus:border-purple-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAplicarCuponPOS}
+                      disabled={validandoCuponPOS || !codigoCuponPOS.trim()}
+                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                    >
+                      {validandoCuponPOS ? <Loader2 size={11} className="animate-spin" /> : null}
+                      <span>Aplicar</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 p-1.5 rounded-lg border border-emerald-500/20">
+                    <span className="font-mono font-black">{cuponAplicadoPOS.promocion?.codigo}</span>
+                    <span>-${Number(cuponAplicadoPOS.descuentoCalculado || 0).toFixed(2)} ({cuponAplicadoPOS.cuposRestantes} cupos)</span>
+                  </div>
+                )}
+
+                {cuponErrorPOS && (
+                  <span className="text-[10px] text-rose-400 font-semibold block">{cuponErrorPOS}</span>
+                )}
+              </div>
+
               {/* Desglose Subtotal, Descuento y Total */}
               <div className="space-y-1.5 p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
                 <div className="flex justify-between text-slate-400">
@@ -670,7 +777,7 @@ export default function PosComponent() {
 
                 <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
                   <span className="text-amber-400 font-semibold flex items-center gap-1">
-                    🎁 Descuento ($):
+                    🎁 Descuento Manual ($):
                   </span>
                   <div className="flex items-center gap-1">
                     <input

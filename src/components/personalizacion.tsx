@@ -6,7 +6,8 @@ import { uploadToCloudinary } from "../services/cloudinary.service";
 import {
   Palette, Clock, MapPin, CheckCircle, AlertCircle,
   Loader2, Shield, Lock, Building2, DollarSign,
-  Truck, Star, Trash2, Plus, Phone
+  Truck, Star, Trash2, Plus, Phone, Globe,
+  Image, ExternalLink, Eye, EyeOff, Share2
 } from "lucide-react";
 
 interface CreditLevelConfigItem {
@@ -49,6 +50,17 @@ interface BusinessConfig {
   creditPlazoMaximoDias?: number;
   creditScoreMinimo?: number;
   creditTasaMoraPct?: number;
+  // Landing Page & Catálogo (Fase E3)
+  heroTitulo?: string;
+  heroSubtitulo?: string;
+  heroBannerUrl?: string;
+  sobreNosotros?: string;
+  whatsappContacto?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
+  mostrarPreciosPublico?: boolean;
+  mostrarStockPublico?: boolean;
 }
 
 const PRESET_COLORS = [
@@ -95,6 +107,16 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     creditPlazoMaximoDias: 30,
     creditScoreMinimo: 60,
     creditTasaMoraPct: 2.5,
+    heroTitulo: "Calzado Ecuatoriano 100% Cuero de Cevallos",
+    heroSubtitulo: "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
+    heroBannerUrl: "",
+    sobreNosotros: "Somos productores y comercializadores de calzado de cuero en el cantón Cevallos, Tungurahua. Garantizamos calidad de exportación, acabados finos y precios directos de fabricante.",
+    whatsappContacto: "593999999999",
+    facebookUrl: "",
+    instagramUrl: "",
+    tiktokUrl: "",
+    mostrarPreciosPublico: true,
+    mostrarStockPublico: true,
   });
 
   const [nivelesCredito, setNivelesCredito] = useState<CreditLevelConfigItem[]>([
@@ -758,6 +780,185 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
               ))}
             </div>
           )}
+        </div>
+
+        {/* ══════ LANDING PAGE & CATÁLOGO ONLINE (Fase E3) ══════ */}
+        <div className="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 border border-emerald-500/20 rounded-2xl p-6 space-y-5">
+          <div className="flex items-center gap-3 pb-3 border-b border-emerald-500/20">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+              <Globe size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-[var(--foreground)]">Landing Page y Catálogo Online Público</h3>
+              <p className="text-[11px] text-[var(--muted-foreground)]">Configura tu página pública de presentación del negocio y catálogo de calzado</p>
+            </div>
+            {config.nombre && (
+              <a
+                href={`/landing?tenantId=${typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : ''}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold rounded-xl transition-all"
+              >
+                <ExternalLink size={12} />
+                Ver Landing Pública
+              </a>
+            )}
+          </div>
+
+          {/* Hero */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                Título Principal (Hero)
+              </label>
+              <input
+                type="text"
+                value={config.heroTitulo || ""}
+                onChange={(e) => setConfig({ ...config, heroTitulo: e.target.value })}
+                placeholder="Ej: Calzado 100% Cuero de Cevallos"
+                className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                Subtítulo del Hero
+              </label>
+              <input
+                type="text"
+                value={config.heroSubtitulo || ""}
+                onChange={(e) => setConfig({ ...config, heroSubtitulo: e.target.value })}
+                placeholder="Ej: Venta mayorista directa de fábrica..."
+                className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          {/* Banner URL */}
+          <div>
+            <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+              <Image size={12} className="inline mr-1" /> URL de Imagen Banner del Hero (opcional)
+            </label>
+            <input
+              type="url"
+              value={config.heroBannerUrl || ""}
+              onChange={(e) => setConfig({ ...config, heroBannerUrl: e.target.value })}
+              placeholder="https://res.cloudinary.com/...  o cualquier URL de imagen"
+              className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+            />
+            {config.heroBannerUrl && (
+              <div className="mt-2 rounded-xl overflow-hidden border border-[var(--border)] max-h-32">
+                <img src={config.heroBannerUrl} alt="Banner preview" className="w-full h-32 object-cover" />
+              </div>
+            )}
+          </div>
+
+          {/* Sobre Nosotros */}
+          <div>
+            <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+              Sobre Nosotros / Descripción del Negocio
+            </label>
+            <textarea
+              rows={3}
+              value={config.sobreNosotros || ""}
+              onChange={(e) => setConfig({ ...config, sobreNosotros: e.target.value })}
+              placeholder="Descripción para la sección 'Sobre Nosotros' de tu landing..."
+              className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500 resize-none"
+            />
+          </div>
+
+          {/* Redes Sociales y WhatsApp */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Share2 size={14} className="text-emerald-600" />
+              <span className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">Redes Sociales y Contacto</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                  📱 WhatsApp de Contacto (con código de país)
+                </label>
+                <input
+                  type="text"
+                  value={config.whatsappContacto || ""}
+                  onChange={(e) => setConfig({ ...config, whatsappContacto: e.target.value })}
+                  placeholder="Ej: 593987654321"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                  📘 Facebook (URL completa)
+                </label>
+                <input
+                  type="url"
+                  value={config.facebookUrl || ""}
+                  onChange={(e) => setConfig({ ...config, facebookUrl: e.target.value })}
+                  placeholder="https://facebook.com/tu-pagina"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                  📸 Instagram (URL completa)
+                </label>
+                <input
+                  type="url"
+                  value={config.instagramUrl || ""}
+                  onChange={(e) => setConfig({ ...config, instagramUrl: e.target.value })}
+                  placeholder="https://instagram.com/tu-cuenta"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                  🎵 TikTok (URL completa)
+                </label>
+                <input
+                  type="url"
+                  value={config.tiktokUrl || ""}
+                  onChange={(e) => setConfig({ ...config, tiktokUrl: e.target.value })}
+                  placeholder="https://tiktok.com/@tu-cuenta"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Visibilidad del Catálogo */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Eye size={14} className="text-emerald-600" />
+              <span className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">Visibilidad del Catálogo Público</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-center gap-3 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                <input
+                  type="checkbox"
+                  id="chkMostrarPrecios"
+                  checked={config.mostrarPreciosPublico ?? true}
+                  onChange={(e) => setConfig({ ...config, mostrarPreciosPublico: e.target.checked })}
+                  className="rounded border-emerald-400 text-emerald-500 focus:ring-emerald-400 h-4 w-4"
+                />
+                <label htmlFor="chkMostrarPrecios" className="text-xs font-bold text-[var(--foreground)] cursor-pointer">
+                  {config.mostrarPreciosPublico ? <Eye size={12} className="inline mr-1 text-emerald-500" /> : <EyeOff size={12} className="inline mr-1 text-rose-400" />}
+                  Mostrar precios en el catálogo público
+                </label>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                <input
+                  type="checkbox"
+                  id="chkMostrarStock"
+                  checked={config.mostrarStockPublico ?? true}
+                  onChange={(e) => setConfig({ ...config, mostrarStockPublico: e.target.checked })}
+                  className="rounded border-emerald-400 text-emerald-500 focus:ring-emerald-400 h-4 w-4"
+                />
+                <label htmlFor="chkMostrarStock" className="text-xs font-bold text-[var(--foreground)] cursor-pointer">
+                  {config.mostrarStockPublico ? <Eye size={12} className="inline mr-1 text-emerald-500" /> : <EyeOff size={12} className="inline mr-1 text-rose-400" />}
+                  Mostrar disponibilidad de stock en el catálogo público
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end">

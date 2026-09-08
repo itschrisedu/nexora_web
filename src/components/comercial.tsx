@@ -19,6 +19,7 @@ import {
   ChevronUp,
   MessageCircle,
   ShoppingBag,
+  AlertCircle,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -170,6 +171,12 @@ export default function ComercialComponent({ online, userRole, userPermissions }
 
   const [creatingOrder, setCreatingOrder] = useState(false);
 
+  // Cupones Promocionales (Fase E2)
+  const [codigoCuponInput, setCodigoCuponInput] = useState('');
+  const [cuponAplicado, setCuponAplicado] = useState<any | null>(null);
+  const [validandoCupon, setValidandoCupon] = useState(false);
+  const [cuponErrorMsg, setCuponErrorMsg] = useState('');
+
   // Búsqueda interactiva de Modelos de productos
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
@@ -178,6 +185,44 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   // Consulta de Stock Inter-Sucursal en Punto de Venta
   const [stockInterSucursalResult, setStockInterSucursalResult] = useState<any[]>([]);
   const [loadingInterSucursal, setLoadingInterSucursal] = useState(false);
+
+  const handleAplicarCupon = async () => {
+    if (!codigoCuponInput.trim()) return;
+    if (lineasPedido.length === 0) {
+      setCuponErrorMsg('Agrega productos al pedido antes de aplicar el cupón.');
+      return;
+    }
+    setValidandoCupon(true);
+    setCuponErrorMsg('');
+    try {
+      const totalPares = lineasPedido.reduce((acc, l) => acc + l.cantidad, 0);
+      const subtotal = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
+      const res = await ApiService.post('/clientes/promociones/validar', {
+        codigo: codigoCuponInput.trim(),
+        totalPares,
+        totalMonto: subtotal,
+        tipoPago,
+      });
+      if (res.valido) {
+        setCuponAplicado(res);
+        showToast(res.mensaje || '¡Cupón de descuento aplicado con éxito!', 'success');
+      } else {
+        setCuponErrorMsg(res.mensaje || 'El cupón no es válido.');
+        setCuponAplicado(null);
+      }
+    } catch (err: any) {
+      setCuponErrorMsg(err.message || 'Error al validar cupón.');
+      setCuponAplicado(null);
+    } finally {
+      setValidandoCupon(false);
+    }
+  };
+
+  const handleRemoverCupon = () => {
+    setCuponAplicado(null);
+    setCodigoCuponInput('');
+    setCuponErrorMsg('');
+  };
 
   useEffect(() => {
     const checkInterSucursalStock = async () => {
@@ -886,18 +931,31 @@ export default function ComercialComponent({ online, userRole, userPermissions }
         showToast('¡Pedido actualizado exitosamente!', 'success');
       } else {
         const res = await ApiService.post('/pedidos', payload);
-        showToast('¡Pedido creado exitosamente!', 'success');
+        // Si se aplicó cupón, registrar el canje
+        if (cuponAplicado && cuponAplicado.promocion?.codigo) {
+          try {
+            await ApiService.post('/clientes/promociones/canjear', {
+              codigo: cuponAplicado.promocion.codigo,
+            });
+          } catch (e) {
+            console.warn('Error registrando canje de cupón:', e);
+          }
+        }
 
         // Si el cliente tiene teléfono registrado, abrir confirmación por WhatsApp
         const clienteInfo = listaClientes.find((c) => c.id === clientId);
         if (clienteInfo?.telefono) {
+          const subtotalTotal = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
+          const descuentoFinal = cuponAplicado ? Number(cuponAplicado.descuentoCalculado || 0) : 0;
+          const totalFinal = Math.max(0, subtotalTotal - descuentoFinal);
+
           const nuevoPedidoObj: Pedido = {
             id: res?.id || 'NUEVO',
             numero: res?.numero,
             numeroCodigo: res?.numeroCodigo,
             clientId,
             clienteNombre: clienteInfo.nombre,
-            montoTotal: lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0),
+            montoTotal: totalFinal,
             estado: 'PENDIENTE',
             tipoPago,
             tipoEntrega,
@@ -929,9 +987,12 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       setAsumeFlete('CLIENTE');
       setCostoEnvio('5.00');
       setGuiaEnvio('');
-      setCourier('Servientrega');
+      setCourier('Transporte Los Andes');
       setDireccionEnvio('');
       setCiudadEnvio('');
+      setCuponAplicado(null);
+      setCodigoCuponInput('');
+      setCuponErrorMsg('');
       await loadPedidos();
     } catch (err: any) {
       console.error('Error al guardar pedido:', err);
@@ -1541,7 +1602,19 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Tipo de Pago *</label>
                     <select
                       value={tipoPago}
-                      onChange={(e) => setTipoPago(e.target.value)}
+                      onChange={(e) => {
+                        const nuevoTipo = e.target.value;
+                        setTipoPago(nuevoTipo);
+                        if (cuponAplicado?.promocion) {
+                          if (cuponAplicado.promocion.aplicaPara === 'SOLO_CONTADO' && nuevoTipo === 'CREDITO') {
+                            setCuponAplicado(null);
+                            setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para pagos de Contado.');
+                          } else if (cuponAplicado.promocion.aplicaPara === 'SOLO_CREDITO' && nuevoTipo === 'CONTADO') {
+                            setCuponAplicado(null);
+                            setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para compras a Crédito.');
+                          }
+                        }
+                      }}
                       className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
                     >
                       <option value="CONTADO">Contado</option>
@@ -2624,16 +2697,98 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 </div>
               )}
 
+              {/* 3. CUPÓN DE DESCUENTO PROMOCIONAL (FASE E2) */}
+              {lineasPedido.length > 0 && (
+                <div className="p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
+                      <span>🎟️ Cupón de Descuento Promocional</span>
+                    </span>
+                    <span className="text-[10px] text-purple-700 dark:text-purple-400 font-semibold">
+                      (Válido por volumen / primeras personas)
+                    </span>
+                  </div>
+
+                  {!cuponAplicado ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Ej: NEXORA10, LOTE10..."
+                        value={codigoCuponInput}
+                        onChange={(e) => setCodigoCuponInput(e.target.value.toUpperCase())}
+                        className="flex-1 px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold uppercase focus:outline-none focus:border-purple-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAplicarCupon}
+                        disabled={validandoCupon || !codigoCuponInput.trim()}
+                        className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-xs cursor-pointer"
+                      >
+                        {validandoCupon ? <Loader2 size={12} className="animate-spin" /> : null}
+                        <span>Aplicar Cupón</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-purple-600 text-white font-mono text-[11px] font-black rounded-md">
+                            {cuponAplicado.promocion?.codigo}
+                          </span>
+                          <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                            Descuento: -${Number(cuponAplicado.descuentoCalculado || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-[var(--muted-foreground)]">
+                          {cuponAplicado.promocion?.titulo} · Quedan {cuponAplicado.cuposRestantes} cupos
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleRemoverCupon}
+                        className="text-xs font-bold text-rose-500 hover:underline px-2 py-1"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  )}
+
+                  {cuponErrorMsg && (
+                    <div className="p-2 bg-rose-500/10 border border-rose-500/20 text-rose-600 text-[11px] font-semibold rounded-lg flex items-center gap-1.5">
+                      <AlertCircle size={13} />
+                      <span>{cuponErrorMsg}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {errorMsg && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl">{errorMsg}</div>}
             </div>
 
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-between gap-3">
-              <div className="text-xs">
-                <span className="text-[var(--muted-foreground)]">Monto Total: </span>
-                <span className="font-black text-base text-emerald-600">
-                  ${lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0).toFixed(2)}
-                </span>
-              </div>
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {(() => {
+                const subtotalBase = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
+                const descCupon = cuponAplicado ? Number(cuponAplicado.descuentoCalculado || 0) : 0;
+                const totalConDescuento = Math.max(0, subtotalBase - descCupon);
+
+                return (
+                  <div className="text-xs space-y-0.5">
+                    {descCupon > 0 && (
+                      <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)]">
+                        <span>Subtotal: ${subtotalBase.toFixed(2)}</span>
+                        <span className="text-purple-600 font-bold">Cupón ({cuponAplicado.promocion?.codigo}): -${descCupon.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[var(--muted-foreground)]">Total a Pagar: </span>
+                      <span className="font-black text-base text-emerald-600">
+                        ${totalConDescuento.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="flex gap-2">
                 <button
