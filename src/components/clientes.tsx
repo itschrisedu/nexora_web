@@ -10,6 +10,7 @@ import {
   Flame, Sparkles, Send, Gift, Calendar, UserX, AlertTriangle, ArrowUpRight
 } from "lucide-react";
 import { getClienteReputacion } from "../utils/cliente-reputacion";
+import ConfirmModal from "./ui/confirm-modal";
 
 interface ClientesProps {
   online: boolean;
@@ -156,6 +157,22 @@ export default function ClientesComponent({ online }: ClientesProps) {
     mensajePlantilla: '',
   });
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
+
+  // Modal de Confirmación UI (reemplaza confirm nativo)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    danger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   // Config del Negocio
   const [businessNombre, setBusinessNombre] = useState('NEXORA');
@@ -461,16 +478,26 @@ export default function ClientesComponent({ online }: ClientesProps) {
     }
   };
 
-  const handleEliminarPromocion = async (id: string) => {
-    if (!confirm("¿Deseas desactivar esta campaña promocional?")) return;
-    try {
-      await ApiService.delete(`/clientes/promociones/${id}`);
-      setSuccess("Promoción eliminada correctamente.");
-      await loadPromociones();
-      setTimeout(() => setSuccess(""), 4000);
-    } catch (err: any) {
-      setError(err.message || "Error al eliminar la promoción.");
-    }
+  const handleEliminarPromocion = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Desactivar Campaña Promocional",
+      message: "¿Deseas desactivar esta campaña promocional? Los clientes ya no podrán canjear este cupón de descuento.",
+      confirmText: "Sí, Desactivar",
+      cancelText: "Cancelar",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await ApiService.delete(`/clientes/promociones/${id}`);
+          setSuccess("Promoción desactivada correctamente.");
+          await loadPromociones();
+          setTimeout(() => setSuccess(""), 4000);
+        } catch (err: any) {
+          setError(err.message || "Error al desactivar la promoción.");
+        }
+      },
+    });
   };
 
   const copiarMensajeDifusion = (promo: PromocionCupon) => {
@@ -1437,34 +1464,90 @@ export default function ClientesComponent({ online }: ClientesProps) {
                 />
               </div>
 
-              {/* Tipo de Descuento y Valor */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">Modalidad de Descuento</label>
-                  <select
-                    value={promoForm.tipoDescuento}
-                    onChange={(e) => setPromoForm({ ...promoForm, tipoDescuento: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
+              {/* Modalidad de Descuento: Monto Fijo ($), Porcentaje (%) o Por Par */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[var(--foreground)]">
+                  Modalidad de Descuento *
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPromoForm({ ...promoForm, tipoDescuento: 'MONTO_FIJO', valorDescuento: promoForm.valorDescuento || '10' })}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                      promoForm.tipoDescuento === 'MONTO_FIJO'
+                        ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                    }`}
                   >
-                    <option value="PORCENTAJE">Porcentaje (% de la venta)</option>
-                    <option value="DESCUENTO_POR_PAR">Descuento por Par ($/par)</option>
-                    <option value="MONTO_FIJO">Monto Fijo ($ directo)</option>
-                  </select>
+                    <span className="text-sm font-black">$ Monto Fijo</span>
+                    <span className="text-[10px] opacity-80">(ej. $10 dólares)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPromoForm({ ...promoForm, tipoDescuento: 'PORCENTAJE', valorDescuento: promoForm.valorDescuento || '10' })}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                      promoForm.tipoDescuento === 'PORCENTAJE'
+                        ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
+                    }`}
+                  >
+                    <span className="text-sm font-black">% Porcentaje</span>
+                    <span className="text-[10px] opacity-80">(ej. 5% o 10%)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPromoForm({ ...promoForm, tipoDescuento: 'DESCUENTO_POR_PAR', valorDescuento: promoForm.valorDescuento || '2' })}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                      promoForm.tipoDescuento === 'DESCUENTO_POR_PAR'
+                        ? 'bg-blue-600 text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-blue-500'
+                    }`}
+                  >
+                    <span className="text-sm font-black">👟 Por Cada Par</span>
+                    <span className="text-[10px] opacity-80">(ej. $2 / par)</span>
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                    Valor del Descuento ({promoForm.tipoDescuento === 'PORCENTAJE' ? '%' : '$'}) *
-                  </label>
+              </div>
+
+              {/* Valor del Descuento */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                  {promoForm.tipoDescuento === 'MONTO_FIJO'
+                    ? 'Monto del Descuento en Dólares ($ USD) *'
+                    : promoForm.tipoDescuento === 'PORCENTAJE'
+                    ? 'Porcentaje de Descuento (%) *'
+                    : 'Descuento por Cada Par de Calzado ($/par) *'}
+                </label>
+                <div className="relative">
                   <input
                     type="number"
-                    step="0.5"
-                    min="0.1"
+                    step="any"
+                    min="0.01"
+                    placeholder={
+                      promoForm.tipoDescuento === 'MONTO_FIJO'
+                        ? 'Ej: 10 (descuento directo de $10 dólares)'
+                        : promoForm.tipoDescuento === 'PORCENTAJE'
+                        ? 'Ej: 5, 10, 15 (descuento del 10%)'
+                        : 'Ej: 2.00 ($2 de descuento por cada par)'
+                    }
                     value={promoForm.valorDescuento}
                     onChange={(e) => setPromoForm({ ...promoForm, valorDescuento: e.target.value })}
                     className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
                     required
                   />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-[var(--muted-foreground)]">
+                    {promoForm.tipoDescuento === 'PORCENTAJE' ? '%' : '$ USD'}
+                  </span>
                 </div>
+                <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                  {promoForm.tipoDescuento === 'MONTO_FIJO'
+                    ? `💡 Se rebajarán $${promoForm.valorDescuento || 0} dólares directos del total del pedido o venta.`
+                    : promoForm.tipoDescuento === 'PORCENTAJE'
+                    ? `💡 Se aplicará el ${promoForm.valorDescuento || 0}% de descuento sobre el subtotal.`
+                    : `💡 Se multiplicarán $${promoForm.valorDescuento || 0} dólares por cada par de calzado incluido.`}
+                </span>
               </div>
 
               {/* Mínimo de pares y Fecha de Expiración */}
@@ -1626,6 +1709,18 @@ export default function ClientesComponent({ online }: ClientesProps) {
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmación UI (Reemplaza confirm nativo) */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        danger={confirmModal.danger}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

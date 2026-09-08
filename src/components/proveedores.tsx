@@ -49,6 +49,7 @@ import {
   Printer,
   MessageCircle,
 } from 'lucide-react';
+import ConfirmModal from './ui/confirm-modal';
 import { useToast } from './ui/toast';
 import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, compartirOrdenCompraPdf, OrdenCompraPdfData } from '../services/pdf-factura.service';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
@@ -287,6 +288,22 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [activeTab, setActiveTab] = useState<'proveedores' | 'ordenes' | 'ingreso' | 'pagos'>('proveedores');
 
   const [saving, setSaving] = useState(false);
+
+  // Modal de confirmación UI (reemplaza confirm nativo)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    danger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   // Filtros de órdenes por estado (Borrador/Pendiente por pedir por defecto)
   const [searchQuery, setSearchQuery] = useState('');
@@ -777,40 +794,58 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  const handleCancelarOrden = async (orderId: string) => {
-    if (!confirm('¿Está seguro de que desea cancelar esta orden de compra?')) return;
-    setSaving(true);
-    try {
-      await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/cancelar`, {});
-      showToast('Orden de compra cancelada.', 'info');
-      setShowOrderDetailModal(false);
-      loadData();
-    } catch (err: any) {
-      showToast(err.message || 'Error al cancelar la orden.', 'error');
-    } finally {
-      setSaving(false);
-    }
+  const handleCancelarOrden = (orderId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Cancelar Orden de Compra',
+      message: '¿Está seguro de que desea cancelar esta orden de compra a proveedor? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, Cancelar Orden',
+      cancelText: 'Volver',
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setSaving(true);
+        try {
+          await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/cancelar`, {});
+          showToast('Orden de compra cancelada.', 'info');
+          setShowOrderDetailModal(false);
+          loadData();
+        } catch (err: any) {
+          showToast(err.message || 'Error al cancelar la orden.', 'error');
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
   };
 
-  const handleCancelarYBloquearReorden = async (orderId: string) => {
-    if (!confirm(
-      '¿Está seguro de CANCELAR esta orden y marcar que los calzados YA NO SE VENDEN?\\n\\n' +
-      '• La orden de compra quedará CANCELADA.\\n' +
-      '• El sistema NO volverá a generar órdenes automáticas para estos modelos aunque se queden sin stock.\\n' +
-      '• Siempre podrás volver a realizar un pedido manualmente si lo requieres en el futuro.'
-    )) return;
-
-    setSaving(true);
-    try {
-      await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/cancelar-y-desactivar-reorden`, {});
-      showToast('Orden cancelada y reorden automática desactivada (Producto marcado como "Ya no se vende").', 'success');
-      setShowOrderDetailModal(false);
-      loadData();
-    } catch (err: any) {
-      showToast(err.message || 'Error al cancelar y bloquear reorden.', 'error');
-    } finally {
-      setSaving(false);
-    }
+  const handleCancelarYBloquearReorden = (orderId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Cancelar y Marcar "Ya No Se Vende"',
+      message:
+        '¿Está seguro de CANCELAR esta orden y marcar que los calzados YA NO SE VENDEN?\n\n' +
+        '• La orden de compra quedará CANCELADA.\n' +
+        '• El sistema NO volverá a generar órdenes automáticas para estos modelos aunque se queden sin stock.\n' +
+        '• Siempre podrás volver a realizar un pedido manualmente si lo requieres en el futuro.',
+      confirmText: 'Sí, Cancelar y Bloquear',
+      cancelText: 'Volver',
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setSaving(true);
+        try {
+          await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/cancelar-y-desactivar-reorden`, {});
+          showToast('Orden cancelada y reorden automática desactivada (Producto marcado como "Ya no se vende").', 'success');
+          setShowOrderDetailModal(false);
+          loadData();
+        } catch (err: any) {
+          showToast(err.message || 'Error al cancelar y bloquear reorden.', 'error');
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
   };
 
   const handleIrARecepcionDesdeOrden = (order: OrdenCompra) => {
@@ -3276,6 +3311,18 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmación UI (Reemplaza confirm nativo) */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        danger={confirmModal.danger}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

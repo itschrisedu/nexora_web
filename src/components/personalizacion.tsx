@@ -9,6 +9,7 @@ import {
   Truck, Star, Trash2, Plus, Phone, Globe,
   Image, ExternalLink, Eye, EyeOff, Share2
 } from "lucide-react";
+import ConfirmModal from "./ui/confirm-modal";
 
 interface CreditLevelConfigItem {
   id?: string;
@@ -127,6 +128,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     { nivel: "NIVEL_4", comprasRequeridas: 60, limiteDolares: 3000, plazoDias: 45 },
   ]);
 
+  // Modal de confirmación UI (reemplaza confirm nativo)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    danger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
   useEffect(() => {
     loadConfig();
     loadTransportes();
@@ -184,15 +201,25 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     }
   };
 
-  const handleDeleteTransporte = async (id: string, nombre: string) => {
-    if (!confirm(`¿Estás seguro de eliminar la empresa de transporte "${nombre}"?`)) return;
-    try {
-      await ApiService.delete(`/configuracion/transportes/${id}`);
-      setSuccess(`"${nombre}" eliminada correctamente.`);
-      await loadTransportes();
-    } catch (err: any) {
-      setError(err.message || "Error al eliminar empresa de transporte.");
-    }
+  const handleDeleteTransporte = (id: string, nombre: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Eliminar Empresa de Transporte",
+      message: `¿Estás seguro de que deseas eliminar la empresa de transporte "${nombre}"? Esta acción no se puede deshacer.`,
+      confirmText: "Sí, Eliminar",
+      cancelText: "Cancelar",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await ApiService.delete(`/configuracion/transportes/${id}`);
+          setSuccess(`"${nombre}" eliminada correctamente.`);
+          await loadTransportes();
+        } catch (err: any) {
+          setError(err.message || "Error al eliminar empresa de transporte.");
+        }
+      },
+    });
   };
 
   const loadConfig = async () => {
@@ -1066,6 +1093,18 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmación UI (Reemplaza confirm nativo) */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        danger={confirmModal.danger}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

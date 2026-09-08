@@ -60,6 +60,7 @@ import {
   armarMensajeWhatsAppAbono,
   ComprobanteAbonoPdfData,
 } from '../services/pdf-abono.service';
+import ConfirmModal from './ui/confirm-modal';
 
 interface FinancieroProps {
   online: boolean;
@@ -305,6 +306,22 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const [clientesRaw, setClientesRaw] = useState<any[]>([]);
   const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
 
+  // Modal de confirmación UI (reemplaza confirm nativo)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    danger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   // Modal Historial Completo del Cliente
   const [showHistorialModal, setShowHistorialModal] = useState(false);
   const [historialCliente, setHistorialCliente] = useState<ClienteHistorial | null>(null);
@@ -454,15 +471,25 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     }
   };
 
-  const handleEliminarGasto = async (id: string, descripcion: string) => {
-    if (!confirm(`¿Estás seguro de eliminar el gasto "${descripcion}"?`)) return;
-    try {
-      await ApiService.delete(`/gastos/${id}`);
-      showToast('Gasto operativo eliminado.', 'info');
-      await loadGastos();
-    } catch (err: any) {
-      showToast(err.message || 'Error al eliminar el gasto.', 'error');
-    }
+  const handleEliminarGasto = (id: string, descripcion: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Gasto Operativo',
+      message: `¿Estás seguro de eliminar el gasto "${descripcion}"? Esta acción registrará el ajuste y no se podrá deshacer.`,
+      confirmText: 'Sí, Eliminar Gasto',
+      cancelText: 'Cancelar',
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await ApiService.delete(`/gastos/${id}`);
+          showToast('Gasto operativo eliminado correctamente.', 'info');
+          await loadGastos();
+        } catch (err: any) {
+          showToast(err.message || 'Error al eliminar el gasto.', 'error');
+        }
+      },
+    });
   };
 
   const loadBusinessConfig = async () => {
@@ -4268,6 +4295,18 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         </div>
         );
       })()}
+
+      {/* Modal de Confirmación UI (Reemplaza confirm nativo) */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        danger={confirmModal.danger}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
