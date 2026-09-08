@@ -492,7 +492,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         if (Array.isArray(dataClientes)) setClientesRaw(dataClientes);
 
         const flat: any[] = [];
-        (dataCatalogo || []).forEach((modelo: any) => {
+        const modelosCatalogo = Array.isArray(dataCatalogo) ? dataCatalogo : (dataCatalogo?.modelos || []);
+        modelosCatalogo.forEach((modelo: any) => {
           (modelo.variantes || []).forEach((v: any) => {
             flat.push({
               id: v.id,

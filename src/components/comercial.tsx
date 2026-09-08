@@ -561,9 +561,10 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   const cargarCatalogo = async () => {
     try {
       if (online) {
-        const data = await ApiService.get('/catalogo/productos');
+        const res = await ApiService.get('/catalogo/productos');
+        const modelosData = Array.isArray(res) ? res : (res?.modelos || []);
         const flat: any[] = [];
-        (data || []).forEach((modelo: any) => {
+        modelosData.forEach((modelo: any) => {
           (modelo.variantes || []).forEach((v: any) => {
             flat.push({
               id: v.id,

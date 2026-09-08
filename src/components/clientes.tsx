@@ -621,6 +621,17 @@ export default function ClientesComponent({ online }: ClientesProps) {
               >
                 <Plus size={16} /><span>Nuevo Cliente</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setVista('PROMOCIONES');
+                  setShowPromoModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
+              >
+                <Gift size={16} /><span>+ Nueva Promoción / Cupón</span>
+              </button>
             </div>
 
             {/* Tabla Directorio */}

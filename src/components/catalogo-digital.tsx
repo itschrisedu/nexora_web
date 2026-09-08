@@ -106,7 +106,7 @@ export default function CatalogoDigitalComponent() {
         ApiService.get("/catalogo/productos"),
       ]);
       setTienda(info);
-      setModelos(catalog || []);
+      setModelos(Array.isArray(catalog) ? catalog : (catalog?.modelos || []));
     } catch (err: any) {
       console.error("Error al cargar el catálogo:", err);
     } finally {
