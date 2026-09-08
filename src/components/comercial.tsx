@@ -38,9 +38,17 @@ interface Pedido {
   numeroCodigo?: string;
   clientId: string;
   clienteNombre?: string;
+  vendedorNombre?: string;
   montoTotal: number;
   estado: EstadoPedido;
   tipoPago: string;
+  tipoEntrega?: 'PRESENCIAL' | 'ENVIO';
+  asumeFlete?: 'NO_APLICA' | 'CLIENTE' | 'EMPRESA';
+  costoEnvio?: number;
+  guiaEnvio?: string;
+  courier?: string;
+  direccionEnvio?: string;
+  ciudadEnvio?: string;
   createdAt: string;
   prioridadScore?: number;
   lines?: any[];
@@ -132,6 +140,27 @@ export default function ComercialComponent({ online, userRole, userPermissions }
   const [metodoPagoContado, setMetodoPagoContado] = useState<'EFECTIVO' | 'TRANSFERENCIA' | 'DEPOSITO' | 'CHEQUE'>('EFECTIVO');
   const [referenciaComprobante, setReferenciaComprobante] = useState('');
   const [notasPedido, setNotasPedido] = useState('');
+
+  // ── Logística de Entrega (Fase E1) ──
+  const [tipoEntrega, setTipoEntrega] = useState<'PRESENCIAL' | 'ENVIO'>('PRESENCIAL');
+  const [asumeFlete, setAsumeFlete] = useState<'CLIENTE' | 'EMPRESA'>('CLIENTE');
+  const [costoEnvio, setCostoEnvio] = useState('5.00');
+  const [guiaEnvio, setGuiaEnvio] = useState('');
+  const [courier, setCourier] = useState('Servientrega');
+  const [direccionEnvio, setDireccionEnvio] = useState('');
+  const [ciudadEnvio, setCiudadEnvio] = useState('');
+
+  // Modal independiente de Gestión de Envío de Pedido
+  const [showModalEnvio, setShowModalEnvio] = useState(false);
+  const [pedidoEnvioSeleccionado, setPedidoEnvioSeleccionado] = useState<Pedido | null>(null);
+  const [envioModalTipoEntrega, setEnvioModalTipoEntrega] = useState<'PRESENCIAL' | 'ENVIO'>('PRESENCIAL');
+  const [envioModalAsumeFlete, setEnvioModalAsumeFlete] = useState<'CLIENTE' | 'EMPRESA'>('CLIENTE');
+  const [envioModalCostoEnvio, setEnvioModalCostoEnvio] = useState('5.00');
+  const [envioModalGuiaEnvio, setEnvioModalGuiaEnvio] = useState('');
+  const [envioModalCourier, setEnvioModalCourier] = useState('Servientrega');
+  const [envioModalDireccionEnvio, setEnvioModalDireccionEnvio] = useState('');
+  const [envioModalCiudadEnvio, setEnvioModalCiudadEnvio] = useState('');
+  const [savingEnvioModal, setSavingEnvioModal] = useState(false);
 
   const [creatingOrder, setCreatingOrder] = useState(false);
 
@@ -689,6 +718,15 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     setTipoPago(p.tipoPago || 'CONTADO');
     setNotasPedido((p as any).notas || '');
 
+    // Logística
+    setTipoEntrega(p.tipoEntrega || 'PRESENCIAL');
+    setAsumeFlete(p.asumeFlete === 'EMPRESA' ? 'EMPRESA' : 'CLIENTE');
+    setCostoEnvio(p.costoEnvio ? String(p.costoEnvio) : '5.00');
+    setGuiaEnvio(p.guiaEnvio || '');
+    setCourier(p.courier || 'Servientrega');
+    setDireccionEnvio(p.direccionEnvio || '');
+    setCiudadEnvio(p.ciudadEnvio || '');
+
     if (p.lines && p.lines.length > 0) {
       setLineasPedido(
         p.lines.map((l: any) => ({
@@ -710,6 +748,44 @@ export default function ComercialComponent({ online, userRole, userPermissions }
     }
     setErrorMsg('');
     setShowModal(true);
+  };
+
+  const handleAbrirModalEnvio = (p: Pedido) => {
+    setPedidoEnvioSeleccionado(p);
+    setEnvioModalTipoEntrega(p.tipoEntrega || 'PRESENCIAL');
+    setEnvioModalAsumeFlete(p.asumeFlete === 'EMPRESA' ? 'EMPRESA' : 'CLIENTE');
+    setEnvioModalCostoEnvio(p.costoEnvio ? String(p.costoEnvio) : '5.00');
+    setEnvioModalGuiaEnvio(p.guiaEnvio || '');
+    setEnvioModalCourier(p.courier || 'Servientrega');
+    setEnvioModalDireccionEnvio(p.direccionEnvio || '');
+    setEnvioModalCiudadEnvio(p.ciudadEnvio || '');
+    setShowModalEnvio(true);
+  };
+
+  const handleGuardarLogisticaEnvio = async () => {
+    if (!pedidoEnvioSeleccionado) return;
+    setSavingEnvioModal(true);
+    try {
+      await ApiService.put(`/pedidos/${pedidoEnvioSeleccionado.id}/envio`, {
+        tipoEntrega: envioModalTipoEntrega,
+        asumeFlete: envioModalTipoEntrega === 'ENVIO' ? envioModalAsumeFlete : 'NO_APLICA',
+        costoEnvio: envioModalTipoEntrega === 'ENVIO' ? Number(envioModalCostoEnvio || 0) : 0,
+        guiaEnvio: envioModalTipoEntrega === 'ENVIO' ? envioModalGuiaEnvio.trim() || undefined : undefined,
+        courier: envioModalTipoEntrega === 'ENVIO' ? envioModalCourier.trim() || undefined : undefined,
+        direccionEnvio: envioModalTipoEntrega === 'ENVIO' ? envioModalDireccionEnvio.trim() || undefined : undefined,
+        ciudadEnvio: envioModalTipoEntrega === 'ENVIO' ? envioModalCiudadEnvio.trim() || undefined : undefined,
+      });
+
+      showToast('¡Logística de entrega actualizada con éxito!', 'success');
+      setShowModalEnvio(false);
+      setPedidoEnvioSeleccionado(null);
+      await loadPedidos();
+    } catch (err: any) {
+      console.error('Error al actualizar logística:', err);
+      showToast(err.message || 'Error al actualizar logística de envío', 'error');
+    } finally {
+      setSavingEnvioModal(false);
+    }
   };
 
   const handleCrearPedidoOnline = async () => {
@@ -747,6 +823,13 @@ export default function ComercialComponent({ online, userRole, userPermissions }
           tipoVenta: l.tipoVenta,
         })),
         notas: notasFinales || undefined,
+        tipoEntrega,
+        asumeFlete: tipoEntrega === 'ENVIO' ? asumeFlete : 'NO_APLICA',
+        costoEnvio: tipoEntrega === 'ENVIO' ? Number(costoEnvio || 0) : 0,
+        guiaEnvio: tipoEntrega === 'ENVIO' ? guiaEnvio.trim() || undefined : undefined,
+        courier: tipoEntrega === 'ENVIO' ? courier.trim() || undefined : undefined,
+        direccionEnvio: tipoEntrega === 'ENVIO' ? direccionEnvio.trim() || undefined : undefined,
+        ciudadEnvio: tipoEntrega === 'ENVIO' ? ciudadEnvio.trim() || undefined : undefined,
       };
 
       if (editingOrderId) {
@@ -768,6 +851,13 @@ export default function ComercialComponent({ online, userRole, userPermissions }
             montoTotal: lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0),
             estado: 'PENDIENTE',
             tipoPago,
+            tipoEntrega,
+            asumeFlete,
+            costoEnvio: Number(costoEnvio || 0),
+            guiaEnvio,
+            courier,
+            direccionEnvio,
+            ciudadEnvio,
             createdAt: new Date().toISOString(),
             lines: lineasPedido.map((l) => ({ ...l, subtotal: l.cantidad * l.precioUnitario })),
           };
@@ -786,6 +876,13 @@ export default function ComercialComponent({ online, userRole, userPermissions }
       setMetodoPagoContado('EFECTIVO');
       setReferenciaComprobante('');
       setBusquedaCliente('');
+      setTipoEntrega('PRESENCIAL');
+      setAsumeFlete('CLIENTE');
+      setCostoEnvio('5.00');
+      setGuiaEnvio('');
+      setCourier('Servientrega');
+      setDireccionEnvio('');
+      setCiudadEnvio('');
       await loadPedidos();
     } catch (err: any) {
       console.error('Error al guardar pedido:', err);
@@ -993,9 +1090,24 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                         onClick={() => setPedidoExpandidoId(isExpanded ? null : p.id)}
                         className={`hover:bg-[var(--muted)]/30 transition-colors cursor-pointer ${isExpanded ? 'bg-[#0F172A]/5' : ''}`}
                       >
-                        <td className="px-6 py-4 font-bold flex items-center gap-2">
-                          {isExpanded ? <ChevronUp size={14} className="text-[#0F172A]" /> : <ChevronDown size={14} className="text-[var(--muted-foreground)]" />}
-                          #{getNumeroPedido(p, idx)}
+                        <td className="px-6 py-4 font-bold">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? <ChevronUp size={14} className="text-[#0F172A]" /> : <ChevronDown size={14} className="text-[var(--muted-foreground)]" />}
+                            <span>#{getNumeroPedido(p, idx)}</span>
+                          </div>
+                          <div className="mt-1">
+                            {p.tipoEntrega === 'ENVIO' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-extrabold">
+                                <Truck size={10} />
+                                <span>{p.courier || 'Envío'}</span>
+                                {p.ciudadEnvio && <span className="text-blue-500">· {p.ciudadEnvio}</span>}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold">
+                                <span>🏪 Presencial</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           {(() => {
@@ -1010,6 +1122,11 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border w-fit ${rep.badgeClass}`} title={rep.descripcion}>
                                     <span>{rep.icon}</span>
                                     <span>{rep.label}</span>
+                                  </span>
+                                )}
+                                {p.vendedorNombre && (
+                                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                                    Vendedor: <strong className="text-[var(--foreground)]">{p.vendedorNombre}</strong>
                                   </span>
                                 )}
                               </div>
@@ -1029,7 +1146,17 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                           {new Date(p.createdAt).toLocaleDateString('es-EC')}
                         </td>
                         <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            {/* Botón rápido para gestionar logística de envío */}
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirModalEnvio(p)}
+                              className="px-2 py-1 bg-blue-500/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-500/20 flex items-center gap-1"
+                              title="Gestionar Courier, Guía y Flete de este pedido"
+                            >
+                              <Truck size={12} /> Logística
+                            </button>
+
                             {isUpdating ? (
                               <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
                                 <Loader2 size={12} className="animate-spin text-[#0F172A]" /> Actualizando...
@@ -1090,9 +1217,51 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                         <tr className="bg-[#0F172A]/5">
                           <td colSpan={7} className="px-6 py-4">
                             <div className="space-y-3">
+                              {/* Tarjeta de Logística de Entrega */}
+                              <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2.5 bg-blue-500/10 text-blue-600 rounded-xl">
+                                    <Truck size={18} />
+                                  </div>
+                                  <div>
+                                    <div className="text-xs font-bold text-[var(--foreground)] flex items-center gap-2">
+                                      <span>Logística: {p.tipoEntrega === 'ENVIO' ? `🚚 Envío por ${p.courier || 'Transporte'}` : '🏪 Entrega Presencial en Local'}</span>
+                                      {p.guiaEnvio && (
+                                        <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[10px] font-mono">
+                                          Guía: {p.guiaEnvio}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                                      {p.tipoEntrega === 'ENVIO' ? (
+                                        <>
+                                          <span>Destino: {p.ciudadEnvio || 'No especificada'} {p.direccionEnvio ? `(${p.direccionEnvio})` : ''}</span>
+                                          <span className="mx-1.5">·</span>
+                                          <span>Flete: {p.asumeFlete === 'EMPRESA' ? `🟢 Asume Empresa ($${Number(p.costoEnvio || 0).toFixed(2)})` : '🔵 Cobro en Destino (Paga Cliente)'}</span>
+                                        </>
+                                      ) : (
+                                        <span>El cliente retira directamente en el mostrador del local comercial.</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAbrirModalEnvio(p);
+                                  }}
+                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shrink-0 flex items-center gap-1"
+                                >
+                                  <Truck size={13} />
+                                  <span>Modificar Envío / Guía</span>
+                                </button>
+                              </div>
+
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-xs text-[var(--foreground)]">
-                                  📦 Detalle de Artículos Solicitados — {getNumeroPedido(p, idx)}
+                                  📦 Detalle de Artículos Solicitados — #{getNumeroPedido(p, idx)}
                                 </span>
                                 {online && p.clientId && (
                                   <button
@@ -1390,6 +1559,168 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* 1.1 SECCIÓN LOGÍSTICA DE ENTREGA Y FLETE (Fase E1) */}
+              <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                    1.1 Modalidad de Entrega y Logística (Flete)
+                  </span>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                    tipoEntrega === 'ENVIO' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  }`}>
+                    {tipoEntrega === 'ENVIO' ? '🚚 Envío / Encomienda' : '🏪 Entrega Presencial en Local'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipoEntrega('PRESENCIAL')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      tipoEntrega === 'PRESENCIAL'
+                        ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
+                    }`}
+                  >
+                    <span>🏪 Entrega Presencial (Local)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoEntrega('ENVIO')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      tipoEntrega === 'ENVIO'
+                        ? 'bg-blue-600 text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-blue-600'
+                    }`}
+                  >
+                    <Truck size={14} />
+                    <span>🚚 Envío a Domicilio / Encomienda</span>
+                  </button>
+                </div>
+
+                {tipoEntrega === 'ENVIO' && (
+                  <div className="pt-2 border-t border-[var(--border)]/60 space-y-3 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                          Empresa de Transporte / Courier *
+                        </label>
+                        <select
+                          value={courier}
+                          onChange={(e) => setCourier(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        >
+                          <option value="Servientrega">📦 Servientrega</option>
+                          <option value="Cooperativa Baños">🚌 Cooperativa Baños</option>
+                          <option value="Cooperativa Cevallos">🚌 Cooperativa Cevallos</option>
+                          <option value="Transportes Santa">🚌 Transportes Santa</option>
+                          <option value="Cooperativa Cita Express">🚌 Cooperativa Cita Express</option>
+                          <option value="Urbano Express">🚚 Urbano Express</option>
+                          <option value="Encomienda Provincial">🚛 Encomienda Provincial / Transporte Local</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                          Ciudad de Destino *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Quito, Guayaquil, Cuenca, Riobamba, Latacunga..."
+                          value={ciudadEnvio}
+                          onChange={(e) => setCiudadEnvio(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                          Dirección de Entrega / Agencia Destino
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Av. 10 de Agosto y Colón / Agencia Terminal Terrestre"
+                          value={direccionEnvio}
+                          onChange={(e) => setDireccionEnvio(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                          N° Guía de Encomienda / Tracking (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: GUIA-2026-88492"
+                          value={guiaEnvio}
+                          onChange={(e) => setGuiaEnvio(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quién asume el Flete */}
+                    <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-2">
+                      <span className="text-[11px] font-bold text-blue-900 dark:text-blue-300 block">
+                        Gestión del Costo de Envío (Flete)
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setAsumeFlete('CLIENTE')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                              asumeFlete === 'CLIENTE'
+                                ? 'bg-blue-600 text-white border-transparent'
+                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                            }`}
+                          >
+                            🔵 Cobro en Destino (Paga Cliente)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAsumeFlete('EMPRESA')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                              asumeFlete === 'EMPRESA'
+                                ? 'bg-emerald-600 text-white border-transparent'
+                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                            }`}
+                          >
+                            🟢 Cubre la Empresa (Cortesía)
+                          </button>
+                        </div>
+
+                        {asumeFlete === 'EMPRESA' ? (
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold text-emerald-700 whitespace-nowrap">
+                              Gasto Flete ($):
+                            </label>
+                            <input
+                              type="number"
+                              step="0.50"
+                              min="0"
+                              value={costoEnvio}
+                              onChange={(e) => setCostoEnvio(e.target.value)}
+                              className="w-24 px-2.5 py-1 bg-[var(--card)] border border-emerald-500/40 rounded-lg text-xs font-bold text-emerald-800 focus:outline-none focus:border-emerald-600 text-center"
+                            />
+                            <span className="text-[10px] text-emerald-600 italic">
+                              (Registra gasto operativo automático)
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-[var(--muted-foreground)] italic">
+                            El cliente pagará el costo del flete directamente a la empresa de transporte al retirar.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 2. SECCIÓN AGREGAR PRODUCTO, MODELO Y TALLA */}
@@ -2532,6 +2863,230 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 >
                   {savingSupplierOrder ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
                   <span>Enviar Orden al Proveedor</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL GESTIONAR LOGÍSTICA DE ENVÍO Y FLETE (Fase E1) ── */}
+      {showModalEnvio && pedidoEnvioSeleccionado && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-500/20 backdrop-blur-sm rounded-2xl border border-blue-400/30 text-blue-400 font-bold">
+                  <Truck size={22} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">
+                    Logística de Envío — Pedido #{getNumeroPedido(pedidoEnvioSeleccionado)}
+                  </h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Cliente: {pedidoEnvioSeleccionado.clienteNombre || 'Consumidor Final'} · Total: ${Number(pedidoEnvioSeleccionado.montoTotal).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowModalEnvio(false);
+                  setPedidoEnvioSeleccionado(null);
+                }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleGuardarLogisticaEnvio();
+              }}
+              className="p-5 space-y-4 overflow-y-auto flex-1"
+            >
+              {/* Selector de Modalidad */}
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">
+                  Modalidad de Entrega del Pedido *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEnvioModalTipoEntrega('PRESENCIAL')}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      envioModalTipoEntrega === 'PRESENCIAL'
+                        ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
+                    }`}
+                  >
+                    <span>🏪 Entrega Presencial (Local)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEnvioModalTipoEntrega('ENVIO')}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      envioModalTipoEntrega === 'ENVIO'
+                        ? 'bg-blue-600 text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-blue-600'
+                    }`}
+                  >
+                    <Truck size={14} />
+                    <span>🚚 Envío / Encomienda</span>
+                  </button>
+                </div>
+              </div>
+
+              {envioModalTipoEntrega === 'ENVIO' ? (
+                <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl space-y-3.5 animate-in fade-in duration-150">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                        Empresa Courier / Transporte *
+                      </label>
+                      <select
+                        value={envioModalCourier}
+                        onChange={(e) => setEnvioModalCourier(e.target.value)}
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                      >
+                        <option value="Servientrega">📦 Servientrega</option>
+                        <option value="Cooperativa Baños">🚌 Cooperativa Baños</option>
+                        <option value="Cooperativa Cevallos">🚌 Cooperativa Cevallos</option>
+                        <option value="Transportes Santa">🚌 Transportes Santa</option>
+                        <option value="Cooperativa Cita Express">🚌 Cooperativa Cita Express</option>
+                        <option value="Urbano Express">🚚 Urbano Express</option>
+                        <option value="Encomienda Provincial">🚛 Encomienda Provincial / Transporte</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                        Ciudad de Destino *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Quito, Guayaquil, Cuenca, Ambato..."
+                        value={envioModalCiudadEnvio}
+                        onChange={(e) => setEnvioModalCiudadEnvio(e.target.value)}
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        required={envioModalTipoEntrega === 'ENVIO'}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Dirección de Entrega / Sucursal de Retiro
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Av. 10 de Agosto y Colón / Agencia Terminal Quitumbe"
+                      value={envioModalDireccionEnvio}
+                      onChange={(e) => setEnvioModalDireccionEnvio(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      N° de Guía de Encomienda / Tracking
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: GUIA-2026-99381"
+                      value={envioModalGuiaEnvio}
+                      onChange={(e) => setEnvioModalGuiaEnvio(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
+                    />
+                  </div>
+
+                  {/* Quién asume el Flete */}
+                  <div className="pt-2 border-t border-blue-500/20 space-y-2">
+                    <span className="text-[11px] font-bold text-blue-900 dark:text-blue-300 block">
+                      Gestión del Flete
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEnvioModalAsumeFlete('CLIENTE')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                          envioModalAsumeFlete === 'CLIENTE'
+                            ? 'bg-blue-600 text-white border-transparent'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                        }`}
+                      >
+                        🔵 Cobro en Destino (Paga Cliente)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEnvioModalAsumeFlete('EMPRESA')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                          envioModalAsumeFlete === 'EMPRESA'
+                            ? 'bg-emerald-600 text-white border-transparent'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                        }`}
+                      >
+                        🟢 Cubre la Empresa (Cortesía)
+                      </button>
+                    </div>
+
+                    {envioModalAsumeFlete === 'EMPRESA' ? (
+                      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-between gap-3">
+                        <div>
+                          <span className="text-xs font-bold text-emerald-800 block">Costo de Flete a Registrar ($):</span>
+                          <span className="text-[10px] text-emerald-600">Se añadirá automáticamente al Libro de Gastos Operativos</span>
+                        </div>
+                        <input
+                          type="number"
+                          step="0.50"
+                          min="0.01"
+                          value={envioModalCostoEnvio}
+                          onChange={(e) => setEnvioModalCostoEnvio(e.target.value)}
+                          className="w-24 px-2.5 py-1 bg-[var(--card)] border border-emerald-500/40 rounded-lg text-xs font-extrabold text-emerald-800 focus:outline-none focus:border-emerald-600 text-center"
+                          required
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-[var(--muted-foreground)] italic">
+                        El cliente pagará el valor del flete directamente a la empresa de transporte al retirar el paquete.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                    <CheckCircle size={18} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-emerald-800">Entrega Presencial en Mostrador</div>
+                    <div className="text-[11px] text-[var(--muted-foreground)]">
+                      El cliente retirará su calzado directamente en el local comercial sin costo de flete.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModalEnvio(false);
+                    setPedidoEnvioSeleccionado(null);
+                  }}
+                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEnvioModal}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {savingEnvioModal ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+                  <span>Guardar Logística de Entrega</span>
                 </button>
               </div>
             </form>

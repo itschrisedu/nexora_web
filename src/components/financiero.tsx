@@ -41,6 +41,15 @@ import {
   Share2,
   Mail,
   MapPin,
+  Plus,
+  Trash2,
+  Edit2,
+  Truck,
+  Tag,
+  Wallet,
+  PieChart,
+  BarChart3,
+  Filter,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
 import { compartirFacturaPdf, generarFacturaPdfDoc } from '../services/pdf-factura.service';
@@ -55,6 +64,75 @@ import {
 interface FinancieroProps {
   online: boolean;
 }
+
+export interface GastoItem {
+  id: string;
+  tenantId: string;
+  userId?: string;
+  descripcion: string;
+  categoria: string;
+  monto: number;
+  metodoPago: string;
+  comprobanteRef?: string;
+  observaciones?: string;
+  orderId?: string;
+  fechaGasto: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    nombre: string;
+    email: string;
+    rol: string;
+  };
+  order?: {
+    id: string;
+    numeroPedido: number;
+    clienteNombre: string;
+    tipoEntrega: string;
+    asumeFlete: string;
+    costoEnvio: number;
+    guiaEnvio?: string;
+    courier?: string;
+  };
+}
+
+export interface EstadisticasGastos {
+  totalMonto: number;
+  totalCantidad: number;
+  porCategoria: {
+    categoria: string;
+    totalMonto: number;
+    cantidad: number;
+    porcentaje: number;
+  }[];
+  porMetodoPago: {
+    metodoPago: string;
+    totalMonto: number;
+    cantidad: number;
+  }[];
+  fletesEmpresaMonto: number;
+}
+
+export const GASTO_CATEGORIAS: Record<string, { label: string; color: string; bg: string }> = {
+  ARRIENDO: { label: 'Arriendo de Local', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
+  SERVICIOS_BASICOS: { label: 'Servicios Básicos (Luz/Agua/Net)', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+  SUELDOS_PERSONAL: { label: 'Nómina & Sueldos', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+  LOGISTICA_ENVIOS: { label: 'Logística de Envíos / Flete', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+  SUMINISTROS_LOCAL: { label: 'Suministros de Tienda', color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' },
+  MARKETING_PUBLICIDAD: { label: 'Marketing & Publicidad', color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-500/10 border-pink-500/20' },
+  MANTENIMIENTO_LOCAL: { label: 'Mantenimiento & Reparación', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
+  IMPUESTOS_TASAS: { label: 'Impuestos & Tasas Municipales', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' },
+  OTROS: { label: 'Otros Gastos Operativos', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-500/10 border-slate-500/20' },
+};
+
+export const METODOS_PAGO_GASTO: Record<string, string> = {
+  EFECTIVO: 'Efectivo en Caja',
+  TRANSFERENCIA: 'Transferencia Bancaria',
+  TARJETA: 'Tarjeta Débito/Crédito',
+  CHEQUE: 'Cheque',
+  DEBITO_BANCARIO: 'Débito Bancario Automático',
+  OTRO: 'Otro Método',
+};
 
 type EstadoCobro = 'PENDIENTE' | 'PARCIALMENTE_PAGADO' | 'SALDADO' | 'PAGADO' | 'VENCIDO';
 
@@ -166,9 +244,28 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   const { showToast } = useToast();
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [loading, setLoading] = useState(false);
-  const [vista, setVista] = useState<'CLIENTES' | 'FACTURAS'>('CLIENTES');
+  const [vista, setVista] = useState<'CLIENTES' | 'FACTURAS' | 'GASTOS'>('CLIENTES');
   const [filtro, setFiltro] = useState<EstadoCobro | 'TODOS'>('TODOS');
   const [busqueda, setBusqueda] = useState('');
+
+  // ── Estados de Gastos Operativos (OPEX) & Fletes ──
+  const [gastosList, setGastosList] = useState<GastoItem[]>([]);
+  const [gastosStats, setGastosStats] = useState<EstadisticasGastos | null>(null);
+  const [loadingGastos, setLoadingGastos] = useState(false);
+  const [filtroCategoriaGasto, setFiltroCategoriaGasto] = useState<string>('TODOS');
+  const [busquedaGasto, setBusquedaGasto] = useState('');
+  const [showGastoModal, setShowGastoModal] = useState(false);
+  const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
+  const [savingGasto, setSavingGasto] = useState(false);
+  const [gastoForm, setGastoForm] = useState({
+    descripcion: '',
+    categoria: 'SERVICIOS_BASICOS',
+    monto: '',
+    metodoPago: 'EFECTIVO',
+    comprobanteRef: '',
+    observaciones: '',
+    fechaGasto: new Date().toISOString().split('T')[0],
+  });
 
   // Cliente o Cobro seleccionado para el modal de cuenta corriente
   const [clienteSeleccionadoId, setClienteSeleccionadoId] = useState<string | null>(null);
@@ -266,7 +363,107 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
   useEffect(() => {
     loadCobros();
     loadBusinessConfig();
+    loadGastos();
   }, [online]);
+
+  const loadGastos = async () => {
+    setLoadingGastos(true);
+    try {
+      if (online) {
+        const [listaData, statsData] = await Promise.all([
+          ApiService.get('/gastos'),
+          ApiService.get('/gastos/stats'),
+        ]);
+        setGastosList(Array.isArray(listaData) ? listaData : []);
+        setGastosStats(statsData || null);
+      }
+    } catch (err) {
+      console.error('Error al cargar gastos operativos:', err);
+    } finally {
+      setLoadingGastos(false);
+    }
+  };
+
+  const handleAbrirNuevoGasto = () => {
+    setEditingGastoId(null);
+    setGastoForm({
+      descripcion: '',
+      categoria: 'SERVICIOS_BASICOS',
+      monto: '',
+      metodoPago: 'EFECTIVO',
+      comprobanteRef: '',
+      observaciones: '',
+      fechaGasto: new Date().toISOString().split('T')[0],
+    });
+    setShowGastoModal(true);
+  };
+
+  const handleAbrirEditarGasto = (g: GastoItem) => {
+    setEditingGastoId(g.id);
+    const fecha = g.fechaGasto ? new Date(g.fechaGasto).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    setGastoForm({
+      descripcion: g.descripcion || '',
+      categoria: g.categoria || 'OTROS',
+      monto: String(g.monto || ''),
+      metodoPago: g.metodoPago || 'EFECTIVO',
+      comprobanteRef: g.comprobanteRef || '',
+      observaciones: g.observaciones || '',
+      fechaGasto: fecha,
+    });
+    setShowGastoModal(true);
+  };
+
+  const handleGuardarGasto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const montoNum = parseFloat(gastoForm.monto);
+    if (!gastoForm.descripcion.trim()) {
+      showToast('Ingresa el concepto o descripción del gasto.', 'warning');
+      return;
+    }
+    if (isNaN(montoNum) || montoNum <= 0) {
+      showToast('Ingresa un monto válido mayor a 0.', 'warning');
+      return;
+    }
+
+    setSavingGasto(true);
+    try {
+      const payload = {
+        descripcion: gastoForm.descripcion.trim(),
+        categoria: gastoForm.categoria,
+        monto: montoNum,
+        metodoPago: gastoForm.metodoPago,
+        comprobanteRef: gastoForm.comprobanteRef.trim() || undefined,
+        observaciones: gastoForm.observaciones.trim() || undefined,
+        fechaGasto: gastoForm.fechaGasto ? new Date(gastoForm.fechaGasto).toISOString() : new Date().toISOString(),
+      };
+
+      if (editingGastoId) {
+        await ApiService.put(`/gastos/${editingGastoId}`, payload);
+        showToast('Gasto operativo actualizado exitosamente.', 'success');
+      } else {
+        await ApiService.post('/gastos', payload);
+        showToast('Gasto operativo registrado exitosamente.', 'success');
+      }
+
+      setShowGastoModal(false);
+      await loadGastos();
+    } catch (err: any) {
+      showToast(err.message || 'Error al guardar el gasto operativo.', 'error');
+    } finally {
+      setSavingGasto(false);
+    }
+  };
+
+  const handleEliminarGasto = async (id: string, descripcion: string) => {
+    if (!confirm(`¿Estás seguro de eliminar el gasto "${descripcion}"?`)) return;
+    try {
+      await ApiService.delete(`/gastos/${id}`);
+      showToast('Gasto operativo eliminado.', 'info');
+      await loadGastos();
+    } catch (err: any) {
+      showToast(err.message || 'Error al eliminar el gasto.', 'error');
+    }
+  };
 
   const loadBusinessConfig = async () => {
     try {
@@ -1201,18 +1398,20 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header & KPI Saldo Pendiente */}
+      {/* Header & KPI */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="font-extrabold text-xl tracking-tight text-[var(--foreground)]">
-            Cartera de Clientes y Gestión de Cobros
+            {vista === 'GASTOS' ? 'Gestión de Gastos Operativos (OPEX)' : 'Cartera de Clientes y Gestión de Cobros'}
           </h2>
           <p className="text-xs text-[var(--muted-foreground)] font-medium">
-            Consolidación de deudas por cliente, detalle de notas de venta y control de abonos
+            {vista === 'GASTOS'
+              ? 'Control integral de egresos: arriendo, servicios básicos, nómina, logística, suministros y más'
+              : 'Consolidación de deudas por cliente, detalle de notas de venta y control de abonos'}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Selector de Vistas */}
           <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl">
             <button
@@ -1233,21 +1432,45 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
               <Receipt size={14} />
               <span>Por Nota/Cobro</span>
             </button>
+            <button
+              onClick={() => setVista('GASTOS')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                vista === 'GASTOS' ? 'bg-[#0F172A] text-white shadow-sm' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              <Wallet size={14} />
+              <span>Gastos & Fletes</span>
+            </button>
           </div>
 
-          <div className="px-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm text-sm flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-red-500/10 text-red-500">
-              <DollarSign size={18} />
+          {vista !== 'GASTOS' && (
+            <div className="px-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm text-sm flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-red-500/10 text-red-500">
+                <DollarSign size={18} />
+              </div>
+              <div>
+                <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold leading-tight">Total por Cobrar:</span>
+                <span className="font-extrabold text-base text-red-500 leading-tight">${saldoTotalGeneral.toFixed(2)}</span>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold leading-tight">Total por Cobrar:</span>
-              <span className="font-extrabold text-base text-red-500 leading-tight">${saldoTotalGeneral.toFixed(2)}</span>
+          )}
+
+          {vista === 'GASTOS' && (
+            <div className="px-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm text-sm flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500">
+                <Wallet size={18} />
+              </div>
+              <div>
+                <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold leading-tight">Total Gastado (Mes):</span>
+                <span className="font-extrabold text-base text-orange-500 leading-tight">${(gastosStats?.totalMonto ?? 0).toFixed(2)}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Barra de Búsqueda y Filtros de Estado */}
+      {/* Barra de Búsqueda y Filtros de Estado — solo para vistas CLIENTES y FACTURAS */}
+      {vista !== 'GASTOS' && (
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
@@ -1284,6 +1507,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
           ))}
         </div>
       </div>
+      )}
 
       {/* Grid Principal: Tabla completa */}
       <div className="space-y-4">
@@ -1528,7 +1752,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                 </div>
               </div>
             )
-          ) : (
+          ) : vista === 'FACTURAS' ? (
             /* ══════════════════════════════════════════════════════════════ */
             /* VISTA DETALLADA POR NOTA / FACTURA INDIVIDUAL                  */
             /* ══════════════════════════════════════════════════════════════ */
@@ -1629,9 +1853,411 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                 </div>
               </div>
             )
+          ) : vista === 'GASTOS' ? (
+            /* ══════════════════════════════════════════════════════════════ */
+            /* VISTA GASTOS OPERATIVOS (OPEX) & FLETES                        */
+            /* ══════════════════════════════════════════════════════════════ */
+            <div className="space-y-5">
+              {loadingGastos ? (
+                <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
+                  <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
+                  <span className="text-xs font-bold">Cargando gastos operativos...</span>
+                </div>
+              ) : (
+                <>
+                  {/* KPI Cards Row */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500"><DollarSign size={16} /></div>
+                        <span className="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase">Total del Mes</span>
+                      </div>
+                      <span className="text-lg font-black text-orange-500">${(gastosStats?.totalMonto ?? 0).toFixed(2)}</span>
+                    </div>
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500"><BarChart3 size={16} /></div>
+                        <span className="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase">N° de Registros</span>
+                      </div>
+                      <span className="text-lg font-black text-[var(--foreground)]">{gastosStats?.totalCantidad ?? 0}</span>
+                    </div>
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500"><Truck size={16} /></div>
+                        <span className="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase">Fletes Empresa</span>
+                      </div>
+                      <span className="text-lg font-black text-emerald-600">${(gastosStats?.fletesEmpresaMonto ?? 0).toFixed(2)}</span>
+                    </div>
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500"><PieChart size={16} /></div>
+                        <span className="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase">Categorías</span>
+                      </div>
+                      <span className="text-lg font-black text-[var(--foreground)]">{gastosStats?.porCategoria?.length ?? 0}</span>
+                    </div>
+                  </div>
+
+                  {/* Category Breakdown Cards */}
+                  {gastosStats && gastosStats.porCategoria && gastosStats.porCategoria.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      {gastosStats.porCategoria.map((cat) => {
+                        const catConfig = GASTO_CATEGORIAS[cat.categoria] || { label: cat.categoria, color: 'text-slate-600', bg: 'bg-slate-500/10 border-slate-500/20' };
+                        return (
+                          <button
+                            key={cat.categoria}
+                            onClick={() => setFiltroCategoriaGasto(filtroCategoriaGasto === cat.categoria ? 'TODOS' : cat.categoria)}
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                              filtroCategoriaGasto === cat.categoria
+                                ? 'bg-[#0F172A] border-transparent text-white'
+                                : `${catConfig.bg}`
+                            }`}
+                          >
+                            <span className={`text-[10px] font-bold block truncate ${filtroCategoriaGasto === cat.categoria ? 'text-white/80' : catConfig.color}`}>
+                              {catConfig.label}
+                            </span>
+                            <div className="flex items-baseline justify-between mt-1">
+                              <span className={`text-sm font-black ${filtroCategoriaGasto === cat.categoria ? 'text-white' : 'text-[var(--foreground)]'}`}>
+                                ${cat.totalMonto.toFixed(2)}
+                              </span>
+                              <span className={`text-[9px] font-semibold ${filtroCategoriaGasto === cat.categoria ? 'text-white/60' : 'text-[var(--muted-foreground)]'}`}>
+                                {cat.porcentaje.toFixed(0)}%
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Search & Actions Bar for Gastos */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div className="relative flex-1 max-w-md">
+                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                      <input
+                        type="text"
+                        placeholder="Buscar gasto por concepto, comprobante o categoría..."
+                        value={busquedaGasto}
+                        onChange={(e) => setBusquedaGasto(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] shadow-sm"
+                      />
+                      {busquedaGasto && (
+                        <button
+                          onClick={() => setBusquedaGasto('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {filtroCategoriaGasto !== 'TODOS' && (
+                        <button
+                          onClick={() => setFiltroCategoriaGasto('TODOS')}
+                          className="px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-xs font-bold text-[var(--muted-foreground)] hover:border-[#0F172A] transition-all flex items-center gap-1.5"
+                        >
+                          <Filter size={12} />
+                          <span>Limpiar Filtro</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={handleAbrirNuevoGasto}
+                        className="px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-2xl transition-all shadow-sm flex items-center gap-2 cursor-pointer border border-slate-700"
+                      >
+                        <Plus size={16} />
+                        <span>Registrar Gasto</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expenses Table */}
+                  {(() => {
+                    const gastosFiltrados = gastosList.filter((g) => {
+                      const cumpleCategoria = filtroCategoriaGasto === 'TODOS' || g.categoria === filtroCategoriaGasto;
+                      const q = busquedaGasto.toLowerCase().trim();
+                      if (!q) return cumpleCategoria;
+                      const desc = (g.descripcion || '').toLowerCase();
+                      const comp = (g.comprobanteRef || '').toLowerCase();
+                      const catLabel = (GASTO_CATEGORIAS[g.categoria]?.label || g.categoria || '').toLowerCase();
+                      const obs = (g.observaciones || '').toLowerCase();
+                      return cumpleCategoria && (desc.includes(q) || comp.includes(q) || catLabel.includes(q) || obs.includes(q));
+                    });
+
+                    return gastosFiltrados.length === 0 ? (
+                      <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
+                        <Wallet size={40} className="mx-auto text-[var(--muted-foreground)]/40 mb-2" />
+                        <p className="text-sm font-bold">No se encontraron gastos operativos</p>
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                          {busquedaGasto ? `No hay resultados para "${busquedaGasto}"` : 'Registra gastos como arriendo, luz, agua, personal, envíos y más.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-left">
+                            <thead className="bg-[var(--muted)]/40 text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                              <tr>
+                                <th className="px-5 py-4">Concepto / Descripción</th>
+                                <th className="px-5 py-4">Categoría</th>
+                                <th className="px-5 py-4 text-center">Método Pago</th>
+                                <th className="px-5 py-4 text-right">Monto</th>
+                                <th className="px-5 py-4 text-center">Fecha</th>
+                                <th className="px-5 py-4">Comprobante</th>
+                                <th className="px-5 py-4 text-center">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--border)]">
+                              {gastosFiltrados.map((g) => {
+                                const catCfg = GASTO_CATEGORIAS[g.categoria] || { label: g.categoria, color: 'text-slate-600', bg: 'bg-slate-500/10 border-slate-500/20' };
+                                const metodoPagoLabel = METODOS_PAGO_GASTO[g.metodoPago] || g.metodoPago;
+                                const fechaDisplay = g.fechaGasto ? new Date(g.fechaGasto).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                                const esFleteAuto = g.categoria === 'LOGISTICA_ENVIOS' && g.orderId;
+
+                                return (
+                                  <tr key={g.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                    <td className="px-5 py-4">
+                                      <div className="font-extrabold text-xs text-[var(--foreground)] max-w-[220px] truncate">
+                                        {g.descripcion}
+                                      </div>
+                                      {esFleteAuto && g.order && (
+                                        <div className="flex items-center gap-1 mt-0.5">
+                                          <Truck size={10} className="text-emerald-500" />
+                                          <span className="text-[9px] text-emerald-600 font-semibold">
+                                            Auto-generado — Pedido #{g.order.numeroPedido} ({g.order.clienteNombre})
+                                          </span>
+                                        </div>
+                                      )}
+                                      {g.observaciones && (
+                                        <span className="text-[10px] text-[var(--muted-foreground)] block mt-0.5 max-w-[220px] truncate">{g.observaciones}</span>
+                                      )}
+                                      {g.user && (
+                                        <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Registrado por: {g.user.nombre}</span>
+                                      )}
+                                    </td>
+
+                                    <td className="px-5 py-4">
+                                      <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold inline-block ${catCfg.bg}`}>
+                                        {catCfg.label}
+                                      </span>
+                                    </td>
+
+                                    <td className="px-5 py-4 text-center">
+                                      <span className="text-[11px] font-semibold text-[var(--muted-foreground)]">{metodoPagoLabel}</span>
+                                    </td>
+
+                                    <td className="px-5 py-4 text-right">
+                                      <span className="text-sm font-black text-orange-500">${Number(g.monto).toFixed(2)}</span>
+                                    </td>
+
+                                    <td className="px-5 py-4 text-center">
+                                      <span className="text-[11px] font-semibold text-[var(--muted-foreground)]">{fechaDisplay}</span>
+                                    </td>
+
+                                    <td className="px-5 py-4">
+                                      <span className="text-[11px] text-[var(--muted-foreground)] font-semibold max-w-[120px] truncate block">
+                                        {g.comprobanteRef || '—'}
+                                      </span>
+                                    </td>
+
+                                    <td className="px-5 py-4 text-center">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <button
+                                          onClick={() => handleAbrirEditarGasto(g)}
+                                          className="p-2 rounded-xl bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors cursor-pointer"
+                                          title="Editar Gasto"
+                                        >
+                                          <Edit2 size={13} />
+                                        </button>
+                                        {!esFleteAuto && (
+                                          <button
+                                            onClick={() => handleEliminarGasto(g.id, g.descripcion)}
+                                            className="p-2 rounded-xl bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                                            title="Eliminar Gasto"
+                                          >
+                                            <Trash2 size={13} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          ) : (
+            /* ══════════════════════════════════════════════════════════════ */
+            /* VISTA DETALLADA POR NOTA / FACTURA INDIVIDUAL (was else)       */
+            /* ══════════════════════════════════════════════════════════════ */
+            null
           )}
         </div>
       </div>
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* MODAL: REGISTRAR / EDITAR GASTO OPERATIVO                      */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {showGastoModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowGastoModal(false)}
+        >
+          <div
+            className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-5 border-b border-[var(--border)] bg-gradient-to-r from-[#0F172A] to-[#1e293b]">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10">
+                    <Wallet size={20} className="text-orange-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-white">
+                      {editingGastoId ? 'Editar Gasto Operativo' : 'Registrar Nuevo Gasto'}
+                    </h3>
+                    <p className="text-[11px] text-slate-300 mt-0.5">Ingresa los datos del egreso operacional</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowGastoModal(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleGuardarGasto} className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Concepto */}
+              <div>
+                <label className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Concepto / Descripción del Gasto</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Pago arriendo local mes de septiembre, Planilla EEASA, Envío Servientrega..."
+                  value={gastoForm.descripcion}
+                  onChange={(e) => setGastoForm({ ...gastoForm, descripcion: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  autoFocus
+                />
+              </div>
+
+              {/* Categoría + Monto */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Categoría</label>
+                  <select
+                    value={gastoForm.categoria}
+                    onChange={(e) => setGastoForm({ ...gastoForm, categoria: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none cursor-pointer"
+                  >
+                    {Object.entries(GASTO_CATEGORIAS).map(([key, cfg]) => (
+                      <option key={key} value={key}>{cfg.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Monto ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={gastoForm.monto}
+                    onChange={(e) => setGastoForm({ ...gastoForm, monto: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+              </div>
+
+              {/* Método de Pago + Fecha */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Método de Pago</label>
+                  <select
+                    value={gastoForm.metodoPago}
+                    onChange={(e) => setGastoForm({ ...gastoForm, metodoPago: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none cursor-pointer"
+                  >
+                    {Object.entries(METODOS_PAGO_GASTO).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Fecha del Gasto</label>
+                  <input
+                    type="date"
+                    value={gastoForm.fechaGasto}
+                    onChange={(e) => setGastoForm({ ...gastoForm, fechaGasto: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+              </div>
+
+              {/* Comprobante */}
+              <div>
+                <label className="text-xs font-bold text-[var(--foreground)] block mb-1.5">N° Comprobante / Referencia (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: FAC-001-00234, REC-2026-09, Planilla #12345..."
+                  value={gastoForm.comprobanteRef}
+                  onChange={(e) => setGastoForm({ ...gastoForm, comprobanteRef: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              {/* Observaciones */}
+              <div>
+                <label className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Observaciones (Opcional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="Notas adicionales sobre este gasto..."
+                  value={gastoForm.observaciones}
+                  onChange={(e) => setGastoForm({ ...gastoForm, observaciones: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => setShowGastoModal(false)}
+                  className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingGasto || !online}
+                  className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer border border-slate-700"
+                >
+                  {savingGasto ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} />
+                      <span>{editingGastoId ? 'Actualizar Gasto' : 'Registrar Gasto'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════ */}
       {/* MODAL: GESTIÓN DE ABONOS & CUENTA CORRIENTE DEL CLIENTE       */}
