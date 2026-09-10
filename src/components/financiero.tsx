@@ -143,6 +143,9 @@ interface Abono {
   metodo: string;
   notas?: string;
   createdAt: string;
+  usuarioNombre?: string;
+  usuarioEmail?: string;
+  usuarioRol?: string;
 }
 
 interface Cobro {
@@ -171,6 +174,10 @@ interface Cobro {
     lines?: any[];
   };
   abonos?: Abono[];
+  vendedorNombre?: string;
+  vendedorEmail?: string;
+  vendedorRol?: string;
+  sucursalNombre?: string;
 }
 
 interface ClienteCartera {
@@ -691,7 +698,15 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
   const armarDatosComprobanteAbono = (
     cartera: ClienteCartera,
-    abonoInfo: { monto: number; metodo: string; fecha?: string; notas?: string; numeroNota?: string }
+    abonoInfo: {
+      monto: number;
+      metodo: string;
+      fecha?: string;
+      notas?: string;
+      numeroNota?: string;
+      usuarioNombre?: string;
+      sucursalNombre?: string;
+    }
   ): ComprobanteAbonoPdfData => {
     const hoy = new Date();
     const hoyStr = hoy.toISOString().split('T')[0];
@@ -728,6 +743,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         formaPago: abonoInfo.metodo,
         referencia: abonoInfo.notas,
         notas: abonoInfo.notas,
+        cajero: abonoInfo.usuarioNombre,
+        sucursal: abonoInfo.sucursalNombre || cartera.cobros[0]?.sucursalNombre,
       },
       cliente: {
         nombre: cartera.clienteNombre,
@@ -750,7 +767,15 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
 
   const handleEnviarComprobanteAbono = async (
     cartera: ClienteCartera,
-    abonoInfo: { monto: number; metodo: string; fecha?: string; notas?: string; numeroNota?: string },
+    abonoInfo: {
+      monto: number;
+      metodo: string;
+      fecha?: string;
+      notas?: string;
+      numeroNota?: string;
+      usuarioNombre?: string;
+      sucursalNombre?: string;
+    },
     _modo?: 'PDF' | 'TEXTO'
   ) => {
     if (!cartera.clienteTelefono) {
@@ -1715,10 +1740,22 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                                     {cCfg.label}
                                                   </span>
                                                 </div>
-                                                <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-3 mt-1">
+                                                <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-3 mt-1 flex-wrap">
                                                   <span>Fecha: {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}</span>
                                                   {cobroItem.fechaVencimiento && (
                                                     <span>Vence: {new Date(cobroItem.fechaVencimiento).toLocaleDateString('es-EC')}</span>
+                                                  )}
+                                                  {cobroItem.vendedorNombre && (
+                                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                                                      <User size={10} />
+                                                      <span>Vendedor: {cobroItem.vendedorNombre}</span>
+                                                    </span>
+                                                  )}
+                                                  {cobroItem.sucursalNombre && (
+                                                    <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                                                      <Building size={10} />
+                                                      <span>Sucursal: {cobroItem.sucursalNombre}</span>
+                                                    </span>
                                                   )}
                                                 </div>
                                               </div>
@@ -1840,11 +1877,23 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                               <div className="font-extrabold text-xs text-[var(--foreground)]">
                                 {cobro.clienteNombre}
                               </div>
-                              <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                              <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] mt-0.5 flex-wrap">
                                 <span>C.I: {cobro.clienteCedula}</span>
                                 {cobro.clienteNivel && (
                                   <span className="px-1.5 py-0.2 bg-slate-500/10 text-slate-700 rounded font-bold">
                                     {cobro.clienteNivel}
+                                  </span>
+                                )}
+                                {cobro.vendedorNombre && (
+                                  <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                                    <User size={10} />
+                                    <span>{cobro.vendedorNombre}</span>
+                                  </span>
+                                )}
+                                {cobro.sucursalNombre && (
+                                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                                    <Building size={10} />
+                                    <span>{cobro.sucursalNombre}</span>
                                   </span>
                                 )}
                               </div>
@@ -2384,8 +2433,20 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                             Nota Más Antigua (Por orden de llegada)
                           </span>
                         </div>
-                        <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
-                          Monto Original: <strong>${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)}</strong> ({cobroSeleccionado.tipo || 'Crédito'})
+                        <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5 flex items-center gap-2 flex-wrap">
+                          <span>Monto Original: <strong>${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)}</strong> ({cobroSeleccionado.tipo || 'Crédito'})</span>
+                          {cobroSeleccionado.vendedorNombre && (
+                            <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                              <User size={10} />
+                              <span>Vendedor: {cobroSeleccionado.vendedorNombre}</span>
+                            </span>
+                          )}
+                          {cobroSeleccionado.sucursalNombre && (
+                            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                              <Building size={10} />
+                              <span>Sucursal: {cobroSeleccionado.sucursalNombre}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2509,6 +2570,12 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                             <span className="text-[10px] text-[var(--muted-foreground)]">
                               {new Date(a.createdAt).toLocaleDateString('es-EC')}
                             </span>
+                            {a.usuarioNombre && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                                <User size={10} />
+                                <span>Cobrado por: {a.usuarioNombre}</span>
+                              </span>
+                            )}
                           </div>
                           {a.notas && <p className="text-[9px] text-[var(--muted-foreground)] italic mt-0.5 truncate">{a.notas}</p>}
                         </div>
@@ -2526,6 +2593,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                 numeroNota: cobroSeleccionado.saleNote?.numero
                                   ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
                                   : cobroSeleccionado.numeroCobro,
+                                usuarioNombre: a.usuarioNombre,
+                                sucursalNombre: cobroSeleccionado.sucursalNombre,
                               });
                               descargarComprobanteAbonoPdf(dataAbono);
                               showToast('Comprobante de abono PDF descargado.', 'success');
@@ -2550,6 +2619,8 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                     numeroNota: cobroSeleccionado.saleNote?.numero
                                       ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
                                       : cobroSeleccionado.numeroCobro,
+                                    usuarioNombre: a.usuarioNombre,
+                                    sucursalNombre: cobroSeleccionado.sucursalNombre,
                                   },
                                   formatoEnvioAbono
                                 );

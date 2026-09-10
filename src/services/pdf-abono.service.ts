@@ -18,6 +18,8 @@ export interface ComprobanteAbonoPdfData {
     formaPago: string;
     referencia?: string;
     notas?: string;
+    cajero?: string;
+    sucursal?: string;
   };
   cliente: {
     nombre: string;
@@ -292,7 +294,7 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
-  doc.text(data.emisor.nombre, 57.5, firmaY + 8, { align: 'center' });
+  doc.text(data.comprobante.cajero ? `Cajero/a: ${data.comprobante.cajero}` : data.emisor.nombre, 57.5, firmaY + 8, { align: 'center' });
   doc.text(data.cliente.nombre, pageWidth - 57.5, firmaY + 8, { align: 'center' });
 
   // ── 6. Footer de Seguridad y Validez ─────────────

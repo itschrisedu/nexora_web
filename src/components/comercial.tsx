@@ -20,6 +20,8 @@ import {
   MessageCircle,
   ShoppingBag,
   AlertCircle,
+  User,
+  Building,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -40,6 +42,7 @@ interface Pedido {
   clientId: string;
   clienteNombre?: string;
   vendedorNombre?: string;
+  sucursalNombre?: string;
   montoTotal: number;
   estado: EstadoPedido;
   tipoPago: string;
@@ -1235,11 +1238,20 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                     <span>{rep.label}</span>
                                   </span>
                                 )}
-                                {p.vendedorNombre && (
-                                  <span className="text-[10px] text-[var(--muted-foreground)]">
-                                    Vendedor: <strong className="text-[var(--foreground)]">{p.vendedorNombre}</strong>
-                                  </span>
-                                )}
+                                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                  {p.vendedorNombre && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                                      <User size={10} />
+                                      <span>{p.vendedorNombre}</span>
+                                    </span>
+                                  )}
+                                  {p.sucursalNombre && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                                      <Building size={10} />
+                                      <span>{p.sucursalNombre}</span>
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             );
                           })()}
@@ -1370,10 +1382,24 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                 </button>
                               </div>
 
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-xs text-[var(--foreground)]">
-                                  📦 Detalle de Artículos Solicitados — #{getNumeroPedido(p, idx)}
-                                </span>
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <span className="font-bold text-xs text-[var(--foreground)]">
+                                    📦 Detalle de Artículos Solicitados — #{getNumeroPedido(p, idx)}
+                                  </span>
+                                  {p.vendedorNombre && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[10px] font-semibold">
+                                      <User size={10} />
+                                      <span>Vendedor: {p.vendedorNombre}</span>
+                                    </span>
+                                  )}
+                                  {p.sucursalNombre && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 text-[10px] font-semibold">
+                                      <Building size={10} />
+                                      <span>Sucursal: {p.sucursalNombre}</span>
+                                    </span>
+                                  )}
+                                </div>
                                 {online && p.clientId && (
                                   <button
                                     onClick={(e) => {
