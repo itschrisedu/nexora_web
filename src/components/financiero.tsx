@@ -50,6 +50,7 @@ import {
   PieChart,
   BarChart3,
   Filter,
+  Package,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
 import { compartirFacturaPdf, generarFacturaPdfDoc } from '../services/pdf-factura.service';
@@ -178,6 +179,10 @@ interface Cobro {
   vendedorEmail?: string;
   vendedorRol?: string;
   sucursalNombre?: string;
+  tipoEntrega?: 'PRESENCIAL' | 'ENVIO';
+  courier?: string;
+  ciudadEnvio?: string;
+  lines?: any[];
 }
 
 interface ClienteCartera {
@@ -360,6 +365,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
     }[];
     notasSeleccionadas: string[];
   } | null>(null);
+  const [notaExpandidaFacturaId, setNotaExpandidaFacturaId] = useState<string | null>(null);
   const [emittingFactura, setEmittingFactura] = useState(false);
   const [facturaResultado, setFacturaResultado] = useState<{
     success: boolean;
@@ -4027,42 +4033,141 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
                       {carteraSeleccionada.cobros.map((c) => {
                         const numNota = c.saleNote?.numero
                           ? `NOTA #${String(c.saleNote.numero).padStart(4, '0')}`
                           : c.numeroCobro || `#${c.id.slice(0, 8).toUpperCase()}`;
                         const monto = Number(c.montoOriginal ?? c.montoTotal ?? 0);
                         const isChecked = facturaCliente.notasSeleccionadas.includes(c.id);
+                        const isExpanded = notaExpandidaFacturaId === c.id;
+                        const lineasNota = (c.lines && c.lines.length > 0) ? c.lines : (c.saleNote?.lines || []);
 
                         return (
-                          <label
+                          <div
                             key={c.id}
-                            onClick={() => handleToggleNotaFacturar(c)}
-                            className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                            className={`p-3 rounded-xl border transition-all ${
+                              isExpanded ? 'sm:col-span-2' : ''
+                            } ${
                               isChecked
-                                ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs'
-                                : 'bg-[var(--card)] border-[var(--border)] opacity-60 hover:opacity-100'
+                                ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs ring-1 ring-[#0F172A]/20'
+                                : 'bg-[var(--card)] border-[var(--border)] hover:border-slate-400 opacity-90 hover:opacity-100'
                             }`}
                           >
-                            <div className="flex items-center gap-2.5">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {}}
-                                className="w-4 h-4 rounded text-[#0F172A] accent-[#0F172A] focus:ring-0 cursor-pointer"
-                              />
-                              <div>
-                                <div className="font-bold text-xs text-[var(--foreground)]">{numNota}</div>
-                                <div className="text-[10px] text-[var(--muted-foreground)]">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2.5">
+                                {/* Checkbox de selección para facturación */}
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleNotaFacturar(c);
+                                  }}
+                                  className="w-4 h-4 mt-1 rounded text-[#0F172A] accent-[#0F172A] focus:ring-0 cursor-pointer shrink-0"
+                                  title={isChecked ? 'Deseleccionar nota' : 'Seleccionar nota para facturar'}
+                                />
+
+                                {/* Bloque interactivo con Chevron, Código y Badge Presencial / Envíos */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setNotaExpandidaFacturaId(isExpanded ? null : c.id);
+                                  }}
+                                  className="flex items-start gap-1.5 text-left cursor-pointer group"
+                                  title="Clic para ver u ocultar los artículos de esta nota"
+                                >
+                                  <div className="mt-0.5 text-[var(--muted-foreground)] group-hover:text-[#0F172A] transition-colors shrink-0">
+                                    {isExpanded ? <ChevronUp size={15} className="text-[#0F172A]" /> : <ChevronDown size={15} />}
+                                  </div>
+                                  <div>
+                                    <div className="font-extrabold text-xs text-[var(--foreground)] group-hover:text-[#0F172A] transition-colors">
+                                      {numNota}
+                                    </div>
+                                    <div className="mt-1">
+                                      {c.tipoEntrega === 'ENVIO' ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-extrabold">
+                                          <Truck size={10} />
+                                          <span>{c.courier || 'Envío'}</span>
+                                          {c.ciudadEnvio && <span className="text-blue-500">· {c.ciudadEnvio}</span>}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
+                                          <span>🏪 Presencial</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </button>
+                              </div>
+
+                              {/* Monto y Fecha */}
+                              <div className="text-right shrink-0">
+                                <span className="font-black text-xs text-[var(--foreground)] block">
+                                  ${monto.toFixed(2)}
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)] block">
                                   {new Date(c.createdAt).toLocaleDateString('es-EC')} ({c.tipo || 'Crédito'})
-                                </div>
+                                </span>
                               </div>
                             </div>
-                            <span className="font-black text-xs text-[var(--foreground)]">
-                              ${monto.toFixed(2)}
-                            </span>
-                          </label>
+
+                            {/* Detalle Desplegado de Artículos Solicitados */}
+                            {isExpanded && (
+                              <div className="mt-3 pt-2.5 border-t border-[var(--border)] space-y-2 text-xs animate-in fade-in">
+                                <div className="flex items-center justify-between text-[11px] font-bold text-[var(--foreground)]">
+                                  <span className="flex items-center gap-1.5">
+                                    <Package size={13} className="text-[#0F172A]" />
+                                    <span>Artículos Solicitados ({lineasNota.length} {lineasNota.length === 1 ? 'ítem' : 'ítems'}):</span>
+                                  </span>
+                                  {c.vendedorNombre && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-semibold px-2 py-0.5 bg-blue-500/10 rounded">
+                                      <User size={10} />
+                                      <span>Vendedor: {c.vendedorNombre}</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                  {lineasNota && lineasNota.length > 0 ? (
+                                    lineasNota.map((l: any, lIdx: number) => {
+                                      const modelo = l.modelName || l.nombre || 'Calzado de Cuero';
+                                      const color = l.color ? `(${l.color})` : '';
+                                      const talla = l.numeroTalla || l.talla || '38';
+                                      const serie = l.serieNombre || l.serie || 'Serie';
+                                      const cant = Number(l.cantidad) || 1;
+                                      const pre = Number(l.precioUnitario) || 0;
+                                      const sub = cant * pre;
+
+                                      return (
+                                        <div
+                                          key={lIdx}
+                                          className="flex justify-between items-center py-1.5 px-2.5 bg-[var(--muted)]/40 rounded-xl text-xs"
+                                        >
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="font-bold text-[var(--foreground)]">
+                                              {modelo} {color}
+                                            </span>
+                                            <span className="text-[var(--muted-foreground)] text-[11px]">
+                                              · Talla {talla} ({serie})
+                                            </span>
+                                          </div>
+                                          <div className="font-mono font-bold text-[var(--foreground)] shrink-0 ml-2">
+                                            {cant} {cant === 1 ? 'par' : 'pares'} × ${pre.toFixed(2)} = <strong className="text-emerald-600">${sub.toFixed(2)}</strong>
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="text-[11px] text-[var(--muted-foreground)] italic py-1">
+                                      Calzado de Cuero Cevallos Artesanal — ${monto.toFixed(2)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
