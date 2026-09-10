@@ -300,6 +300,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
       if (typeof document !== "undefined" && config.primaryColor) {
         document.documentElement.style.setProperty("--primary", config.primaryColor);
         document.documentElement.style.setProperty("--primary-foreground", getContrastColor(config.primaryColor));
+        window.dispatchEvent(new CustomEvent("nexora:theme-changed", { detail: { primaryColor: config.primaryColor } }));
       }
     } catch (err: any) {
       setError(err.message || "Error al guardar la configuración.");
@@ -430,6 +431,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 if (typeof document !== "undefined") {
                   document.documentElement.style.setProperty("--primary", newColor);
                   document.documentElement.style.setProperty("--primary-foreground", getContrastColor(newColor));
+                  window.dispatchEvent(new CustomEvent("nexora:theme-changed", { detail: { primaryColor: newColor } }));
                 }
               }}
               label="Color Primario de Marca & Identidad"

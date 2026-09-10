@@ -102,7 +102,7 @@ export function getContrastColor(hex: string): "#FFFFFF" | "#0F172A" {
   if (!rgb) return "#FFFFFF";
   // Luminancia percibida según ITU-R BT.709
   const luminance = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
-  return luminance > 160 ? "#0F172A" : "#FFFFFF";
+  return luminance > 135 ? "#0F172A" : "#FFFFFF";
 }
 
 // Paleta corporativa elegante de calzado y comercio (sin tonos morados)

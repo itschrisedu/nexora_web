@@ -24,6 +24,7 @@ import {
   Store,
   Clock
 } from "lucide-react";
+import { getContrastColor } from "@/components/ui/color-picker";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -219,6 +220,7 @@ function LandingContent() {
           1. HEADER / NAVBAR RESPONSIVE
          ══════════════════════════════════════════════ */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+        <div className="h-1.5 w-full transition-colors" style={{ backgroundColor: brandColor }} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
           {/* Logo & Nombre */}
           <a href="#inicio" className="flex items-center gap-3 group">
@@ -556,14 +558,23 @@ function LandingContent() {
 
                         {/* Badges superiores */}
                         <div className="absolute top-3 left-3 flex flex-col gap-1">
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-slate-900/85 backdrop-blur-md text-white shadow-xs">
+                          <span
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold shadow-xs transition-colors"
+                            style={{
+                              backgroundColor: brandColor,
+                              color: getContrastColor(brandColor),
+                            }}
+                          >
                             {modelo.brand || "Cuero"}
                           </span>
                         </div>
 
                         {/* Precio Flotante (si está habilitado) */}
                         {negocio.mostrarPreciosPublico && currentVariant?.salePrice > 0 && (
-                          <div className="absolute bottom-3 right-3 px-3 py-1 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl font-black text-sm text-slate-900 font-mono shadow-md">
+                          <div
+                            className="absolute bottom-3 right-3 px-3 py-1 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl font-black text-sm font-mono shadow-md"
+                            style={{ color: brandColor }}
+                          >
                             ${currentVariant.salePrice.toFixed(2)}
                           </div>
                         )}
@@ -600,9 +611,18 @@ function LandingContent() {
                                     onClick={() => handleSelectVariant(modelo.id, v.id)}
                                     className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
                                       isSelected
-                                        ? "bg-slate-900 text-white border-slate-900 shadow-xs scale-105"
+                                        ? "shadow-xs scale-105"
                                         : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
                                     }`}
+                                    style={
+                                      isSelected
+                                        ? {
+                                            backgroundColor: brandColor,
+                                            color: getContrastColor(brandColor),
+                                            borderColor: brandColor,
+                                          }
+                                        : {}
+                                    }
                                     title={`Ver en color ${v.color}`}
                                   >
                                     <span
@@ -666,7 +686,11 @@ function LandingContent() {
                         href={getWhatsAppOrderUrl(modelo, currentVariant)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md"
+                        className="w-full py-2.5 px-3 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md hover:scale-[1.01]"
+                        style={{
+                          backgroundColor: brandColor,
+                          color: getContrastColor(brandColor),
+                        }}
                       >
                         <MessageCircle size={14} />
                         <span>Pedir / Cotizar por WhatsApp</span>

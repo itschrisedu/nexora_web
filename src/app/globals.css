@@ -1,4 +1,12 @@
 @import "tailwindcss";
+@import "tailwindcss/preflight" layer(base);
+
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--primary);
+  --color-brand-foreground: var(--primary-foreground);
+}
 
 :root {
   --background: #f8fafc;
@@ -6,7 +14,7 @@
   --card: #ffffff;
   --card-foreground: #0f172a;
   --border: #e2e8f0;
-  --primary: #0f172a; /* Azul Profundo Exacto */
+  --primary: #0f172a;
   --primary-foreground: #ffffff;
   --secondary: #464D57;
   --muted: #f1f5f9;
@@ -24,8 +32,6 @@
   --card: #1e293b;
   --card-foreground: #f8fafc;
   --border: #334155;
-  --primary: #f8fafc;
-  --primary-foreground: #0f172a;
   --secondary: #94a3b8;
   --muted: #1e293b;
   --muted-foreground: #94a3b8;

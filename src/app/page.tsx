@@ -128,6 +128,13 @@ function MainApp() {
     const savedSucursal = localStorage.getItem('activeSucursalId');
     if (savedSucursal) setActiveSucursalId(savedSucursal);
 
+    const handleThemeChange = (e: any) => {
+      if (e.detail?.primaryColor) {
+        applyBrandingColor(e.detail.primaryColor);
+      }
+    };
+    window.addEventListener('nexora:theme-changed', handleThemeChange);
+
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token) { 
@@ -140,7 +147,39 @@ function MainApp() {
       fetchBusinessBranding();
       GeolocationService.captureAndReportLocation();
     }
+
+    return () => {
+      window.removeEventListener('nexora:theme-changed', handleThemeChange);
+    };
   }, []);
+
+  const applyBrandingColor = (color: string) => {
+    if (!color || typeof document === 'undefined') return;
+    const lowerColor = color.toLowerCase();
+    const isPurple = lowerColor.includes('6366f1') || 
+                     lowerColor.includes('8b5cf6') || 
+                     lowerColor.includes('7c3aed') || 
+                     lowerColor.includes('violet') || 
+                     lowerColor.includes('purple');
+    const finalColor = isPurple ? '#0F172A' : color;
+    document.documentElement.style.setProperty('--primary', finalColor);
+    
+    // Calcular contraste de texto automático
+    let clean = finalColor.replace('#', '').trim();
+    if (clean.length === 3) {
+      clean = clean.split('').map(c => c + c).join('');
+    }
+    if (clean.length === 6) {
+      const r = parseInt(clean.substring(0, 2), 16);
+      const g = parseInt(clean.substring(2, 4), 16);
+      const b = parseInt(clean.substring(4, 6), 16);
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        const contrastColor = lum > 135 ? '#0F172A' : '#FFFFFF';
+        document.documentElement.style.setProperty('--primary-foreground', contrastColor);
+      }
+    }
+  };
 
   const fetchSucursales = async () => {
     try {
@@ -171,25 +210,8 @@ function MainApp() {
       const config = await ApiService.get('/configuracion/negocio');
       if (config) {
         if (config.logoUrl) setBusinessLogo(config.logoUrl);
-        if (config.primaryColor && typeof document !== 'undefined') {
-          const lowerColor = config.primaryColor.toLowerCase();
-          const isPurple = lowerColor.includes('6366f1') || 
-                           lowerColor.includes('8b5cf6') || 
-                           lowerColor.includes('7c3aed') || 
-                           lowerColor.includes('violet') || 
-                           lowerColor.includes('purple');
-          const finalColor = isPurple ? '#0F172A' : config.primaryColor;
-          document.documentElement.style.setProperty('--primary', finalColor);
-          
-          // Calcular contraste de texto automático
-          const hex = finalColor.replace('#', '');
-          if (hex.length === 6) {
-            const r = parseInt(hex.substring(0, 2), 16);
-            const g = parseInt(hex.substring(2, 4), 16);
-            const b = parseInt(hex.substring(4, 6), 16);
-            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-            document.documentElement.style.setProperty('--primary-foreground', lum > 160 ? '#0F172A' : '#FFFFFF');
-          }
+        if (config.primaryColor) {
+          applyBrandingColor(config.primaryColor);
         }
       }
     } catch (err) {}
@@ -389,12 +411,19 @@ function MainApp() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={businessLogo} alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
               ) : (
-                <div className="w-7 h-7 rounded-lg bg-[#0F172A] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {businessLogo ? <img src={businessLogo} alt="Logo" className="w-full h-full object-cover rounded-lg" /> : "N"}
+                <div
+                  className="w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center shadow-sm"
+                  style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                >
+                  N
                 </div>
               )}
-              <span className="text-xl font-black tracking-widest text-[#0F172A]">NEXORA</span>
+              <span
+                className="text-xl font-black tracking-widest"
+                style={{ color: 'var(--primary)' }}
+              >
+                NEXORA
+              </span>
             </div>
             <button onClick={toggleTheme}
               className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity">
@@ -438,20 +467,46 @@ function MainApp() {
                     <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
                       {group.label}
                     </div>
-                    {groupItems.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => setVistaActual(item.id)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                          vistaActual === item.id
-                            ? 'bg-[#0F172A]/10 text-[#0F172A] font-semibold dark:bg-amber-400/10 dark:text-amber-400'
-                            : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">{item.icon}<span>{item.label}</span></div>
-                        {vistaActual !== item.id && <ChevronRight size={14} />}
-                      </button>
-                    ))}
+                    {groupItems.map((item) => {
+                      const isActive = vistaActual === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setVistaActual(item.id)}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all ${
+                            isActive
+                              ? 'font-extrabold shadow-sm'
+                              : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                          }`}
+                          style={
+                            isActive
+                              ? {
+                                  backgroundColor: 'var(--primary)',
+                                  color: 'var(--primary-foreground)',
+                                }
+                              : {}
+                          }
+                        >
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="transition-colors"
+                              style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
+                            >
+                              {item.icon}
+                            </span>
+                            <span
+                              style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
+                            >
+                              {item.label}
+                            </span>
+                          </div>
+                          <ChevronRight 
+                            size={14} 
+                            style={{ color: isActive ? 'var(--primary-foreground)' : undefined }} 
+                          />
+                        </button>
+                      );
+                    })}
                   </div>
                 );
               });
@@ -462,7 +517,10 @@ function MainApp() {
         {/* Usuario (Fijo abajo) */}
         <div className="shrink-0 p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#0F172A] text-white flex items-center justify-center font-bold text-xs">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-xs"
+              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+            >
               {user?.nombre ? user.nombre.slice(0, 2).toUpperCase() : 'US'}
             </div>
             <div>
@@ -476,11 +534,12 @@ function MainApp() {
             {(user?.rol === 'ROL_ADMIN' || user?.rol === 'ROL_SUPER_ADMIN') && (
               <button
                 onClick={() => setVistaActual('personalizacion')}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className="p-1.5 rounded-lg transition-colors"
+                style={
                   vistaActual === 'personalizacion'
-                    ? 'bg-[#0F172A] text-amber-400'
-                    : 'text-[var(--muted-foreground)] hover:text-[#0F172A] hover:bg-[var(--muted)]'
-                }`}
+                    ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }
+                    : {}
+                }
                 title="Configuración Global ⚙️"
               >
                 <Settings size={16} />
@@ -497,16 +556,33 @@ function MainApp() {
       <main className="flex-1 flex flex-col h-full max-h-screen overflow-hidden min-w-0">
 
         {/* Navbar superior (Fijo arriba) */}
-        <header className="h-16 shrink-0 border-b border-[var(--border)] bg-white dark:bg-slate-900 px-8 flex items-center justify-between z-30 shadow-sm">
+        <header
+          className="h-16 shrink-0 border-b px-8 flex items-center justify-between z-30 shadow-xs transition-colors duration-200"
+          style={{ 
+            backgroundColor: 'var(--primary)', 
+            color: 'var(--primary-foreground)',
+            borderColor: 'color-mix(in srgb, var(--primary) 80%, black)'
+          }}
+        >
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-black text-[#0F172A] dark:text-white tracking-tight">
+            <h1 
+              className="text-xl font-black tracking-tight"
+              style={{ color: 'var(--primary-foreground)' }}
+            >
               {NAV_ITEMS.find((n) => n.id === vistaActual)?.label ?? 'Panel de Control'}
             </h1>
 
             {/* Conmutador / Indicador de Sucursal Activa */}
             {user?.rol && user?.rol !== 'ROL_SUPER_ADMIN' && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl text-xs">
-                <MapPin size={14} className="text-amber-500 shrink-0" />
+              <div 
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs backdrop-blur-sm shadow-xs"
+                style={{ 
+                  backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)', 
+                  border: '1px solid color-mix(in srgb, var(--primary-foreground) 25%, transparent)',
+                  color: 'var(--primary-foreground)'
+                }}
+              >
+                <MapPin size={14} className="shrink-0" style={{ color: 'var(--primary-foreground)' }} />
                 {user?.rol === 'ROL_ADMIN' ? (
                   <select
                     value={activeSucursalId}
@@ -514,18 +590,19 @@ function MainApp() {
                       setActiveSucursalId(e.target.value);
                       localStorage.setItem('activeSucursalId', e.target.value);
                     }}
-                    className="bg-transparent font-bold text-[var(--foreground)] focus:outline-none cursor-pointer"
+                    className="bg-transparent font-bold focus:outline-none cursor-pointer"
+                    style={{ color: 'var(--primary-foreground)' }}
                     title="Navegar entre sucursales con 1 clic"
                   >
-                    <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
+                    <option value="TODAS" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">🏢 Todas las Sucursales (Consolidado)</option>
                     {sucursales.map((s) => (
-                      <option key={s.id} value={s.id}>
+                      <option key={s.id} value={s.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                         {s.isMatriz ? '🏢 Matriz: ' : '🏪 Sucursal: '} {s.name}
                       </option>
                     ))}
                   </select>
                 ) : (
-                  <span className="font-bold text-[var(--foreground)]">
+                  <span className="font-bold" style={{ color: 'var(--primary-foreground)' }}>
                     📍 {sucursales.find((s) => s.id === activeSucursalId)?.name || 'Sucursal Asignada'}
                   </span>
                 )}
@@ -535,19 +612,48 @@ function MainApp() {
 
           <div className="flex items-center gap-4">
             {online
-              ? <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><Wifi size={13} className="animate-pulse" /><span>Online</span></div>
-              : <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400"><WifiOff size={13} className="animate-bounce" /><span>Offline</span></div>
+              ? <div 
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)',
+                    color: 'var(--primary-foreground)',
+                    border: '1px solid color-mix(in srgb, var(--primary-foreground) 25%, transparent)'
+                  }}
+                >
+                  <Wifi size={13} className="animate-pulse" style={{ color: 'var(--primary-foreground)' }} />
+                  <span style={{ color: 'var(--primary-foreground)' }}>Online</span>
+                </div>
+              : <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  <WifiOff size={13} className="animate-bounce" />
+                  <span>Offline</span>
+                </div>
             }
             {stats.pendingSyncCount > 0 && (
               <button onClick={handleSyncManual} disabled={loading}
-                className="flex items-center gap-2 px-3 py-1 rounded-lg border border-yellow-500/30 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 text-xs font-semibold transition-all disabled:opacity-50">
+                className="flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)',
+                  color: 'var(--primary-foreground)',
+                  border: '1px solid color-mix(in srgb, var(--primary-foreground) 30%, transparent)'
+                }}
+              >
                 <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
                 <span>Sincronizar ({stats.pendingSyncCount})</span>
               </button>
             )}
-            <button className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors relative">
-              <Bell size={18} />
-              <span className="absolute top-1 right-1.5 w-2 h-2 bg-[#0F172A] rounded-full" />
+            <button 
+              className="p-2 rounded-lg transition-colors relative hover:bg-black/10 dark:hover:bg-white/10"
+              style={{ color: 'var(--primary-foreground)' }}
+              title="Notificaciones"
+            >
+              <Bell size={18} style={{ color: 'var(--primary-foreground)' }} />
+              <span
+                className="absolute top-1 right-1.5 w-2 h-2 rounded-full ring-2"
+                style={{ 
+                  backgroundColor: 'var(--primary-foreground)',
+                  borderColor: 'var(--primary)'
+                }}
+              />
             </button>
           </div>
         </header>
