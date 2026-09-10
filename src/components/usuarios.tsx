@@ -54,7 +54,7 @@ interface StockInterItem {
 }
 
 export default function UsuariosComponent({ online }: UsuariosProps) {
-  const [tabActiva, setTabActiva] = useState<'sucursales' | 'personal' | 'stock-inter' | 'personalizacion'>('sucursales');
+  const [tabActiva, setTabActiva] = useState<'sucursales' | 'personal' | 'stock-inter'>('sucursales');
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -529,18 +529,6 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         >
           <Share2 size={15} /> Consulta de Stock Inter-Sucursal
         </button>
-
-        <button
-          type="button"
-          onClick={() => setTabActiva('personalizacion')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-            tabActiva === 'personalizacion'
-              ? 'bg-[#0F172A] text-white shadow-sm'
-              : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-          }`}
-        >
-          <Palette size={15} /> Personalización
-        </button>
       </div>
 
       {/* ═══ TAB 1: SUCURSALES ═══ */}
@@ -996,173 +984,6 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* ═══ TAB 4: PERSONALIZACIÓN ═══ */}
-      {tabActiva === 'personalizacion' && (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-base font-bold text-[var(--foreground)]">Personalización de Marca</h2>
-            <p className="text-xs text-[var(--muted-foreground)]">
-              Define la identidad visual de tu negocio: color primario y logo del establecimiento.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* ─── Color Primario ─── */}
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-              <div className="flex items-center gap-2">
-                <Paintbrush size={16} className="text-[var(--foreground)]" />
-                <h3 className="font-bold text-sm text-[var(--foreground)]">Color Primario del Sistema</h3>
-              </div>
-
-              {/* Paleta Predefinida */}
-              <div>
-                <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">Paleta Corporativa</div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { hex: '#0F172A', name: 'Azul Marino' },
-                    { hex: '#1E293B', name: 'Slate' },
-                    { hex: '#064E3B', name: 'Esmeralda' },
-                    { hex: '#312E81', name: 'Indigo' },
-                    { hex: '#581C87', name: 'Violeta' },
-                    { hex: '#7C2D12', name: 'Terracota' },
-                    { hex: '#1E3A5F', name: 'Cobalto' },
-                    { hex: '#0D3B66', name: 'Navy' },
-                    { hex: '#2D1B69', name: 'Púrpura' },
-                    { hex: '#14532D', name: 'Bosque' },
-                    { hex: '#7F1D1D', name: 'Borgoña' },
-                    { hex: '#44403C', name: 'Piedra' },
-                  ].map((c) => (
-                    <button
-                      key={c.hex}
-                      type="button"
-                      onClick={() => setCustomColor(c.hex)}
-                      className={`w-9 h-9 rounded-xl border-2 transition-all hover:scale-110 ${
-                        customColor === c.hex ? 'border-[var(--foreground)] ring-2 ring-[var(--foreground)]/20 scale-110' : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: c.hex }}
-                      title={c.name}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Color Picker + Hex Input */}
-              <div className="flex items-center gap-4">
-                <div>
-                  <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Selector Libre</div>
-                  <input
-                    type="color"
-                    value={customColor}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                    className="w-12 h-10 rounded-xl border border-[var(--border)] cursor-pointer"
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Código HEX</div>
-                  <input
-                    type="text"
-                    value={customColor}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setCustomColor(v);
-                    }}
-                    placeholder="#0F172A"
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-[#0F172A]"
-                  />
-                </div>
-              </div>
-
-              {/* Preview */}
-              <div>
-                <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Vista Previa</div>
-                <div className="rounded-xl overflow-hidden border border-[var(--border)]">
-                  <div className="p-4 text-white font-bold text-sm" style={{ backgroundColor: customColor }}>
-                    Header del Sistema — {businessConfig?.nombre || 'Mi Negocio'}
-                  </div>
-                  <div className="p-3 bg-[var(--card)] text-xs text-[var(--muted-foreground)]">
-                    Este es el color que se usara en la cabecera, botones principales y acentos del sistema.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ─── Logo del Negocio ─── */}
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-              <div className="flex items-center gap-2">
-                <ImageIcon size={16} className="text-[var(--foreground)]" />
-                <h3 className="font-bold text-sm text-[var(--foreground)]">Logo del Negocio</h3>
-              </div>
-
-              {/* Preview del Logo */}
-              <div className="flex items-center justify-center">
-                {logoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={logoPreview}
-                      alt="Logo"
-                      className="w-32 h-32 object-contain rounded-2xl border border-[var(--border)] bg-white p-2"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveLogo}
-                      className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-colors shadow-md"
-                      title="Quitar logo"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-2">
-                    <ImageIcon size={28} />
-                    <span className="text-[10px] font-bold">Sin Logo</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Botón de Subida */}
-              <div>
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  onChange={handleLogoUpload}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => logoInputRef.current?.click()}
-                  disabled={uploadingLogo}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold hover:bg-[var(--muted)] transition-colors disabled:opacity-50"
-                >
-                  {uploadingLogo ? (
-                    <><Loader2 size={14} className="animate-spin" /> Subiendo...</>
-                  ) : (
-                    <><Upload size={14} /> Seleccionar Imagen (PNG, JPG, WebP, SVG)</>
-                  )}
-                </button>
-              </div>
-
-              <p className="text-[10px] text-[var(--muted-foreground)] text-center">
-                El logo se sube automaticamente a la nube (Cloudinary) y se muestra en facturas, reportes y el encabezado del sistema.
-              </p>
-            </div>
-          </div>
-
-          {/* Botón Guardar */}
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleSavePersonalizacion}
-              disabled={savingConfig}
-              className="flex items-center gap-2 px-6 py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition-all disabled:opacity-50"
-            >
-              {savingConfig ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-              {savingConfig ? 'Guardando...' : 'Guardar Personalización'}
-            </button>
-          </div>
         </div>
       )}
 

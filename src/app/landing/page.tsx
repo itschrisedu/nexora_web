@@ -1,10 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import {
+  ShoppingBag,
+  MapPin,
+  Phone,
+  Mail,
+  Menu,
+  X,
+  CheckCircle2,
+  Sparkles,
+  ExternalLink,
+  MessageCircle,
+  Search,
+  ChevronRight,
+  ShieldCheck,
+  Truck,
+  Award,
+  Layers,
+  ArrowUpRight,
+  Store,
+  Clock
+} from "lucide-react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
 interface NegocioInfo {
   tenantId: string;
@@ -13,6 +34,7 @@ interface NegocioInfo {
   telefono: string;
   email: string;
   logoUrl: string | null;
+  primaryColor?: string;
   ruc: string;
   heroTitulo: string;
   heroSubtitulo: string;
@@ -37,9 +59,38 @@ interface Sucursal {
   isMatriz: boolean;
 }
 
+interface Variante {
+  id: string;
+  code: string;
+  color: string;
+  imageUrl?: string;
+  salePrice: number;
+  serieNombre?: string;
+  totalStock?: number;
+  tallas?: Array<{
+    tallaId: string;
+    numero: number | string;
+    stock: number;
+    disponible: number;
+  }>;
+}
+
+interface ModeloCalzado {
+  id: string;
+  baseCode: string;
+  name: string;
+  brand: string;
+  material: string;
+  sucursalNombre?: string;
+  precioMin: number;
+  precioMax: number;
+  variantes: Variante[];
+}
+
 interface LandingData {
   negocio: NegocioInfo;
   sucursales: Sucursal[];
+  modelos?: ModeloCalzado[];
 }
 
 function LandingContent() {
@@ -49,16 +100,37 @@ function LandingContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Estado del menú móvil
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Filtros del catálogo
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("TODAS");
+
+  // Estado de variantes seleccionadas por modelo: { [modeloId]: varianteId }
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+
   useEffect(() => {
     const fetchLanding = async () => {
       try {
         const url = `${API_BASE_URL}/catalogo/landing${tenantId ? `?tenantId=${tenantId}` : ""}`;
         const res = await fetch(url);
-        if (!res.ok) throw new Error("No se pudo cargar la información");
+        if (!res.ok) throw new Error("No se pudo cargar la información del negocio");
         const json = await res.json();
         setData(json);
+
+        // Inicializar la primera variante de cada modelo
+        if (json.modelos && Array.isArray(json.modelos)) {
+          const initialMap: Record<string, string> = {};
+          json.modelos.forEach((m: ModeloCalzado) => {
+            if (m.variantes && m.variantes.length > 0) {
+              initialMap[m.id] = m.variantes[0].id;
+            }
+          });
+          setSelectedVariants(initialMap);
+        }
       } catch (err: any) {
-        setError(err.message || "Error al cargar");
+        setError(err.message || "Error al cargar la información");
       } finally {
         setLoading(false);
       }
@@ -66,12 +138,41 @@ function LandingContent() {
     fetchLanding();
   }, [tenantId]);
 
+  // Lista de marcas únicas para filtros
+  const brands = useMemo(() => {
+    if (!data?.modelos) return [];
+    const set = new Set<string>();
+    data.modelos.forEach((m) => {
+      if (m.brand) set.add(m.brand);
+    });
+    return Array.from(set);
+  }, [data]);
+
+  // Filtrado de modelos
+  const filteredModelos = useMemo(() => {
+    if (!data?.modelos) return [];
+    return data.modelos.filter((m) => {
+      const matchBrand = selectedBrand === "TODAS" || m.brand === selectedBrand;
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        m.name.toLowerCase().includes(q) ||
+        m.baseCode.toLowerCase().includes(q) ||
+        m.material.toLowerCase().includes(q) ||
+        m.variantes.some((v) => v.color.toLowerCase().includes(q) || v.code.toLowerCase().includes(q));
+      return matchBrand && matchSearch;
+    });
+  }, [data, selectedBrand, searchQuery]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-white/60 text-sm font-medium">Cargando...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-3xl border border-slate-200/80 shadow-xl max-w-sm text-center">
+          <div className="w-12 h-12 border-4 border-slate-900 border-t-amber-500 rounded-full animate-spin" />
+          <div className="space-y-1">
+            <h3 className="font-extrabold text-slate-900 text-sm">Cargando Catálogo Oficial...</h3>
+            <p className="text-slate-500 text-xs">Conectando con los puntos de venta y calzado de cuero en Cevallos.</p>
+          </div>
         </div>
       </div>
     );
@@ -79,157 +180,275 @@ function LandingContent() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="text-6xl">👟</div>
-          <h2 className="text-2xl font-bold text-white">No se pudo cargar la página</h2>
-          <p className="text-white/60 text-sm">{error || "Intenta de nuevo más tarde"}</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
+          <div className="text-5xl">👞</div>
+          <h2 className="text-xl font-bold text-slate-900">Catálogo Temporalmente No Disponible</h2>
+          <p className="text-slate-600 text-xs leading-relaxed">{error || "Intenta recargar la página en unos momentos."}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md"
+          >
+            Reintentar
+          </button>
         </div>
       </div>
     );
   }
 
   const { negocio, sucursales } = data;
-  const primaryColor = "#B8860B";
+  const brandColor = negocio.primaryColor || "#0F172A";
+
+  const handleSelectVariant = (modeloId: string, varianteId: string) => {
+    setSelectedVariants((prev) => ({
+      ...prev,
+      [modeloId]: varianteId,
+    }));
+  };
+
+  const getWhatsAppOrderUrl = (modelo: ModeloCalzado, variante: Variante) => {
+    const phone = negocio.whatsappContacto || negocio.telefono || "593999999999";
+    const cleanPhone = phone.replace(/[^0-9]/g, "");
+    const msg = `¡Hola ${negocio.nombreNegocio}! 👋\n\nEstoy interesado en el siguiente modelo de calzado de su catálogo web:\n\n👞 *Modelo:* ${modelo.name}\n🎨 *Color:* ${variante.color}\n🏷️ *Código:* ${variante.code}\n💎 *Material:* ${modelo.material}\n${negocio.mostrarPreciosPublico && variante.salePrice > 0 ? `💵 *Precio:* $${variante.salePrice.toFixed(2)}\n` : ""}\n¿Tienen disponibilidad de tallas y realizan envíos?`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-auto" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
-      {/* ══════ NAVBAR ══════ */}
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-white text-slate-800 antialiased selection:bg-slate-900 selection:text-white">
+      {/* ══════════════════════════════════════════════
+          1. HEADER / NAVBAR RESPONSIVE
+         ══════════════════════════════════════════════ */}
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
+          {/* Logo & Nombre */}
+          <a href="#inicio" className="flex items-center gap-3 group">
             {negocio.logoUrl ? (
-              <img src={negocio.logoUrl} alt={negocio.nombreNegocio} className="h-9 w-9 rounded-xl object-cover ring-2 ring-amber-400/30" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={negocio.logoUrl}
+                alt={negocio.nombreNegocio}
+                className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-contain bg-white border border-slate-200 p-1 shadow-xs group-hover:scale-105 transition-transform"
+              />
             ) : (
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-900 font-black text-sm">
-                {negocio.nombreNegocio.charAt(0)}
+              <div
+                className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl flex items-center justify-center text-white font-black text-base shadow-sm group-hover:scale-105 transition-transform"
+                style={{ backgroundColor: brandColor }}
+              >
+                {negocio.nombreNegocio ? negocio.nombreNegocio.charAt(0) : "N"}
               </div>
             )}
-            <span className="font-bold text-base tracking-tight">{negocio.nombreNegocio}</span>
-          </div>
-          <div className="hidden md:flex items-center gap-6 text-sm text-white/60">
-            <a href="#inicio" className="hover:text-amber-400 transition-colors">Inicio</a>
-            <a href="#nosotros" className="hover:text-amber-400 transition-colors">Nosotros</a>
-            <a href="#sucursales" className="hover:text-amber-400 transition-colors">Sucursales</a>
-            <a href="#contacto" className="hover:text-amber-400 transition-colors">Contacto</a>
-          </div>
-          <a
-            href={`https://wa.me/${negocio.whatsappContacto}?text=${encodeURIComponent("Hola, me interesa su catálogo de calzado")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20"
-          >
-            💬 WhatsApp
-          </a>
-        </div>
-      </nav>
-
-      {/* ══════ HERO ══════ */}
-      <section
-        id="inicio"
-        className="relative pt-16 min-h-[85vh] flex items-center"
-        style={{
-          background: negocio.heroBannerUrl
-            ? `linear-gradient(135deg, rgba(15,23,42,0.92), rgba(15,23,42,0.75)), url(${negocio.heroBannerUrl}) center/cover no-repeat`
-            : `linear-gradient(135deg, #0f172a 0%, #1e293b 50%, ${primaryColor}22 100%)`,
-        }}
-      >
-        {/* Decorative elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-amber-400/5 rounded-full blur-[100px]" />
-          <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px]" />
-        </div>
-
-        <div className="max-w-7xl mx-auto px-6 py-20 relative z-10">
-          <div className="max-w-3xl space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-400/10 border border-amber-400/20 rounded-full">
-              <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-              <span className="text-amber-400 text-xs font-semibold tracking-wide uppercase">Cantón Cevallos • Tungurahua</span>
+            <div>
+              <span className="font-extrabold text-sm sm:text-base text-slate-900 tracking-tight block leading-tight">
+                {negocio.nombreNegocio || "Calzado en Cuero"}
+              </span>
+              <span className="text-[10px] font-semibold text-amber-700 bg-amber-500/10 px-1.5 py-0.2 rounded-md border border-amber-500/20">
+                100% Cuero Cevallos
+              </span>
             </div>
+          </a>
 
-            <h1 className="text-4xl md:text-6xl font-black leading-tight tracking-tight">
-              {negocio.heroTitulo || "Calzado Ecuatoriano de Calidad"}
-            </h1>
+          {/* Menú Desktop */}
+          <nav className="hidden md:flex items-center gap-7 text-xs font-bold text-slate-600">
+            <a href="#inicio" className="hover:text-slate-900 transition-colors">
+              Inicio
+            </a>
+            <a href="#catalogo" className="hover:text-slate-900 transition-colors flex items-center gap-1">
+              <span>Catálogo de Modelos</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-slate-100 text-slate-700 border border-slate-200 font-mono">
+                {data.modelos?.length || 0}
+              </span>
+            </a>
+            <a href="#sucursales" className="hover:text-slate-900 transition-colors">
+              Sucursales ({sucursales.length})
+            </a>
+            <a href="#nosotros" className="hover:text-slate-900 transition-colors">
+              Garantía & Taller
+            </a>
+            <a href="#contacto" className="hover:text-slate-900 transition-colors">
+              Contacto
+            </a>
+          </nav>
 
-            <p className="text-lg md:text-xl text-white/60 leading-relaxed max-w-2xl">
-              {negocio.heroSubtitulo || "Calzado artesanal de cuero directamente desde fábrica"}
-            </p>
+          {/* Botón WhatsApp & Hamburguesa Móvil */}
+          <div className="flex items-center gap-2.5">
+            <a
+              href={`https://wa.me/${(negocio.whatsappContacto || negocio.telefono || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola ${negocio.nombreNegocio}! Deseo consultar sobre su catálogo de calzado de cuero.`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm hover:shadow-md"
+            >
+              <MessageCircle size={15} />
+              <span>Contactar WhatsApp</span>
+            </a>
 
-            <div className="flex flex-wrap gap-4 pt-4">
-              {sucursales.length > 0 && (
-                <a
-                  href={`/catalogo/${sucursales[0].id}`}
-                  className="group px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-900 font-bold text-sm rounded-xl transition-all shadow-xl shadow-amber-400/20 flex items-center gap-2"
-                >
-                  👞 Ver Catálogo
-                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-                </a>
-              )}
+            {/* Botón Menú Móvil */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors"
+              aria-label="Abrir Menú"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Menú Móvil Desplegable */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 bg-white/98 backdrop-blur-xl px-4 py-5 space-y-4 shadow-xl animate-in slide-in-from-top-3 duration-200">
+            <nav className="flex flex-col space-y-2 text-sm font-bold text-slate-700">
               <a
-                href={`https://wa.me/${negocio.whatsappContacto}?text=${encodeURIComponent("Hola, me interesa consultar precios mayoristas de calzado de cuero")}`}
+                href="#inicio"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                🏠 Inicio
+              </a>
+              <a
+                href="#catalogo"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-between"
+              >
+                <span>👟 Catálogo de Modelos</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-800 font-mono">
+                  {data.modelos?.length || 0}
+                </span>
+              </a>
+              <a
+                href="#sucursales"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                🏪 Sucursales & Locales ({sucursales.length})
+              </a>
+              <a
+                href="#nosotros"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                🛡️ Garantía & Taller en Cevallos
+              </a>
+              <a
+                href="#contacto"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                📞 Contacto & Ubicaciones
+              </a>
+            </nav>
+
+            <div className="pt-2 border-t border-slate-200">
+              <a
+                href={`https://wa.me/${(negocio.whatsappContacto || negocio.telefono || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola! Deseo más información sobre su catálogo.`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-sm rounded-xl transition-all flex items-center gap-2"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md"
               >
-                📱 Consultar Precios
+                <MessageCircle size={16} />
+                <span>Pedir y Consultar por WhatsApp</span>
               </a>
             </div>
-
-            {/* Stats */}
-            <div className="flex gap-8 pt-8">
-              <div>
-                <div className="text-2xl font-black text-amber-400">{sucursales.length}</div>
-                <div className="text-xs text-white/40 font-medium">Sucursales</div>
-              </div>
-              <div>
-                <div className="text-2xl font-black text-amber-400">100%</div>
-                <div className="text-xs text-white/40 font-medium">Cuero Genuino</div>
-              </div>
-              <div>
-                <div className="text-2xl font-black text-amber-400">Cevallos</div>
-                <div className="text-xs text-white/40 font-medium">Capital del Calzado</div>
-              </div>
-            </div>
           </div>
-        </div>
-      </section>
+        )}
+      </header>
 
-      {/* ══════ SOBRE NOSOTROS ══════ */}
-      <section id="nosotros" className="py-24 bg-slate-900/50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/10 border border-amber-400/20 rounded-full">
-                <span className="text-amber-400 text-xs font-semibold uppercase tracking-wider">Sobre Nosotros</span>
+      {/* ══════════════════════════════════════════════
+          2. HERO SECTION ELEGANTE Y LUMINOSO
+         ══════════════════════════════════════════════ */}
+      <section
+        id="inicio"
+        className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/50 py-16 sm:py-24 border-b border-slate-200/60"
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            {/* Texto Hero */}
+            <div className="lg:col-span-7 space-y-6 text-left">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-900 font-bold text-xs">
+                <Sparkles size={14} className="text-amber-600" />
+                <span>Producción Directa desde Fábrica • Cantón Cevallos</span>
               </div>
-              <h2 className="text-3xl md:text-4xl font-black leading-tight">
-                Tradición y calidad desde el corazón de <span className="text-amber-400">Cevallos</span>
-              </h2>
-              <p className="text-white/60 leading-relaxed text-base">
-                {negocio.sobreNosotros || "Somos productores y comercializadores de calzado de cuero."}
+
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
+                {negocio.heroTitulo || "Calzado Ecuatoriano 100% Cuero de Cevallos"}
+              </h1>
+
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal max-w-2xl">
+                {negocio.heroSubtitulo ||
+                  "Fabricación con los mejores estándares de calidad, acabados finos y venta directa por par y por mayor a todo el país."}
               </p>
-              <div className="grid grid-cols-2 gap-4 pt-4">
-                {[
-                  { icon: "🏭", label: "Producción Propia" },
-                  { icon: "🐄", label: "Cuero 100% Genuino" },
-                  { icon: "📦", label: "Envíos a todo Ecuador" },
-                  { icon: "💰", label: "Precios de Fábrica" },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 bg-white/5 border border-white/5 rounded-xl">
-                    <span className="text-xl">{item.icon}</span>
-                    <span className="text-sm font-semibold text-white/80">{item.label}</span>
+
+              {/* Botones de Acción */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <a
+                  href="#catalogo"
+                  className="px-6 py-3.5 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2 hover:scale-[1.02]"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  <ShoppingBag size={17} />
+                  <span>Explorar Colección ({data.modelos?.length || 0} Modelos)</span>
+                </a>
+
+                <a
+                  href="#sucursales"
+                  className="px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 transition-all flex items-center gap-2"
+                >
+                  <Store size={17} />
+                  <span>Ver Puntos de Venta</span>
+                </a>
+              </div>
+
+              {/* Pilares rápidos */}
+              <div className="grid grid-cols-3 gap-3 pt-6 border-t border-slate-200/80">
+                <div className="space-y-1">
+                  <div className="font-extrabold text-xs text-slate-900 flex items-center gap-1">
+                    <ShieldCheck size={14} className="text-emerald-600" /> 100% Cuero
                   </div>
-                ))}
+                  <p className="text-[11px] text-slate-500">Material vacuno legítimo</p>
+                </div>
+                <div className="space-y-1">
+                  <div className="font-extrabold text-xs text-slate-900 flex items-center gap-1">
+                    <Truck size={14} className="text-blue-600" /> Envíos Seguros
+                  </div>
+                  <p className="text-[11px] text-slate-500">A todo el Ecuador</p>
+                </div>
+                <div className="space-y-1">
+                  <div className="font-extrabold text-xs text-slate-900 flex items-center gap-1">
+                    <Award size={14} className="text-amber-600" /> Venta por Mayor
+                  </div>
+                  <p className="text-[11px] text-slate-500">Precios de fabricante</p>
+                </div>
               </div>
             </div>
-            <div className="relative">
-              <div className="aspect-square bg-gradient-to-br from-amber-400/10 to-emerald-500/10 rounded-3xl border border-white/5 flex items-center justify-center">
-                {negocio.logoUrl ? (
-                  <img src={negocio.logoUrl} alt={negocio.nombreNegocio} className="w-48 h-48 object-contain rounded-2xl" />
+
+            {/* Banner / Ilustración Hero */}
+            <div className="lg:col-span-5">
+              <div className="relative rounded-3xl overflow-hidden border border-slate-200/80 bg-slate-100 shadow-2xl p-2 group">
+                {negocio.heroBannerUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={negocio.heroBannerUrl}
+                    alt={negocio.heroTitulo}
+                    className="w-full h-80 sm:h-96 object-cover rounded-2xl group-hover:scale-102 transition-transform duration-500"
+                  />
                 ) : (
-                  <div className="text-center space-y-4">
-                    <div className="text-8xl">👞</div>
-                    <p className="text-white/40 text-sm font-medium">Calzado de Cuero Artesanal</p>
+                  <div className="w-full h-80 sm:h-96 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 flex flex-col justify-between text-white relative overflow-hidden">
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                        Artesanía & Confort
+                      </span>
+                      <h3 className="text-2xl font-black">Hecho a Mano en Tungurahua</h3>
+                      <p className="text-xs text-slate-300">
+                        Cada par refleja la tradición zapatera de Cevallos con tecnología y estilo contemporáneo.
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-between">
+                      <div className="text-xs">
+                        <span className="text-slate-300 block text-[10px]">Garantía de Calidad</span>
+                        <span className="font-bold">Cuero Vacuno Seleccionado</span>
+                      </div>
+                      <span className="text-2xl">👞</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -238,150 +457,451 @@ function LandingContent() {
         </div>
       </section>
 
-      {/* ══════ SUCURSALES ══════ */}
-      {sucursales.length > 0 && (
-        <section id="sucursales" className="py-24">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center space-y-4 mb-16">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/10 border border-amber-400/20 rounded-full mx-auto">
-                <span className="text-amber-400 text-xs font-semibold uppercase tracking-wider">Nuestras Sucursales</span>
-              </div>
-              <h2 className="text-3xl md:text-4xl font-black">Encuéntranos en <span className="text-amber-400">Cevallos</span></h2>
-              <p className="text-white/50 text-base max-w-lg mx-auto">Visita nuestros locales o explora nuestro catálogo digital por sucursal</p>
+      {/* ══════════════════════════════════════════════
+          3. CATÁLOGO DE MODELOS CON VARIANTES INTEGRADAS
+         ══════════════════════════════════════════════ */}
+      <section id="catalogo" className="py-16 sm:py-20 bg-slate-50/60 border-b border-slate-200/60 scroll-mt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
+          {/* Encabezado del Catálogo */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="space-y-2 max-w-xl">
+              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                Colección en Exhibición
+              </span>
+              <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
+                Modelos de Calzado & Variantes
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Selecciona cualquier modelo para ver sus colores y fotografías reales. Puedes hacer tu pedido o cotización directa a través de WhatsApp.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sucursales.map((suc) => (
-                <div
-                  key={suc.id}
-                  className="group relative bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/5 rounded-2xl p-6 hover:border-amber-400/30 transition-all duration-300 hover:shadow-xl hover:shadow-amber-400/5"
+            {/* Barra de Búsqueda y Marcas */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+              <div className="relative">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar modelo, color..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900 w-full sm:w-60 shadow-xs"
+                />
+              </div>
+
+              {brands.length > 1 && (
+                <select
+                  value={selectedBrand}
+                  onChange={(e) => setSelectedBrand(e.target.value)}
+                  className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:border-slate-900 shadow-xs"
                 >
-                  {suc.isMatriz && (
-                    <div className="absolute -top-2.5 right-4 px-3 py-0.5 bg-amber-400 text-slate-900 text-[10px] font-black uppercase rounded-full tracking-wider">
-                      Matriz
-                    </div>
-                  )}
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-xl bg-amber-400/10 text-amber-400">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  <option value="TODAS">Todas las Marcas ({brands.length})</option>
+                  {brands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+
+          {/* Grid de Modelos */}
+          {filteredModelos.length === 0 ? (
+            <div className="p-16 text-center bg-white border border-slate-200 rounded-3xl space-y-3 shadow-xs">
+              <div className="text-4xl">🔍</div>
+              <h4 className="text-base font-bold text-slate-900">No se encontraron modelos con esa búsqueda</h4>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Intenta buscar con otro término o selecciona &quot;Todas las Marcas&quot;.
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedBrand("TODAS");
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl"
+              >
+                Limpiar Filtros
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredModelos.map((modelo) => {
+                const currentVarId = selectedVariants[modelo.id] || (modelo.variantes[0]?.id ?? "");
+                const currentVariant =
+                  modelo.variantes.find((v) => v.id === currentVarId) || modelo.variantes[0];
+                const fotoUrl = currentVariant?.imageUrl || "";
+
+                return (
+                  <div
+                    key={modelo.id}
+                    className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                  >
+                    <div>
+                      {/* Imagen de la Variante con Badge */}
+                      <div className="relative aspect-4/3 bg-slate-100 overflow-hidden border-b border-slate-100 flex items-center justify-center">
+                        {fotoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={fotoUrl}
+                            alt={`${modelo.name} - ${currentVariant?.color}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-slate-400 gap-1">
+                            <span className="text-3xl">👞</span>
+                            <span className="text-[10px] font-bold">Foto en catálogo</span>
+                          </div>
+                        )}
+
+                        {/* Badges superiores */}
+                        <div className="absolute top-3 left-3 flex flex-col gap-1">
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-slate-900/85 backdrop-blur-md text-white shadow-xs">
+                            {modelo.brand || "Cuero"}
+                          </span>
+                        </div>
+
+                        {/* Precio Flotante (si está habilitado) */}
+                        {negocio.mostrarPreciosPublico && currentVariant?.salePrice > 0 && (
+                          <div className="absolute bottom-3 right-3 px-3 py-1 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl font-black text-sm text-slate-900 font-mono shadow-md">
+                            ${currentVariant.salePrice.toFixed(2)}
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-base text-white">{suc.nombre}</h3>
-                        <p className="text-white/40 text-xs mt-0.5">{suc.direccion}</p>
+
+                      {/* Detalles del Modelo */}
+                      <div className="p-5 space-y-3.5">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono">
+                            {modelo.baseCode} · {modelo.material}
+                          </span>
+                          <h3 className="font-extrabold text-base text-slate-900 line-clamp-1 group-hover:text-amber-700 transition-colors">
+                            {modelo.name}
+                          </h3>
+                        </div>
+
+                        {/* Selector Interactivo de Colores / Variantes */}
+                        {modelo.variantes.length > 0 && (
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-slate-500">Color seleccionado:</span>
+                              <span className="font-extrabold text-slate-900">
+                                {currentVariant?.color || "Estándar"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {modelo.variantes.map((v) => {
+                                const isSelected = v.id === currentVariant?.id;
+                                return (
+                                  <button
+                                    key={v.id}
+                                    type="button"
+                                    onClick={() => handleSelectVariant(modelo.id, v.id)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
+                                      isSelected
+                                        ? "bg-slate-900 text-white border-slate-900 shadow-xs scale-105"
+                                        : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                                    }`}
+                                    title={`Ver en color ${v.color}`}
+                                  >
+                                    <span
+                                      className="w-2 h-2 rounded-full border border-white/40 shrink-0"
+                                      style={{
+                                        backgroundColor:
+                                          v.color.toLowerCase().includes("negro")
+                                            ? "#111"
+                                            : v.color.toLowerCase().includes("café") || v.color.toLowerCase().includes("cafe")
+                                            ? "#6F4E37"
+                                            : v.color.toLowerCase().includes("miel")
+                                            ? "#D4A373"
+                                            : v.color.toLowerCase().includes("suela")
+                                            ? "#99582A"
+                                            : v.color.toLowerCase().includes("azul")
+                                            ? "#1D4ED8"
+                                            : v.color.toLowerCase().includes("blanco")
+                                            ? "#FFF"
+                                            : "#777",
+                                      }}
+                                    />
+                                    <span>{v.color}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Desglose de Tallas Disponibles (si está habilitado) */}
+                        {negocio.mostrarStockPublico && currentVariant?.tallas && currentVariant.tallas.length > 0 && (
+                          <div className="space-y-1 pt-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                              Tallas Disponibles:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {currentVariant.tallas.map((t, tidx) => {
+                                const tieneStock = t.stock > 0;
+                                return (
+                                  <span
+                                    key={tidx}
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                                      tieneStock
+                                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                        : "bg-slate-50 text-slate-400 border-slate-200 line-through opacity-60"
+                                    }`}
+                                  >
+                                    T{t.numero}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <div className="space-y-2 text-xs text-white/50">
-                      {suc.telefono && (
-                        <div className="flex items-center gap-2">
-                          <span>📞</span>
-                          <span>{suc.telefono}</span>
-                        </div>
-                      )}
-                      {suc.email && (
-                        <div className="flex items-center gap-2">
-                          <span>📧</span>
-                          <span>{suc.email}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <span>👟</span>
-                        <span>{suc.totalModelos} modelos disponibles</span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-2">
+                    {/* Botón WhatsApp de la Card */}
+                    <div className="p-4 pt-0">
                       <a
-                        href={`/catalogo/${suc.id}`}
-                        className="flex-1 text-center px-4 py-2.5 bg-amber-400/10 hover:bg-amber-400/20 text-amber-400 font-bold text-xs rounded-xl transition-all border border-amber-400/10"
-                      >
-                        Ver Catálogo
-                      </a>
-                      <a
-                        href={`https://wa.me/${suc.whatsapp}?text=${encodeURIComponent(`Hola ${suc.nombre}, me interesa su catálogo de calzado`)}`}
+                        href={getWhatsAppOrderUrl(modelo, currentVariant)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold text-xs rounded-xl transition-all border border-emerald-500/10"
+                        className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md"
                       >
-                        💬
+                        <MessageCircle size={14} />
+                        <span>Pedir / Cotizar por WhatsApp</span>
                       </a>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ══════ CONTACTO ══════ */}
-      <section id="contacto" className="py-24 bg-slate-900/50">
-        <div className="max-w-4xl mx-auto px-6 text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/10 border border-amber-400/20 rounded-full mx-auto">
-            <span className="text-amber-400 text-xs font-semibold uppercase tracking-wider">Contáctanos</span>
-          </div>
-          <h2 className="text-3xl md:text-4xl font-black">
-            ¿Listo para renovar tu <span className="text-amber-400">inventario</span>?
-          </h2>
-          <p className="text-white/50 text-base max-w-lg mx-auto">
-            Escríbenos por WhatsApp para cotizaciones mayoristas, pedidos personalizados y más
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-4">
-            <a
-              href={`https://wa.me/${negocio.whatsappContacto}?text=${encodeURIComponent("Hola, me interesa hacer un pedido mayorista de calzado")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-sm rounded-xl transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-2"
-            >
-              📱 Escribir por WhatsApp
-            </a>
-            {negocio.email && (
-              <a
-                href={`mailto:${negocio.email}`}
-                className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-sm rounded-xl transition-all flex items-center gap-2"
-              >
-                📧 {negocio.email}
-              </a>
-            )}
-          </div>
-
-          {/* Redes Sociales */}
-          {(negocio.facebookUrl || negocio.instagramUrl || negocio.tiktokUrl) && (
-            <div className="flex justify-center gap-4 pt-4">
-              {negocio.facebookUrl && (
-                <a href={negocio.facebookUrl} target="_blank" rel="noopener noreferrer" className="p-3 bg-white/5 hover:bg-blue-500/10 border border-white/5 hover:border-blue-500/20 rounded-xl transition-all text-white/50 hover:text-blue-400">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                </a>
-              )}
-              {negocio.instagramUrl && (
-                <a href={negocio.instagramUrl} target="_blank" rel="noopener noreferrer" className="p-3 bg-white/5 hover:bg-pink-500/10 border border-white/5 hover:border-pink-500/20 rounded-xl transition-all text-white/50 hover:text-pink-400">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
-                </a>
-              )}
-              {negocio.tiktokUrl && (
-                <a href={negocio.tiktokUrl} target="_blank" rel="noopener noreferrer" className="p-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-xl transition-all text-white/50 hover:text-white">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
-                </a>
-              )}
+                );
+              })}
             </div>
           )}
         </div>
       </section>
 
-      {/* ══════ FOOTER ══════ */}
-      <footer className="border-t border-white/5 py-8">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            {negocio.logoUrl && <img src={negocio.logoUrl} alt="" className="h-6 w-6 rounded-lg object-cover" />}
-            <span className="text-white/40 text-xs font-medium">{negocio.nombreNegocio}</span>
+      {/* ══════════════════════════════════════════════
+          4. SUCURSALES & PUNTOS DE VENTA
+         ══════════════════════════════════════════════ */}
+      <section id="sucursales" className="py-16 sm:py-20 bg-white border-b border-slate-200/60 scroll-mt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
+          <div className="text-center space-y-2 max-w-2xl mx-auto">
+            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+              Locales Físicos
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
+              Nuestras Sucursales & Puntos de Venta
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Visítanos en nuestras tiendas físicas en Cevallos y demás localidades o solicita envíos directos a cualquier provincia.
+            </p>
           </div>
-          <div className="text-white/30 text-xs">
-            RUC: {negocio.ruc} · {negocio.direccion}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sucursales.map((suc) => (
+              <div
+                key={suc.id}
+                className={`p-6 rounded-3xl border transition-all space-y-4 ${
+                  suc.isMatriz
+                    ? "bg-gradient-to-br from-amber-500/5 via-slate-50 to-amber-500/10 border-amber-500/30 shadow-md ring-1 ring-amber-500/20"
+                    : "bg-white border-slate-200/90 shadow-xs hover:shadow-lg"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                        suc.isMatriz
+                          ? "bg-amber-500/20 text-amber-900 border-amber-500/30"
+                          : "bg-slate-100 text-slate-800 border-slate-200"
+                      }`}
+                    >
+                      <Store size={11} />
+                      {suc.isMatriz ? "🏢 Casa Matriz & Fábrica" : "🏪 Sucursal Oficial"}
+                    </span>
+                    <h3 className="font-extrabold text-lg text-slate-900">{suc.nombre}</h3>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                  <div className="flex items-start gap-2">
+                    <MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                    <span>{suc.direccion || "Cantón Cevallos, Tungurahua"}</span>
+                  </div>
+                  {suc.telefono && (
+                    <div className="flex items-center gap-2">
+                      <Phone size={14} className="text-slate-400 shrink-0" />
+                      <span>{suc.telefono}</span>
+                    </div>
+                  )}
+                  {suc.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail size={14} className="text-slate-400 shrink-0" />
+                      <span>{suc.email}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-emerald-700 font-semibold">
+                    <Clock size={14} className="shrink-0" />
+                    <span>Atención de Lunes a Domingo</span>
+                  </div>
+                </div>
+
+                <a
+                  href={`https://wa.me/${(suc.whatsapp || suc.telefono || negocio.whatsappContacto || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola! Deseo comunicarme con el punto de venta de ${suc.nombre}.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs"
+                >
+                  <MessageCircle size={14} className="text-emerald-400" />
+                  <span>Contactar este Local</span>
+                </a>
+              </div>
+            ))}
           </div>
-          <div className="text-white/20 text-[10px]">
-            Powered by NEXORA · © {new Date().getFullYear()}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════
+          5. SOBRE NOSOTROS & TRADICIÓN EN CEVALLOS
+         ══════════════════════════════════════════════ */}
+      <section id="nosotros" className="py-16 sm:py-20 bg-slate-50/50 border-b border-slate-200/60 scroll-mt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div className="space-y-5">
+              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                Tradición Zapatera
+              </span>
+              <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                Calidad de Exportación en Cuero Ecuatoriano
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                {negocio.sobreNosotros ||
+                  "Somos una empresa dedicada a la fabricación y comercialización de calzado de cuero en el cantón Cevallos, cuna del calzado en Tungurahua. Seleccionamos cuidadosamente cueros vacunos de primera y combinamos técnicas tradicionales con moldes anatómicos contemporáneos para garantizar máxima durabilidad y confort."}
+              </p>
+
+              <div className="space-y-3 pt-2">
+                {[
+                  "Cueros vacunos genuinos tratados para resistir el uso continuo.",
+                  "Suelas antideslizantes de alta adherencia y costuras reforzadas.",
+                  "Atención personalizada a comerciantes mayoristas y clientes particulares.",
+                  "Garantía de fábrica en cada uno de nuestros modelos.",
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-2">
+                <span className="text-3xl font-black text-slate-900 block font-mono">100%</span>
+                <h4 className="font-extrabold text-xs text-slate-900">Cuero Vacuno</h4>
+                <p className="text-[11px] text-slate-500">Materia prima seleccionada para garantizar longevidad.</p>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-2">
+                <span className="text-3xl font-black text-slate-900 block font-mono">{sucursales.length}</span>
+                <h4 className="font-extrabold text-xs text-slate-900">Puntos de Venta</h4>
+                <p className="text-[11px] text-slate-500">Locales para atención directa y retiro de pedidos.</p>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-2">
+                <span className="text-3xl font-black text-slate-900 block font-mono">{data.modelos?.length || 0}+</span>
+                <h4 className="font-extrabold text-xs text-slate-900">Modelos Activos</h4>
+                <p className="text-[11px] text-slate-500">Variedad de estilos casuales, formales y botas.</p>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-2">
+                <span className="text-3xl font-black text-slate-900 block font-mono">24h</span>
+                <h4 className="font-extrabold text-xs text-slate-900">Despacho Rápido</h4>
+                <p className="text-[11px] text-slate-500">Envíos coordinados por transporte interprovincial.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════
+          6. FOOTER CORPORATIVO
+         ══════════════════════════════════════════════ */}
+      <footer id="contacto" className="bg-slate-900 text-white py-14">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="space-y-3 md:col-span-2">
+              <div className="flex items-center gap-3">
+                {negocio.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={negocio.logoUrl}
+                    alt=""
+                    className="h-10 w-10 rounded-2xl object-contain bg-white p-1"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded-2xl bg-amber-500 flex items-center justify-center text-slate-900 font-black text-sm">
+                    {negocio.nombreNegocio?.charAt(0) || "N"}
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-bold text-base">{negocio.nombreNegocio}</h3>
+                  <p className="text-xs text-slate-400">Calzado 100% Cuero de Cevallos</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                Venta mayorista y minorista de calzado en cuero genuino. Visita nuestros locales o realiza pedidos desde cualquier parte del país con entrega garantizada.
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-400">
+              <h4 className="font-bold text-sm text-white uppercase tracking-wider mb-2">Contacto Matriz</h4>
+              <p className="flex items-center gap-2">
+                <MapPin size={13} className="text-slate-400" />
+                <span>{negocio.direccion || "Cantón Cevallos, Tungurahua"}</span>
+              </p>
+              {negocio.telefono && (
+                <p className="flex items-center gap-2">
+                  <Phone size={13} className="text-slate-400" />
+                  <span>{negocio.telefono}</span>
+                </p>
+              )}
+              {negocio.email && (
+                <p className="flex items-center gap-2">
+                  <Mail size={13} className="text-slate-400" />
+                  <span>{negocio.email}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-400">
+              <h4 className="font-bold text-sm text-white uppercase tracking-wider">Enlaces</h4>
+              <ul className="space-y-1.5 font-semibold">
+                <li>
+                  <a href="#catalogo" className="hover:text-amber-400 transition-colors">
+                    Catálogo de Calzado
+                  </a>
+                </li>
+                <li>
+                  <a href="#sucursales" className="hover:text-amber-400 transition-colors">
+                    Nuestras Sucursales
+                  </a>
+                </li>
+                <li>
+                  <a href="#nosotros" className="hover:text-amber-400 transition-colors">
+                    Sobre la Fábrica
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-slate-800 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span>
+              &copy; {new Date().getFullYear()} {negocio.nombreNegocio}. Todos los derechos reservados.
+            </span>
+            <span className="text-[11px] text-slate-400">
+              Plataforma y Catálogo Digital impulsado por <strong>NEXORA</strong>
+            </span>
           </div>
         </div>
       </footer>
@@ -391,11 +911,13 @@ function LandingContent() {
 
 export default function LandingPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-slate-900 border-t-amber-500 rounded-full animate-spin" />
+        </div>
+      }
+    >
       <LandingContent />
     </Suspense>
   );

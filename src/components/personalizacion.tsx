@@ -7,9 +7,11 @@ import {
   Palette, Clock, MapPin, CheckCircle, AlertCircle,
   Loader2, Shield, Lock, Building2, DollarSign,
   Truck, Star, Trash2, Plus, Phone, Globe,
-  Image, ExternalLink, Eye, EyeOff, Share2
+  Image, ExternalLink, Eye, EyeOff, Share2,
+  Copy, Check, MessageCircle, Upload, Sparkles
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
+import ColorPicker, { getContrastColor } from "./ui/color-picker";
 
 interface CreditLevelConfigItem {
   id?: string;
@@ -65,20 +67,13 @@ interface BusinessConfig {
   mostrarStockPublico?: boolean;
 }
 
-const PRESET_COLORS = [
-  { hex: "#0F172A", label: "Azul Profundo (Predeterminado)" },
-  { hex: "#1d4ed8", label: "Azul Real" },
-  { hex: "#10b981", label: "Esmeralda" },
-  { hex: "#06b6d4", label: "Cian" },
-  { hex: "#f43f5e", label: "Rosa" },
-  { hex: "#B8860B", label: "Dorado" },
-];
-
 export default function PersonalizacionComponent({ online }: PersonalizacionProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [copiadoLink, setCopiadoLink] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Transportes state
   const [transportes, setTransportes] = useState<EmpresaTransporteItem[]>([]);
@@ -256,6 +251,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
           if (data.primaryColor && typeof document !== "undefined") {
             document.documentElement.style.setProperty("--primary", data.primaryColor);
+            document.documentElement.style.setProperty("--primary-foreground", getContrastColor(data.primaryColor));
           }
         }
 
@@ -281,6 +277,12 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
     try {
       let finalConfig = { ...config };
+      // Limpiar campos que no pertenecen a BusinessConfig
+      delete (finalConfig as any).creditMontoMaximoInicial;
+      delete (finalConfig as any).creditPlazoMaximoDias;
+      delete (finalConfig as any).creditScoreMinimo;
+      delete (finalConfig as any).creditTasaMoraPct;
+
       if (config.logoUrl && config.logoUrl.startsWith("data:image") && online) {
         const cloudUrl = await uploadToCloudinary(config.logoUrl, 'nexora_logos');
         if (cloudUrl) {
@@ -297,6 +299,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
       setSuccess("Configuración global y escala de niveles crediticios guardados correctamente.");
       if (typeof document !== "undefined" && config.primaryColor) {
         document.documentElement.style.setProperty("--primary", config.primaryColor);
+        document.documentElement.style.setProperty("--primary-foreground", getContrastColor(config.primaryColor));
       }
     } catch (err: any) {
       setError(err.message || "Error al guardar la configuración.");
@@ -411,46 +414,94 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
             <Palette className="text-[#0F172A]" size={20} />
-            <h2 className="text-base font-bold text-[var(--foreground)]">2. Identidad Visual & Personalización (Branding)</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Color Primario Corporativo
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                {PRESET_COLORS.map(c => (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    onClick={() => setConfig(prev => ({ ...prev, primaryColor: c.hex }))}
-                    className={`w-8 h-8 rounded-xl border-2 transition-transform ${
-                      config.primaryColor === c.hex ? "scale-110 border-black shadow-sm" : "border-transparent"
-                    }`}
-                    style={{ backgroundColor: c.hex }}
-                    title={c.label}
-                  />
-                ))}
-                <input
-                  type="color"
-                  value={config.primaryColor || "#0F172A"}
-                  onChange={(e) => setConfig(prev => ({ ...prev, primaryColor: e.target.value }))}
-                  className="w-8 h-8 rounded-xl cursor-pointer border border-[var(--border)]"
-                />
-              </div>
+              <h2 className="text-base font-bold text-[var(--foreground)]">2. Identidad Visual & Personalización (Branding)</h2>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Define el color de marca corporativo y el logo general de la empresa. El fondo se mantendrá en blanco puro y tonos claros para preservar la máxima elegancia.
+              </p>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Logo Corporativo
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ColorPicker
+              value={config.primaryColor || "#0F172A"}
+              onChange={(newColor) => {
+                setConfig((prev) => ({ ...prev, primaryColor: newColor }));
+                if (typeof document !== "undefined") {
+                  document.documentElement.style.setProperty("--primary", newColor);
+                  document.documentElement.style.setProperty("--primary-foreground", getContrastColor(newColor));
+                }
+              }}
+              label="Color Primario de Marca & Identidad"
+            />
+
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                Logo General de la Empresa
               </label>
-              <input
-                type="text"
-                value={config.logoUrl || ""}
-                onChange={(e) => setConfig(prev => ({ ...prev, logoUrl: e.target.value }))}
-                placeholder="https://... URL del logo"
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              />
+
+              <div className="flex items-start gap-4">
+                <div className="w-20 h-20 rounded-2xl bg-white border border-[var(--border)] p-2 flex items-center justify-center shrink-0 shadow-xs">
+                  {config.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={config.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <Building2 className="text-slate-300" size={32} />
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="text"
+                    value={config.logoUrl || ""}
+                    onChange={(e) => setConfig(prev => ({ ...prev, logoUrl: e.target.value }))}
+                    placeholder="https://... URL o sube una imagen"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl border border-[var(--border)] transition-colors flex items-center gap-1.5">
+                      <Upload size={13} />
+                      <span>{uploadingLogo ? 'Subiendo...' : 'Subir Archivo de Logo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingLogo}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setUploadingLogo(true);
+                          try {
+                            const reader = new FileReader();
+                            reader.onload = async (event) => {
+                              const base64 = event.target?.result as string;
+                              const url = await uploadToCloudinary(base64, 'nexora_logos');
+                              if (url) {
+                                setConfig(prev => ({ ...prev, logoUrl: url }));
+                              }
+                              setUploadingLogo(false);
+                            };
+                            reader.readAsDataURL(file);
+                          } catch {
+                            setUploadingLogo(false);
+                          }
+                        }}
+                      />
+                    </label>
+
+                    {config.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setConfig(prev => ({ ...prev, logoUrl: "" }))}
+                        className="text-[11px] text-rose-500 hover:underline font-semibold"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -855,27 +906,86 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         </div>
 
         {/* ══════ LANDING PAGE & CATÁLOGO ONLINE (Fase E3) ══════ */}
-        <div className="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 border border-emerald-500/20 rounded-2xl p-6 space-y-5">
-          <div className="flex items-center gap-3 pb-3 border-b border-emerald-500/20">
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
-              <Globe size={20} />
+        <div className="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 border border-emerald-500/20 rounded-2xl p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-emerald-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                <Globe size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[var(--foreground)]">Landing Page & Catálogo Online Público</h3>
+                <p className="text-[11px] text-[var(--muted-foreground)]">Página web de presentación de la marca y catálogo de calzado con pedidos por WhatsApp</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-[var(--foreground)]">Landing Page y Catálogo Online Público</h3>
-              <p className="text-[11px] text-[var(--muted-foreground)]">Configura tu página pública de presentación del negocio y catálogo de calzado</p>
-            </div>
-            {config.nombre && (
-              <a
-                href={`/landing?tenantId=${typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : ''}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold rounded-xl transition-all"
-              >
-                <ExternalLink size={12} />
-                Ver Landing Pública
-              </a>
-            )}
           </div>
+
+          {/* TARJETA DESTACADA: ENLACE PÚBLICO Y BOTONES PARA COMPARTIR */}
+          {(() => {
+            const currentTenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : '';
+            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+            const fullLandingUrl = `${baseUrl}/landing${currentTenantId ? `?tenantId=${currentTenantId}` : ''}`;
+            const msgWhatsApp = `¡Hola! Te invito a conocer el catálogo digital oficial de ${config.nombre || 'nuestro calzado'} (100% Cuero de Cevallos):\n👉 ${fullLandingUrl}`;
+            const waShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgWhatsApp)}`;
+
+            return (
+              <div className="bg-[var(--card)] border border-emerald-500/30 rounded-2xl p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5 uppercase tracking-wider">
+                    <Share2 size={13} className="text-emerald-600" />
+                    <span>Enlace Público de tu Catálogo & Landing Page</span>
+                  </span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-500/20">
+                    🟢 Página Web Activa
+                  </span>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                  <div className="flex-1 px-3 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl font-mono text-xs text-[var(--foreground)] truncate select-all">
+                    {fullLandingUrl}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                        navigator.clipboard.writeText(fullLandingUrl);
+                        setCopiadoLink(true);
+                        setTimeout(() => setCopiadoLink(false), 2500);
+                      }
+                    }}
+                    className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 ${
+                      copiadoLink
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-[var(--foreground)] text-[var(--background)] hover:opacity-90'
+                    }`}
+                  >
+                    {copiadoLink ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{copiadoLink ? '¡Enlace Copiado!' : 'Copiar Enlace'}</span>
+                  </button>
+
+                  <a
+                    href={waShareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs"
+                  >
+                    <MessageCircle size={14} />
+                    <span>Compartir en WhatsApp</span>
+                  </a>
+
+                  <a
+                    href={fullLandingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl border border-[var(--border)] transition-all flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    <ExternalLink size={14} />
+                    <span>Ver en Vivo</span>
+                  </a>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Hero */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
