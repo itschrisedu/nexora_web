@@ -70,6 +70,7 @@ interface FinancieroProps {
 export interface GastoItem {
   id: string;
   tenantId: string;
+  sucursalNombre?: string;
   userId?: string;
   descripcion: string;
   categoria: string;
@@ -1913,6 +1914,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       <tr>
                         <th className="px-5 py-4">N° Cobro / Nota</th>
                         <th className="px-5 py-4">Cliente Deudor</th>
+                        <th className="px-5 py-4 text-center">Sucursal</th>
                         <th className="px-5 py-4 text-center">Estado</th>
                         <th className="px-5 py-4 text-right">Monto Total</th>
                         <th className="px-5 py-4 text-right">Saldo Pendiente</th>
@@ -1969,13 +1971,14 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                     <span>{cobro.vendedorNombre}</span>
                                   </span>
                                 )}
-                                {cobro.sucursalNombre && (
-                                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
-                                    <Building size={10} />
-                                    <span>{cobro.sucursalNombre}</span>
-                                  </span>
-                                )}
                               </div>
+                            </td>
+
+                            <td className="px-5 py-4 text-center">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
+                                <Building size={11} className="shrink-0" />
+                                <span>{cobro.sucursalNombre || 'Matriz'}</span>
+                              </span>
                             </td>
 
                             <td className="px-5 py-4 text-center">
@@ -2155,6 +2158,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                               <tr>
                                 <th className="px-5 py-4">Concepto / Descripción</th>
                                 <th className="px-5 py-4">Categoría</th>
+                                <th className="px-5 py-4 text-center">Sucursal</th>
                                 <th className="px-5 py-4 text-center">Método Pago</th>
                                 <th className="px-5 py-4 text-right">Monto</th>
                                 <th className="px-5 py-4 text-center">Fecha</th>
@@ -2194,6 +2198,13 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                     <td className="px-5 py-4">
                                       <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold inline-block ${catCfg.bg}`}>
                                         {catCfg.label}
+                                      </span>
+                                    </td>
+
+                                    <td className="px-5 py-4 text-center">
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
+                                        <Building size={11} className="shrink-0" />
+                                        <span>{g.sucursalNombre || 'Matriz'}</span>
                                       </span>
                                     </td>
 

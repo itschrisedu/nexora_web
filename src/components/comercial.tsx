@@ -1259,6 +1259,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 <tr>
                   <th className="px-6 py-4 flex items-center gap-1"><ArrowUpDown size={12} />N° Pedido</th>
                   <th className="px-6 py-4">Cliente</th>
+                  <th className="px-6 py-4 text-center">Sucursal</th>
                   <th className="px-6 py-4 text-center">Estado</th>
                   <th className="px-6 py-4">Tipo Pago</th>
                   <th className="px-6 py-4 text-right">Total</th>
@@ -1311,23 +1312,23 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                     <span>{rep.label}</span>
                                   </span>
                                 )}
-                                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                                  {p.vendedorNombre && (
+                                {p.vendedorNombre && (
+                                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                     <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
                                       <User size={10} />
-                                      <span>{p.vendedorNombre}</span>
+                                      <span>Vendedor: {p.vendedorNombre}</span>
                                     </span>
-                                  )}
-                                  {p.sucursalNombre && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                                      <Building size={10} />
-                                      <span>{p.sucursalNombre}</span>
-                                    </span>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
                               </div>
                             );
                           })()}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
+                            <Building size={12} className="shrink-0" />
+                            <span>{p.sucursalNombre || 'Matriz'}</span>
+                          </span>
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>

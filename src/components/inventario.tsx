@@ -39,6 +39,8 @@ interface Producto {
   precioVenta: number;
   serie?: { nombre: string };
   tallas: Talla[];
+  tenantId?: string;
+  sucursalNombre?: string;
 }
 
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
@@ -347,7 +349,14 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div>
-                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">{p.marca} · {p.modelo}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">{p.marca} · {p.modelo}</span>
+                          {activeSucursalId === 'TODAS' && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                              <Building2 size={10} /> {p.sucursalNombre || 'Matriz'}
+                            </span>
+                          )}
+                        </div>
                         <h4 className="font-bold text-sm truncate text-[var(--foreground)]">{p.nombre}</h4>
                       </div>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${total === 0 ? "bg-red-500/10 text-red-500" : bajo ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"}`}>
