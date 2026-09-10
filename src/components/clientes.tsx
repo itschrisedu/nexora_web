@@ -14,6 +14,8 @@ import ConfirmModal from "./ui/confirm-modal";
 
 interface ClientesProps {
   online: boolean;
+  activeSucursalId?: string;
+  sucursales?: { id: string; name: string; isMatriz: boolean }[];
 }
 
 interface Cliente {
@@ -116,7 +118,7 @@ function scoreColor(s: number) {
   return "text-red-500";
 }
 
-export default function ClientesComponent({ online }: ClientesProps) {
+export default function ClientesComponent({ online, activeSucursalId, sucursales }: ClientesProps) {
   // Pestañas de Navegación
   const [vista, setVista] = useState<'DIRECTORIO' | 'INACTIVOS' | 'PROMOCIONES'>('DIRECTORIO');
 
@@ -681,7 +683,9 @@ export default function ClientesComponent({ online }: ClientesProps) {
                   <thead>
                     <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30">
                       <th className="text-left px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Cliente</th>
-                      <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Sucursal</th>
+                      {activeSucursalId === 'TODAS' && (
+                        <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Sucursal</th>
+                      )}
                       <th className="text-left px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider hidden md:table-cell">Cédula / RUC</th>
                       <th className="text-left px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider hidden lg:table-cell">Contacto</th>
                       <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Score</th>
@@ -711,12 +715,14 @@ export default function ClientesComponent({ online }: ClientesProps) {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
-                              <Building size={11} className="shrink-0" />
-                              <span>{c.sucursalNombre || "Matriz"}</span>
-                            </span>
-                          </td>
+                          {activeSucursalId === 'TODAS' && (
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
+                                <Building size={11} className="shrink-0" />
+                                <span>{c.sucursalNombre || "Matriz"}</span>
+                              </span>
+                            </td>
+                          )}
                           <td className="px-4 py-3 hidden md:table-cell">
                             <span className="text-xs font-mono text-[var(--muted-foreground)]">{c.cedula || c.ruc || "—"}</span>
                           </td>
@@ -790,10 +796,12 @@ export default function ClientesComponent({ online }: ClientesProps) {
                 })()}
 
                 <div className="space-y-2 text-xs text-[var(--muted-foreground)]">
-                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
-                    <Building size={13} />
-                    <span>Sucursal: {selected.sucursalNombre || "Matriz"}</span>
-                  </div>
+                  {activeSucursalId === 'TODAS' && (
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
+                      <Building size={13} />
+                      <span>Sucursal: {selected.sucursalNombre || "Matriz"}</span>
+                    </div>
+                  )}
                   {selected.telefono && <div className="flex items-center gap-2"><Phone size={13} />{selected.telefono}</div>}
                   {selected.email && <div className="flex items-center gap-2"><Mail size={13} />{selected.email}</div>}
                   {selected.cedula && <div className="flex items-center gap-2"><User size={13} />C.I: {selected.cedula}</div>}

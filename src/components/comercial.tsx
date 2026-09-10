@@ -31,6 +31,8 @@ interface ComercialProps {
   online: boolean;
   userRole?: string;
   userPermissions?: { permiteCambiarPrecio?: boolean; rol?: string };
+  activeSucursalId?: string;
+  sucursales?: { id: string; name: string; isMatriz: boolean }[];
 }
 
 type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'EN_ESPERA_STOCK' | 'ENTREGADO' | 'CANCELADO';
@@ -139,7 +141,7 @@ const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: 
   CANCELADO:       { label: 'Anulado',          color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',          icon: <XCircle size={12} /> },
 };
 
-export default function ComercialComponent({ online, userRole, userPermissions }: ComercialProps) {
+export default function ComercialComponent({ online, userRole, userPermissions, activeSucursalId, sucursales }: ComercialProps) {
   const { showToast } = useToast();
   const puedeCambiarPrecio = userRole === 'ROL_ADMIN' || userPermissions?.permiteCambiarPrecio === true;
 
@@ -1259,7 +1261,9 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                 <tr>
                   <th className="px-6 py-4 flex items-center gap-1"><ArrowUpDown size={12} />N° Pedido</th>
                   <th className="px-6 py-4">Cliente</th>
-                  <th className="px-6 py-4 text-center">Sucursal</th>
+                  {activeSucursalId === 'TODAS' && (
+                    <th className="px-6 py-4 text-center">Sucursal</th>
+                  )}
                   <th className="px-6 py-4 text-center">Estado</th>
                   <th className="px-6 py-4">Tipo Pago</th>
                   <th className="px-6 py-4 text-right">Total</th>
@@ -1324,12 +1328,14 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                             );
                           })()}
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
-                            <Building size={12} className="shrink-0" />
-                            <span>{p.sucursalNombre || 'Matriz'}</span>
-                          </span>
-                        </td>
+                        {activeSucursalId === 'TODAS' && (
+                          <td className="px-6 py-4 text-center">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
+                              <Building size={12} className="shrink-0" />
+                              <span>{p.sucursalNombre || 'Matriz'}</span>
+                            </span>
+                          </td>
+                        )}
                         <td className="px-6 py-4 text-center">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>
                             {cfg.icon}{cfg.label}
@@ -1467,7 +1473,7 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                       <span>Vendedor: {p.vendedorNombre}</span>
                                     </span>
                                   )}
-                                  {p.sucursalNombre && (
+                                  {activeSucursalId === 'TODAS' && p.sucursalNombre && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 text-[10px] font-semibold">
                                       <Building size={10} />
                                       <span>Sucursal: {p.sucursalNombre}</span>

@@ -202,6 +202,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         adminPassword: '',
       });
       await loadSucursales();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('nexora:sucursales-changed'));
+      }
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al crear la sucursal.');
@@ -378,6 +381,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     try {
       const data = await ApiService.put(`/configuracion/sucursales/${editingSucursal.id}`, editSucursalForm);
       if (Array.isArray(data)) setSucursales(data);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('nexora:sucursales-changed'));
+      }
       setSuccessMsg(`Sucursal "${editSucursalForm.name}" actualizada.`);
       setShowEditSucursalModal(false);
       setEditingSucursal(null);

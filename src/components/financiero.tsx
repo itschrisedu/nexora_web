@@ -65,6 +65,8 @@ import ConfirmModal from './ui/confirm-modal';
 
 interface FinancieroProps {
   online: boolean;
+  activeSucursalId?: string;
+  sucursales?: { id: string; name: string; isMatriz: boolean }[];
 }
 
 export interface GastoItem {
@@ -328,7 +330,7 @@ function getCobroConfig(estado?: string) {
   return COBRO_ESTADO[estado || 'PENDIENTE'] || { label: estado || 'Pendiente', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' };
 }
 
-export default function FinancieroComponent({ online }: FinancieroProps) {
+export default function FinancieroComponent({ online, activeSucursalId, sucursales }: FinancieroProps) {
   const { showToast } = useToast();
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1679,7 +1681,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     <thead className="bg-[var(--muted)]/40 text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
                       <tr>
                         <th className="px-5 py-4">Cliente Deudor</th>
-                        <th className="px-5 py-4 text-center">Sucursal</th>
+                        {activeSucursalId === 'TODAS' && (
+                          <th className="px-5 py-4 text-center">Sucursal</th>
+                        )}
                         <th className="px-5 py-4 text-center">Compras / Notas</th>
                         <th className="px-5 py-4 text-center">Estado Cartera</th>
                         <th className="px-5 py-4 text-right">Total Facturado</th>
@@ -1731,11 +1735,13 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                 </div>
                               </td>
 
-                              <td className="px-5 py-4 text-center">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                                  <Building size={12} /> {cliente.sucursalNombre || 'Matriz'}
-                                </span>
-                              </td>
+                              {activeSucursalId === 'TODAS' && (
+                                <td className="px-5 py-4 text-center">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                    <Building size={12} /> {cliente.sucursalNombre || 'Matriz'}
+                                  </span>
+                                </td>
+                              )}
 
                               <td className="px-5 py-4 text-center">
                                 <span className="px-2.5 py-1 bg-[var(--muted)] text-[var(--foreground)] rounded-lg text-xs font-bold border border-[var(--border)]">
@@ -1829,9 +1835,11 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                               <div>
                                                 <div className="font-bold text-xs text-[var(--foreground)] flex items-center gap-2 flex-wrap">
                                                   <span>{numNota}</span>
-                                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                                                    <Building size={10} /> {cobroItem.sucursalNombre || 'Matriz'}
-                                                  </span>
+                                                  {activeSucursalId === 'TODAS' && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                                      <Building size={10} /> {cobroItem.sucursalNombre || 'Matriz'}
+                                                    </span>
+                                                  )}
                                                   <span className="px-2 py-0.2 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px]">
                                                     {cobroItem.tipo || 'Crédito'}
                                                   </span>
@@ -1850,7 +1858,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                                       <span>Vendedor: {cobroItem.vendedorNombre}</span>
                                                     </span>
                                                   )}
-                                                  {cobroItem.sucursalNombre && (
+                                                  {activeSucursalId === 'TODAS' && cobroItem.sucursalNombre && (
                                                     <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
                                                       <Building size={10} />
                                                       <span>Sucursal: {cobroItem.sucursalNombre}</span>
@@ -1933,7 +1941,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                       <tr>
                         <th className="px-5 py-4">N° Cobro / Nota</th>
                         <th className="px-5 py-4">Cliente Deudor</th>
-                        <th className="px-5 py-4 text-center">Sucursal</th>
+                        {activeSucursalId === 'TODAS' && (
+                          <th className="px-5 py-4 text-center">Sucursal</th>
+                        )}
                         <th className="px-5 py-4 text-center">Estado</th>
                         <th className="px-5 py-4 text-right">Monto Total</th>
                         <th className="px-5 py-4 text-right">Saldo Pendiente</th>
@@ -1993,12 +2003,14 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                               </div>
                             </td>
 
-                            <td className="px-5 py-4 text-center">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
-                                <Building size={11} className="shrink-0" />
-                                <span>{cobro.sucursalNombre || 'Matriz'}</span>
-                              </span>
-                            </td>
+                            {activeSucursalId === 'TODAS' && (
+                              <td className="px-5 py-4 text-center">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
+                                  <Building size={11} className="shrink-0" />
+                                  <span>{cobro.sucursalNombre || 'Matriz'}</span>
+                                </span>
+                              </td>
+                            )}
 
                             <td className="px-5 py-4 text-center">
                               <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold inline-block ${cfg.color}`}>
@@ -2177,7 +2189,9 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                               <tr>
                                 <th className="px-5 py-4">Concepto / Descripción</th>
                                 <th className="px-5 py-4">Categoría</th>
-                                <th className="px-5 py-4 text-center">Sucursal</th>
+                                {activeSucursalId === 'TODAS' && (
+                                  <th className="px-5 py-4 text-center">Sucursal</th>
+                                )}
                                 <th className="px-5 py-4 text-center">Método Pago</th>
                                 <th className="px-5 py-4 text-right">Monto</th>
                                 <th className="px-5 py-4 text-center">Fecha</th>
@@ -2220,12 +2234,14 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                       </span>
                                     </td>
 
-                                    <td className="px-5 py-4 text-center">
-                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
-                                        <Building size={11} className="shrink-0" />
-                                        <span>{g.sucursalNombre || 'Matriz'}</span>
-                                      </span>
-                                    </td>
+                                    {activeSucursalId === 'TODAS' && (
+                                      <td className="px-5 py-4 text-center">
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
+                                          <Building size={11} className="shrink-0" />
+                                          <span>{g.sucursalNombre || 'Matriz'}</span>
+                                        </span>
+                                      </td>
+                                    )}
 
                                     <td className="px-5 py-4 text-center">
                                       <span className="text-[11px] font-semibold text-[var(--muted-foreground)]">{metodoPagoLabel}</span>

@@ -135,6 +135,11 @@ function MainApp() {
     };
     window.addEventListener('nexora:theme-changed', handleThemeChange);
 
+    const handleSucursalesChange = () => {
+      fetchSucursales();
+    };
+    window.addEventListener('nexora:sucursales-changed', handleSucursalesChange);
+
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token) { 
@@ -150,6 +155,7 @@ function MainApp() {
 
     return () => {
       window.removeEventListener('nexora:theme-changed', handleThemeChange);
+      window.removeEventListener('nexora:sucursales-changed', handleSucursalesChange);
     };
   }, []);
 
@@ -706,8 +712,22 @@ function MainApp() {
           )}
           {vistaActual === 'modelos' && <ModelosComponent online={online} />}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
-          {vistaActual === 'comercial' && <ComercialComponent online={online} userRole={user?.rol} userPermissions={user} />}
-          {vistaActual === 'financiero' && <FinancieroComponent online={online} />}
+          {vistaActual === 'comercial' && (
+            <ComercialComponent
+              online={online}
+              userRole={user?.rol}
+              userPermissions={user}
+              activeSucursalId={activeSucursalId}
+              sucursales={sucursales}
+            />
+          )}
+          {vistaActual === 'financiero' && (
+            <FinancieroComponent
+              online={online}
+              activeSucursalId={activeSucursalId}
+              sucursales={sucursales}
+            />
+          )}
           {vistaActual === 'proveedores' && <ProveedoresComponent online={online} userRole={user?.rol} />}
           {vistaActual === 'usuarios' && <UsuariosComponent online={online} />}
           {vistaActual === 'super-admin' && <SuperAdminComponent online={online} />}

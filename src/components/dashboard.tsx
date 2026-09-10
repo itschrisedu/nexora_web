@@ -204,12 +204,12 @@ export default function DashboardComponent({
               <span className="px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
                 NEXORA INTELIGENCIA OPERATIVA
               </span>
-              <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5">
-                <MapPin size={12} className="text-amber-400" />
-                {activeSucursalId === "TODAS"
-                  ? "Todas las Sucursales (Consolidado)"
-                  : sucursales.find((s) => s.id === activeSucursalId)?.name || "Sucursal Actual"}
-              </span>
+              {activeSucursalId === "TODAS" && (
+                <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5">
+                  <MapPin size={12} className="text-amber-400" />
+                  Todas las Sucursales (Consolidado)
+                </span>
+              )}
             </div>
             <h2 className="text-2xl lg:text-3xl font-black tracking-tight">
               Control Comercial e Inventario en Tiempo Real

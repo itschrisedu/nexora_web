@@ -301,9 +301,11 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-base font-bold text-[var(--foreground)]">Control de Inventario</h2>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 bg-[#0F172A]/10 dark:bg-white/10 text-[var(--foreground)] border border-[var(--border)] rounded-full">
-              📍 {activeSucursalId === 'TODAS' ? '🏢 Todas las Sucursales (Consolidado)' : sucursales?.find(s => s.id === activeSucursalId)?.name || 'Matriz Principal'}
-            </span>
+            {activeSucursalId === 'TODAS' && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 bg-[#0F172A]/10 dark:bg-white/10 text-[var(--foreground)] border border-[var(--border)] rounded-full">
+                📍 🏢 Todas las Sucursales (Consolidado)
+              </span>
+            )}
           </div>
           <p className="text-xs text-[var(--muted-foreground)] font-medium mt-0.5">Control físico de existencias por modelo y talla en tiempo real</p>
         </div>
