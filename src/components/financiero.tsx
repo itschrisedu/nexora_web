@@ -249,6 +249,79 @@ const COBRO_ESTADO: Record<string, { label: string; color: string }> = {
   VENCIDO:             { label: 'Vencido',   color: 'bg-rose-500/10 text-rose-600 border-rose-500/20' },
 };
 
+interface GrupoModeloResumen {
+  key: string;
+  modelName: string;
+  color: string;
+  imageUrl?: string | null;
+  serieNombre?: string;
+  totalPares: number;
+  precioUnitario: number;
+  subtotal: number;
+  tipoVenta?: string;
+  etiquetaVolumen: string;
+  tallas: { numero: string | number; cantidad: number }[];
+}
+
+function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
+  if (!lines || lines.length === 0) return [];
+  const map = new Map<string, GrupoModeloResumen>();
+
+  lines.forEach((l) => {
+    const model = l.modelName || l.nombre || 'Calzado de Cuero';
+    const color = l.color || '';
+    const key = `${model.toLowerCase()}_${color.toLowerCase()}_${l.productId || ''}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        modelName: model,
+        color,
+        imageUrl: l.imageUrl || null,
+        serieNombre: l.serieNombre || l.serie || '',
+        totalPares: 0,
+        precioUnitario: Number(l.precioUnitario) || 0,
+        subtotal: 0,
+        tipoVenta: l.tipoVenta,
+        etiquetaVolumen: '',
+        tallas: [],
+      });
+    }
+
+    const g = map.get(key)!;
+    const cant = Number(l.cantidad) || 1;
+    const numTalla = l.numeroTalla || l.tallaNumero || l.talla || '38';
+
+    g.totalPares += cant;
+    g.subtotal += Number(l.subtotal ?? (cant * g.precioUnitario));
+
+    const existingTalla = g.tallas.find((t) => String(t.numero) === String(numTalla));
+    if (existingTalla) {
+      existingTalla.cantidad += cant;
+    } else {
+      g.tallas.push({ numero: numTalla, cantidad: cant });
+    }
+  });
+
+  return Array.from(map.values()).map((g) => {
+    g.tallas.sort((a, b) => Number(a.numero) - Number(b.numero));
+
+    if (g.totalPares >= 12 && g.totalPares % 12 === 0) {
+      const doc = g.totalPares / 12;
+      g.etiquetaVolumen = doc === 1 ? '1 Docena (12 pares)' : `${doc} Docenas (${g.totalPares} pares)`;
+    } else if (g.totalPares === 6) {
+      g.etiquetaVolumen = 'Media Docena (6 pares)';
+    } else if (g.totalPares >= 6 && g.totalPares % 6 === 0) {
+      const med = g.totalPares / 6;
+      g.etiquetaVolumen = `${med * 0.5} Docenas (${g.totalPares} pares)`;
+    } else {
+      g.etiquetaVolumen = `${g.totalPares} ${g.totalPares === 1 ? 'par' : 'pares'}`;
+    }
+
+    return g;
+  });
+}
+
 function getCobroConfig(estado?: string) {
   return COBRO_ESTADO[estado || 'PENDIENTE'] || { label: estado || 'Pendiente', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' };
 }
@@ -4129,41 +4202,83 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                   )}
                                 </div>
 
-                                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                                  {lineasNota && lineasNota.length > 0 ? (
-                                    lineasNota.map((l: any, lIdx: number) => {
-                                      const modelo = l.modelName || l.nombre || 'Calzado de Cuero';
-                                      const color = l.color ? `(${l.color})` : '';
-                                      const talla = l.numeroTalla || l.talla || '38';
-                                      const serie = l.serieNombre || l.serie || 'Serie';
-                                      const cant = Number(l.cantidad) || 1;
-                                      const pre = Number(l.precioUnitario) || 0;
-                                      const sub = cant * pre;
-
+                                <div className="mt-2">
+                                  {(() => {
+                                    const grupos = agruparLineasPorModelo(lineasNota);
+                                    if (grupos.length === 0) {
                                       return (
-                                        <div
-                                          key={lIdx}
-                                          className="flex justify-between items-center py-1.5 px-2.5 bg-[var(--muted)]/40 rounded-xl text-xs"
-                                        >
-                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="font-bold text-[var(--foreground)]">
-                                              {modelo} {color}
-                                            </span>
-                                            <span className="text-[var(--muted-foreground)] text-[11px]">
-                                              · Talla {talla} ({serie})
-                                            </span>
-                                          </div>
-                                          <div className="font-mono font-bold text-[var(--foreground)] shrink-0 ml-2">
-                                            {cant} {cant === 1 ? 'par' : 'pares'} × ${pre.toFixed(2)} = <strong className="text-emerald-600">${sub.toFixed(2)}</strong>
-                                          </div>
+                                        <div className="text-[11px] text-[var(--muted-foreground)] italic py-1">
+                                          Calzado de Cuero Cevallos Artesanal — ${monto.toFixed(2)}
                                         </div>
                                       );
-                                    })
-                                  ) : (
-                                    <div className="text-[11px] text-[var(--muted-foreground)] italic py-1">
-                                      Calzado de Cuero Cevallos Artesanal — ${monto.toFixed(2)}
-                                    </div>
-                                  )}
+                                    }
+
+                                    return (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                        {grupos.map((g) => (
+                                          <div
+                                            key={g.key}
+                                            className="p-3 bg-[var(--card)] dark:bg-slate-900/60 border border-[var(--border)] rounded-2xl flex items-start gap-3 shadow-2xs hover:border-slate-400 transition-all"
+                                          >
+                                            {/* Miniatura del calzado */}
+                                            <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                                              {g.imageUrl ? (
+                                                <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
+                                              ) : (
+                                                <Package className="text-slate-400" size={22} />
+                                              )}
+                                            </div>
+
+                                            {/* Detalle del modelo y pastillas de tallas */}
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-start justify-between gap-1">
+                                                <div className="min-w-0">
+                                                  <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate">
+                                                    {g.color ? `${g.color} · ${g.serieNombre || 'Calzado'}` : (g.serieNombre || 'Calzado')}
+                                                  </div>
+                                                  <h4 className="font-extrabold text-xs text-[var(--foreground)] truncate">
+                                                    {g.modelName}
+                                                  </h4>
+                                                </div>
+
+                                                {/* Badge de Volumen / Al por mayor */}
+                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 ${
+                                                  g.totalPares >= 6
+                                                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                                }`}>
+                                                  {g.etiquetaVolumen}
+                                                </span>
+                                              </div>
+
+                                              {/* Pastillas de tallas estilo inventario (T38: 2, T39: 3...) */}
+                                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                                {g.tallas.map((t) => (
+                                                  <span
+                                                    key={t.numero}
+                                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/60 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-[10px] font-bold"
+                                                  >
+                                                    <span>T{t.numero}:</span>
+                                                    <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
+                                                  </span>
+                                                ))}
+                                              </div>
+
+                                              {/* Subtotal del modelo */}
+                                              <div className="mt-2 pt-1 border-t border-[var(--border)]/60 flex items-center justify-between text-[11px]">
+                                                <span className="text-[var(--muted-foreground)] text-[10px]">
+                                                  ${g.precioUnitario.toFixed(2)} c/u
+                                                </span>
+                                                <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                                                  Total: ${g.subtotal.toFixed(2)}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             )}

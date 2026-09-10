@@ -58,6 +58,79 @@ interface Pedido {
   lines?: any[];
 }
 
+interface GrupoModeloResumen {
+  key: string;
+  modelName: string;
+  color: string;
+  imageUrl?: string | null;
+  serieNombre?: string;
+  totalPares: number;
+  precioUnitario: number;
+  subtotal: number;
+  tipoVenta?: string;
+  etiquetaVolumen: string;
+  tallas: { numero: string | number; cantidad: number }[];
+}
+
+function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
+  if (!lines || lines.length === 0) return [];
+  const map = new Map<string, GrupoModeloResumen>();
+
+  lines.forEach((l) => {
+    const model = l.modelName || l.nombre || 'Calzado de Cuero';
+    const color = l.color || '';
+    const key = `${model.toLowerCase()}_${color.toLowerCase()}_${l.productId || ''}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        modelName: model,
+        color,
+        imageUrl: l.imageUrl || null,
+        serieNombre: l.serieNombre || l.serie || '',
+        totalPares: 0,
+        precioUnitario: Number(l.precioUnitario) || 0,
+        subtotal: 0,
+        tipoVenta: l.tipoVenta,
+        etiquetaVolumen: '',
+        tallas: [],
+      });
+    }
+
+    const g = map.get(key)!;
+    const cant = Number(l.cantidad) || 1;
+    const numTalla = l.numeroTalla || l.tallaNumero || l.talla || '38';
+
+    g.totalPares += cant;
+    g.subtotal += Number(l.subtotal ?? (cant * g.precioUnitario));
+
+    const existingTalla = g.tallas.find((t) => String(t.numero) === String(numTalla));
+    if (existingTalla) {
+      existingTalla.cantidad += cant;
+    } else {
+      g.tallas.push({ numero: numTalla, cantidad: cant });
+    }
+  });
+
+  return Array.from(map.values()).map((g) => {
+    g.tallas.sort((a, b) => Number(a.numero) - Number(b.numero));
+
+    if (g.totalPares >= 12 && g.totalPares % 12 === 0) {
+      const doc = g.totalPares / 12;
+      g.etiquetaVolumen = doc === 1 ? '1 Docena (12 pares)' : `${doc} Docenas (${g.totalPares} pares)`;
+    } else if (g.totalPares === 6) {
+      g.etiquetaVolumen = 'Media Docena (6 pares)';
+    } else if (g.totalPares >= 6 && g.totalPares % 6 === 0) {
+      const med = g.totalPares / 6;
+      g.etiquetaVolumen = `${med * 0.5} Docenas (${g.totalPares} pares)`;
+    } else {
+      g.etiquetaVolumen = `${g.totalPares} ${g.totalPares === 1 ? 'par' : 'pares'}`;
+    }
+
+    return g;
+  });
+}
+
 const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: React.ReactNode }> = {
   PENDIENTE:       { label: 'Pendiente',        color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',       icon: <Clock size={12} /> },
   EN_PREPARACION:  { label: 'En Preparación',   color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',          icon: <Package size={12} /> },
@@ -1414,32 +1487,80 @@ export default function ComercialComponent({ online, userRole, userPermissions }
                                   </button>
                                 )}
                               </div>
-                              <div className="space-y-1 text-xs">
-                                {p.lines && p.lines.length > 0 ? (
-                                  p.lines.map((l: any, lineIdx: number) => (
-                                    <div
-                                      key={lineIdx}
-                                      className="flex justify-between items-center py-1 border-b border-[var(--border)] last:border-none"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-[var(--foreground)]">
-                                          {l.modelName || 'Calzado'} ({l.color || ''})
-                                        </span>
-                                        <span className="text-[var(--muted-foreground)]">
-                                          · Talla {l.numeroTalla || l.tallaNumero || 38} ({l.serieNombre || 'Serie'})
-                                        </span>
-                                        <span className="text-[10px] px-1.5 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded font-mono">
-                                          {l.tipoVenta === 'SERIE_COMPLETA' ? 'Serie' : 'Por Talla'}
-                                        </span>
-                                      </div>
-                                      <div className="font-mono font-bold">
-                                        {l.cantidad} pares × ${Number(l.precioUnitario).toFixed(2)} = ${(l.cantidad * Number(l.precioUnitario)).toFixed(2)}
-                                      </div>
+                              {/* Tarjetas compactas agrupadas por modelo / variante con foto y pastillas de tallas */}
+                              <div className="mt-2">
+                                {(() => {
+                                  const grupos = agruparLineasPorModelo(p.lines || []);
+                                  if (grupos.length === 0) {
+                                    return <span className="text-[var(--muted-foreground)] text-xs italic">Sin líneas de detalle</span>;
+                                  }
+
+                                  return (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                      {grupos.map((g) => (
+                                        <div
+                                          key={g.key}
+                                          className="p-3 bg-[var(--card)] dark:bg-slate-900/60 border border-[var(--border)] rounded-2xl flex items-start gap-3 shadow-2xs hover:border-slate-400 transition-all"
+                                        >
+                                          {/* Miniatura del calzado */}
+                                          <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                                            {g.imageUrl ? (
+                                              <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
+                                            ) : (
+                                              <Package className="text-slate-400" size={22} />
+                                            )}
+                                          </div>
+
+                                          {/* Detalle del modelo y pastillas de tallas */}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-start justify-between gap-1">
+                                              <div className="min-w-0">
+                                                <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate">
+                                                  {g.color ? `${g.color} · ${g.serieNombre || 'Calzado'}` : (g.serieNombre || 'Calzado')}
+                                                </div>
+                                                <h4 className="font-extrabold text-xs text-[var(--foreground)] truncate">
+                                                  {g.modelName}
+                                                </h4>
+                                              </div>
+
+                                              {/* Badge de Volumen / Al por mayor */}
+                                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 ${
+                                                g.totalPares >= 6
+                                                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                              }`}>
+                                                {g.etiquetaVolumen}
+                                              </span>
+                                            </div>
+
+                                            {/* Pastillas de tallas estilo inventario (T38: 2, T39: 3...) */}
+                                            <div className="flex flex-wrap gap-1 mt-1.5">
+                                              {g.tallas.map((t) => (
+                                                <span
+                                                  key={t.numero}
+                                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/60 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-[10px] font-bold"
+                                                >
+                                                  <span>T{t.numero}:</span>
+                                                  <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
+                                                </span>
+                                              ))}
+                                            </div>
+
+                                            {/* Subtotal del modelo */}
+                                            <div className="mt-2 pt-1 border-t border-[var(--border)]/60 flex items-center justify-between text-[11px]">
+                                              <span className="text-[var(--muted-foreground)] text-[10px]">
+                                                ${g.precioUnitario.toFixed(2)} c/u
+                                              </span>
+                                              <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                                                Total: ${g.subtotal.toFixed(2)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))
-                                ) : (
-                                  <span className="text-[var(--muted-foreground)]">Sin líneas de detalle</span>
-                                )}
+                                  );
+                                })()}
                               </div>
                             </div>
                           </td>
