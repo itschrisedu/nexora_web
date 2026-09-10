@@ -3170,18 +3170,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
               )}
             </div>
 
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowHistorialModal(false);
-                  setShowCuentaModal(true);
-                }}
-                className="px-4 py-2 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              >
-                <ArrowLeft size={14} />
-                <span>Volver a Cobros</span>
-              </button>
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setShowHistorialModal(false)}
@@ -3762,7 +3751,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del Modal */}
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+            <div className="p-6 pr-52 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400">
@@ -3781,14 +3770,28 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                   </div>
                 </div>
 
-                {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
-                <button
-                  onClick={() => setShowFacturaModal(false)}
-                  className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Cerrar ventana"
-                >
-                  <X size={18} />
-                </button>
+                {/* Botones de acción en la cabecera: Volver a Cobros al lado izquierdo de Cerrar */}
+                <div className="absolute top-5 right-5 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowFacturaModal(false);
+                      setShowCuentaModal(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white/10 text-slate-200 hover:text-white hover:bg-white/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10 shadow-2xs"
+                    title="Volver a la gestión de cobro"
+                  >
+                    <ArrowLeft size={14} />
+                    <span>Volver a Cobros</span>
+                  </button>
+                  <button
+                    onClick={() => setShowFacturaModal(false)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Cerrar ventana"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
 
               {/* Pestañas */}
@@ -4290,19 +4293,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
             </div>
 
             {/* Footer con Acciones Estandarizadas */}
-            <div className="p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFacturaModal(false);
-                  setShowCuentaModal(true);
-                }}
-                className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              >
-                <ArrowLeft size={14} />
-                <span>Volver a Cobros</span>
-              </button>
-
+            <div className="p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap items-center justify-end gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 {/* Botón Imprimir / Guardar PDF */}
                 {tabFactura === 'PREVISUALIZAR' && (
