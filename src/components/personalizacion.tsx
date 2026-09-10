@@ -43,6 +43,7 @@ interface BusinessConfig {
   horaInicioOperativa?: string;
   horaFinOperativa?: string;
   duracionSesionHoras?: number;
+  autoDespachoHabilitado?: boolean;
   sriAmbiente?: string;
   sriEstablecimiento?: string;
   sriPuntoEmision?: string;
@@ -619,40 +620,84 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             <div className="flex items-center gap-2">
               <Clock className="text-[#0F172A] dark:text-amber-400" size={20} />
               <div>
-                <h2 className="text-base font-bold text-[var(--foreground)]">5. Envío Automático Programado de Órdenes a Proveedores 🚚</h2>
+                <h2 className="text-base font-bold text-[var(--foreground)]">5. Despacho Automático de Órdenes a Proveedores 🚚</h2>
                 <p className="text-xs text-[var(--muted-foreground)]">
-                  Configura el envío automático diario de los pedidos y borradores acumulados a cada fabricante/proveedor.
+                  Habilita o deshabilita el envío automático diario de los borradores acumulados a cada fabricante/proveedor.
                 </p>
               </div>
             </div>
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-              08:00 AM (Por Defecto)
-            </span>
+
+            {/* Switch Toggle ON/OFF */}
+            <button
+              type="button"
+              onClick={() => setConfig(prev => ({ ...prev, autoDespachoHabilitado: !prev.autoDespachoHabilitado }))}
+              className={`relative inline-flex h-7 w-[52px] shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none ${
+                config.autoDespachoHabilitado !== false
+                  ? 'bg-emerald-500 border-emerald-500'
+                  : 'bg-slate-300 dark:bg-slate-600 border-slate-300 dark:border-slate-600'
+              }`}
+              title={config.autoDespachoHabilitado !== false ? 'Despacho automático ACTIVADO — Clic para desactivar' : 'Despacho automático DESACTIVADO — Clic para activar'}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  config.autoDespachoHabilitado !== false ? 'translate-x-[24px]' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Estado visual del switch */}
+          <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${
+            config.autoDespachoHabilitado !== false
+              ? 'bg-emerald-500/5 border-emerald-500/20'
+              : 'bg-rose-500/5 border-rose-500/20'
+          }`}>
+            <div className={`w-3 h-3 rounded-full shrink-0 ${
+              config.autoDespachoHabilitado !== false
+                ? 'bg-emerald-500 animate-pulse'
+                : 'bg-rose-500'
+            }`} />
             <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Hora de Envío Automático Diario a Proveedores
-              </label>
-              <input
-                type="time"
-                value={config.horaInicioOperativa || "08:00"}
-                onChange={(e) => setConfig(prev => ({ ...prev, horaInicioOperativa: e.target.value }))}
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              />
-              <span className="text-[11px] text-[var(--muted-foreground)] mt-1 block">
-                A esta hora, todas las órdenes en Borrador generadas por ventas o faltantes se emiten automáticamente.
+              <span className={`text-sm font-bold ${
+                config.autoDespachoHabilitado !== false ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'
+              }`}>
+                {config.autoDespachoHabilitado !== false ? 'Despacho Automático ACTIVADO' : 'Despacho Automático DESACTIVADO'}
               </span>
-            </div>
-
-            <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs space-y-2">
-              <span className="font-bold text-[var(--foreground)] block">💡 ¿Cómo funciona la consolidación?</span>
-              <p className="text-[var(--muted-foreground)] leading-relaxed">
-                Durante el día, todos los pedidos de clientes con faltante de stock y calzados bajo inventario mínimo se acumulan en un solo <strong>Borrador por Proveedor</strong> (con el faltante + 1 docena de reserva). A la hora indicada ({config.horaInicioOperativa || "08:00"}), el sistema envía automáticamente el consolidado sin que tengas que generar múltiples órdenes manuales.
+              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                {config.autoDespachoHabilitado !== false
+                  ? `Las órdenes en borrador se enviarán automáticamente todos los días a las ${config.horaInicioOperativa || '08:00'}.`
+                  : 'Las órdenes en borrador NO se enviarán automáticamente. Deberás despacharlas manualmente desde el módulo de Proveedores.'
+                }
               </p>
             </div>
           </div>
+
+          {/* Configuración de hora (solo visible si está activado) */}
+          {config.autoDespachoHabilitado !== false && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                  Hora de Envío Automático Diario a Proveedores
+                </label>
+                <input
+                  type="time"
+                  value={config.horaInicioOperativa || "08:00"}
+                  onChange={(e) => setConfig(prev => ({ ...prev, horaInicioOperativa: e.target.value }))}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                />
+                <span className="text-[11px] text-[var(--muted-foreground)] mt-1 block">
+                  A esta hora, todas las órdenes en Borrador generadas por ventas o faltantes se emiten automáticamente.
+                </span>
+              </div>
+
+              <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs space-y-2">
+                <span className="font-bold text-[var(--foreground)] block">💡 ¿Cómo funciona la consolidación?</span>
+                <p className="text-[var(--muted-foreground)] leading-relaxed">
+                  Durante el día, todos los pedidos de clientes con faltante de stock y calzados bajo inventario mínimo se acumulan en un solo <strong>Borrador por Proveedor</strong> (con el faltante + 1 docena de reserva). A la hora indicada ({config.horaInicioOperativa || "08:00"}), el sistema envía automáticamente el consolidado sin que tengas que generar múltiples órdenes manuales.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* SECCIÓN 6: HORARIOS OPERATIVOS Y SEGURIDAD */}
