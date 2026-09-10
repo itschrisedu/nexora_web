@@ -61,6 +61,8 @@ interface ProveedoresProps {
 
 interface Proveedor {
   id: string;
+  tenantId?: string;
+  sucursalNombre?: string;
   nombre: string;
   razonSocial: string;
   ruc: string;
@@ -98,6 +100,8 @@ interface OrdenCompraLine {
 
 interface OrdenCompra {
   id: string;
+  tenantId?: string;
+  sucursalNombre?: string;
   numero: number;
   supplierId: string;
   total: number;
@@ -109,6 +113,8 @@ interface OrdenCompra {
   lines?: OrdenCompraLine[];
   supplier?: {
     id: string;
+    tenantId?: string;
+    sucursalNombre?: string;
     nombre: string;
     razonSocial: string;
     ruc: string;
@@ -120,6 +126,8 @@ interface OrdenCompra {
 
 interface SupplierPayment {
   id: string;
+  tenantId?: string;
+  sucursalNombre?: string;
   supplierId: string;
   supplierOrderId?: string;
   monto: number;
@@ -130,6 +138,8 @@ interface SupplierPayment {
   createdAt: string;
   supplier?: {
     id?: string;
+    tenantId?: string;
+    sucursalNombre?: string;
     nombre: string;
     ruc: string;
     contacto?: string;
@@ -138,6 +148,8 @@ interface SupplierPayment {
 
 interface EntradaMercancia {
   id: string;
+  tenantId?: string;
+  sucursalNombre?: string;
   numero: number;
   supplierOrderId?: string;
   supplierId: string;
@@ -145,7 +157,7 @@ interface EntradaMercancia {
   fechaIngreso: string;
   observaciones?: string;
   estado: string;
-  supplier?: { nombre: string; ruc: string };
+  supplier?: { nombre: string; ruc: string; sucursalNombre?: string };
   supplierOrder?: { numero: number };
 }
 
@@ -1309,7 +1321,12 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   <div className="space-y-3">
                     <div className="flex justify-between items-start gap-3">
                       <div>
-                        <h4 className="font-extrabold text-sm text-[var(--foreground)] line-clamp-1">{p.razonSocial || p.nombre}</h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-extrabold text-sm text-[var(--foreground)] line-clamp-1">{p.razonSocial || p.nombre}</h4>
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                            <Building2 size={10} /> {p.sucursalNombre || 'Matriz'}
+                          </span>
+                        </div>
                         <span className="px-2 py-0.5 rounded bg-[var(--muted)] text-[10px] text-[var(--muted-foreground)] font-bold font-mono tracking-wider">
                           {p.ruc}
                         </span>
@@ -1454,6 +1471,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     <tr>
                       <th className="px-5 py-3.5">N° Orden</th>
                       <th className="px-4 py-3.5">Proveedor</th>
+                      <th className="px-4 py-3.5 text-center">Sucursal</th>
                       <th className="px-4 py-3.5">Modelo / Curva</th>
                       <th className="px-4 py-3.5 text-center">Estado</th>
                       <th className="px-4 py-3.5 text-right">Monto Total</th>
@@ -1474,6 +1492,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                           </td>
                           <td className="px-4 py-3.5 font-semibold text-xs text-[var(--foreground)]">
                             {o.supplier?.nombre || o.supplier?.razonSocial || 'Proveedor'}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                              <Building size={10} /> {o.supplier?.sucursalNombre || (o as any).sucursalNombre || 'Matriz'}
+                            </span>
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="flex items-center gap-2.5">
@@ -1940,6 +1963,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   <tr>
                     <th className="px-5 py-3">Fecha</th>
                     <th className="px-4 py-3">Proveedor</th>
+                    <th className="px-4 py-3 text-center">Sucursal</th>
                     <th className="px-4 py-3">Método</th>
                     <th className="px-4 py-3">Banco / Comprobante</th>
                     <th className="px-4 py-3">Notas / Concepto</th>
@@ -1955,6 +1979,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       </td>
                       <td className="px-4 py-3 font-bold text-[var(--foreground)]">
                         {p.supplier?.nombre || 'Proveedor'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                          <Building size={10} /> {p.supplier?.sucursalNombre || (p as any).sucursalNombre || 'Matriz'}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 bg-[var(--muted)] border border-[var(--border)] rounded text-[10px] font-bold">

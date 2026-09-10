@@ -188,6 +188,7 @@ interface Cobro {
 
 interface ClienteCartera {
   clientId: string;
+  sucursalNombre?: string;
   clienteNombre: string;
   clienteCedula: string;
   clienteTelefono: string;
@@ -700,8 +701,16 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
         .filter(Boolean)
         .sort((a, b) => new Date(a!).getTime() - new Date(b!).getTime());
 
+      const sucursalSet = new Set<string>();
+      listaCobros.forEach((c) => {
+        if (c.sucursalNombre) sucursalSet.add(c.sucursalNombre);
+      });
+      if (clienteDb?.sucursalNombre) sucursalSet.add(clienteDb.sucursalNombre);
+      const sucursalNombre = sucursalSet.size > 0 ? Array.from(sucursalSet).join(', ') : 'Matriz';
+
       resultado.push({
         clientId,
+        sucursalNombre,
         clienteNombre: nombreResuelto,
         clienteCedula: cedulaResuelta,
         clienteTelefono: telefonoResuelto,
@@ -1670,6 +1679,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                     <thead className="bg-[var(--muted)]/40 text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
                       <tr>
                         <th className="px-5 py-4">Cliente Deudor</th>
+                        <th className="px-5 py-4 text-center">Sucursal</th>
                         <th className="px-5 py-4 text-center">Compras / Notas</th>
                         <th className="px-5 py-4 text-center">Estado Cartera</th>
                         <th className="px-5 py-4 text-right">Total Facturado</th>
@@ -1722,6 +1732,12 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                               </td>
 
                               <td className="px-5 py-4 text-center">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                  <Building size={12} /> {cliente.sucursalNombre || 'Matriz'}
+                                </span>
+                              </td>
+
+                              <td className="px-5 py-4 text-center">
                                 <span className="px-2.5 py-1 bg-[var(--muted)] text-[var(--foreground)] rounded-lg text-xs font-bold border border-[var(--border)]">
                                   {cliente.totalCompras} {cliente.totalCompras === 1 ? 'compra' : 'compras'}
                                 </span>
@@ -1771,7 +1787,7 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                             {/* Desglose Expandible de Notas/Facturas del Cliente */}
                             {isExpanded && (
                               <tr className="bg-[var(--muted)]/20">
-                                <td colSpan={7} className="px-6 py-4">
+                                <td colSpan={8} className="px-6 py-4">
                                   <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3">
                                     <div className="flex justify-between items-center border-b border-[var(--border)] pb-2">
                                       <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
@@ -1811,8 +1827,11 @@ export default function FinancieroComponent({ online }: FinancieroProps) {
                                                 <FileText size={16} />
                                               </div>
                                               <div>
-                                                <div className="font-bold text-xs text-[var(--foreground)] flex items-center gap-2">
+                                                <div className="font-bold text-xs text-[var(--foreground)] flex items-center gap-2 flex-wrap">
                                                   <span>{numNota}</span>
+                                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                                    <Building size={10} /> {cobroItem.sucursalNombre || 'Matriz'}
+                                                  </span>
                                                   <span className="px-2 py-0.2 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px]">
                                                     {cobroItem.tipo || 'Crédito'}
                                                   </span>
