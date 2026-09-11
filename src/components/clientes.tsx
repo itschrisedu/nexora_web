@@ -347,7 +347,11 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       setShowCreate(false); resetForm(); loadClientes();
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
-      setError(err.message || "Error al guardar el cliente.");
+      let msg = err.message || "Error al registrar el cliente.";
+      if (typeof msg === 'string' && (msg.includes("tenantId") || msg.toLowerCase().includes("tenant"))) {
+        msg = "Por favor, selecciona una sucursal en la barra superior antes de registrar un cliente.";
+      }
+      setError(msg);
     } finally { setSaving(false); }
   };
 
@@ -375,7 +379,11 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       setShowEdit(false); setSelected(null); resetForm(); loadClientes();
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
-      setError(err.message || "Error al actualizar el cliente.");
+      let msg = err.message || "Error al actualizar el cliente.";
+      if (typeof msg === 'string' && (msg.includes("tenantId") || msg.toLowerCase().includes("tenant"))) {
+        msg = "Por favor, selecciona una sucursal en la barra superior antes de guardar los cambios.";
+      }
+      setError(msg);
     } finally { setSaving(false); }
   };
 
