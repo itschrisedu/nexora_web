@@ -197,7 +197,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     loadBusinessInfo();
     if (vista === 'INACTIVOS') loadInactivos();
     if (vista === 'PROMOCIONES') loadPromociones();
-  }, [online, vista]);
+  }, [online, vista, activeSucursalId]);
 
   const loadBusinessInfo = async () => {
     try {

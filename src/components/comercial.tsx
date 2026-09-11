@@ -412,7 +412,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     loadSeriesConfig();
     loadListaProveedores();
     loadTransportes();
-  }, [online]);
+  }, [online, activeSucursalId]);
 
   const loadTransportes = async () => {
     try {

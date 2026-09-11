@@ -471,7 +471,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     loadCobros();
     loadBusinessConfig();
     loadGastos();
-  }, [online]);
+  }, [online, activeSucursalId]);
 
   const loadGastos = async () => {
     setLoadingGastos(true);

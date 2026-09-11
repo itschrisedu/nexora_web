@@ -593,8 +593,10 @@ function MainApp() {
                   <select
                     value={activeSucursalId}
                     onChange={(e) => {
-                      setActiveSucursalId(e.target.value);
-                      localStorage.setItem('activeSucursalId', e.target.value);
+                      const val = e.target.value;
+                      setActiveSucursalId(val);
+                      localStorage.setItem('activeSucursalId', val);
+                      fetchStats();
                     }}
                     className="bg-transparent font-bold focus:outline-none cursor-pointer"
                     style={{ color: 'var(--primary-foreground)' }}
