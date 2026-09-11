@@ -165,6 +165,12 @@ function MainApp() {
     };
   }, []);
 
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchStats();
+    }
+  }, [activeSucursalId, isLoggedIn]);
+
   const applyBrandingColor = (color: string) => {
     if (!color || typeof document === 'undefined') return;
     const lowerColor = color.toLowerCase();
@@ -753,21 +759,13 @@ function MainApp() {
               title="Centro de Notificaciones & Cobranza"
             >
               <Bell size={18} style={{ color: 'var(--primary-foreground)' }} />
-              {alertaCount > 0 ? (
+              {alertaCount > 0 && (
                 <span
-                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black bg-rose-500 text-white flex items-center justify-center shadow-md border-2"
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black bg-rose-500 text-white flex items-center justify-center shadow-md border-2 animate-pulse"
                   style={{ borderColor: 'var(--primary)' }}
                 >
                   {alertaCount > 99 ? '99+' : alertaCount}
                 </span>
-              ) : (
-                <span
-                  className="absolute top-1 right-1.5 w-2 h-2 rounded-full ring-2"
-                  style={{ 
-                    backgroundColor: 'var(--primary-foreground)',
-                    borderColor: 'var(--primary)'
-                  }}
-                />
               )}
             </button>
           </div>
