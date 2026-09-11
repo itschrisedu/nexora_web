@@ -11,6 +11,13 @@ import {
 } from "lucide-react";
 import { getClienteReputacion } from "../utils/cliente-reputacion";
 import ConfirmModal from "./ui/confirm-modal";
+import {
+  validarCedula,
+  validarRuc,
+  validarTelefonoCelular,
+  validarDocumentoEcuador,
+  normalizarTelefonoCelular,
+} from "../utils/ecuador-validators";
 
 interface ClientesProps {
   online: boolean;
@@ -69,31 +76,6 @@ interface PromocionCupon {
 }
 
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
-
-// --- Validaciones Ecuador ---
-function validarCedula(cedula: string): boolean {
-  if (!cedula || cedula.length !== 10) return false;
-  const provincia = parseInt(cedula.substring(0, 2));
-  if (provincia < 1 || provincia > 24) return false;
-  const digits = cedula.split("").map(Number);
-  let sum = 0;
-  for (let i = 0; i < 9; i++) {
-    let val = digits[i];
-    if (i % 2 === 0) {
-      val *= 2;
-      if (val > 9) val -= 9;
-    }
-    sum += val;
-  }
-  const verificador = sum % 10 === 0 ? 0 : 10 - (sum % 10);
-  return verificador === digits[9];
-}
-
-function validarRuc(ruc: string): boolean {
-  if (!ruc || ruc.length !== 13) return false;
-  if (!ruc.endsWith("001")) return false;
-  return validarCedula(ruc.substring(0, 10));
-}
 
 function Lbl({ t, req }: { t: string; req?: boolean }) {
   return (
@@ -191,6 +173,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   const [direccion, setDireccion] = useState("");
   const [notas, setNotas] = useState("");
   const [docErr, setDocErr] = useState("");
+  const [telErr, setTelErr] = useState("");
 
   useEffect(() => {
     loadClientes();
@@ -277,7 +260,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   const resetForm = () => {
     setNombre(""); setApellido(""); setTelefono(""); setEmail("");
     setTipoDoc("CEDULA"); setNumDoc(""); setDireccion(""); setNotas("");
-    setError(""); setDocErr("");
+    setError(""); setDocErr(""); setTelErr("");
   };
 
   const openCreate = () => { resetForm(); setShowCreate(true); };
@@ -297,53 +280,66 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       setNumDoc(c.cedula || "");
     }
     
-    setError(""); setDocErr("");
+    setError(""); setDocErr(""); setTelErr("");
     setShowEdit(true);
   };
 
   const validateForm = (): boolean => {
     let valid = true;
-    if (!nombre || !apellido || !telefono) {
-      setError("Nombre, Apellido y Teléfono son obligatorios.");
+    setError("");
+    setTelErr("");
+    setDocErr("");
+
+    if (!nombre.trim() || !apellido.trim() || !telefono.trim()) {
+      setError("Nombre, Apellido y Teléfono Celular son obligatorios.");
       return false;
     }
-    if (numDoc) {
-      if (tipoDoc === "CEDULA" && !validarCedula(numDoc)) {
-        setDocErr("Cédula ecuatoriana inválida (debe tener 10 dígitos verificado).");
-        valid = false;
-      } else if (tipoDoc === "RUC" && !validarRuc(numDoc)) {
-        setDocErr("RUC ecuatoriano inválido (13 dígitos, debe terminar en 001).");
-        valid = false;
-      } else {
-        setDocErr("");
-      }
-    } else {
-      setDocErr("");
+
+    // Validación del Teléfono Celular Ecuador (10 dígitos, empieza por 09)
+    if (!validarTelefonoCelular(telefono)) {
+      setTelErr("El número celular debe tener exactamente 10 dígitos y empezar con 09 (ej. 0991234567).");
+      valid = false;
     }
+
+    // Validación de Documento de Identificación (Cédula 10 dígitos módulo 10 / RUC 13 dígitos terminado en 001)
+    if (numDoc) {
+      const docRes = validarDocumentoEcuador(tipoDoc, numDoc);
+      if (!docRes.valido) {
+        setDocErr(docRes.mensaje || "Documento de identificación inválido.");
+        valid = false;
+      }
+    }
+
     return valid;
   };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     if (!validateForm()) return;
     setSaving(true);
     try {
-      const cedulaVal = tipoDoc === "CEDULA" || tipoDoc === "PASAPORTE" ? (numDoc || undefined) : undefined;
-      const rucVal = tipoDoc === "RUC" ? (numDoc || undefined) : undefined;
+      const telNormalizado = normalizarTelefonoCelular(telefono);
+      const cedulaVal = tipoDoc === "CEDULA" || tipoDoc === "PASAPORTE" ? (numDoc ? numDoc.trim() : undefined) : undefined;
+      const rucVal = tipoDoc === "RUC" ? (numDoc ? numDoc.trim() : undefined) : undefined;
 
       if (online) {
         await ApiService.post("/clientes", {
-          nombre, apellido, telefono,
-          email: email || undefined, cedula: cedulaVal,
-          ruc: rucVal, direccion: direccion || undefined, notas: notas || undefined,
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          telefono: telNormalizado,
+          email: email.trim() || undefined,
+          cedula: cedulaVal,
+          ruc: rucVal,
+          direccion: direccion.trim() || undefined,
+          notas: notas.trim() || undefined,
         });
       } else {
         await db.clientes.add({
           id: `offline-${Date.now()}`,
-          nombre: `${nombre} ${apellido}`.trim(),
-          cedula: numDoc || "S/N",
-          email: email || undefined, telefono,
+          nombre: `${nombre.trim()} ${apellido.trim()}`.trim(),
+          cedula: numDoc ? numDoc.trim() : "S/N",
+          email: email.trim() || undefined,
+          telefono: telNormalizado,
           limiteCredito: 0, cupoDisponible: 0, score: 100, nivelCredito: "SIN_CREDITO",
         });
       }
@@ -358,17 +354,22 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) return;
-    setError("");
     if (!validateForm()) return;
     setSaving(true);
     try {
-      const cedulaVal = tipoDoc === "CEDULA" || tipoDoc === "PASAPORTE" ? (numDoc || undefined) : undefined;
-      const rucVal = tipoDoc === "RUC" ? (numDoc || undefined) : undefined;
+      const telNormalizado = normalizarTelefonoCelular(telefono);
+      const cedulaVal = tipoDoc === "CEDULA" || tipoDoc === "PASAPORTE" ? (numDoc ? numDoc.trim() : undefined) : undefined;
+      const rucVal = tipoDoc === "RUC" ? (numDoc ? numDoc.trim() : undefined) : undefined;
 
       await ApiService.patch(`/clientes/${selected.id}`, {
-        nombre, apellido, telefono,
-        email: email || undefined, cedula: cedulaVal,
-        ruc: rucVal, direccion: direccion || undefined, notas: notas || undefined,
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
+        telefono: telNormalizado,
+        email: email.trim() || undefined,
+        cedula: cedulaVal,
+        ruc: rucVal,
+        direccion: direccion.trim() || undefined,
+        notas: notas.trim() || undefined,
       });
       setSuccess("Cliente actualizado correctamente.");
       setShowEdit(false); setSelected(null); resetForm(); loadClientes();
@@ -1673,7 +1674,23 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 <div><Lbl t="Apellido" req /><input type="text" required value={apellido} onChange={e => setApellido(e.target.value)} placeholder="Ej. Pérez" className={INPUT} /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><Lbl t="Teléfono" req /><input type="tel" required value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Ej. 0991234567" className={INPUT} /></div>
+                <div>
+                  <Lbl t="Teléfono Celular" req />
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={telefono}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setTelefono(val);
+                      if (telErr) setTelErr("");
+                    }}
+                    placeholder="0991234567 (10 dígitos)"
+                    className={`${INPUT} ${telErr ? "border-red-400 focus:border-red-400" : ""}`}
+                  />
+                  {telErr && <p className="text-[10px] text-red-400 mt-1 font-medium">{telErr}</p>}
+                </div>
                 <div><Lbl t="Email" /><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Ej. juan@correo.com" className={INPUT} /></div>
               </div>
               <div className="space-y-2">
@@ -1699,17 +1716,24 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                     type="text"
                     maxLength={tipoDoc === "CEDULA" ? 10 : tipoDoc === "RUC" ? 13 : 20}
                     value={numDoc}
-                    onChange={(e) => { setNumDoc(e.target.value); if (docErr) setDocErr(""); }}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (tipoDoc === "CEDULA" || tipoDoc === "RUC") {
+                        val = val.replace(/\D/g, '');
+                      }
+                      setNumDoc(val);
+                      if (docErr) setDocErr("");
+                    }}
                     placeholder={
                       tipoDoc === "CEDULA"
-                        ? "Ingrese los 10 dígitos de la Cédula"
+                        ? "10 dígitos de la Cédula (ej. 1801234567)"
                         : tipoDoc === "RUC"
-                        ? "Ingrese los 13 dígitos del RUC (ej. 1801234567001)"
-                        : "Ingrese número de pasaporte o ID extranjero"
+                        ? "13 dígitos del RUC (Cédula + 001)"
+                        : "Número de pasaporte o ID extranjero"
                     }
-                    className={`${INPUT} ${docErr ? "border-red-400" : ""}`}
+                    className={`${INPUT} ${docErr ? "border-red-400 focus:border-red-400" : ""}`}
                   />
-                  {docErr && <p className="text-[10px] text-red-400 mt-1">{docErr}</p>}
+                  {docErr && <p className="text-[10px] text-red-400 mt-1 font-medium">{docErr}</p>}
                 </div>
               </div>
               <div><Lbl t="Dirección" /><input type="text" value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Ej. Av. Principal 123, Guayaquil" className={INPUT} /></div>
