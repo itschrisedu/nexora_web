@@ -60,6 +60,7 @@ const AuditoriaComponent = dynamic(() => import('@/components/auditoria'), { ssr
 const PersonalizacionComponent = dynamic(() => import('@/components/personalizacion'), { ssr: false });
 const UbicacionesComponent = dynamic(() => import('@/components/ubicaciones'), { ssr: false });
 const ReportesComponent = dynamic(() => import('@/components/reportes'), { ssr: false });
+const NotificacionesModal = dynamic(() => import('@/components/notificaciones-modal'), { ssr: false });
 
 type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
 
@@ -109,6 +110,8 @@ function MainApp() {
   const [sucursales, setSucursales] = useState<any[]>([]);
   const [activeSucursalId, setActiveSucursalId] = useState<string>('TODAS');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificacionesModalOpen, setNotificacionesModalOpen] = useState(false);
+  const [alertaCount, setAlertaCount] = useState(0);
 
   const [stats, setStats] = useState({
     totalSales: 0,
@@ -299,14 +302,18 @@ function MainApp() {
 
       if (navigator.onLine) {
         try {
-          const [resumen, clientes, productos] = await Promise.all([
+          const [resumen, clientes, productos, notifRes] = await Promise.all([
             ApiService.get('/financiero/resumen').catch(() => ({ totalFacturado: 0 })),
             ApiService.get('/clientes').catch(() => []),
             ApiService.get('/inventario/productos').catch(() => []),
+            ApiService.get(`/notificaciones/resumen?sucursalId=${activeSucursalId}`).catch(() => null),
           ]);
 
           realSales = resumen.totalFacturado || 0;
           realClients = Array.isArray(clientes) ? clientes.length : 0;
+          if (notifRes?.metricas?.totalAlertas !== undefined) {
+            setAlertaCount(notifRes.metricas.totalAlertas);
+          }
           
           if (Array.isArray(productos)) {
             // Contar productos donde la suma de stock de todas sus tallas sea menor a 15
@@ -740,18 +747,28 @@ function MainApp() {
               </button>
             )}
             <button 
-              className="p-1.5 sm:p-2 rounded-lg transition-colors relative hover:bg-black/10 dark:hover:bg-white/10"
+              onClick={() => setNotificacionesModalOpen(true)}
+              className="p-1.5 sm:p-2 rounded-lg transition-colors relative hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
               style={{ color: 'var(--primary-foreground)' }}
-              title="Notificaciones"
+              title="Centro de Notificaciones & Cobranza"
             >
               <Bell size={18} style={{ color: 'var(--primary-foreground)' }} />
-              <span
-                className="absolute top-1 right-1.5 w-2 h-2 rounded-full ring-2"
-                style={{ 
-                  backgroundColor: 'var(--primary-foreground)',
-                  borderColor: 'var(--primary)'
-                }}
-              />
+              {alertaCount > 0 ? (
+                <span
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black bg-rose-500 text-white flex items-center justify-center shadow-md border-2"
+                  style={{ borderColor: 'var(--primary)' }}
+                >
+                  {alertaCount > 99 ? '99+' : alertaCount}
+                </span>
+              ) : (
+                <span
+                  className="absolute top-1 right-1.5 w-2 h-2 rounded-full ring-2"
+                  style={{ 
+                    backgroundColor: 'var(--primary-foreground)',
+                    borderColor: 'var(--primary)'
+                  }}
+                />
+              )}
             </button>
           </div>
         </header>
@@ -890,6 +907,21 @@ function MainApp() {
           <span className="text-[10px] mt-1 font-medium">Menú</span>
         </button>
       </nav>
+
+      {/* ─── MODAL DE NOTIFICACIONES & COBRANZA ─── */}
+      <NotificacionesModal
+        isOpen={notificacionesModalOpen}
+        onClose={() => {
+          setNotificacionesModalOpen(false);
+          fetchStats();
+        }}
+        activeSucursalId={activeSucursalId}
+        onNavigateToView={(v) => {
+          setVistaActual(v as Vista);
+          setNotificacionesModalOpen(false);
+        }}
+        onRefreshStats={fetchStats}
+      />
     </div>
   );
 }
