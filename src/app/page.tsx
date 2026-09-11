@@ -36,6 +36,8 @@ import {
   MapPin,
   Settings,
   BarChart3,
+  Menu,
+  X,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import { ToastProvider } from '@/components/ui/toast';
@@ -106,6 +108,7 @@ function MainApp() {
   const [user, setUser] = useState<any>(null);
   const [sucursales, setSucursales] = useState<any[]>([]);
   const [activeSucursalId, setActiveSucursalId] = useState<string>('TODAS');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [stats, setStats] = useState({
     totalSales: 0,
@@ -402,16 +405,35 @@ function MainApp() {
   }
 
   // ══════════════════════════════════════════
-  // SHELL PRINCIPAL: Sidebar + Vista Activa
-  // ══════════════════════════════════════════
-  return (
-    <div className="h-screen max-h-screen w-full flex overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+  // Helper para renderizar el contenido del sidebar (compartido entre escritorio y móvil)
+  const renderSidebarContent = (isMobile: boolean = false) => {
+    const SECTION_GROUPS: { label: string; ids: Vista[] }[] = [
+      { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
+      { label: 'Gestión Comercial', ids: ['clientes', 'financiero', 'proveedores', 'modelos'] },
+      { label: 'Analítica', ids: ['reportes', 'prediccion-ml'] },
+      { label: 'Administración', ids: ['usuarios', 'catalogo', 'sri', 'auditoria', 'ubicaciones', 'super-admin'] },
+    ];
 
-      {/* ─── SIDEBAR ─── */}
-      <aside className="w-64 h-full max-h-screen border-r border-[var(--border)] bg-[var(--card)] flex flex-col justify-between shrink-0 overflow-hidden">
+    const filteredItems = NAV_ITEMS.filter((item) => {
+      if (!user) return item.id !== 'super-admin';
+      if (user.rol === 'ROL_SUPER_ADMIN') {
+        return ['dashboard', 'super-admin', 'auditoria', 'ubicaciones'].includes(item.id);
+      }
+      if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin';
+      if (user.rol === 'ROL_VENDEDOR') {
+        return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
+      }
+      if (user.rol === 'ROL_BODEGUERO') {
+        return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
+      }
+      return !['modelos', 'super-admin'].includes(item.id);
+    });
+
+    return (
+      <div className="flex-1 min-h-0 flex flex-col justify-between h-full">
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* Logo + Toggle tema (Fijo arriba) */}
-          <div className="shrink-0 p-6 border-b border-[var(--border)] flex items-center justify-between">
+          {/* Logo + Toggle tema + Botón Cerrar (en móvil) */}
+          <div className="shrink-0 p-5 border-b border-[var(--border)] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               {businessLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -431,92 +453,118 @@ function MainApp() {
                 NEXORA
               </span>
             </div>
-            <button onClick={toggleTheme}
-              className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity">
-              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity cursor-pointer"
+                title="Cambiar tema"
+              >
+                {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+              </button>
+              {isMobile && (
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  title="Cerrar menú"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Selector de sucursal móvil */}
+          {isMobile && user?.rol && user?.rol !== 'ROL_SUPER_ADMIN' && (
+            <div className="p-3 mx-3 mt-3 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)]">
+              <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <MapPin size={12} /> Sucursal Activa
+              </div>
+              {user?.rol === 'ROL_ADMIN' ? (
+                <select
+                  value={activeSucursalId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setActiveSucursalId(val);
+                    localStorage.setItem('activeSucursalId', val);
+                    fetchStats();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg p-2 text-xs font-bold text-[var(--foreground)] focus:outline-none cursor-pointer"
+                >
+                  <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
+                  {sucursales.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.isMatriz ? '🏢 Matriz: ' : '🏪 Sucursal: '} {s.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-xs font-bold text-[var(--foreground)] py-1">
+                  📍 {sucursales.find((s) => s.id === activeSucursalId)?.name || 'Sucursal Asignada'}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Navegación (Scroll vertical independiente únicamente en el área de items) */}
           <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-0.5">
-            {(() => {
-              const SECTION_GROUPS: { label: string; ids: Vista[] }[] = [
-                { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
-                { label: 'Gestión Comercial', ids: ['clientes', 'financiero', 'proveedores', 'modelos'] },
-                { label: 'Analítica', ids: ['reportes', 'prediccion-ml'] },
-                { label: 'Administración', ids: ['usuarios', 'catalogo', 'sri', 'auditoria', 'ubicaciones', 'super-admin'] },
-              ];
-
-              const filteredItems = NAV_ITEMS.filter((item) => {
-                if (!user) return item.id !== 'super-admin';
-                if (user.rol === 'ROL_SUPER_ADMIN') {
-                  return ['dashboard', 'super-admin', 'auditoria', 'ubicaciones'].includes(item.id);
-                }
-                if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin';
-                if (user.rol === 'ROL_VENDEDOR') {
-                  return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
-                }
-                if (user.rol === 'ROL_BODEGUERO') {
-                  return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
-                }
-                return !['modelos', 'super-admin'].includes(item.id);
-              });
-
-              return SECTION_GROUPS.map((group, gi) => {
-                const groupItems = group.ids
-                  .map((id) => filteredItems.find((fi) => fi.id === id))
-                  .filter(Boolean) as NavItem[];
-                if (groupItems.length === 0) return null;
-                return (
-                  <div key={group.label}>
-                    {gi > 0 && <div className="my-2 border-t border-[var(--border)]" />}
-                    <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                      {group.label}
-                    </div>
-                    {groupItems.map((item) => {
-                      const isActive = vistaActual === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => setVistaActual(item.id)}
-                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all ${
-                            isActive
-                              ? 'font-extrabold shadow-sm'
-                              : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
-                          }`}
-                          style={
-                            isActive
-                              ? {
-                                  backgroundColor: 'var(--primary)',
-                                  color: 'var(--primary-foreground)',
-                                }
-                              : {}
-                          }
-                        >
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="transition-colors"
-                              style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
-                            >
-                              {item.icon}
-                            </span>
-                            <span
-                              style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
-                            >
-                              {item.label}
-                            </span>
-                          </div>
-                          <ChevronRight 
-                            size={14} 
-                            style={{ color: isActive ? 'var(--primary-foreground)' : undefined }} 
-                          />
-                        </button>
-                      );
-                    })}
+            {SECTION_GROUPS.map((group, gi) => {
+              const groupItems = group.ids
+                .map((id) => filteredItems.find((fi) => fi.id === id))
+                .filter(Boolean) as NavItem[];
+              if (groupItems.length === 0) return null;
+              return (
+                <div key={group.label}>
+                  {gi > 0 && <div className="my-2 border-t border-[var(--border)]" />}
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    {group.label}
                   </div>
-                );
-              });
-            })()}
+                  {groupItems.map((item) => {
+                    const isActive = vistaActual === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setVistaActual(item.id);
+                          if (isMobile) setMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer ${
+                          isActive
+                            ? 'font-extrabold shadow-sm'
+                            : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                        }`}
+                        style={
+                          isActive
+                            ? {
+                                backgroundColor: 'var(--primary)',
+                                color: 'var(--primary-foreground)',
+                              }
+                            : {}
+                        }
+                      >
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="transition-colors"
+                            style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
+                          >
+                            {item.icon}
+                          </span>
+                          <span
+                            style={{ color: isActive ? 'var(--primary-foreground)' : undefined }}
+                          >
+                            {item.label}
+                          </span>
+                        </div>
+                        <ChevronRight 
+                          size={14} 
+                          style={{ color: isActive ? 'var(--primary-foreground)' : undefined }} 
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </nav>
         </div>
 
@@ -524,23 +572,26 @@ function MainApp() {
         <div className="shrink-0 p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
           <div className="flex items-center gap-3">
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-xs"
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-xs shrink-0"
               style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
             >
               {user?.nombre ? user.nombre.slice(0, 2).toUpperCase() : 'US'}
             </div>
-            <div>
-              <div className="text-xs font-semibold truncate max-w-[100px]">{user?.nombre || 'Usuario'}</div>
-              <div className="text-[10px] text-[var(--muted-foreground)]">
+            <div className="min-w-0">
+              <div className="text-xs font-semibold truncate max-w-[110px]">{user?.nombre || 'Usuario'}</div>
+              <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[110px]">
                 {user?.rol === 'ROL_SUPER_ADMIN' ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? 'Administrador' : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             {(user?.rol === 'ROL_ADMIN' || user?.rol === 'ROL_SUPER_ADMIN') && (
               <button
-                onClick={() => setVistaActual('personalizacion')}
-                className="p-1.5 rounded-lg transition-colors"
+                onClick={() => {
+                  setVistaActual('personalizacion');
+                  if (isMobile) setMobileMenuOpen(false);
+                }}
+                className="p-1.5 rounded-lg transition-colors cursor-pointer"
                 style={
                   vistaActual === 'personalizacion'
                     ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }
@@ -551,11 +602,40 @@ function MainApp() {
                 <Settings size={16} />
               </button>
             )}
-            <button onClick={handleLogout} className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Cerrar sesión">
+            <button onClick={handleLogout} className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer" title="Cerrar sesión">
               <LogOut size={16} />
             </button>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // ══════════════════════════════════════════
+  // SHELL PRINCIPAL: Sidebar + Vista Activa
+  // ══════════════════════════════════════════
+  return (
+    <div className="h-screen max-h-screen w-full flex overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+
+      {/* ─── SIDEBAR ESCRITORIO (Fijo, visible en pantallas >= md) ─── */}
+      <aside className="hidden md:flex w-64 h-full max-h-screen border-r border-[var(--border)] bg-[var(--card)] flex-col justify-between shrink-0 overflow-hidden">
+        {renderSidebarContent(false)}
+      </aside>
+
+      {/* ─── SIDEBAR MÓVIL (Off-canvas Drawer) ─── */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 md:hidden transition-opacity duration-200 animate-in fade-in"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside 
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] h-full bg-[var(--card)] border-r border-[var(--border)] flex flex-col justify-between shadow-2xl md:hidden transform transition-transform duration-300 ease-in-out ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {renderSidebarContent(true)}
       </aside>
 
       {/* ─── CONTENIDO PRINCIPAL ─── */}
@@ -563,16 +643,26 @@ function MainApp() {
 
         {/* Navbar superior (Fijo arriba) */}
         <header
-          className="h-16 shrink-0 border-b px-8 flex items-center justify-between z-30 shadow-xs transition-colors duration-200"
+          className="h-16 shrink-0 border-b px-4 sm:px-6 md:px-8 flex items-center justify-between z-30 shadow-xs transition-colors duration-200"
           style={{ 
             backgroundColor: 'var(--primary)', 
             color: 'var(--primary-foreground)',
             borderColor: 'color-mix(in srgb, var(--primary) 80%, black)'
           }}
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            {/* Botón Hamburguesa Móvil */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 -ml-1 sm:-ml-2 rounded-xl text-[var(--primary-foreground)] hover:bg-black/15 md:hidden flex items-center justify-center transition-colors cursor-pointer"
+              title="Abrir menú"
+              aria-label="Abrir menú de navegación"
+            >
+              <Menu size={22} />
+            </button>
+
             <h1 
-              className="text-xl font-black tracking-tight"
+              className="text-base sm:text-lg md:text-xl font-black tracking-tight truncate"
               style={{ color: 'var(--primary-foreground)' }}
             >
               {NAV_ITEMS.find((n) => n.id === vistaActual)?.label ?? 'Panel de Control'}
@@ -581,7 +671,7 @@ function MainApp() {
             {/* Conmutador / Indicador de Sucursal Activa */}
             {user?.rol && user?.rol !== 'ROL_SUPER_ADMIN' && (
               <div 
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs backdrop-blur-sm shadow-xs"
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs backdrop-blur-sm shadow-xs shrink-0"
                 style={{ 
                   backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)', 
                   border: '1px solid color-mix(in srgb, var(--primary-foreground) 25%, transparent)',
@@ -598,7 +688,7 @@ function MainApp() {
                       localStorage.setItem('activeSucursalId', val);
                       fetchStats();
                     }}
-                    className="bg-transparent font-bold focus:outline-none cursor-pointer"
+                    className="bg-transparent font-bold focus:outline-none cursor-pointer text-xs"
                     style={{ color: 'var(--primary-foreground)' }}
                     title="Navegar entre sucursales con 1 clic"
                   >
@@ -610,7 +700,7 @@ function MainApp() {
                     ))}
                   </select>
                 ) : (
-                  <span className="font-bold" style={{ color: 'var(--primary-foreground)' }}>
+                  <span className="font-bold text-xs truncate max-w-[150px]" style={{ color: 'var(--primary-foreground)' }}>
                     📍 {sucursales.find((s) => s.id === activeSucursalId)?.name || 'Sucursal Asignada'}
                   </span>
                 )}
@@ -618,39 +708,39 @@ function MainApp() {
             )}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             {online
               ? <div 
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold backdrop-blur-sm"
                   style={{
                     backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)',
                     color: 'var(--primary-foreground)',
                     border: '1px solid color-mix(in srgb, var(--primary-foreground) 25%, transparent)'
                   }}
                 >
-                  <Wifi size={13} className="animate-pulse" style={{ color: 'var(--primary-foreground)' }} />
-                  <span style={{ color: 'var(--primary-foreground)' }}>Online</span>
+                  <Wifi size={13} className="animate-pulse shrink-0" style={{ color: 'var(--primary-foreground)' }} />
+                  <span className="hidden xs:inline" style={{ color: 'var(--primary-foreground)' }}>Online</span>
                 </div>
-              : <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  <WifiOff size={13} className="animate-bounce" />
+              : <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  <WifiOff size={13} className="animate-bounce shrink-0" />
                   <span>Offline</span>
                 </div>
             }
             {stats.pendingSyncCount > 0 && (
               <button onClick={handleSyncManual} disabled={loading}
-                className="flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all disabled:opacity-50"
                 style={{
                   backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)',
                   color: 'var(--primary-foreground)',
                   border: '1px solid color-mix(in srgb, var(--primary-foreground) 30%, transparent)'
                 }}
               >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                <span>Sincronizar ({stats.pendingSyncCount})</span>
+                <RefreshCw size={13} className={loading ? 'animate-spin shrink-0' : 'shrink-0'} />
+                <span className="hidden sm:inline">Sincronizar</span> <span>({stats.pendingSyncCount})</span>
               </button>
             )}
             <button 
-              className="p-2 rounded-lg transition-colors relative hover:bg-black/10 dark:hover:bg-white/10"
+              className="p-1.5 sm:p-2 rounded-lg transition-colors relative hover:bg-black/10 dark:hover:bg-white/10"
               style={{ color: 'var(--primary-foreground)' }}
               title="Notificaciones"
             >
@@ -666,8 +756,8 @@ function MainApp() {
           </div>
         </header>
 
-        {/* ─── VISTA ACTIVA (Scroll vertical independiente únicamente en el contenido) ─── */}
-        <section key={`${vistaActual}-${activeSucursalId}`} className="flex-1 min-h-0 overflow-y-auto p-8 space-y-8">
+        {/* ─── VISTA ACTIVA (Scroll vertical independiente con margen para móvil) ─── */}
+        <section key={`${vistaActual}-${activeSucursalId}`} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 pb-24 md:pb-8">
           {/* Alerta de datos offline pendientes */}
           {stats.pendingSyncCount > 0 && (
             <div className="p-4 border border-yellow-500/20 bg-yellow-500/5 text-yellow-600 rounded-xl flex items-center justify-between">
@@ -742,6 +832,64 @@ function MainApp() {
           {vistaActual === 'ubicaciones' && <UbicacionesComponent online={online} />}
         </section>
       </main>
+
+      {/* ─── BARRA DE NAVEGACIÓN RÁPIDA INFERIOR (MÓVIL) ─── */}
+      <nav 
+        aria-label="Navegación rápida móvil"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-30 h-16 bg-[var(--card)]/95 backdrop-blur-md border-t border-[var(--border)] flex items-center justify-around px-1 shadow-lg"
+      >
+        <button
+          onClick={() => setVistaActual('dashboard')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            vistaActual === 'dashboard' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+          style={vistaActual === 'dashboard' ? { color: 'var(--primary)' } : {}}
+        >
+          <LayoutDashboard size={19} />
+          <span className="text-[10px] mt-1 font-medium">Panel</span>
+        </button>
+
+        <button
+          onClick={() => setVistaActual('pos')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            vistaActual === 'pos' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+          style={vistaActual === 'pos' ? { color: 'var(--primary)' } : {}}
+        >
+          <CreditCard size={19} />
+          <span className="text-[10px] mt-1 font-medium">Caja</span>
+        </button>
+
+        <button
+          onClick={() => setVistaActual('comercial')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            vistaActual === 'comercial' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+          style={vistaActual === 'comercial' ? { color: 'var(--primary)' } : {}}
+        >
+          <Package size={19} />
+          <span className="text-[10px] mt-1 font-medium">Pedidos</span>
+        </button>
+
+        <button
+          onClick={() => setVistaActual('clientes')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            vistaActual === 'clientes' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+          }`}
+          style={vistaActual === 'clientes' ? { color: 'var(--primary)' } : {}}
+        >
+          <User size={19} />
+          <span className="text-[10px] mt-1 font-medium">Clientes</span>
+        </button>
+
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="flex flex-col items-center justify-center flex-1 py-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+        >
+          <Menu size={19} />
+          <span className="text-[10px] mt-1 font-medium">Menú</span>
+        </button>
+      </nav>
     </div>
   );
 }

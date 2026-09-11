@@ -298,7 +298,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   return (
     <div className="space-y-6">      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-base font-bold text-[var(--foreground)]">Control de Inventario</h2>
             {activeSucursalId === 'TODAS' && (
@@ -309,11 +309,11 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
           </div>
           <p className="text-xs text-[var(--muted-foreground)] font-medium mt-0.5">Control físico de existencias por modelo y talla en tiempo real</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={loadProducts} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+        <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto">
+          <button onClick={loadProducts} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors shrink-0">
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
-          <div className="relative w-full sm:w-64">
+          <div className="relative flex-1 sm:flex-none sm:w-64">
             <Search size={16} className="absolute left-3 top-3 text-[var(--muted-foreground)]" />
             <input type="text" placeholder="Buscar calzado..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]" />
           </div>
@@ -337,62 +337,128 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
           No se encontraron productos en el inventario de esta sucursal.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
           {filteredProducts.map((p) => {
             const total = stockTotal(p);
             const bajo = stockBajo(p);
             return (
-              <div key={p.id} onClick={() => setSelected(selected?.id === p.id ? null : p)}
-                className={`bg-[var(--card)] border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer ${selected?.id === p.id ? "border-[#0F172A] ring-1 ring-[#0F172A]" : "border-[var(--border)]"}`}>
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0">
-                    {p.fotoUrl ? <img src={p.fotoUrl} alt={p.nombre} className="w-full h-full object-cover" /> : <ImageIcon size={24} className="text-[var(--muted-foreground)] opacity-40" />}
+              <div
+                key={p.id}
+                onClick={() => setSelected(selected?.id === p.id ? null : p)}
+                className={`bg-[var(--card)] border rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden w-full min-w-0 ${
+                  selected?.id === p.id
+                    ? "border-[#0F172A] ring-1 ring-[#0F172A]"
+                    : "border-[var(--border)]"
+                }`}
+              >
+                <div className="flex items-start gap-3 sm:gap-4 w-full min-w-0">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0">
+                    {p.fotoUrl ? (
+                      <img
+                        src={p.fotoUrl}
+                        alt={p.nombre}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon
+                        size={24}
+                        className="text-[var(--muted-foreground)] opacity-40"
+                      />
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div>
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <div className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-1.5 min-w-0">
+                      <div className="min-w-0 flex-1 pr-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">{p.marca} · {p.modelo}</span>
-                          {activeSucursalId === 'TODAS' && (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                              <Building2 size={10} /> {p.sucursalNombre || 'Matriz'}
+                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate block max-w-full">
+                            {p.marca} · {p.modelo}
+                          </span>
+                          {activeSucursalId === "TODAS" && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                              <Building2 size={10} /> {p.sucursalNombre || "Matriz"}
                             </span>
                           )}
                         </div>
-                        <h4 className="font-bold text-sm truncate text-[var(--foreground)]">{p.nombre}</h4>
+                        <h4 className="font-bold text-sm truncate text-[var(--foreground)] mt-0.5">
+                          {p.nombre}
+                        </h4>
                       </div>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${total === 0 ? "bg-red-500/10 text-red-500" : bajo ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"}`}>
+                      <span
+                        className={`text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap self-start ${
+                          total === 0
+                            ? "bg-red-500/10 text-red-500"
+                            : bajo
+                            ? "bg-amber-500/10 text-amber-600"
+                            : "bg-emerald-500/10 text-emerald-600"
+                        }`}
+                      >
                         {total} pares
                       </span>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-1">
+
+                    {/* Desglose de tallas con wrap limpio */}
+                    <div className="mt-2.5 flex flex-wrap gap-1.5 w-full overflow-hidden">
                       {(p.tallas || []).map((t, idx) => {
                         const st = t.stock ?? t.cantidad ?? t.disponible ?? 0;
                         const min = t.stockMinimo || 0;
                         const num = t.nombre || t.numero;
                         return (
-                          <span key={t.id || idx} className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${st === 0 ? "bg-red-500/10 text-red-500 border-red-500/20" : min > 0 && st <= min ? "bg-amber-500/10 text-amber-600 border-amber-500/20" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"}`}>
+                          <span
+                            key={t.id || idx}
+                            className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-[10px] font-bold border whitespace-nowrap inline-flex items-center ${
+                              st === 0
+                                ? "bg-red-500/10 text-red-500 border-red-500/20"
+                                : min > 0 && st <= min
+                                ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                                : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            }`}
+                          >
                             T{num}: {st}
                           </span>
                         );
                       })}
                     </div>
+
+                    {/* Acciones expandidas */}
                     {selected?.id === p.id && (
-                      <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
-                          <span>Costo: <strong>${Number(p.precioCosto).toFixed(2)}</strong></span>
-                          <span>Venta: <strong className="text-[#0F172A]">${Number(p.precioVenta).toFixed(2)}</strong></span>
+                      <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-2.5 w-full">
+                        <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] flex-wrap gap-2">
+                          <span>
+                            Costo: <strong className="text-[var(--foreground)]">${Number(p.precioCosto).toFixed(2)}</strong>
+                          </span>
+                          <span>
+                            Venta: <strong className="text-emerald-600 font-bold">${Number(p.precioVenta).toFixed(2)}</strong>
+                          </span>
                         </div>
                         {canMove && (
-                          <div className="flex items-center gap-2">
-                            <button onClick={(e) => { e.stopPropagation(); openMovimiento(p, "entrada"); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl text-xs font-semibold hover:bg-emerald-500/20 transition-colors">
+                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1 w-full">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openMovimiento(p, "entrada");
+                              }}
+                              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl text-xs font-semibold hover:bg-emerald-500/20 transition-colors"
+                            >
                               <TrendingUp size={13} /> Entrada
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); openMovimiento(p, "salida"); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-xs font-semibold hover:bg-red-500/20 transition-colors">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openMovimiento(p, "salida");
+                              }}
+                              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-xs font-semibold hover:bg-red-500/20 transition-colors"
+                            >
                               <TrendingDown size={13} /> Salida
                             </button>
                             {isAdmin && (sucursales || []).length > 1 && total > 0 && (
-                              <button onClick={(e) => { e.stopPropagation(); openTransferencia(p); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-xl text-xs font-semibold hover:bg-blue-500/20 transition-colors" title="Despachar pares a otra sucursal">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openTransferencia(p);
+                                }}
+                                className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-xl text-xs font-semibold hover:bg-blue-500/20 transition-colors"
+                                title="Despachar pares a otra sucursal"
+                              >
                                 <ArrowRightLeft size={13} /> Despachar
                               </button>
                             )}
@@ -489,7 +555,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
               )}
               <div>
                 <Lbl t="Motivo / Documento" req />
-                <input type="text" value={movMotivo} onChange={(e) => setMovMotivo(e.target.value)} placeholder={movType === "entrada" ? "Ej. Factura Proveedor N° 001" : "Ej. Ajuste de inventario"} className={INPUT} />
+                <input type="text" value={movMotivo} onChange={(e) => setMovMotivo(e.target.value)} placeholder={movType === "entrada" ? "Ej. Comprobante de recepción / Guía N° 001" : "Ej. Ajuste de inventario"} className={INPUT} />
               </div>
               {movError && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
