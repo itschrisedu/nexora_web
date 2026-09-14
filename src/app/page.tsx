@@ -61,6 +61,8 @@ const PersonalizacionComponent = dynamic(() => import('@/components/personalizac
 const UbicacionesComponent = dynamic(() => import('@/components/ubicaciones'), { ssr: false });
 const ReportesComponent = dynamic(() => import('@/components/reportes'), { ssr: false });
 const NotificacionesModal = dynamic(() => import('@/components/notificaciones-modal'), { ssr: false });
+const TermsModal = dynamic(() => import('@/components/terms-modal'), { ssr: false });
+const GpsConsentModal = dynamic(() => import('@/components/gps-consent-modal'), { ssr: false });
 
 type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
 
@@ -112,6 +114,42 @@ function MainApp() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificacionesModalOpen, setNotificacionesModalOpen] = useState(false);
   const [alertaCount, setAlertaCount] = useState(0);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showGpsModal, setShowGpsModal] = useState(false);
+
+  const checkLegalAndGpsConsent = (userData: any) => {
+    if (!userData) return;
+    if (!userData.termsAcceptedAt) {
+      setShowTermsModal(true);
+      setShowGpsModal(false);
+    } else if (
+      (userData.rol === 'ROL_VENDEDOR' || userData.rol === 'ROL_BODEGUERO') &&
+      !userData.gpsConsentAt
+    ) {
+      setShowTermsModal(false);
+      setShowGpsModal(true);
+    } else {
+      setShowTermsModal(false);
+      setShowGpsModal(false);
+    }
+  };
+
+  const handleTermsAccepted = () => {
+    const updated = { ...(user || {}), termsAcceptedAt: new Date().toISOString(), termsVersion: '1.0' };
+    setUser(updated);
+    localStorage.setItem('user', JSON.stringify(updated));
+    setShowTermsModal(false);
+    if ((updated.rol === 'ROL_VENDEDOR' || updated.rol === 'ROL_BODEGUERO') && !updated.gpsConsentAt) {
+      setShowGpsModal(true);
+    }
+  };
+
+  const handleGpsAccepted = () => {
+    const updated = { ...(user || {}), gpsConsentAt: new Date().toISOString() };
+    setUser(updated);
+    localStorage.setItem('user', JSON.stringify(updated));
+    setShowGpsModal(false);
+  };
 
   const [stats, setStats] = useState({
     totalSales: 0,
@@ -151,7 +189,9 @@ function MainApp() {
     if (token) { 
       setIsLoggedIn(true); 
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser);
+        setUser(parsed);
+        checkLegalAndGpsConsent(parsed);
       }
       fetchStats();
       fetchSucursales();
@@ -256,18 +296,20 @@ function MainApp() {
         }
         localStorage.setItem('user', JSON.stringify(response.user));
         setUser(response.user);
+        checkLegalAndGpsConsent(response.user);
       } else {
         let mockUser;
         if (username.trim() === 'superadmin@nexora.com' && password.trim() === 'SuperAdmin2026!') {
-          mockUser = { id: 'offline-superadmin', email: 'superadmin@nexora.com', nombre: 'Super Administrador Global', rol: 'ROL_SUPER_ADMIN' };
+          mockUser = { id: 'offline-superadmin', email: 'superadmin@nexora.com', nombre: 'Super Administrador Global', rol: 'ROL_SUPER_ADMIN', termsAcceptedAt: new Date().toISOString() };
         } else if (username.trim() === 'admin@nexora.com' && password.trim() === 'Admin123!') {
-          mockUser = { id: 'offline-admin', email: 'admin@nexora.com', nombre: 'Administrador Local', rol: 'ROL_ADMIN' };
+          mockUser = { id: 'offline-admin', email: 'admin@nexora.com', nombre: 'Administrador Local', rol: 'ROL_ADMIN', termsAcceptedAt: new Date().toISOString() };
         } else {
           throw new Error('Modo Offline: use superadmin@nexora.com / SuperAdmin2026! o admin@nexora.com / Admin123!');
         }
         localStorage.setItem('token', 'offline-token-mock');
         localStorage.setItem('user', JSON.stringify(mockUser));
         setUser(mockUser);
+        checkLegalAndGpsConsent(mockUser);
       }
       setIsLoggedIn(true);
       fetchStats();
@@ -920,6 +962,26 @@ function MainApp() {
         }}
         onRefreshStats={fetchStats}
       />
+
+      {/* ─── MODALES BLOQUEANTES LEGALES & ONBOARDING (FASE E8) ─── */}
+      {isLoggedIn && user && showTermsModal && (
+        <TermsModal
+          isOpen={showTermsModal}
+          userNombre={user.nombre || user.email}
+          userEmail={user.email}
+          userRol={user.rol}
+          onAccepted={handleTermsAccepted}
+        />
+      )}
+
+      {isLoggedIn && user && !showTermsModal && showGpsModal && (
+        <GpsConsentModal
+          isOpen={showGpsModal}
+          userNombre={user.nombre || user.email}
+          userRol={user.rol}
+          onAccepted={handleGpsAccepted}
+        />
+      )}
     </div>
   );
 }

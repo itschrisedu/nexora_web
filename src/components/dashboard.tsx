@@ -22,7 +22,7 @@ import {
   PieChart,
   Layers,
   Award,
-  ChevronDown,
+  Activity,
 } from "lucide-react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "@/components/ui/toast";
@@ -43,7 +43,6 @@ export default function DashboardComponent({
   sucursales,
 }: DashboardProps) {
   const { showToast } = useToast();
-
   const isAdmin = userRole === "ROL_ADMIN" || userRole === "ROL_SUPER_ADMIN";
 
   // Estados de Filtro y Datos
@@ -56,7 +55,11 @@ export default function DashboardComponent({
     clientesActivos: 0,
     creditoPendiente: 0,
     stockBajoCount: 0,
+    tallasAgotadasCount: 0,
+    totalModelos: 0,
+    saludInventarioPct: 100,
   });
+  const [alertasInventario, setAlertasInventario] = useState<any[]>([]);
 
   const [ventasChart, setVentasChart] = useState<{ label: string; monto: number; pares: number }[]>([]);
   const [metodosPago, setMetodosPago] = useState<{ metodo: string; porcentaje: number; total: number; color: string }[]>([]);
@@ -77,7 +80,6 @@ export default function DashboardComponent({
       }
 
       if (data) {
-        // Mapeo correcto de los campos que devuelve el backend (kpis, serieTemporal, etc.)
         const kpisBackend = data.kpis || {};
         setKpis({
           totalFacturado: Number(kpisBackend.totalIngresos || 0),
@@ -85,10 +87,18 @@ export default function DashboardComponent({
           totalPedidos: Number(kpisBackend.totalPedidos || 0),
           clientesActivos: Number(kpisBackend.saldoCarteraTotal || 0) > 0 ? 1 : 0,
           creditoPendiente: Number(kpisBackend.saldoCarteraTotal || 0),
-          stockBajoCount: 0,
+          stockBajoCount: Number(kpisBackend.stockBajoCount || 0),
+          tallasAgotadasCount: Number(kpisBackend.tallasAgotadasCount || 0),
+          totalModelos: Number(kpisBackend.totalModelos || 0),
+          saludInventarioPct: Number(kpisBackend.saludInventarioPct ?? 100),
         });
 
-        // Gráfico de ventas temporales — campo real: serieTemporal
+        if (Array.isArray(data.alertasInventario)) {
+          setAlertasInventario(data.alertasInventario);
+        } else {
+          setAlertasInventario([]);
+        }
+
         if (Array.isArray(data.serieTemporal) && data.serieTemporal.length > 0) {
           setVentasChart(
             data.serieTemporal.map((item: any) => ({
@@ -101,7 +111,6 @@ export default function DashboardComponent({
           setVentasChart([]);
         }
 
-        // Métodos de pago — campo real: distribucionFormasPago
         const formasPago = data.distribucionFormasPago;
         if (formasPago && typeof formasPago === 'object') {
           const colores: Record<string, string> = {
@@ -125,10 +134,9 @@ export default function DashboardComponent({
           setMetodosPago([]);
         }
 
-        // Top modelos vendidos — campo real: topModelos
         if (Array.isArray(data.topModelos) && data.topModelos.length > 0) {
           setTopModelos(
-            data.topModelos.slice(0, 5).map((m: any) => ({
+            data.topModelos.slice(0, 4).map((m: any) => ({
               id: m.productId || '',
               nombre: m.modelName || 'Calzado de Cuero',
               marca: m.serieNombre || m.color || 'Estándar',
@@ -140,7 +148,6 @@ export default function DashboardComponent({
           setTopModelos([]);
         }
 
-        // Comparativo por sucursales — campo real: ventasPorSucursal
         if (isAdmin) {
           if (Array.isArray(data.ventasPorSucursal) && data.ventasPorSucursal.length > 0) {
             setComparativoSucursales(data.ventasPorSucursal);
@@ -149,7 +156,6 @@ export default function DashboardComponent({
           }
         }
       } else {
-        // Sin datos (offline o error) — mostrar estados vacíos, no datos falsos
         setKpis({
           totalFacturado: 0,
           totalParesVendidos: 0,
@@ -157,7 +163,11 @@ export default function DashboardComponent({
           clientesActivos: 0,
           creditoPendiente: 0,
           stockBajoCount: 0,
+          tallasAgotadasCount: 0,
+          totalModelos: 0,
+          saludInventarioPct: 100,
         });
+        setAlertasInventario([]);
         setVentasChart([]);
         setMetodosPago([]);
         setTopModelos([]);
@@ -168,89 +178,76 @@ export default function DashboardComponent({
     } finally {
       setLoading(false);
     }
-
-  };
-
-  const generarVentasMock = (tipo: string) => {
-    if (tipo === "SEMANAL") {
-      return [
-        { label: "Lun", monto: 450, pares: 9 },
-        { label: "Mar", monto: 620, pares: 12 },
-        { label: "Mié", monto: 510, pares: 10 },
-        { label: "Jue", monto: 780, pares: 15 },
-        { label: "Vie", monto: 1100, pares: 22 },
-        { label: "Sáb", monto: 1450, pares: 28 },
-        { label: "Dom", monto: 890, pares: 18 },
-      ];
-    }
-    return [
-      { label: "Sem 1", monto: 2100, pares: 42 },
-      { label: "Sem 2", monto: 2850, pares: 57 },
-      { label: "Sem 3", monto: 3400, pares: 68 },
-      { label: "Sem 4", monto: 2980, pares: 60 },
-    ];
   };
 
   const maxVentaChart = Math.max(...ventasChart.map((v) => v.monto), 1);
 
+  // Metas dinámicas para los medidores de rendimiento
+  const metaPeriodo = periodo === "SEMANAL" ? 1500 : periodo === "MENSUAL" ? 6000 : 70000;
+  const metaPares = periodo === "SEMANAL" ? 40 : periodo === "MENSUAL" ? 160 : 1800;
+
+  const pctIngresos = Math.min(Math.round((kpis.totalFacturado / metaPeriodo) * 100), 100);
+  const pctPares = Math.min(Math.round((kpis.totalParesVendidos / metaPares) * 100), 100);
+  const pctCartera = kpis.totalFacturado > 0 
+    ? Math.min(Math.round((kpis.creditoPendiente / (kpis.totalFacturado + kpis.creditoPendiente)) * 100), 100)
+    : 0;
+  const pctStock = kpis.saludInventarioPct;
+
   return (
-    <div className="space-y-8">
-      {/* ─── BANNER PRINCIPAL CON SELECCIÓN DE SUCURSAL ─── */}
-      <div className="p-8 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-3xl border border-slate-700/80 text-white relative overflow-hidden shadow-xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                NEXORA INTELIGENCIA OPERATIVA
+    <div className="space-y-4 max-w-full pb-4">
+      {/* ─── BANNER COMPACTO CON SELECCIÓN DE SUCURSAL Y PERIODO ─── */}
+      <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-2xl border border-slate-700/80 text-white relative overflow-hidden shadow-md">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          
+          {/* Título e Insignias */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                NEXORA
               </span>
-              {activeSucursalId === "TODAS" && (
-                <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5">
-                  <MapPin size={12} className="text-amber-400" />
-                  Todas las Sucursales (Consolidado)
-                </span>
-              )}
+              <h2 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-1.5">
+                Control Comercial e Inventario
+              </h2>
             </div>
-            <h2 className="text-2xl lg:text-3xl font-black tracking-tight">
-              Control Comercial e Inventario en Tiempo Real
-            </h2>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Monitoreo unificado de rotación de calzado de cuero, flujo de caja, cobranza a crédito y rendimiento operativo.
-            </p>
+            {activeSucursalId === "TODAS" && (
+              <span className="hidden lg:inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700 items-center gap-1">
+                <MapPin size={10} className="text-amber-400" />
+                Consolidado General
+              </span>
+            )}
           </div>
 
-          {/* Filtros de Sucursal & Periodo */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+          {/* Filtros de Sucursal & Periodo Compactos */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             {isAdmin && sucursales.length > 0 && (
-              <div className="relative">
-                <select
-                  value={activeSucursalId}
-                  onChange={(e) => onSucursalChange(e.target.value)}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer shadow-inner pr-8"
-                >
-                  <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
-                  {sucursales.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.isMatriz ? "🏢 Matriz: " : "🏪 Sucursal: "} {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={activeSucursalId}
+                onChange={(e) => onSucursalChange(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-900/90 border border-slate-700 rounded-xl text-[11px] font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer shadow-inner pr-6"
+              >
+                <option value="TODAS">🏢 Consolidado</option>
+                {sucursales.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.isMatriz ? "🏢 " : "🏪 "} {s.name}
+                  </option>
+                ))}
+              </select>
             )}
 
             {/* Selector de Periodo */}
-            <div className="flex bg-slate-900/80 p-1 rounded-xl border border-slate-700">
+            <div className="flex bg-slate-900/90 p-0.5 rounded-xl border border-slate-700">
               {(["SEMANAL", "MENSUAL", "ANUAL"] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPeriodo(p)}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
                     periodo === p
-                      ? "bg-[#0F172A] text-white shadow-sm border border-slate-600"
+                      ? "bg-amber-500 text-slate-950 shadow-sm"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  {p === "SEMANAL" ? "Semana" : p === "MENSUAL" ? "Mes" : "Año"}
+                  {p === "SEMANAL" ? "Semanal" : p === "MENSUAL" ? "Mensual" : "Anual"}
                 </button>
               ))}
             </div>
@@ -258,98 +255,120 @@ export default function DashboardComponent({
             <button
               onClick={cargarDashboard}
               disabled={loading}
-              className="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 hover:text-white transition-colors shrink-0"
               title="Recargar Métricas"
             >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* ─── TARJETAS DE KPIS PRINCIPALES ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiCard
-          title="Facturación Total"
+      {/* ─── TARJETAS DE KPIS PRINCIPALES CON MEDIDOR GAUGE DINÁMICO ─── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <KpiCardCompact
+          title="Ventas Totales"
           value={`$${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`${kpis.totalPedidos} pedidos concretados`}
-          icon={<DollarSign size={18} />}
-          iconBg="bg-emerald-500/10 text-emerald-500 dark:bg-emerald-500/20"
-          trend={kpis.totalFacturado > 0 ? `$${(kpis.totalFacturado / (kpis.totalPedidos || 1)).toFixed(2)} ticket promedio` : "Sin ventas en este periodo"}
+          subtitle={`${kpis.totalPedidos} transacciones`}
+          icon={<DollarSign size={16} />}
+          iconBg="bg-emerald-500/10 text-emerald-500"
+          gaugePercent={pctIngresos}
+          gaugeColor="#10B981"
+          gaugeLabel={`Meta: $${metaPeriodo.toLocaleString()}`}
+          trend={kpis.totalFacturado > 0 ? `$${(kpis.totalFacturado / (kpis.totalPedidos || 1)).toFixed(2)} prom.` : "Sin ventas"}
           trendPositive={kpis.totalFacturado > 0}
         />
-        <KpiCard
+        <KpiCardCompact
           title="Calzado Vendido"
           value={`${kpis.totalParesVendidos} pares`}
-          subtitle="Rotación efectiva de stock"
-          icon={<ShoppingBag size={18} />}
-          iconBg="bg-blue-500/10 text-blue-500 dark:bg-blue-500/20"
-          trend={kpis.totalParesVendidos > 0 ? "Demanda activa en el periodo" : "Sin movimiento en este periodo"}
+          subtitle="Rotación en stock"
+          icon={<ShoppingBag size={16} />}
+          iconBg="bg-blue-500/10 text-blue-500"
+          gaugePercent={pctPares}
+          gaugeColor="#3B82F6"
+          gaugeLabel={`Meta: ${metaPares} pares`}
+          trend={kpis.totalParesVendidos > 0 ? "Demanda activa" : "Sin salidas"}
           trendPositive={kpis.totalParesVendidos > 0}
         />
-        <KpiCard
+        <KpiCardCompact
           title="Cartera por Cobrar"
           value={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
           subtitle={`${kpis.clientesActivos} clientes con saldo`}
-          icon={<CreditCard size={18} />}
-          iconBg="bg-amber-500/10 text-amber-500 dark:bg-amber-500/20"
-          trend="Seguimiento de cuotas"
+          icon={<CreditCard size={16} />}
+          iconBg="bg-amber-500/10 text-amber-500"
+          gaugePercent={pctCartera}
+          gaugeColor="#F59E0B"
+          gaugeLabel="Exposición crédito"
+          trend="Seguimiento cuotas"
           trendPositive={false}
         />
-        <KpiCard
-          title="Stock Crítico (< 15 p)"
-          value={`${kpis.stockBajoCount} modelos`}
-          subtitle={kpis.stockBajoCount > 0 ? "Requieren reabastecimiento" : "Inventario nivel óptimo"}
-          icon={<AlertTriangle size={18} />}
-          iconBg={kpis.stockBajoCount > 0 ? "bg-rose-500/10 text-rose-500 dark:bg-rose-500/20" : "bg-emerald-500/10 text-emerald-500"}
-          valueColor={kpis.stockBajoCount > 0 ? "text-rose-500" : ""}
-          trend={kpis.stockBajoCount > 0 ? "Alerta reposición" : "Inventario OK"}
+        <KpiCardCompact
+          title="Salud de Inventario"
+          value={
+            kpis.stockBajoCount > 0
+              ? `${kpis.stockBajoCount} modelos alerta`
+              : "100% Óptimo"
+          }
+          subtitle={
+            kpis.tallasAgotadasCount > 0
+              ? `${kpis.tallasAgotadasCount} tallas en 0 / < 12 pares`
+              : kpis.stockBajoCount > 0
+              ? `${kpis.stockBajoCount} con stock bajo (< 12 p)`
+              : "Stock completo por talla"
+          }
+          icon={<AlertTriangle size={16} />}
+          iconBg={kpis.stockBajoCount > 0 ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500"}
+          valueColor={kpis.stockBajoCount > 0 ? "text-rose-500" : "text-emerald-600"}
+          gaugePercent={pctStock}
+          gaugeColor={pctStock < 50 ? "#EF4444" : pctStock < 85 ? "#F59E0B" : "#10B981"}
+          gaugeLabel={`${pctStock}% disponible`}
+          trend={kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} de ${kpis.totalModelos || kpis.stockBajoCount} afectados` : "Inventario al día"}
           trendPositive={kpis.stockBajoCount === 0}
         />
       </div>
 
-      {/* ─── SECCIÓN DE GRÁFICOS Y ANALÍTICA ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* ─── SECCIÓN DE GRÁFICOS Y ANALÍTICA COMPACTA ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         
         {/* GRÁFICO 1: EVOLUCIÓN DE VENTAS (BARRAS SVG) */}
-        <div className="lg:col-span-2 p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-6">
+        <div className="lg:col-span-2 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-                <BarChart3 size={18} className="text-[#0F172A]" />
-                Evolución de Ingresos y Ventas
+              <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                <BarChart3 size={15} className="text-amber-500" />
+                Evolución de Ventas ({periodo.toLowerCase()})
               </h3>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Ventas acumuladas por {periodo.toLowerCase()} en la sucursal seleccionada
+              <p className="text-[10px] text-[var(--muted-foreground)]">
+                Ingresos registrados por periodo en la sucursal activa
               </p>
             </div>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[var(--muted)] text-[var(--muted-foreground)]">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--muted-foreground)] uppercase">
               {periodo}
             </span>
           </div>
 
-          {/* Gráfico SVG de Barras Customizado */}
-          <div className="pt-4 space-y-4">
+          {/* Gráfico SVG de Barras Compacto */}
+          <div className="pt-2">
             {ventasChart.length > 0 ? (
               <>
-                <div className="h-64 w-full flex items-end justify-between gap-3 px-2 pb-2 border-b border-[var(--border)]">
+                <div className="h-44 w-full flex items-end justify-between gap-2 px-1 pb-1 border-b border-[var(--border)]">
                   {ventasChart.map((item, idx) => {
-                    const heightPercent = Math.max(Math.round((item.monto / maxVentaChart) * 100), 8);
+                    const heightPercent = Math.max(Math.round((item.monto / maxVentaChart) * 100), 10);
                     return (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative h-full justify-end">
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group relative h-full justify-end">
                         {/* Tooltip Hover */}
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 bg-[#0F172A] text-white text-[10px] font-bold py-1 px-2.5 rounded-lg pointer-events-none shadow-lg z-20 whitespace-nowrap">
-                          ${Number(item.monto || 0).toFixed(2)} ({item.pares || 0} pares)
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-9 bg-slate-900 text-white text-[9px] font-bold py-0.5 px-2 rounded-md pointer-events-none shadow-lg z-20 whitespace-nowrap">
+                          ${Number(item.monto || 0).toFixed(2)} · {item.pares || 0} p.
                         </div>
 
                         {/* Barra con gradiente */}
                         <div
                           style={{ height: `${heightPercent}%` }}
-                          className="w-full max-w-[48px] bg-gradient-to-t from-[#0F172A] to-slate-700 hover:from-amber-600 hover:to-amber-500 rounded-t-xl transition-all shadow-sm"
+                          className="w-full max-w-[40px] bg-gradient-to-t from-slate-900 via-slate-800 to-amber-500 group-hover:from-amber-600 group-hover:to-amber-400 rounded-t-lg transition-all shadow-sm"
                         />
 
                         {/* Etiqueta Eje X */}
-                        <span className="text-[11px] font-semibold text-[var(--muted-foreground)] truncate max-w-full">
+                        <span className="text-[10px] font-semibold text-[var(--muted-foreground)] truncate max-w-full">
                           {item.label}
                         </span>
                       </div>
@@ -357,51 +376,50 @@ export default function DashboardComponent({
                   })}
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-2">
+                <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] pt-2">
                   <span className="flex items-center gap-1.5 font-medium">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#0F172A]" /> Ingresos totales en USD
+                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Monto total ventas (USD)
                   </span>
                   <span className="font-bold text-[var(--foreground)]">
-                    Promedio por tramo: ${Math.round(kpis.totalFacturado / (ventasChart.length || 1)).toLocaleString()}
+                    Promedio tramo: ${Math.round(kpis.totalFacturado / (ventasChart.length || 1)).toLocaleString()}
                   </span>
                 </div>
               </>
             ) : (
-              <div className="h-64 w-full flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-3">
-                <BarChart3 size={40} className="opacity-20" />
-                <p className="text-sm font-bold">Sin datos de ventas en este periodo</p>
-                <p className="text-xs">Registra ventas desde el Punto de Venta para ver la evolucion aqui.</p>
+              <div className="h-44 w-full flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-2">
+                <BarChart3 size={32} className="opacity-20" />
+                <p className="text-xs font-bold">Sin registros de ventas en este periodo</p>
               </div>
             )}
           </div>
         </div>
 
         {/* GRÁFICO 2: CANALES Y MÉTODOS DE PAGO */}
-        <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-6 flex flex-col justify-between">
+        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3 flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-              <PieChart size={18} className="text-[#0F172A]" />
-              Métodos de Pago Utilizados
+            <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
+              <PieChart size={15} className="text-amber-500" />
+              Métodos de Cobro
             </h3>
-            <p className="text-xs text-[var(--muted-foreground)]">
-              Distribución porcentual del recaudo
+            <p className="text-[10px] text-[var(--muted-foreground)]">
+              Distribución de medios de pago en caja
             </p>
           </div>
 
-          <div className="space-y-4 my-auto">
+          <div className="space-y-2.5 my-auto">
             {metodosPago.length > 0 ? (
               metodosPago.map((item, idx) => (
-                <div key={idx} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-[var(--foreground)] flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                <div key={idx} className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                       {item.metodo}
                     </span>
                     <span className="font-bold text-[var(--foreground)]">
-                      ${Number(item.total || 0).toFixed(2)} ({item.porcentaje || 0}%)
+                      ${Number(item.total || 0).toFixed(2)} ({item.porcentaje}%)
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${item.porcentaje}%`, backgroundColor: item.color }}
@@ -410,116 +428,115 @@ export default function DashboardComponent({
                 </div>
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-[var(--muted-foreground)] gap-2">
-                <PieChart size={32} className="opacity-20" />
-                <p className="text-xs font-bold">Sin datos de pagos en este periodo</p>
+              <div className="flex flex-col items-center justify-center py-6 text-[var(--muted-foreground)] gap-1.5">
+                <PieChart size={24} className="opacity-20" />
+                <p className="text-[11px] font-bold">Sin datos de cobros</p>
               </div>
             )}
           </div>
 
-          <div className="p-3 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-[11px] text-[var(--muted-foreground)] flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-            <span>Cobros conciliados automáticamente con el módulo de caja.</span>
+          <div className="p-2 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5">
+            <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+            <span>Conciliado con arqueos diarios de caja.</span>
           </div>
         </div>
       </div>
 
-      {/* ─── SECCIÓN INFERIOR: RANKING DE MODELOS & COMPARATIVO DE SUCURSALES ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* ─── SECCIÓN INFERIOR COMPACTA: RANKING DE MODELOS & COMPARATIVO ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         
         {/* TOP MODELOS MÁS VENDIDOS */}
-        <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-4">
+        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2.5">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-              <Award size={18} className="text-amber-500" />
+            <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
+              <Award size={15} className="text-amber-500" />
               Modelos Más Vendidos (Calzado de Cuero)
             </h3>
-            <span className="text-xs font-semibold text-[var(--muted-foreground)]">Top 5</span>
+            <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">Top 4</span>
           </div>
 
           {topModelos.length > 0 ? (
             <div className="divide-y divide-[var(--border)]">
               {topModelos.map((m, idx) => (
-                <div key={m.id || idx} className="py-3 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-[#0F172A] text-amber-400 font-black text-xs flex items-center justify-center shrink-0">
+                <div key={m.id || idx} className="py-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-slate-900 text-amber-400 font-black text-[10px] flex items-center justify-center shrink-0">
                       #{idx + 1}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-bold text-[var(--foreground)] truncate">{m.nombre}</div>
-                      <div className="text-[10px] text-[var(--muted-foreground)] font-semibold">{m.marca}</div>
+                      <div className="text-[11px] font-bold text-[var(--foreground)] truncate">{m.nombre}</div>
+                      <div className="text-[9px] text-[var(--muted-foreground)]">{m.marca}</div>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-xs font-black text-[var(--foreground)]">{m.pares} pares</div>
-                    <div className="text-[10px] text-emerald-600 font-bold">${Number(m.total || 0).toFixed(2)}</div>
+                    <div className="text-[11px] font-black text-[var(--foreground)]">{m.pares} p.</div>
+                    <div className="text-[9px] text-emerald-600 font-bold">${Number(m.total || 0).toFixed(2)}</div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-[var(--muted-foreground)] gap-2">
-              <Award size={32} className="opacity-20 text-amber-500" />
-              <p className="text-xs font-bold">Sin modelos vendidos en este periodo</p>
+            <div className="flex flex-col items-center justify-center py-6 text-[var(--muted-foreground)] gap-1.5">
+              <Award size={24} className="opacity-20 text-amber-500" />
+              <p className="text-[11px] font-bold">Sin rotación en este periodo</p>
             </div>
           )}
         </div>
 
-        {/* COMPARATIVO POR SUCURSALES (SÓLO ADMINS) */}
+        {/* COMPARATIVO POR SUCURSALES (SÓLO ADMINS) O VISTA VENDEDOR */}
         {isAdmin ? (
-          <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-4">
+          <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-                <Building2 size={18} className="text-[#0F172A]" />
-                Rendimiento Comercial por Sucursal
+              <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                <Building2 size={15} className="text-amber-500" />
+                Rendimiento por Sucursal
               </h3>
-              <span className="text-xs font-semibold text-[var(--muted-foreground)]">Red de Locales</span>
+              <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">Red Comercial</span>
             </div>
 
             {comparativoSucursales.length > 0 ? (
-              <div className="space-y-4 pt-2">
-                {comparativoSucursales.map((s, idx) => (
-                  <div key={idx} className="space-y-1.5 p-3 rounded-xl bg-[var(--muted)]/30 border border-[var(--border)]">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-[var(--foreground)] flex items-center gap-2">
-                        <Store size={14} className="text-amber-500" />
+              <div className="space-y-2 pt-1">
+                {comparativoSucursales.slice(0, 3).map((s, idx) => (
+                  <div key={idx} className="space-y-1 p-2 rounded-xl bg-[var(--muted)]/30 border border-[var(--border)]">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                        <Store size={12} className="text-amber-500" />
                         {s.sucursalNombre}
                       </span>
-                      <span className="font-black text-[#0F172A] dark:text-amber-400">
-                        ${Number(s.total || 0).toLocaleString("es-EC", { minimumFractionDigits: 2 })} ({s.porcentaje || 0}%)
+                      <span className="font-black text-[var(--foreground)]">
+                        ${Number(s.total || 0).toLocaleString("es-EC", { minimumFractionDigits: 2 })} ({s.porcentaje}%)
                       </span>
                     </div>
-                    <div className="w-full h-2.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-slate-900 to-amber-600 rounded-full transition-all"
-                        style={{ width: `${s.porcentaje || 0}%` }}
+                        className="h-full bg-gradient-to-r from-slate-900 to-amber-500 rounded-full transition-all"
+                        style={{ width: `${s.porcentaje}%` }}
                       />
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-[var(--muted-foreground)] gap-2">
-                <Store size={32} className="opacity-20 text-amber-500" />
-                <p className="text-xs font-bold">Sin datos de ventas en las sucursales para este periodo</p>
+              <div className="flex flex-col items-center justify-center py-6 text-[var(--muted-foreground)] gap-1.5">
+                <Store size={24} className="opacity-20 text-amber-500" />
+                <p className="text-[11px] font-bold">Sin ventas registradas en sucursales</p>
               </div>
             )}
           </div>
         ) : (
-          /* Vendedor / Bodeguero info card */
-          <div className="p-6 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700 flex flex-col justify-between space-y-4">
-            <div className="space-y-2">
-              <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                SUCURSAL ASIGNADA
+          <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700 flex flex-col justify-between space-y-2">
+            <div className="space-y-1">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                PUNTO DE ATENCIÓN ACTIVO
               </span>
-              <h4 className="text-xl font-bold">Rendimiento de tu Punto de Venta</h4>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Estás visualizando las métricas exclusivas de tu sucursal. Registra ventas en el Punto de Venta (POS) o consulta disponibilidad inter-sucursal para mantener un nivel de atención superior.
+              <h4 className="text-sm font-bold">Rendimiento Operativo Local</h4>
+              <p className="text-[10px] text-slate-300 leading-relaxed">
+                Visualización de métricas correspondientes a tu sucursal. Registra ventas en el POS y atiende pedidos para elevar la productividad.
               </p>
             </div>
-            <div className="pt-2 border-t border-slate-700/80 flex items-center justify-between text-xs text-slate-400">
-              <span>NEXORA POS Sistema Operativo</span>
-              <span className="text-amber-400 font-bold">100% Sincronizado</span>
+            <div className="pt-2 border-t border-slate-700/80 flex items-center justify-between text-[10px] text-slate-400">
+              <span>NEXORA Inteligencia Comercial</span>
+              <span className="text-amber-400 font-bold">En línea</span>
             </div>
           </div>
         )}
@@ -528,41 +545,93 @@ export default function DashboardComponent({
   );
 }
 
-interface KpiCardProps {
+{/* ─── COMPONENTE TARJETA KPI COMPACTA CON MEDIDOR GAUGE SVG INTEGRADO ─── */}
+interface KpiCardCompactProps {
   title: string;
   value: string;
   subtitle: string;
   valueColor?: string;
   icon: React.ReactNode;
   iconBg: string;
+  gaugePercent: number; // 0 - 100
+  gaugeColor: string;
+  gaugeLabel: string;
   trend: string;
   trendPositive: boolean;
 }
 
-function KpiCard({
+function KpiCardCompact({
   title,
   value,
   subtitle,
   valueColor = "",
   icon,
   iconBg,
+  gaugePercent,
+  gaugeColor,
+  gaugeLabel,
   trend,
   trendPositive,
-}: KpiCardProps) {
+}: KpiCardCompactProps) {
+  // Cálculo SVG del arco de gauge (semicírculo o arco 180 grados)
+  const radius = 22;
+  const circumference = Math.PI * radius; // 180 grados
+  const strokeDashoffset = circumference - (Math.min(gaugePercent, 100) / 100) * circumference;
+
   return (
-    <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm hover:shadow-md transition-all space-y-3">
-      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
-        <span className="text-[10px] font-bold uppercase tracking-wider">{title}</span>
-        <div className={`p-2.5 rounded-xl ${iconBg}`}>{icon}</div>
+    <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col justify-between">
+      
+      {/* Medidor Gauge SVG sutil en la esquina superior derecha */}
+      <div className="absolute right-2 top-2 flex flex-col items-center pointer-events-none opacity-85">
+        <svg width="54" height="32" viewBox="0 0 54 32" className="overflow-visible">
+          {/* Fondo del arco */}
+          <path
+            d="M 5,28 A 22,22 0 0,1 49,28"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            className="text-[var(--muted)]/60"
+          />
+          {/* Progreso del arco dinámico */}
+          <path
+            d="M 5,28 A 22,22 0 0,1 49,28"
+            fill="none"
+            stroke={gaugeColor}
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            className="transition-all duration-700 ease-out"
+          />
+        </svg>
+        <span className="text-[8px] font-black -mt-2.5 text-[var(--muted-foreground)]">
+          {gaugePercent}%
+        </span>
       </div>
-      <div>
-        <div className={`text-2xl font-black ${valueColor || "text-[var(--foreground)]"}`}>{value}</div>
-        <div className="text-[10px] font-semibold text-[var(--muted-foreground)] mt-0.5">{subtitle}</div>
+
+      <div className="space-y-1.5 pr-12">
+        <div className="flex items-center gap-1.5 text-[var(--muted-foreground)]">
+          <div className={`p-1.5 rounded-lg ${iconBg}`}>{icon}</div>
+          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider truncate">{title}</span>
+        </div>
+        <div>
+          <div className={`text-lg sm:text-xl font-black tracking-tight ${valueColor || "text-[var(--foreground)]"}`}>
+            {value}
+          </div>
+          <div className="text-[9px] sm:text-[10px] font-semibold text-[var(--muted-foreground)] truncate">
+            {subtitle}
+          </div>
+        </div>
       </div>
-      <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-[10px] font-bold">
-        <span className={trendPositive ? "text-emerald-600 flex items-center gap-1" : "text-amber-600 flex items-center gap-1"}>
-          {trendPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+
+      <div className="pt-2 mt-2 border-t border-[var(--border)] flex items-center justify-between text-[9px] font-bold">
+        <span className={trendPositive ? "text-emerald-600 flex items-center gap-0.5" : "text-amber-600 flex items-center gap-0.5"}>
+          {trendPositive ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
           {trend}
+        </span>
+        <span className="text-[8px] text-[var(--muted-foreground)] truncate max-w-[80px]">
+          {gaugeLabel}
         </span>
       </div>
     </div>

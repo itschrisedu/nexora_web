@@ -8,7 +8,8 @@ import {
   Loader2, Shield, Lock, Building2, DollarSign,
   Truck, Star, Trash2, Plus, Phone, Globe,
   Image, ExternalLink, Eye, EyeOff, Share2,
-  Copy, Check, MessageCircle, Upload, Sparkles
+  Copy, Check, MessageCircle, Upload, Sparkles,
+  Layers, Sliders, Settings2, HelpCircle
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
@@ -54,7 +55,6 @@ interface BusinessConfig {
   creditPlazoMaximoDias?: number;
   creditScoreMinimo?: number;
   creditTasaMoraPct?: number;
-  // Landing Page & Catálogo (Fase E3)
   heroTitulo?: string;
   heroSubtitulo?: string;
   heroBannerUrl?: string;
@@ -67,7 +67,10 @@ interface BusinessConfig {
   mostrarStockPublico?: boolean;
 }
 
+type TabType = "general" | "credito" | "operaciones" | "fiscal" | "catalogo";
+
 export default function PersonalizacionComponent({ online }: PersonalizacionProps) {
+  const [activeTab, setActiveTab] = useState<TabType>("general");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
@@ -124,7 +127,6 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     { nivel: "NIVEL_4", comprasRequeridas: 60, limiteDolares: 3000, plazoDias: 45 },
   ]);
 
-  // Modal de confirmación UI (reemplaza confirm nativo)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -247,6 +249,16 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             creditPlazoMaximoDias: data.creditPlazoMaximoDias ?? 30,
             creditScoreMinimo: data.creditScoreMinimo ?? 60,
             creditTasaMoraPct: data.creditTasaMoraPct ?? 2.5,
+            heroTitulo: data.heroTitulo || "Calzado Ecuatoriano 100% Cuero de Cevallos",
+            heroSubtitulo: data.heroSubtitulo || "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
+            heroBannerUrl: data.heroBannerUrl || "",
+            sobreNosotros: data.sobreNosotros || "Somos productores y comercializadores de calzado de cuero en el cantón Cevallos, Tungurahua.",
+            whatsappContacto: data.whatsappContacto || "",
+            facebookUrl: data.facebookUrl || "",
+            instagramUrl: data.instagramUrl || "",
+            tiktokUrl: data.tiktokUrl || "",
+            mostrarPreciosPublico: data.mostrarPreciosPublico ?? true,
+            mostrarStockPublico: data.mostrarStockPublico ?? true,
           });
 
           if (data.primaryColor && typeof document !== "undefined") {
@@ -277,7 +289,6 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
     try {
       let finalConfig = { ...config };
-      // Limpiar campos que no pertenecen a BusinessConfig
       delete (finalConfig as any).creditMontoMaximoInicial;
       delete (finalConfig as any).creditPlazoMaximoDias;
       delete (finalConfig as any).creditScoreMinimo;
@@ -296,7 +307,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         ApiService.put("/configuracion/niveles-credito", { niveles: nivelesCredito }),
       ]);
 
-      setSuccess("Configuración global y escala de niveles crediticios guardados correctamente.");
+      setSuccess("Configuración global guardada correctamente.");
       if (typeof document !== "undefined" && config.primaryColor) {
         document.documentElement.style.setProperty("--primary", config.primaryColor);
         document.documentElement.style.setProperty("--primary-foreground", getContrastColor(config.primaryColor));
@@ -312,920 +323,846 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-[#0F172A]" size={32} />
+        <Loader2 className="animate-spin text-amber-500" size={32} />
       </div>
     );
   }
 
+  const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
+    { id: "general", label: "Identidad & Negocio", icon: <Building2 size={16} /> },
+    { id: "credito", label: "Scoring & Crédito", icon: <DollarSign size={16} /> },
+    { id: "operaciones", label: "Operaciones & Logística", icon: <Truck size={16} /> },
+    { id: "fiscal", label: "Parámetros Fiscales", icon: <Shield size={16} /> },
+    { id: "catalogo", label: "Landing Web & Catálogo", icon: <Globe size={16} /> },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* MENSAJES */}
+    <div className="space-y-4 max-w-full pb-6">
+      {/* ─── NAVEGADOR DE PESTAÑAS SUPERIOR ─── */}
+      <div className="flex items-center gap-1.5 p-1.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs overflow-x-auto no-scrollbar">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                isActive
+                  ? "bg-slate-900 text-amber-400 shadow-sm border border-slate-700"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/50"
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* MENSAJES DE ESTADO */}
       {success && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-2xl flex items-center gap-3 text-xs font-semibold">
-          <CheckCircle size={16} /> {success}
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-xl flex items-center gap-2 text-xs font-semibold">
+          <CheckCircle size={15} /> {success}
         </div>
       )}
       {error && (
-        <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-2xl flex items-center gap-3 text-xs font-semibold">
-          <AlertCircle size={16} /> {error}
+        <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl flex items-center gap-2 text-xs font-semibold">
+          <AlertCircle size={15} /> {error}
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-8">
-        {/* SECCIÓN 1: DATOS COMERCIALES */}
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-            <Building2 className="text-[#0F172A]" size={20} />
-            <h2 className="text-base font-bold text-[var(--foreground)]">1. Datos Comerciales del Establecimiento</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Nombre Comercial
-              </label>
-              <input
-                type="text"
-                required
-                value={config.nombre}
-                onChange={(e) => setConfig(prev => ({ ...prev, nombre: e.target.value }))}
-                placeholder="Ej: Calzados Don Pepe"
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                RUC de la Empresa
-              </label>
-              <input
-                type="text"
-                required
-                maxLength={13}
-                value={config.ruc}
-                onChange={(e) => setConfig(prev => ({ ...prev, ruc: e.target.value }))}
-                placeholder="1790012345001"
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Dirección Matriz / Local
-              </label>
-              <input
-                type="text"
-                required
-                value={config.direccion}
-                onChange={(e) => setConfig(prev => ({ ...prev, direccion: e.target.value }))}
-                placeholder="Av. 24 de Mayo y 10 de Agosto, Cevallos"
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                  Teléfono
-                </label>
-                <input
-                  type="text"
-                  value={config.telefono || ""}
-                  onChange={(e) => setConfig(prev => ({ ...prev, telefono: e.target.value }))}
-                  placeholder="0991234567"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-                />
+      <form onSubmit={handleSave} className="space-y-4">
+        
+        {/* ══════════════ PESTAÑA 1: IDENTIDAD & NEGOCIO ══════════════ */}
+        {activeTab === "general" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {/* DATOS COMERCIALES */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <Building2 className="text-amber-500" size={18} />
+                <h3 className="text-sm font-bold text-[var(--foreground)]">Datos Comerciales del Establecimiento</h3>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                  Correo Electrónico
-                </label>
-                <input
-                  type="email"
-                  value={config.email || ""}
-                  onChange={(e) => setConfig(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="contacto@calzado.com"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN 2: IDENTIDAD VISUAL */}
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-            <Palette className="text-[#0F172A]" size={20} />
-            <div>
-              <h2 className="text-base font-bold text-[var(--foreground)]">2. Identidad Visual & Personalización (Branding)</h2>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Define el color de marca corporativo y el logo general de la empresa. El fondo se mantendrá en blanco puro y tonos claros para preservar la máxima elegancia.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ColorPicker
-              value={config.primaryColor || "#0F172A"}
-              onChange={(newColor) => {
-                setConfig((prev) => ({ ...prev, primaryColor: newColor }));
-                if (typeof document !== "undefined") {
-                  document.documentElement.style.setProperty("--primary", newColor);
-                  document.documentElement.style.setProperty("--primary-foreground", getContrastColor(newColor));
-                  window.dispatchEvent(new CustomEvent("nexora:theme-changed", { detail: { primaryColor: newColor } }));
-                }
-              }}
-              label="Color Primario de Marca & Identidad"
-            />
-
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                Logo General de la Empresa
-              </label>
-
-              <div className="flex items-start gap-4">
-                <div className="w-20 h-20 rounded-2xl bg-white border border-[var(--border)] p-2 flex items-center justify-center shrink-0 shadow-xs">
-                  {config.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={config.logoUrl} alt="Logo" className="w-full h-full object-contain" />
-                  ) : (
-                    <Building2 className="text-slate-300" size={32} />
-                  )}
-                </div>
-
-                <div className="flex-1 space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Nombre Comercial
+                  </label>
                   <input
                     type="text"
-                    value={config.logoUrl || ""}
-                    onChange={(e) => setConfig(prev => ({ ...prev, logoUrl: e.target.value }))}
-                    placeholder="https://... URL o sube una imagen"
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    required
+                    value={config.nombre}
+                    onChange={(e) => setConfig(prev => ({ ...prev, nombre: e.target.value }))}
+                    placeholder="Ej: Calzados Don Pepe"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
                   />
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <label className="cursor-pointer px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl border border-[var(--border)] transition-colors flex items-center gap-1.5">
-                      <Upload size={13} />
-                      <span>{uploadingLogo ? 'Subiendo...' : 'Subir Archivo de Logo'}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        disabled={uploadingLogo}
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          setUploadingLogo(true);
-                          try {
-                            const reader = new FileReader();
-                            reader.onload = async (event) => {
-                              const base64 = event.target?.result as string;
-                              const url = await uploadToCloudinary(base64, 'nexora_logos');
-                              if (url) {
-                                setConfig(prev => ({ ...prev, logoUrl: url }));
-                              }
-                              setUploadingLogo(false);
-                            };
-                            reader.readAsDataURL(file);
-                          } catch {
-                            setUploadingLogo(false);
-                          }
-                        }}
-                      />
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    RUC de la Empresa
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={13}
+                    value={config.ruc}
+                    onChange={(e) => setConfig(prev => ({ ...prev, ruc: e.target.value }))}
+                    placeholder="1790012345001"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Dirección Matriz / Local
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={config.direccion}
+                    onChange={(e) => setConfig(prev => ({ ...prev, direccion: e.target.value }))}
+                    placeholder="Av. 24 de Mayo y 10 de Agosto, Cevallos"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                      Teléfono
                     </label>
-
-                    {config.logoUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setConfig(prev => ({ ...prev, logoUrl: "" }))}
-                        className="text-[11px] text-rose-500 hover:underline font-semibold"
-                      >
-                        Quitar
-                      </button>
-                    )}
+                    <input
+                      type="text"
+                      value={config.telefono || ""}
+                      onChange={(e) => setConfig(prev => ({ ...prev, telefono: e.target.value }))}
+                      placeholder="0991234567"
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                      Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      value={config.email || ""}
+                      onChange={(e) => setConfig(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="contacto@calzado.com"
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                    />
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* SECCIÓN 3: PARÁMETROS SRI */}
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-            <Shield className="text-[#0F172A]" size={20} />
-            <h2 className="text-base font-bold text-[var(--foreground)]">3. Parámetros Fiscales & Facturación SRI</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Ambiente SRI
-              </label>
-              <select
-                value={config.sriAmbiente || "1"}
-                onChange={(e) => setConfig(prev => ({ ...prev, sriAmbiente: e.target.value }))}
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              >
-                <option value="1">1 - Pruebas / Sandbox</option>
-                <option value="2">2 - Producción</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Establecimiento
-              </label>
-              <input
-                type="text"
-                maxLength={3}
-                value={config.sriEstablecimiento || "001"}
-                onChange={(e) => setConfig(prev => ({ ...prev, sriEstablecimiento: e.target.value }))}
-                placeholder="001"
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold text-center font-mono focus:outline-none focus:border-[#0F172A]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Punto de Emisión
-              </label>
-              <input
-                type="text"
-                maxLength={3}
-                value={config.sriPuntoEmision || "001"}
-                onChange={(e) => setConfig(prev => ({ ...prev, sriPuntoEmision: e.target.value }))}
-                placeholder="001"
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold text-center font-mono focus:outline-none focus:border-[#0F172A]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Obligado Contabilidad
-              </label>
-              <select
-                value={config.sriObligadoContabilidad ? "SI" : "NO"}
-                onChange={(e) => setConfig(prev => ({ ...prev, sriObligadoContabilidad: e.target.value === "SI" }))}
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              >
-                <option value="NO">NO</option>
-                <option value="SI">SÍ</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN 4: NIVELES DE CRÉDITO */}
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-            <DollarSign className="text-[#0F172A]" size={20} />
-            <div>
-              <h2 className="text-base font-bold text-[var(--foreground)]">4. Escala de Niveles de Crédito Directo y Topes Asignados 💳</h2>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Define las políticas de crédito directo, cupos máximos iniciales y plazos permitidos para los clientes según su nivel.
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                <tr>
-                  <th className="p-3">Nivel Crediticio</th>
-                  <th className="p-3 text-center">Compras Requeridas (Pares)</th>
-                  <th className="p-3 text-center">Cupo Límite Tope ($ USD)</th>
-                  <th className="p-3 text-center">Plazo Máximo (Días)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {nivelesCredito.map((lvl, index) => {
-                  const labelNivel = 
-                    lvl.nivel === "SIN_CREDITO" ? "Sin Crédito (Bloqueado)" :
-                    lvl.nivel === "NIVEL_1" ? "Nivel 1 (Inicial)" :
-                    lvl.nivel === "NIVEL_2" ? "Nivel 2 (Bronce)" :
-                    lvl.nivel === "NIVEL_3" ? "Nivel 3 (Plata)" :
-                    lvl.nivel === "NIVEL_4" ? "Nivel 4 (Oro / VIP)" :
-                    lvl.nivel;
-
-                  const badgeColor = 
-                    lvl.nivel === "SIN_CREDITO" ? "bg-rose-500/10 text-rose-600 border-rose-500/20" :
-                    lvl.nivel === "NIVEL_1" ? "bg-blue-500/10 text-blue-600 border-blue-500/20" :
-                    lvl.nivel === "NIVEL_2" ? "bg-amber-500/10 text-amber-700 border-amber-500/20" :
-                    lvl.nivel === "NIVEL_3" ? "bg-purple-500/10 text-purple-700 border-purple-500/20" :
-                    "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-
-                  return (
-                    <tr key={lvl.nivel} className="hover:bg-[var(--muted)]/20">
-                      <td className="p-3">
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${badgeColor}`}>
-                          {labelNivel}
-                        </span>
-                      </td>
-                      <td className="p-3 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          value={lvl.comprasRequeridas}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, comprasRequeridas: val } : item));
-                          }}
-                          className="w-24 px-2 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-[#0F172A]"
-                        />
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="inline-flex items-center gap-1">
-                          <span className="font-bold text-slate-400">$</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="50"
-                            value={lvl.limiteDolares}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, limiteDolares: val } : item));
-                            }}
-                            className="w-28 px-2 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-[#0F172A]"
-                          />
-                        </div>
-                      </td>
-                      <td className="p-3 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          value={lvl.plazoDias}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, plazoDias: val } : item));
-                          }}
-                          className="w-24 px-2 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-[#0F172A]"
-                        />
-                      </td>
-            </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* SECCIÓN 5: DESPACHO AUTOMÁTICO DE ÓRDENES DE COMPRA A PROVEEDORES */}
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-            <div className="flex items-center gap-2">
-              <Clock className="text-[#0F172A] dark:text-amber-400" size={20} />
-              <div>
-                <h2 className="text-base font-bold text-[var(--foreground)]">5. Despacho Automático de Órdenes a Proveedores 🚚</h2>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  Habilita o deshabilita el envío automático diario de los borradores acumulados a cada fabricante/proveedor.
-                </p>
+            {/* IDENTIDAD VISUAL & BRANDING */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <Palette className="text-amber-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Identidad Visual & Branding</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Color corporativo y logotipo comercial para encabezados y documentos.
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {/* Switch Toggle ON/OFF */}
-            <button
-              type="button"
-              onClick={() => setConfig(prev => ({ ...prev, autoDespachoHabilitado: !prev.autoDespachoHabilitado }))}
-              className={`relative inline-flex h-7 w-[52px] shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none ${
-                config.autoDespachoHabilitado !== false
-                  ? 'bg-emerald-500 border-emerald-500'
-                  : 'bg-slate-300 dark:bg-slate-600 border-slate-300 dark:border-slate-600'
-              }`}
-              title={config.autoDespachoHabilitado !== false ? 'Despacho automático ACTIVADO — Clic para desactivar' : 'Despacho automático DESACTIVADO — Clic para activar'}
-            >
-              <span
-                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  config.autoDespachoHabilitado !== false ? 'translate-x-[24px]' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Estado visual del switch */}
-          <div className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${
-            config.autoDespachoHabilitado !== false
-              ? 'bg-emerald-500/5 border-emerald-500/20'
-              : 'bg-rose-500/5 border-rose-500/20'
-          }`}>
-            <div className={`w-3 h-3 rounded-full shrink-0 ${
-              config.autoDespachoHabilitado !== false
-                ? 'bg-emerald-500 animate-pulse'
-                : 'bg-rose-500'
-            }`} />
-            <div>
-              <span className={`text-sm font-bold ${
-                config.autoDespachoHabilitado !== false ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'
-              }`}>
-                {config.autoDespachoHabilitado !== false ? 'Despacho Automático ACTIVADO' : 'Despacho Automático DESACTIVADO'}
-              </span>
-              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                {config.autoDespachoHabilitado !== false
-                  ? `Las órdenes en borrador se enviarán automáticamente todos los días a las ${config.horaInicioOperativa || '08:00'}.`
-                  : 'Las órdenes en borrador NO se enviarán automáticamente. Deberás despacharlas manualmente desde el módulo de Proveedores.'
-                }
-              </p>
-            </div>
-          </div>
-
-          {/* Configuración de hora (solo visible si está activado) */}
-          {config.autoDespachoHabilitado !== false && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
-              <div>
-                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                  Hora de Envío Automático Diario a Proveedores
-                </label>
-                <input
-                  type="time"
-                  value={config.horaInicioOperativa || "08:00"}
-                  onChange={(e) => setConfig(prev => ({ ...prev, horaInicioOperativa: e.target.value }))}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ColorPicker
+                  value={config.primaryColor || "#0F172A"}
+                  onChange={(newColor) => {
+                    setConfig((prev) => ({ ...prev, primaryColor: newColor }));
+                    if (typeof document !== "undefined") {
+                      document.documentElement.style.setProperty("--primary", newColor);
+                      document.documentElement.style.setProperty("--primary-foreground", getContrastColor(newColor));
+                      window.dispatchEvent(new CustomEvent("nexora:theme-changed", { detail: { primaryColor: newColor } }));
+                    }
+                  }}
+                  label="Color Primario de Marca"
                 />
-                <span className="text-[11px] text-[var(--muted-foreground)] mt-1 block">
-                  A esta hora, todas las órdenes en Borrador generadas por ventas o faltantes se emiten automáticamente.
-                </span>
-              </div>
 
-              <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs space-y-2">
-                <span className="font-bold text-[var(--foreground)] block">💡 ¿Cómo funciona la consolidación?</span>
-                <p className="text-[var(--muted-foreground)] leading-relaxed">
-                  Durante el día, todos los pedidos de clientes con faltante de stock y calzados bajo inventario mínimo se acumulan en un solo <strong>Borrador por Proveedor</strong> (con el faltante + 1 docena de reserva). A la hora indicada ({config.horaInicioOperativa || "08:00"}), el sistema envía automáticamente el consolidado sin que tengas que generar múltiples órdenes manuales.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    Logotipo del Establecimiento
+                  </label>
 
-        {/* SECCIÓN 6: HORARIOS OPERATIVOS Y SEGURIDAD */}
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-            <Clock className="text-[#0F172A]" size={20} />
-            <h2 className="text-base font-bold text-[var(--foreground)]">6. Horarios Operativos de Sesión & Duración de Tokens</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Hora Inicio Jornada
-              </label>
-              <input
-                type="time"
-                value={config.horaInicioOperativa || "08:00"}
-                onChange={(e) => setConfig(prev => ({ ...prev, horaInicioOperativa: e.target.value }))}
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Hora de Cierre Jornada
-              </label>
-              <input
-                type="time"
-                value={config.horaFinOperativa || "19:00"}
-                onChange={(e) => setConfig(prev => ({ ...prev, horaFinOperativa: e.target.value }))}
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                Duración de Sesión (Horas)
-              </label>
-              <select
-                value={config.duracionSesionHoras || 24}
-                onChange={(e) => setConfig(prev => ({ ...prev, duracionSesionHoras: parseInt(e.target.value) || 24 }))}
-                className="w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
-              >
-                <option value={8}>8 Horas (Turno Regular)</option>
-                <option value={12}>12 Horas (Jornada Extendida)</option>
-                <option value={24}>24 Horas (Todo el Día)</option>
-                <option value={168}>7 Días (Semana Completa)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 rounded-xl flex items-start gap-3 text-xs leading-relaxed">
-            <Lock size={18} className="shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold block">Protección de Sesión Activa</span>
-              Durante la jornada de <strong>{config.horaInicioOperativa || "08:00"}</strong> a <strong>{config.horaFinOperativa || "19:00"}</strong>, el personal podrá utilizar los módulos sin que la pantalla se bloquee o se cierre la sesión cada 15 minutos.
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN 7: EMPRESAS DE TRANSPORTE Y LOGÍSTICA DE ENVÍOS */}
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 space-y-5 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-            <div className="flex items-center gap-2">
-              <Truck className="text-[#0F172A] dark:text-amber-400" size={20} />
-              <div>
-                <h2 className="text-base font-bold text-[var(--foreground)]">7. Empresas de Transporte y Envíos (Logística de Despacho) 🚚</h2>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  Administra las cooperativas y empresas de encomienda disponibles para los pedidos con envío interprovincial o local.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowModalTransporte(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm w-fit"
-            >
-              <Plus size={15} />
-              + Agregar Empresa de Transporte
-            </button>
-          </div>
-
-          {loadingTransportes ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="animate-spin text-[#0F172A]" size={24} />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {transportes.map((transp) => (
-                <div
-                  key={transp.id}
-                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
-                    transp.esPredeterminada
-                      ? "bg-amber-500/5 border-amber-500/30 shadow-sm"
-                      : "bg-[var(--muted)]/20 border-[var(--border)] hover:border-slate-400"
-                  }`}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 font-bold text-sm text-[var(--foreground)]">
-                        <Truck size={16} className={transp.esPredeterminada ? "text-amber-500" : "text-[var(--muted-foreground)]"} />
-                        <span>{transp.nombre}</span>
-                      </div>
-                      {transp.esPredeterminada && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                          <Star size={10} className="fill-amber-500 text-amber-500" />
-                          Predeterminada
-                        </span>
+                  <div className="flex items-start gap-3">
+                    <div className="w-16 h-16 rounded-xl bg-white border border-[var(--border)] p-1.5 flex items-center justify-center shrink-0 shadow-xs">
+                      {config.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={config.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      ) : (
+                        <Building2 className="text-slate-300" size={24} />
                       )}
                     </div>
 
-                    {transp.telefono && (
-                      <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
-                        <Phone size={12} />
-                        <span>{transp.telefono}</span>
-                      </div>
-                    )}
-                    {transp.direccion && (
-                      <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
-                        <MapPin size={12} />
-                        <span>{transp.direccion}</span>
-                      </div>
-                    )}
-                  </div>
+                    <div className="flex-1 space-y-2">
+                      <input
+                        type="text"
+                        value={config.logoUrl || ""}
+                        onChange={(e) => setConfig(prev => ({ ...prev, logoUrl: e.target.value }))}
+                        placeholder="URL de imagen o sube un archivo"
+                        className="w-full px-3 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                      />
 
-                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-[var(--border)]/60 text-xs">
-                    {!transp.esPredeterminada ? (
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer px-2.5 py-1 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-[11px] font-bold rounded-lg border border-[var(--border)] transition-colors flex items-center gap-1.5">
+                          <Upload size={12} />
+                          <span>{uploadingLogo ? 'Subiendo...' : 'Subir Archivo'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingLogo}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadingLogo(true);
+                              try {
+                                const reader = new FileReader();
+                                reader.onload = async (event) => {
+                                  const base64 = event.target?.result as string;
+                                  const url = await uploadToCloudinary(base64, 'nexora_logos');
+                                  if (url) {
+                                    setConfig(prev => ({ ...prev, logoUrl: url }));
+                                  }
+                                  setUploadingLogo(false);
+                                };
+                                reader.readAsDataURL(file);
+                              } catch {
+                                setUploadingLogo(false);
+                              }
+                            }}
+                          />
+                        </label>
+
+                        {config.logoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setConfig(prev => ({ ...prev, logoUrl: "" }))}
+                            className="text-[11px] text-rose-500 hover:underline font-semibold"
+                          >
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ PESTAÑA 2: SCORING & NIVELES DE CRÉDITO ══════════════ */}
+        {activeTab === "credito" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <DollarSign className="text-amber-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Escala Progresiva de Crédito Directo y Límites</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Parámetros del motor de scoring para asignación de cupos y plazos según historial comercial.
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    <tr>
+                      <th className="p-2.5">Nivel Crediticio</th>
+                      <th className="p-2.5 text-center">Compras Requeridas (Pares)</th>
+                      <th className="p-2.5 text-center">Cupo Límite Tope ($ USD)</th>
+                      <th className="p-2.5 text-center">Plazo Máximo (Días)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {nivelesCredito.map((lvl, index) => {
+                      const labelNivel = 
+                        lvl.nivel === "SIN_CREDITO" ? "Sin Crédito (Bloqueado)" :
+                        lvl.nivel === "NIVEL_1" ? "Nivel 1 (Inicial)" :
+                        lvl.nivel === "NIVEL_2" ? "Nivel 2 (Bronce)" :
+                        lvl.nivel === "NIVEL_3" ? "Nivel 3 (Plata)" :
+                        lvl.nivel === "NIVEL_4" ? "Nivel 4 (Oro / VIP)" :
+                        lvl.nivel;
+
+                      const badgeColor = 
+                        lvl.nivel === "SIN_CREDITO" ? "bg-rose-500/10 text-rose-600 border-rose-500/20" :
+                        lvl.nivel === "NIVEL_1" ? "bg-blue-500/10 text-blue-600 border-blue-500/20" :
+                        lvl.nivel === "NIVEL_2" ? "bg-amber-500/10 text-amber-700 border-amber-500/20" :
+                        lvl.nivel === "NIVEL_3" ? "bg-purple-500/10 text-purple-700 border-purple-500/20" :
+                        "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+
+                      return (
+                        <tr key={lvl.nivel} className="hover:bg-[var(--muted)]/20">
+                          <td className="p-2.5">
+                            <span className={`px-2 py-0.5 rounded-lg text-xs font-bold border ${badgeColor}`}>
+                              {labelNivel}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              value={lvl.comprasRequeridas}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, comprasRequeridas: val } : item));
+                              }}
+                              className="w-20 px-2 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-amber-500 text-xs"
+                            />
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <div className="inline-flex items-center gap-1">
+                              <span className="font-bold text-slate-400 text-xs">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="50"
+                                value={lvl.limiteDolares}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, limiteDolares: val } : item));
+                                }}
+                                className="w-24 px-2 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-amber-500 text-xs"
+                              />
+                            </div>
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              value={lvl.plazoDias}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setNivelesCredito(prev => prev.map((item, i) => i === index ? { ...item, plazoDias: val } : item));
+                              }}
+                              className="w-20 px-2 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg text-center font-mono font-bold focus:outline-none focus:border-amber-500 text-xs"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ PESTAÑA 3: OPERACIONES & LOGÍSTICA ══════════════ */}
+        {activeTab === "operaciones" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {/* DESPACHO AUTOMÁTICO */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Clock className="text-amber-500" size={18} />
+                  <div>
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">Despacho Automático a Proveedores</h3>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">
+                      Consolidación diaria de pedidos faltantes hacia fabricantes de calzado.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setConfig(prev => ({ ...prev, autoDespachoHabilitado: !prev.autoDespachoHabilitado }))}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none ${
+                    config.autoDespachoHabilitado !== false
+                      ? 'bg-emerald-500 border-emerald-500'
+                      : 'bg-slate-300 dark:bg-slate-600 border-slate-300 dark:border-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      config.autoDespachoHabilitado !== false ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Hora de Envío Automático Diario
+                  </label>
+                  <input
+                    type="time"
+                    value={config.horaInicioOperativa || "08:00"}
+                    onChange={(e) => setConfig(prev => ({ ...prev, horaInicioOperativa: e.target.value }))}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Duración de Sesión de Usuario
+                  </label>
+                  <select
+                    value={config.duracionSesionHoras || 24}
+                    onChange={(e) => setConfig(prev => ({ ...prev, duracionSesionHoras: parseInt(e.target.value) || 24 }))}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value={8}>8 Horas (Jornada estándar)</option>
+                    <option value={12}>12 Horas (Jornada extendida)</option>
+                    <option value={24}>24 Horas (Todo el día)</option>
+                    <option value={168}>7 Días (Semana completa)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* EMPRESAS DE TRANSPORTE */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Truck className="text-amber-500" size={18} />
+                  <div>
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">Empresas de Transporte & Envíos</h3>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">
+                      Logística y encomiendas para despachos locales e interprovinciales.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowModalTransporte(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                >
+                  <Plus size={14} />
+                  + Agregar Transporte
+                </button>
+              </div>
+
+              {loadingTransportes ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="animate-spin text-amber-500" size={20} />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {transportes.map((transp) => (
+                    <div
+                      key={transp.id}
+                      className={`p-3 rounded-xl border transition-all flex flex-col justify-between ${
+                        transp.esPredeterminada
+                          ? "bg-amber-500/5 border-amber-500/30 shadow-xs"
+                          : "bg-[var(--muted)]/20 border-[var(--border)]"
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <span className="font-bold text-xs text-[var(--foreground)] flex items-center gap-1.5 truncate">
+                            <Truck size={14} className={transp.esPredeterminada ? "text-amber-500" : "text-slate-400"} />
+                            {transp.nombre}
+                          </span>
+                          {transp.esPredeterminada && (
+                            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                              Predeterminada
+                            </span>
+                          )}
+                        </div>
+
+                        {transp.telefono && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]">
+                            <Phone size={11} />
+                            <span>{transp.telefono}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 mt-2 border-t border-[var(--border)]/60 text-[11px]">
+                        {!transp.esPredeterminada ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSetPredeterminada(transp.id, transp.nombre)}
+                            className="font-semibold text-amber-600 hover:underline flex items-center gap-1"
+                          >
+                            <Star size={11} />
+                            Hacer Predeterminada
+                          </button>
+                        ) : (
+                          <span className="font-semibold text-emerald-600 flex items-center gap-1">
+                            <CheckCircle size={11} /> Por defecto
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTransporte(transp.id, transp.nombre)}
+                          className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors ml-auto"
+                          title="Eliminar Transporte"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ PESTAÑA 4: PARÁMETROS FISCALES ══════════════ */}
+        {activeTab === "fiscal" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <Shield className="text-amber-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Parámetros Operativos de Comprobantes</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Identificadores de serie y puntos de emisión para notas de venta internas.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Ambiente SRI
+                  </label>
+                  <select
+                    value={config.sriAmbiente || "1"}
+                    onChange={(e) => setConfig(prev => ({ ...prev, sriAmbiente: e.target.value }))}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="1">1 - Pruebas / Sandbox</option>
+                    <option value="2">2 - Producción</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Establecimiento
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={config.sriEstablecimiento || "001"}
+                    onChange={(e) => setConfig(prev => ({ ...prev, sriEstablecimiento: e.target.value }))}
+                    placeholder="001"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold text-center font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Punto de Emisión
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={config.sriPuntoEmision || "001"}
+                    onChange={(e) => setConfig(prev => ({ ...prev, sriPuntoEmision: e.target.value }))}
+                    placeholder="001"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold text-center font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Obligado Contabilidad
+                  </label>
+                  <select
+                    value={config.sriObligadoContabilidad ? "SI" : "NO"}
+                    onChange={(e) => setConfig(prev => ({ ...prev, sriObligadoContabilidad: e.target.value === "SI" }))}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="NO">NO</option>
+                    <option value="SI">SÍ</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ PESTAÑA 5: LANDING WEB & CATÁLOGO ══════════════ */}
+        {activeTab === "catalogo" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="bg-[var(--card)] border border-emerald-500/30 rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Globe className="text-emerald-600" size={18} />
+                  <div>
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">Catálogo Digital & Landing Web</h3>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">
+                      Portal público de exhibición de calzado de cuero con pedidos directos vía WhatsApp.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ENLACE PÚBLICO */}
+              {(() => {
+                const currentTenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : '';
+                const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                const fullLandingUrl = `${baseUrl}/landing${currentTenantId ? `?tenantId=${currentTenantId}` : ''}`;
+                const msgWhatsApp = `¡Hola! Te invito a conocer el catálogo digital oficial de ${config.nombre || 'nuestro calzado'} (100% Cuero de Cevallos):\n👉 ${fullLandingUrl}`;
+                const waShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgWhatsApp)}`;
+
+                return (
+                  <div className="p-3 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5 uppercase tracking-wider">
+                        <Share2 size={13} className="text-emerald-600" />
+                        <span>Enlace Público de tu Catálogo</span>
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full">
+                        🟢 Activo
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-[var(--border)] rounded-lg font-mono text-xs text-[var(--foreground)] truncate select-all">
+                        {fullLandingUrl}
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => handleSetPredeterminada(transp.id, transp.nombre)}
-                        className="text-[11px] font-semibold text-[#0F172A] dark:text-amber-400 hover:underline flex items-center gap-1"
+                        onClick={() => {
+                          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                            navigator.clipboard.writeText(fullLandingUrl);
+                            setCopiadoLink(true);
+                            setTimeout(() => setCopiadoLink(false), 2500);
+                          }
+                        }}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shrink-0 ${
+                          copiadoLink ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'
+                        }`}
                       >
-                        <Star size={12} />
-                        Marcar como Predeterminada
+                        {copiadoLink ? <Check size={13} /> : <Copy size={13} />}
+                        <span>{copiadoLink ? 'Copiado' : 'Copiar'}</span>
                       </button>
-                    ) : (
-                      <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
-                        <CheckCircle size={12} /> Opción por defecto
-                      </span>
-                    )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTransporte(transp.id, transp.nombre)}
-                      className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors ml-auto"
-                      title="Eliminar Transporte"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                      <a
+                        href={waShareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        <MessageCircle size={13} />
+                        <span>WhatsApp</span>
+                      </a>
+
+                      <a
+                        href={fullLandingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-lg border border-[var(--border)] transition-all flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Ver Web</span>
+                      </a>
+                    </div>
                   </div>
+                );
+              })()}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                    Título Principal
+                  </label>
+                  <input
+                    type="text"
+                    value={config.heroTitulo || ""}
+                    onChange={(e) => setConfig({ ...config, heroTitulo: e.target.value })}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ══════ LANDING PAGE & CATÁLOGO ONLINE (Fase E3) ══════ */}
-        <div className="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 border border-emerald-500/20 rounded-2xl p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-emerald-500/20">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
-                <Globe size={20} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-[var(--foreground)]">Landing Page & Catálogo Online Público</h3>
-                <p className="text-[11px] text-[var(--muted-foreground)]">Página web de presentación de la marca y catálogo de calzado con pedidos por WhatsApp</p>
-              </div>
-            </div>
-          </div>
-
-          {/* TARJETA DESTACADA: ENLACE PÚBLICO Y BOTONES PARA COMPARTIR */}
-          {(() => {
-            const currentTenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : '';
-            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-            const fullLandingUrl = `${baseUrl}/landing${currentTenantId ? `?tenantId=${currentTenantId}` : ''}`;
-            const msgWhatsApp = `¡Hola! Te invito a conocer el catálogo digital oficial de ${config.nombre || 'nuestro calzado'} (100% Cuero de Cevallos):\n👉 ${fullLandingUrl}`;
-            const waShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgWhatsApp)}`;
-
-            return (
-              <div className="bg-[var(--card)] border border-emerald-500/30 rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5 uppercase tracking-wider">
-                    <Share2 size={13} className="text-emerald-600" />
-                    <span>Enlace Público de tu Catálogo & Landing Page</span>
-                  </span>
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-500/20">
-                    🟢 Página Web Activa
-                  </span>
-                </div>
-
-                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
-                  <div className="flex-1 px-3 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl font-mono text-xs text-[var(--foreground)] truncate select-all">
-                    {fullLandingUrl}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                        navigator.clipboard.writeText(fullLandingUrl);
-                        setCopiadoLink(true);
-                        setTimeout(() => setCopiadoLink(false), 2500);
-                      }
-                    }}
-                    className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 ${
-                      copiadoLink
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-[var(--foreground)] text-[var(--background)] hover:opacity-90'
-                    }`}
-                  >
-                    {copiadoLink ? <Check size={14} /> : <Copy size={14} />}
-                    <span>{copiadoLink ? '¡Enlace Copiado!' : 'Copiar Enlace'}</span>
-                  </button>
-
-                  <a
-                    href={waShareUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs"
-                  >
-                    <MessageCircle size={14} />
-                    <span>Compartir en WhatsApp</span>
-                  </a>
-
-                  <a
-                    href={fullLandingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-2 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl border border-[var(--border)] transition-all flex items-center justify-center gap-1.5 shrink-0"
-                  >
-                    <ExternalLink size={14} />
-                    <span>Ver en Vivo</span>
-                  </a>
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                    Subtítulo
+                  </label>
+                  <input
+                    type="text"
+                    value={config.heroSubtitulo || ""}
+                    onChange={(e) => setConfig({ ...config, heroSubtitulo: e.target.value })}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
               </div>
-            );
-          })()}
 
-          {/* Hero */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                Título Principal (Hero)
-              </label>
-              <input
-                type="text"
-                value={config.heroTitulo || ""}
-                onChange={(e) => setConfig({ ...config, heroTitulo: e.target.value })}
-                placeholder="Ej: Calzado 100% Cuero de Cevallos"
-                className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                Subtítulo del Hero
-              </label>
-              <input
-                type="text"
-                value={config.heroSubtitulo || ""}
-                onChange={(e) => setConfig({ ...config, heroSubtitulo: e.target.value })}
-                placeholder="Ej: Venta mayorista directa de fábrica..."
-                className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-          </div>
-
-          {/* Banner URL */}
-          <div>
-            <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-              <Image size={12} className="inline mr-1" /> URL de Imagen Banner del Hero (opcional)
-            </label>
-            <input
-              type="url"
-              value={config.heroBannerUrl || ""}
-              onChange={(e) => setConfig({ ...config, heroBannerUrl: e.target.value })}
-              placeholder="https://res.cloudinary.com/...  o cualquier URL de imagen"
-              className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
-            />
-            {config.heroBannerUrl && (
-              <div className="mt-2 rounded-xl overflow-hidden border border-[var(--border)] max-h-32">
-                <img src={config.heroBannerUrl} alt="Banner preview" className="w-full h-32 object-cover" />
-              </div>
-            )}
-          </div>
-
-          {/* Sobre Nosotros */}
-          <div>
-            <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-              Sobre Nosotros / Descripción del Negocio
-            </label>
-            <textarea
-              rows={3}
-              value={config.sobreNosotros || ""}
-              onChange={(e) => setConfig({ ...config, sobreNosotros: e.target.value })}
-              placeholder="Descripción para la sección 'Sobre Nosotros' de tu landing..."
-              className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500 resize-none"
-            />
-          </div>
-
-          {/* Redes Sociales y WhatsApp */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Share2 size={14} className="text-emerald-600" />
-              <span className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">Redes Sociales y Contacto</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
-                  📱 WhatsApp de Contacto (con código de país)
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                  Sobre Nosotros / Reseña
                 </label>
-                <input
-                  type="text"
-                  value={config.whatsappContacto || ""}
-                  onChange={(e) => setConfig({ ...config, whatsappContacto: e.target.value })}
-                  placeholder="Ej: 593987654321"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
+                <textarea
+                  rows={2}
+                  value={config.sobreNosotros || ""}
+                  onChange={(e) => setConfig({ ...config, sobreNosotros: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 resize-none"
                 />
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
-                  📘 Facebook (URL completa)
-                </label>
-                <input
-                  type="url"
-                  value={config.facebookUrl || ""}
-                  onChange={(e) => setConfig({ ...config, facebookUrl: e.target.value })}
-                  placeholder="https://facebook.com/tu-pagina"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
-                />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                    📱 WhatsApp
+                  </label>
+                  <input
+                    type="text"
+                    value={config.whatsappContacto || ""}
+                    onChange={(e) => setConfig({ ...config, whatsappContacto: e.target.value })}
+                    placeholder="593987654321"
+                    className="w-full px-2.5 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                    📘 Facebook URL
+                  </label>
+                  <input
+                    type="url"
+                    value={config.facebookUrl || ""}
+                    onChange={(e) => setConfig({ ...config, facebookUrl: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                    📸 Instagram URL
+                  </label>
+                  <input
+                    type="url"
+                    value={config.instagramUrl || ""}
+                    onChange={(e) => setConfig({ ...config, instagramUrl: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                    🎵 TikTok URL
+                  </label>
+                  <input
+                    type="url"
+                    value={config.tiktokUrl || ""}
+                    onChange={(e) => setConfig({ ...config, tiktokUrl: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
-                  📸 Instagram (URL completa)
-                </label>
-                <input
-                  type="url"
-                  value={config.instagramUrl || ""}
-                  onChange={(e) => setConfig({ ...config, instagramUrl: e.target.value })}
-                  placeholder="https://instagram.com/tu-cuenta"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
-                  🎵 TikTok (URL completa)
-                </label>
-                <input
-                  type="url"
-                  value={config.tiktokUrl || ""}
-                  onChange={(e) => setConfig({ ...config, tiktokUrl: e.target.value })}
-                  placeholder="https://tiktok.com/@tu-cuenta"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-emerald-500"
-                />
+
+              {/* Visibilidad */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                <div className="flex items-center gap-2 p-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="chkPrecios"
+                    checked={config.mostrarPreciosPublico ?? true}
+                    onChange={(e) => setConfig({ ...config, mostrarPreciosPublico: e.target.checked })}
+                    className="rounded border-emerald-400 text-emerald-500 h-4 w-4"
+                  />
+                  <label htmlFor="chkPrecios" className="text-xs font-bold text-[var(--foreground)] cursor-pointer">
+                    Mostrar precios de calzado en el catálogo público
+                  </label>
+                </div>
+                <div className="flex items-center gap-2 p-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="chkStock"
+                    checked={config.mostrarStockPublico ?? true}
+                    onChange={(e) => setConfig({ ...config, mostrarStockPublico: e.target.checked })}
+                    className="rounded border-emerald-400 text-emerald-500 h-4 w-4"
+                  />
+                  <label htmlFor="chkStock" className="text-xs font-bold text-[var(--foreground)] cursor-pointer">
+                    Mostrar disponibilidad de stock en el catálogo público
+                  </label>
+                </div>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Visibilidad del Catálogo */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Eye size={14} className="text-emerald-600" />
-              <span className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">Visibilidad del Catálogo Público</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-center gap-3 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
-                <input
-                  type="checkbox"
-                  id="chkMostrarPrecios"
-                  checked={config.mostrarPreciosPublico ?? true}
-                  onChange={(e) => setConfig({ ...config, mostrarPreciosPublico: e.target.checked })}
-                  className="rounded border-emerald-400 text-emerald-500 focus:ring-emerald-400 h-4 w-4"
-                />
-                <label htmlFor="chkMostrarPrecios" className="text-xs font-bold text-[var(--foreground)] cursor-pointer">
-                  {config.mostrarPreciosPublico ? <Eye size={12} className="inline mr-1 text-emerald-500" /> : <EyeOff size={12} className="inline mr-1 text-rose-400" />}
-                  Mostrar precios en el catálogo público
-                </label>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
-                <input
-                  type="checkbox"
-                  id="chkMostrarStock"
-                  checked={config.mostrarStockPublico ?? true}
-                  onChange={(e) => setConfig({ ...config, mostrarStockPublico: e.target.checked })}
-                  className="rounded border-emerald-400 text-emerald-500 focus:ring-emerald-400 h-4 w-4"
-                />
-                <label htmlFor="chkMostrarStock" className="text-xs font-bold text-[var(--foreground)] cursor-pointer">
-                  {config.mostrarStockPublico ? <Eye size={12} className="inline mr-1 text-emerald-500" /> : <EyeOff size={12} className="inline mr-1 text-rose-400" />}
-                  Mostrar disponibilidad de stock en el catálogo público
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end">
+        {/* BOTÓN GUARDAR FLOTANTE / INFERIOR */}
+        <div className="flex justify-end pt-2">
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
           >
-            {saving ? <Loader2 className="animate-spin" size={15} /> : <CheckCircle size={15} />}
-            Guardar Personalización
+            {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+            Guardar Configuración
           </button>
         </div>
       </form>
 
       {/* MODAL CREAR NUEVA EMPRESA DE TRANSPORTE */}
       {showModalTransporte && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
               <div className="flex items-center gap-2">
-                <Truck className="text-[#0F172A] dark:text-amber-400" size={20} />
-                <h3 className="text-base font-bold text-[var(--foreground)]">Nueva Empresa de Transporte</h3>
+                <Truck className="text-amber-500" size={18} />
+                <h3 className="text-sm font-bold text-[var(--foreground)]">Nueva Empresa de Transporte</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowModalTransporte(false)}
-                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-lg"
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-base"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCrearTransporte} className="space-y-4">
+            <form onSubmit={handleCrearTransporte} className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                  Nombre de la Empresa / Cooperativa *
+                  Nombre de la Cooperativa / Transporte *
                 </label>
                 <input
                   type="text"
                   required
                   value={nuevoTranspNombre}
                   onChange={(e) => setNuevoTranspNombre(e.target.value)}
-                  placeholder="Ej: Transporte Los Andes, Flota Pelileo..."
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                  placeholder="Ej: Transporte Los Andes"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                  Teléfono / WhatsApp de Encomiendas (Opcional)
+                  Teléfono de Contacto (Opcional)
                 </label>
                 <input
                   type="text"
                   value={nuevoTranspTel}
                   onChange={(e) => setNuevoTranspTel(e.target.value)}
-                  placeholder="Ej: 0987654321 / 032-876543"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                  placeholder="0987654321"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                  Dirección de Terminal / Oficina (Opcional)
+                  Oficina / Dirección (Opcional)
                 </label>
                 <input
                   type="text"
                   value={nuevoTranspDir}
                   onChange={(e) => setNuevoTranspDir(e.target.value)}
-                  placeholder="Ej: Terminal Terrestre de Cevallos, Oficina 4"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                  placeholder="Terminal Terrestre, Oficina 3"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
                 />
               </div>
 
-              <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+              <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                 <input
                   type="checkbox"
                   id="chkPredet"
                   checked={nuevoTranspPredet}
                   onChange={(e) => setNuevoTranspPredet(e.target.checked)}
-                  className="rounded border-amber-400 text-amber-500 focus:ring-amber-400 h-4 w-4"
+                  className="rounded border-amber-400 text-amber-500 h-4 w-4"
                 />
                 <label htmlFor="chkPredet" className="text-xs font-bold text-[var(--foreground)] cursor-pointer">
-                  ⭐ Establecer como empresa predeterminada para todos los envíos
+                  ⭐ Establecer como transporte predeterminado
                 </label>
               </div>
 
@@ -1233,17 +1170,17 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 <button
                   type="button"
                   onClick={() => setShowModalTransporte(false)}
-                  className="px-4 py-2 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl transition-all"
+                  className="px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={guardandoTransporte || !nuevoTranspNombre.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
-                  {guardandoTransporte ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                  Guardar Transporte
+                  {guardandoTransporte ? <Loader2 className="animate-spin" size={13} /> : <CheckCircle size={13} />}
+                  Guardar
                 </button>
               </div>
             </form>
@@ -1251,7 +1188,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         </div>
       )}
 
-      {/* Modal de Confirmación UI (Reemplaza confirm nativo) */}
+      {/* Modal de Confirmación UI */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         title={confirmModal.title}
