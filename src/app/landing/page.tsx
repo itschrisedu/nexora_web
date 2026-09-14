@@ -41,6 +41,10 @@ interface NegocioInfo {
   heroSubtitulo: string;
   heroBannerUrl: string | null;
   sobreNosotros: string;
+  garantiaTaller?: string;
+  caracteristicasCalidad?: string;
+  materialDestacado?: string;
+  materialDescripcion?: string;
   whatsappContacto: string;
   facebookUrl: string | null;
   instagramUrl: string | null;
@@ -96,7 +100,7 @@ interface LandingData {
 
 function LandingContent() {
   const searchParams = useSearchParams();
-  const tenantId = searchParams.get("tenantId") || "";
+  const [effectiveTenantId, setEffectiveTenantId] = useState<string>("");
   const [data, setData] = useState<LandingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -111,24 +115,50 @@ function LandingContent() {
   // Estado de variantes seleccionadas por modelo: { [modeloId]: varianteId }
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
+  // Estado de serie seleccionada por modelo: { [modeloId]: serieNombre }
+  const [selectedSeries, setSelectedSeries] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fromParam = searchParams.get("tenantId");
+    if (fromParam) {
+      setEffectiveTenantId(fromParam);
+      return;
+    }
+    if (typeof window !== "undefined") {
+      const stored =
+        localStorage.getItem("activeSucursalId") ||
+        (localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user") || "{}").tenantId : "") ||
+        localStorage.getItem("tenantId") ||
+        "";
+      if (stored) {
+        setEffectiveTenantId(stored);
+      }
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     const fetchLanding = async () => {
       try {
-        const url = `${API_BASE_URL}/catalogo/landing${tenantId ? `?tenantId=${tenantId}` : ""}`;
+        const url = `${API_BASE_URL}/catalogo/landing${effectiveTenantId ? `?tenantId=${effectiveTenantId}` : ""}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("No se pudo cargar la información del negocio");
         const json = await res.json();
         setData(json);
 
-        // Inicializar la primera variante de cada modelo
+        // Inicializar la primera variante y serie de cada modelo
         if (json.modelos && Array.isArray(json.modelos)) {
-          const initialMap: Record<string, string> = {};
+          const initialVarMap: Record<string, string> = {};
+          const initialSerieMap: Record<string, string> = {};
           json.modelos.forEach((m: ModeloCalzado) => {
             if (m.variantes && m.variantes.length > 0) {
-              initialMap[m.id] = m.variantes[0].id;
+              initialVarMap[m.id] = m.variantes[0].id;
+              if (m.variantes[0].serieNombre) {
+                initialSerieMap[m.id] = m.variantes[0].serieNombre;
+              }
             }
           });
-          setSelectedVariants(initialMap);
+          setSelectedVariants(initialVarMap);
+          setSelectedSeries(initialSerieMap);
         }
       } catch (err: any) {
         setError(err.message || "Error al cargar la información");
@@ -137,7 +167,7 @@ function LandingContent() {
       }
     };
     fetchLanding();
-  }, [tenantId]);
+  }, [effectiveTenantId]);
 
   // Lista de marcas únicas para filtros
   const brands = useMemo(() => {
@@ -164,6 +194,24 @@ function LandingContent() {
       return matchBrand && matchSearch;
     });
   }, [data, selectedBrand, searchQuery]);
+
+  // bulletPoints debe estar ANTES de los early returns para respetar las reglas de Hooks
+  const bulletPoints = useMemo(() => {
+    const caracCalidad = data?.negocio?.caracteristicasCalidad;
+    if (caracCalidad) {
+      const parsed = caracCalidad
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (parsed.length > 0) return parsed;
+    }
+    return [
+      "Cueros vacunos genuinos tratados para resistir el uso continuo.",
+      "Suelas antideslizantes de alta adherencia y costuras reforzadas.",
+      "Atención personalizada a comerciantes mayoristas y clientes particulares.",
+      "Servicio y respaldo técnico en todos nuestros locales.",
+    ];
+  }, [data?.negocio?.caracteristicasCalidad]);
 
   if (loading) {
     return (
@@ -200,6 +248,17 @@ function LandingContent() {
   const { negocio, sucursales } = data;
   const brandColor = negocio.primaryColor || "#0F172A";
 
+  const formatWhatsAppNumber = (phone?: string) => {
+    if (!phone) return "";
+    let clean = phone.replace(/[^0-9]/g, "");
+    if (clean.startsWith("0")) {
+      clean = "593" + clean.substring(1);
+    } else if (!clean.startsWith("593") && clean.length === 9) {
+      clean = "593" + clean;
+    }
+    return clean;
+  };
+
   const handleSelectVariant = (modeloId: string, varianteId: string) => {
     setSelectedVariants((prev) => ({
       ...prev,
@@ -207,12 +266,30 @@ function LandingContent() {
     }));
   };
 
+  const handleSelectSerie = (modeloId: string, serieNombre: string, variantes: Variante[]) => {
+    setSelectedSeries((prev) => ({
+      ...prev,
+      [modeloId]: serieNombre,
+    }));
+    // Seleccionar automáticamente la primera variante de esa serie
+    const primeraVarianteDeSerie = variantes.find((v) => v.serieNombre === serieNombre);
+    if (primeraVarianteDeSerie) {
+      setSelectedVariants((prev) => ({
+        ...prev,
+        [modeloId]: primeraVarianteDeSerie.id,
+      }));
+    }
+  };
+
   const getWhatsAppOrderUrl = (modelo: ModeloCalzado, variante: Variante) => {
-    const phone = negocio.whatsappContacto || negocio.telefono || "593999999999";
-    const cleanPhone = phone.replace(/[^0-9]/g, "");
-    const msg = `¡Hola ${negocio.nombreNegocio}! 👋\n\nEstoy interesado en el siguiente modelo de calzado de su catálogo web:\n\n👞 *Modelo:* ${modelo.name}\n🎨 *Color:* ${variante.color}\n🏷️ *Código:* ${variante.code}\n💎 *Material:* ${modelo.material}\n${negocio.mostrarPreciosPublico && variante.salePrice > 0 ? `💵 *Precio:* $${variante.salePrice.toFixed(2)}\n` : ""}\n¿Tienen disponibilidad de tallas y realizan envíos?`;
+    const rawPhone = negocio.whatsappContacto || negocio.telefono || "";
+    const cleanPhone = formatWhatsAppNumber(rawPhone);
+    const serieLine = variante.serieNombre ? `📦 *Serie:* ${variante.serieNombre}\n` : "";
+    const msg = `¡Hola ${negocio.nombreNegocio}! 👋\n\nEstoy interesado en el siguiente modelo de calzado de su catálogo web:\n\n👞 *Modelo:* ${modelo.name}\n${serieLine}🎨 *Color:* ${variante.color}\n🏷️ *Código:* ${variante.code}\n💎 *Material:* ${modelo.material}\n${negocio.mostrarPreciosPublico && variante.salePrice > 0 ? `💵 *Precio:* $${variante.salePrice.toFixed(2)}\n` : ""}\n¿Tienen disponibilidad de tallas y realizan envíos?`;
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
+
+
 
   return (
     <div className="min-h-screen bg-white text-slate-800 antialiased selection:bg-slate-900 selection:text-white">
@@ -274,7 +351,7 @@ function LandingContent() {
           {/* Botón WhatsApp & Hamburguesa Móvil */}
           <div className="flex items-center gap-2.5">
             <a
-              href={`https://wa.me/${(negocio.whatsappContacto || negocio.telefono || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola ${negocio.nombreNegocio}! Deseo consultar sobre su catálogo de calzado de cuero.`)}`}
+              href={`https://wa.me/${formatWhatsAppNumber(negocio.whatsappContacto || negocio.telefono)}?text=${encodeURIComponent(`¡Hola ${negocio.nombreNegocio}! Deseo consultar sobre su catálogo de calzado de cuero.`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm hover:shadow-md"
@@ -340,7 +417,7 @@ function LandingContent() {
 
             <div className="pt-2 border-t border-slate-200">
               <a
-                href={`https://wa.me/${(negocio.whatsappContacto || negocio.telefono || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola! Deseo más información sobre su catálogo.`)}`}
+                href={`https://wa.me/${formatWhatsAppNumber(negocio.whatsappContacto || negocio.telefono)}?text=${encodeURIComponent(`¡Hola! Deseo más información sobre su catálogo.`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
@@ -467,7 +544,7 @@ function LandingContent() {
           {/* Encabezado del Catálogo */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div className="space-y-2 max-w-xl">
-              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: brandColor }}>
                 Colección en Exhibición
               </span>
               <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
@@ -529,9 +606,21 @@ function LandingContent() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredModelos.map((modelo) => {
-                const currentVarId = selectedVariants[modelo.id] || (modelo.variantes[0]?.id ?? "");
+                // Extraer series únicas del modelo
+                const seriesUnicas = Array.from(
+                  new Set(modelo.variantes.map((v) => v.serieNombre).filter(Boolean))
+                ) as string[];
+                const tieneMúltiplesSeries = seriesUnicas.length > 1;
+                const serieActual = selectedSeries[modelo.id] || seriesUnicas[0] || "";
+
+                // Filtrar variantes por serie seleccionada (si hay múltiples series)
+                const variantesFiltradas = tieneMúltiplesSeries
+                  ? modelo.variantes.filter((v) => v.serieNombre === serieActual)
+                  : modelo.variantes;
+
+                const currentVarId = selectedVariants[modelo.id] || (variantesFiltradas[0]?.id ?? "");
                 const currentVariant =
-                  modelo.variantes.find((v) => v.id === currentVarId) || modelo.variantes[0];
+                  variantesFiltradas.find((v) => v.id === currentVarId) || variantesFiltradas[0];
                 const fotoUrl = currentVariant?.imageUrl || "";
 
                 return (
@@ -569,6 +658,15 @@ function LandingContent() {
                           </span>
                         </div>
 
+                        {/* Badge de Serie única (si solo hay una) */}
+                        {seriesUnicas.length === 1 && seriesUnicas[0] && (
+                          <div className="absolute top-3 right-3">
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/90 backdrop-blur-sm border border-slate-200 text-slate-700 shadow-xs">
+                              📦 {seriesUnicas[0]}
+                            </span>
+                          </div>
+                        )}
+
                         {/* Precio Flotante (si está habilitado) */}
                         {negocio.mostrarPreciosPublico && currentVariant?.salePrice > 0 && (
                           <div
@@ -591,8 +689,41 @@ function LandingContent() {
                           </h3>
                         </div>
 
+                        {/* Selector de Serie (si hay múltiples) */}
+                        {tieneMúltiplesSeries && (
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-slate-500">Serie:</span>
+                              <span className="font-extrabold text-slate-900">
+                                {serieActual}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {seriesUnicas.map((serie) => {
+                                const isSelected = serie === serieActual;
+                                return (
+                                  <button
+                                    key={serie}
+                                    type="button"
+                                    onClick={() => handleSelectSerie(modelo.id, serie, modelo.variantes)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
+                                      isSelected
+                                        ? "shadow-xs scale-105 bg-amber-500 text-white border-amber-500"
+                                        : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                                    }`}
+                                    title={`Ver serie ${serie}`}
+                                  >
+                                    <Layers size={11} className="shrink-0" />
+                                    <span>{serie}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Selector Interactivo de Colores / Variantes */}
-                        {modelo.variantes.length > 0 && (
+                        {variantesFiltradas.length > 0 && (
                           <div className="space-y-1.5 pt-2 border-t border-slate-100">
                             <div className="flex items-center justify-between text-[11px]">
                               <span className="font-bold text-slate-500">Color seleccionado:</span>
@@ -602,7 +733,7 @@ function LandingContent() {
                             </div>
 
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {modelo.variantes.map((v) => {
+                              {variantesFiltradas.map((v) => {
                                 const isSelected = v.id === currentVariant?.id;
                                 return (
                                   <button
@@ -710,7 +841,7 @@ function LandingContent() {
       <section id="sucursales" className="py-16 sm:py-20 bg-white border-b border-slate-200/60 scroll-mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
           <div className="text-center space-y-2 max-w-2xl mx-auto">
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: brandColor }}>
               Locales Físicos
             </span>
             <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
@@ -721,11 +852,11 @@ function LandingContent() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex flex-wrap justify-center items-stretch gap-6 max-w-6xl mx-auto">
             {sucursales.map((suc) => (
               <div
                 key={suc.id}
-                className={`p-6 rounded-3xl border transition-all space-y-4 ${
+                className={`w-full max-w-sm flex flex-col justify-between p-6 rounded-3xl border transition-all space-y-4 ${
                   suc.isMatriz
                     ? "bg-gradient-to-br from-amber-500/5 via-slate-50 to-amber-500/10 border-amber-500/30 shadow-md ring-1 ring-amber-500/20"
                     : "bg-white border-slate-200/90 shadow-xs hover:shadow-lg"
@@ -771,7 +902,7 @@ function LandingContent() {
                 </div>
 
                 <a
-                  href={`https://wa.me/${(suc.whatsapp || suc.telefono || negocio.whatsappContacto || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`¡Hola! Deseo comunicarme con el punto de venta de ${suc.nombre}.`)}`}
+                  href={`https://wa.me/${formatWhatsAppNumber(suc.whatsapp || suc.telefono || negocio.whatsappContacto || negocio.telefono)}?text=${encodeURIComponent(`¡Hola! Deseo comunicarme con el punto de venta de ${suc.nombre}.`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs"
@@ -792,24 +923,31 @@ function LandingContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
             <div className="space-y-5">
-              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
-                Tradición Zapatera
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: brandColor }}>
+                Sobre Nosotros & Garantía
               </span>
               <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-                Calidad de Exportación en Cuero Ecuatoriano
+                {negocio.nombreNegocio || "Calzado de Cuero"}
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                 {negocio.sobreNosotros ||
                   "Somos una empresa dedicada a la fabricación y comercialización de calzado de cuero en el cantón Cevallos, cuna del calzado en Tungurahua. Seleccionamos cuidadosamente cueros vacunos de primera y combinamos técnicas tradicionales con moldes anatómicos contemporáneos para garantizar máxima durabilidad y confort."}
               </p>
 
-              <div className="space-y-3 pt-2">
-                {[
-                  "Cueros vacunos genuinos tratados para resistir el uso continuo.",
-                  "Suelas antideslizantes de alta adherencia y costuras reforzadas.",
-                  "Atención personalizada a comerciantes mayoristas y clientes particulares.",
-                  "Garantía de fábrica en cada uno de nuestros modelos.",
-                ].map((item, idx) => (
+              {/* Bloque Destacado de Garantía & Taller */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-extrabold text-amber-950">
+                  <ShieldCheck size={16} className="text-amber-700 shrink-0" />
+                  <span>Garantía de Fábrica & Respaldo de Taller</span>
+                </div>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  {negocio.garantiaTaller ||
+                    "Garantizamos la máxima calidad en cada par de calzado elaborado con 100% cuero vacuno ecuatoriano. Ofrecemos respaldo directo de fábrica y servicio de mantenimiento en todos nuestros puntos de venta autorizados."}
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-1">
+                {bulletPoints.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-xs font-semibold text-slate-800">
                     <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
                     <span>{item}</span>
@@ -820,9 +958,13 @@ function LandingContent() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-2">
-                <span className="text-3xl font-black text-slate-900 block font-mono">100%</span>
-                <h4 className="font-extrabold text-xs text-slate-900">Cuero Vacuno</h4>
-                <p className="text-[11px] text-slate-500">Materia prima seleccionada para garantizar longevidad.</p>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 block font-mono">
+                  {negocio.materialDestacado || "100% Cuero Vacuno"}
+                </span>
+                <h4 className="font-extrabold text-xs text-slate-900">Garantía de Material</h4>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  {negocio.materialDescripcion || "Materia prima seleccionada para garantizar longevidad."}
+                </p>
               </div>
 
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-2">
@@ -850,56 +992,56 @@ function LandingContent() {
       {/* ══════════════════════════════════════════════
           6. FOOTER CORPORATIVO
          ══════════════════════════════════════════════ */}
-      <footer id="contacto" className="bg-slate-900 text-white py-14">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="space-y-3 md:col-span-2">
-              <div className="flex items-center gap-3">
+      <footer id="contacto" className="bg-slate-900 text-white py-8 sm:py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center gap-2.5">
                 {negocio.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={negocio.logoUrl}
                     alt=""
-                    className="h-10 w-10 rounded-2xl object-contain bg-white p-1"
+                    className="h-8 w-8 rounded-xl object-contain bg-white p-0.5"
                   />
                 ) : (
-                  <div className="h-10 w-10 rounded-2xl bg-amber-500 flex items-center justify-center text-slate-900 font-black text-sm">
+                  <div className="h-8 w-8 rounded-xl bg-amber-500 flex items-center justify-center text-slate-900 font-black text-xs">
                     {negocio.nombreNegocio?.charAt(0) || "N"}
                   </div>
                 )}
                 <div>
-                  <h3 className="font-bold text-base">{negocio.nombreNegocio}</h3>
-                  <p className="text-xs text-slate-400">Calzado 100% Cuero de Cevallos</p>
+                  <h3 className="font-bold text-sm leading-tight">{negocio.nombreNegocio}</h3>
+                  <p className="text-[11px] text-slate-400">Calzado 100% Cuero de Cevallos</p>
                 </div>
               </div>
               <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-                Venta mayorista y minorista de calzado en cuero genuino. Visita nuestros locales o realiza pedidos desde cualquier parte del país con entrega garantizada.
+                Venta mayorista y minorista de calzado en cuero genuino con entrega directa a nivel nacional.
               </p>
             </div>
 
-            <div className="space-y-2 text-xs text-slate-400">
-              <h4 className="font-bold text-sm text-white uppercase tracking-wider mb-2">Contacto Matriz</h4>
+            <div className="space-y-1.5 text-xs text-slate-400">
+              <h4 className="font-bold text-xs text-white uppercase tracking-wider mb-1">Contacto Matriz</h4>
               <p className="flex items-center gap-2">
-                <MapPin size={13} className="text-slate-400" />
+                <MapPin size={12} className="text-slate-400" />
                 <span>{negocio.direccion || "Cantón Cevallos, Tungurahua"}</span>
               </p>
               {negocio.telefono && (
                 <p className="flex items-center gap-2">
-                  <Phone size={13} className="text-slate-400" />
+                  <Phone size={12} className="text-slate-400" />
                   <span>{negocio.telefono}</span>
                 </p>
               )}
               {negocio.email && (
                 <p className="flex items-center gap-2">
-                  <Mail size={13} className="text-slate-400" />
+                  <Mail size={12} className="text-slate-400" />
                   <span>{negocio.email}</span>
                 </p>
               )}
             </div>
 
-            <div className="space-y-3 text-xs text-slate-400">
-              <h4 className="font-bold text-sm text-white uppercase tracking-wider">Enlaces</h4>
-              <ul className="space-y-1.5 font-semibold">
+            <div className="space-y-1.5 text-xs text-slate-400">
+              <h4 className="font-bold text-xs text-white uppercase tracking-wider mb-1">Enlaces</h4>
+              <ul className="space-y-1 font-semibold text-[11px]">
                 <li>
                   <a href="#catalogo" className="hover:text-amber-400 transition-colors">
                     Catálogo de Calzado
@@ -912,19 +1054,19 @@ function LandingContent() {
                 </li>
                 <li>
                   <a href="#nosotros" className="hover:text-amber-400 transition-colors">
-                    Sobre la Fábrica
+                    Garantía & Taller
                   </a>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="pt-8 border-t border-slate-800 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <span>
+          <div className="pt-4 border-t border-slate-800 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span className="text-[11px]">
               &copy; {new Date().getFullYear()} {negocio.nombreNegocio}. Todos los derechos reservados.
             </span>
-            <span className="text-[11px] text-slate-400">
-              Plataforma y Catálogo Digital impulsado por <strong>NEXORA</strong>
+            <span className="text-[11px] text-slate-500">
+              Catálogo web oficial del negocio
             </span>
           </div>
         </div>

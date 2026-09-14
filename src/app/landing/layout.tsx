@@ -11,6 +11,6 @@ export default function LandingLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="h-auto overflow-auto">{children}</div>
+    <div className="h-full overflow-y-auto">{children}</div>
   );
 }

@@ -53,7 +53,7 @@ const UsuariosComponent = dynamic(() => import('@/components/usuarios'), { ssr: 
 const ModelosComponent = dynamic(() => import('@/components/modelos'), { ssr: false });
 const SuperAdminComponent = dynamic(() => import('@/components/super-admin'), { ssr: false });
 const SriComponent = dynamic(() => import('@/components/sri'), { ssr: false });
-const CatalogoDigitalComponent = dynamic(() => import('@/components/catalogo-digital'), { ssr: false });
+
 const PosComponent = dynamic(() => import('@/components/pos'), { ssr: false });
 const PrediccionDemandaComponent = dynamic(() => import('@/components/prediccion-demanda'), { ssr: false });
 const AuditoriaComponent = dynamic(() => import('@/components/auditoria'), { ssr: false });
@@ -64,7 +64,7 @@ const NotificacionesModal = dynamic(() => import('@/components/notificaciones-mo
 const TermsModal = dynamic(() => import('@/components/terms-modal'), { ssr: false });
 const GpsConsentModal = dynamic(() => import('@/components/gps-consent-modal'), { ssr: false });
 
-type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'catalogo' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
+type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
 
 interface NavItem {
   id: Vista;
@@ -91,7 +91,7 @@ const NAV_ITEMS: NavItem[] = [
 
   // ── Administración ──
   { id: 'usuarios',        label: 'Sucursales y Equipo',   icon: <Building2 size={18} /> },
-  { id: 'catalogo',        label: 'Catálogo Digital',      icon: <ShoppingBag size={18} /> },
+
   { id: 'sri',             label: 'Facturación SRI',       icon: <FileText size={18} /> },
   { id: 'auditoria',       label: 'Auditoría',             icon: <ShieldCheck size={18} /> },
   { id: 'ubicaciones',     label: 'Rastreo GPS',           icon: <MapPin size={18} /> },
@@ -295,6 +295,9 @@ function MainApp() {
           localStorage.setItem('refreshToken', response.refreshToken);
         }
         localStorage.setItem('user', JSON.stringify(response.user));
+        if (response.user?.tenantId) {
+          localStorage.setItem('tenantId', response.user.tenantId);
+        }
         setUser(response.user);
         checkLegalAndGpsConsent(response.user);
       } else {
@@ -466,7 +469,7 @@ function MainApp() {
       { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
       { label: 'Gestión Comercial', ids: ['clientes', 'financiero', 'proveedores', 'modelos'] },
       { label: 'Analítica', ids: ['reportes', 'prediccion-ml'] },
-      { label: 'Administración', ids: ['usuarios', 'catalogo', 'sri', 'auditoria', 'ubicaciones', 'super-admin'] },
+      { label: 'Administración', ids: ['usuarios', 'sri', 'auditoria', 'ubicaciones', 'super-admin'] },
     ];
 
     const filteredItems = NAV_ITEMS.filter((item) => {
@@ -882,7 +885,7 @@ function MainApp() {
           {vistaActual === 'super-admin' && <SuperAdminComponent online={online} />}
           {vistaActual === 'sri' && <SriComponent />}
           {vistaActual === 'personalizacion' && <PersonalizacionComponent online={online} />}
-          {vistaActual === 'catalogo' && <CatalogoDigitalComponent />}
+
           {vistaActual === 'pos' && <PosComponent />}
           {vistaActual === 'prediccion-ml' && <PrediccionDemandaComponent />}
           {vistaActual === 'auditoria' && <AuditoriaComponent />}

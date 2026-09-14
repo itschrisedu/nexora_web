@@ -59,6 +59,10 @@ interface BusinessConfig {
   heroSubtitulo?: string;
   heroBannerUrl?: string;
   sobreNosotros?: string;
+  garantiaTaller?: string;
+  caracteristicasCalidad?: string;
+  materialDestacado?: string;
+  materialDescripcion?: string;
   whatsappContacto?: string;
   facebookUrl?: string;
   instagramUrl?: string;
@@ -77,6 +81,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [error, setError] = useState("");
   const [copiadoLink, setCopiadoLink] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [tenantId, setTenantId] = useState("");
 
   // Transportes state
   const [transportes, setTransportes] = useState<EmpresaTransporteItem[]>([]);
@@ -111,7 +116,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     heroSubtitulo: "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
     heroBannerUrl: "",
     sobreNosotros: "Somos productores y comercializadores de calzado de cuero en el cantón Cevallos, Tungurahua. Garantizamos calidad de exportación, acabados finos y precios directos de fabricante.",
-    whatsappContacto: "593999999999",
+    garantiaTaller: "Garantizamos la máxima calidad en cada par de calzado elaborado con 100% cuero vacuno ecuatoriano. Ofrecemos respaldo directo de fábrica y servicio de mantenimiento en todos nuestros puntos de venta autorizados.",
+    caracteristicasCalidad: "Cueros vacunos genuinos tratados para resistir el uso continuo.\nSuelas antideslizantes de alta adherencia y costuras reforzadas.\nAtención personalizada a comerciantes mayoristas y clientes particulares.\nServicio y respaldo técnico en todos nuestros locales.",
+    materialDestacado: "100% Cuero Vacuno",
+    materialDescripcion: "Materia prima seleccionada para garantizar longevidad.",
+    whatsappContacto: "",
     facebookUrl: "",
     instagramUrl: "",
     tiktokUrl: "",
@@ -230,6 +239,12 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         ]);
 
         if (data) {
+          if (data.tenantId) {
+            setTenantId(data.tenantId);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("tenantId", data.tenantId);
+            }
+          }
           setConfig({
             nombre: data.nombre || "",
             ruc: data.ruc || "",
@@ -253,7 +268,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             heroSubtitulo: data.heroSubtitulo || "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
             heroBannerUrl: data.heroBannerUrl || "",
             sobreNosotros: data.sobreNosotros || "Somos productores y comercializadores de calzado de cuero en el cantón Cevallos, Tungurahua.",
-            whatsappContacto: data.whatsappContacto || "",
+            garantiaTaller: data.garantiaTaller || "Garantizamos la máxima calidad en cada par de calzado elaborado con 100% cuero vacuno ecuatoriano. Ofrecemos respaldo directo de fábrica y servicio de mantenimiento en todos nuestros puntos de venta autorizados.",
+            caracteristicasCalidad: data.caracteristicasCalidad || "Cueros vacunos genuinos tratados para resistir el uso continuo.\nSuelas antideslizantes de alta adherencia y costuras reforzadas.\nAtención personalizada a comerciantes mayoristas y clientes particulares.\nServicio y respaldo técnico en todos nuestros locales.",
+            materialDestacado: data.materialDestacado || "100% Cuero Vacuno",
+            materialDescripcion: data.materialDescripcion || "Materia prima seleccionada para garantizar longevidad.",
+            whatsappContacto: (data.whatsappContacto && data.whatsappContacto !== "593999999999") ? data.whatsappContacto : "",
             facebookUrl: data.facebookUrl || "",
             instagramUrl: data.instagramUrl || "",
             tiktokUrl: data.tiktokUrl || "",
@@ -901,7 +920,14 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
               {/* ENLACE PÚBLICO */}
               {(() => {
-                const currentTenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') || '' : '';
+                const currentTenantId =
+                  tenantId ||
+                  (typeof window !== "undefined"
+                    ? localStorage.getItem("activeSucursalId") ||
+                      JSON.parse(localStorage.getItem("user") || "{}").tenantId ||
+                      localStorage.getItem("tenantId") ||
+                      ""
+                    : "");
                 const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
                 const fullLandingUrl = `${baseUrl}/landing${currentTenantId ? `?tenantId=${currentTenantId}` : ''}`;
                 const msgWhatsApp = `¡Hola! Te invito a conocer el catálogo digital oficial de ${config.nombre || 'nuestro calzado'} (100% Cuero de Cevallos):\n👉 ${fullLandingUrl}`;
@@ -920,7 +946,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <div className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-[var(--border)] rounded-lg font-mono text-xs text-[var(--foreground)] truncate select-all">
+                      <div className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg font-mono text-xs text-slate-900 truncate select-all">
                         {fullLandingUrl}
                       </div>
 
@@ -995,25 +1021,93 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   Sobre Nosotros / Reseña
                 </label>
                 <textarea
-                  rows={2}
+                  rows={Math.max(3, (config.sobreNosotros || "").split("\n").length)}
                   value={config.sobreNosotros || ""}
-                  onChange={(e) => setConfig({ ...config, sobreNosotros: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 resize-none"
+                  onChange={(e) => {
+                    setConfig({ ...config, sobreNosotros: e.target.value });
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 resize-none overflow-hidden transition-[height]"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                  🛡️ Garantía de Fábrica & Servicio de Taller
+                </label>
+                <textarea
+                  rows={Math.max(3, (config.garantiaTaller || "").split("\n").length)}
+                  value={config.garantiaTaller || ""}
+                  onChange={(e) => {
+                    setConfig({ ...config, garantiaTaller: e.target.value });
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  placeholder="Describe las garantías de calidad, durabilidad del cuero, mantenimiento de taller o políticas de cambio..."
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 resize-none overflow-hidden transition-[height]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                  ✅ Puntos Fuertes & Características Clave (1 por línea)
+                </label>
+                <textarea
+                  rows={Math.max(5, (config.caracteristicasCalidad || "").split("\n").length)}
+                  value={config.caracteristicasCalidad || ""}
+                  onChange={(e) => {
+                    setConfig({ ...config, caracteristicasCalidad: e.target.value });
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  placeholder="Escribe cada punto destacado en una línea separada..."
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 font-mono resize-none overflow-hidden transition-[height] leading-relaxed"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                    🏷️ Título Tarjeta de Material (Ej: 100% Cuero Vacuno)
+                  </label>
+                  <input
+                    type="text"
+                    value={config.materialDestacado || ""}
+                    onChange={(e) => setConfig({ ...config, materialDestacado: e.target.value })}
+                    placeholder="100% Cuero Vacuno"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                    📝 Descripción Tarjeta de Material
+                  </label>
+                  <input
+                    type="text"
+                    value={config.materialDescripcion || ""}
+                    onChange={(e) => setConfig({ ...config, materialDescripcion: e.target.value })}
+                    placeholder="Materia prima seleccionada para garantizar longevidad."
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
-                    📱 WhatsApp
+                    📱 WhatsApp de Contacto / Ventas
                   </label>
                   <input
                     type="text"
                     value={config.whatsappContacto || ""}
                     onChange={(e) => setConfig({ ...config, whatsappContacto: e.target.value })}
-                    placeholder="593987654321"
+                    placeholder="0998765432"
                     className="w-full px-2.5 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
                   />
+                  <span className="text-[10px] text-[var(--muted-foreground)] block mt-0.5">
+                    Ej: 0998765432
+                  </span>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
