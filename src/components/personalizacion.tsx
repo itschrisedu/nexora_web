@@ -380,7 +380,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     { id: "credito", label: "Scoring & Crédito", icon: <DollarSign size={16} /> },
     { id: "operaciones", label: "Operaciones & Logística", icon: <Truck size={16} /> },
     { id: "fiscal", label: "Parámetros Fiscales", icon: <Shield size={16} /> },
-    { id: "catalogo", label: "Landing Web & Catálogo", icon: <Globe size={16} /> },
+    { id: "catalogo", label: "Sitio Web & Catálogo", icon: <Globe size={16} /> },
   ];
 
   return (
@@ -968,7 +968,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </div>
         )}
 
-        {/* ══════════════ PESTAÑA 5: LANDING WEB & CATÁLOGO ══════════════ */}
+        {/* ══════════════ PESTAÑA 5: SITIO WEB & CATÁLOGO ══════════════ */}
         {activeTab === "catalogo" && (
           <div className="space-y-4 animate-in fade-in duration-200">
             <div className="bg-[var(--card)] border border-emerald-500/30 rounded-2xl p-5 space-y-4 shadow-sm">
@@ -976,9 +976,9 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 <div className="flex items-center gap-2">
                   <Globe className="text-emerald-600" size={18} />
                   <div>
-                    <h3 className="text-sm font-bold text-[var(--foreground)]">Catálogo Digital & Landing Web</h3>
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">Sitio Web Oficial & Catálogo Digital</h3>
                     <p className="text-[11px] text-[var(--muted-foreground)]">
-                      Portal público de exhibición de calzado de cuero con pedidos directos vía WhatsApp.
+                      Portal público de exhibición de calzado de cuero con pedidos directos vía WhatsApp y consulta de sucursales.
                     </p>
                   </div>
                 </div>
@@ -1004,7 +1004,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5 uppercase tracking-wider">
                         <Share2 size={13} className="text-emerald-600" />
-                        <span>Enlace Público de tu Catálogo</span>
+                        <span>Enlace Público de tu Sitio Web & Catálogo</span>
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full">
                         🟢 Activo
@@ -1050,7 +1050,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                         className="px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-lg border border-[var(--border)] transition-all flex items-center justify-center gap-1.5 shrink-0"
                       >
                         <ExternalLink size={13} />
-                        <span>Ver Web</span>
+                        <span>Ver Sitio Web</span>
                       </a>
                     </div>
                   </div>
@@ -1062,7 +1062,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
                   <Sparkles className="text-amber-500" size={16} />
                   <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
-                    Portada Principal del Catálogo
+                    Portada Principal del Sitio Web
                   </label>
                 </div>
 
