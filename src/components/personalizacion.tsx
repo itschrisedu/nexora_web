@@ -81,6 +81,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [error, setError] = useState("");
   const [copiadoLink, setCopiadoLink] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingHeroBanner, setUploadingHeroBanner] = useState(false);
   const [tenantId, setTenantId] = useState("");
 
   // Transportes state
@@ -1013,6 +1014,91 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     onChange={(e) => setConfig({ ...config, heroSubtitulo: e.target.value })}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
                   />
+                </div>
+              </div>
+
+              {/* IMAGEN DESTACADA / BANNER HERO */}
+              <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Image className="text-amber-500" size={16} />
+                    <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                      Imagen Destacada del Inicio (Card Lateral del Hero)
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                    Foto de fábrica, calzado o taller
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+                  <div className="w-28 h-20 rounded-xl bg-white border border-[var(--border)] overflow-hidden flex items-center justify-center shrink-0 shadow-xs">
+                    {config.heroBannerUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={config.heroBannerUrl}
+                        alt="Hero Banner Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-400 gap-1">
+                        <Image size={20} />
+                        <span className="text-[9px] font-bold">Por defecto</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 w-full space-y-2">
+                    <input
+                      type="text"
+                      value={config.heroBannerUrl || ""}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, heroBannerUrl: e.target.value }))}
+                      placeholder="URL directa de la imagen (https://...)"
+                      className="w-full px-3 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="cursor-pointer px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs">
+                        <Upload size={13} />
+                        <span>{uploadingHeroBanner ? 'Subiendo imagen...' : 'Subir Imagen'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingHeroBanner}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingHeroBanner(true);
+                            try {
+                              const reader = new FileReader();
+                              reader.onload = async (event) => {
+                                const base64 = event.target?.result as string;
+                                const url = await uploadToCloudinary(base64, 'nexora_landing');
+                                if (url) {
+                                  setConfig((prev) => ({ ...prev, heroBannerUrl: url }));
+                                }
+                                setUploadingHeroBanner(false);
+                              };
+                              reader.readAsDataURL(file);
+                            } catch {
+                              setUploadingHeroBanner(false);
+                            }
+                          }}
+                        />
+                      </label>
+
+                      {config.heroBannerUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setConfig((prev) => ({ ...prev, heroBannerUrl: '' }))}
+                          className="px-2.5 py-1.5 text-xs text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors font-semibold"
+                        >
+                          Quitar imagen (Usar diseño artesanal por defecto)
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -485,7 +485,7 @@ function LandingContent() {
          ══════════════════════════════════════════════ */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         <div className="h-1.5 w-full transition-colors" style={{ backgroundColor: brandColor }} />
-        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 h-18 flex items-center justify-between">
+        <div className="w-full max-w-7xl 2xl:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
           {/* Logo & Nombre */}
           <a href="#inicio" className="flex items-center gap-3 group">
             {negocio.logoUrl ? (
@@ -638,10 +638,16 @@ function LandingContent() {
          ══════════════════════════════════════════════ */}
       <section
         id="inicio"
-        className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/50 py-16 sm:py-24 border-b border-slate-200/60"
+        className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/50 py-12 sm:py-20 border-b border-slate-200/60"
       >
-        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+        {/* Efecto de luz sutil de fondo */}
+        <div
+          className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-3xl opacity-10 pointer-events-none"
+          style={{ backgroundColor: brandColor }}
+        />
+
+        <div className="w-full max-w-7xl 2xl:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Texto Hero */}
             <div className="lg:col-span-7 space-y-6 text-left">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-900 font-bold text-xs">
@@ -653,7 +659,7 @@ function LandingContent() {
                 {negocio.heroTitulo || "Calzado Ecuatoriano 100% Cuero de Cevallos"}
               </h1>
 
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal max-w-3xl">
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal max-w-2xl">
                 {negocio.heroSubtitulo ||
                   "Fabricación con los mejores estándares de calidad, acabados finos y venta directa por par y por mayor a todo el país."}
               </p>
@@ -679,7 +685,7 @@ function LandingContent() {
               </div>
 
               {/* Pilares rápidos */}
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-200/80">
+              <div className="grid grid-cols-3 gap-3 pt-6 border-t border-slate-200/80">
                 <div className="space-y-1">
                   <div className="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
                     <ShieldCheck size={16} className="text-emerald-600 shrink-0" /> 100% Cuero
@@ -701,32 +707,62 @@ function LandingContent() {
               </div>
             </div>
 
-            {/* Banner / Ilustración Hero */}
+            {/* Banner / Card Hero Mejorada */}
             <div className="lg:col-span-5">
-              <div className="relative rounded-3xl overflow-hidden border border-slate-200/80 bg-slate-100 shadow-2xl p-2 group">
+              <div className="relative rounded-3xl overflow-hidden border border-slate-200/90 shadow-2xl group transition-all duration-300 hover:shadow-amber-500/10 hover:border-slate-300">
                 {negocio.heroBannerUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={negocio.heroBannerUrl}
-                    alt={negocio.heroTitulo}
-                    className="w-full h-80 sm:h-96 lg:h-[420px] object-cover rounded-2xl group-hover:scale-102 transition-transform duration-500"
-                  />
+                  <div className="relative aspect-4/3 sm:aspect-16/10 lg:aspect-4/3 w-full overflow-hidden bg-slate-900">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={negocio.heroBannerUrl}
+                      alt={negocio.heroTitulo}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20" />
+                    <div className="absolute bottom-4 left-4 right-4 p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 block">
+                          100% Cuero Vacuno
+                        </span>
+                        <span className="text-xs font-black tracking-tight">
+                          Calzado Artesanal de Cevallos
+                        </span>
+                      </div>
+                      <span className="text-xl">👞</span>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="w-full h-80 sm:h-96 lg:h-[420px] rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 flex flex-col justify-between text-white relative overflow-hidden">
-                    <div className="space-y-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                        Artesanía & Confort
-                      </span>
-                      <h3 className="text-2xl font-black">Hecho a Mano en Tungurahua</h3>
-                      <p className="text-xs text-slate-300">
-                        Cada par refleja la tradición zapatera de Cevallos con tecnología y estilo contemporáneo.
+                  <div className="relative aspect-4/3 sm:aspect-16/10 lg:aspect-4/3 w-full overflow-hidden bg-slate-950 flex flex-col justify-between p-6 sm:p-8 text-white">
+                    {/* Imagen de fondo artesanal de calzado de cuero */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=1000&q=80"
+                      alt="Taller de Calzado de Cuero Cevallos"
+                      className="absolute inset-0 w-full h-full object-cover opacity-35 group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-slate-950/40" />
+
+                    {/* Contenido superior de la card */}
+                    <div className="relative z-10 space-y-2">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 backdrop-blur-md border border-amber-500/30 text-amber-300 text-[11px] font-extrabold shadow-sm">
+                        <Sparkles size={12} />
+                        <span>Artesanía & Confort</span>
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                        Hecho a Mano en Tungurahua
+                      </h3>
+                      <p className="text-xs text-slate-300 leading-relaxed max-w-sm">
+                        Cada par refleja la tradición zapatera de Cevallos con tecnología de confort y cuero vacuno genuino.
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-between">
+                    {/* Badge inferior en vidrio */}
+                    <div className="relative z-10 p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-between shadow-lg">
                       <div className="text-xs">
-                        <span className="text-slate-300 block text-[10px]">Garantía de Calidad</span>
-                        <span className="font-bold">Cuero Vacuno Seleccionado</span>
+                        <span className="text-amber-300 block text-[10px] font-bold uppercase tracking-wider">
+                          Garantía de Calidad
+                        </span>
+                        <span className="font-extrabold text-white">Cuero Vacuno Seleccionado</span>
                       </div>
                       <span className="text-2xl">👞</span>
                     </div>
@@ -742,7 +778,7 @@ function LandingContent() {
           3. CATÁLOGO DE MODELOS CON VARIANTES INTEGRADAS
          ══════════════════════════════════════════════ */}
       <section id="catalogo" className="py-16 sm:py-20 bg-slate-50/60 border-b border-slate-200/60 scroll-mt-20">
-        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 space-y-8">
+        <div className="w-full max-w-7xl 2xl:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           {/* Encabezado del Catálogo */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div className="space-y-2 max-w-2xl">
@@ -806,7 +842,7 @@ function LandingContent() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredModelos.map((modelo) => {
                 // Extraer series únicas del modelo
                 const seriesUnicas = Array.from(
@@ -983,7 +1019,7 @@ function LandingContent() {
           4. SUCURSALES & PUNTOS DE VENTA
          ══════════════════════════════════════════════ */}
       <section id="sucursales" className="py-16 sm:py-20 bg-white border-b border-slate-200/60 scroll-mt-20">
-        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 space-y-8">
+        <div className="w-full max-w-7xl 2xl:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           <div className="text-center space-y-2 max-w-2xl mx-auto">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: brandColor }}>
               Locales Físicos
@@ -996,7 +1032,7 @@ function LandingContent() {
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center items-stretch gap-6 w-full max-w-[1600px] mx-auto">
+          <div className="flex flex-wrap justify-center items-stretch gap-6 max-w-6xl mx-auto">
             {sucursales.map((suc) => (
               <div
                 key={suc.id}
@@ -1064,7 +1100,7 @@ function LandingContent() {
           5. SOBRE NOSOTROS & TRADICIÓN EN CEVALLOS
          ══════════════════════════════════════════════ */}
       <section id="nosotros" className="py-16 sm:py-20 bg-slate-50/50 border-b border-slate-200/60 scroll-mt-20">
-        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12">
+        <div className="w-full max-w-7xl 2xl:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <div className="space-y-5">
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: brandColor }}>
@@ -1137,7 +1173,7 @@ function LandingContent() {
           6. FOOTER CORPORATIVO
          ══════════════════════════════════════════════ */}
       <footer id="contacto" className="bg-slate-900 text-white py-8 sm:py-10">
-        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 space-y-6">
+        <div className="w-full max-w-7xl 2xl:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
             <div className="space-y-2 md:col-span-2">
               <div className="flex items-center gap-2.5">
