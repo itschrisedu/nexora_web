@@ -347,7 +347,13 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
       if (typeof document !== "undefined" && config.primaryColor) {
         document.documentElement.style.setProperty("--primary", config.primaryColor);
         document.documentElement.style.setProperty("--primary-foreground", getContrastColor(config.primaryColor));
-        window.dispatchEvent(new CustomEvent("nexora:theme-changed", { detail: { primaryColor: config.primaryColor } }));
+        window.dispatchEvent(new CustomEvent("nexora:theme-changed", {
+          detail: {
+            primaryColor: config.primaryColor,
+            nombre: config.nombre,
+            logoUrl: finalConfig.logoUrl || config.logoUrl,
+          },
+        }));
       }
     } catch (err: any) {
       setError(err.message || "Error al guardar la configuración.");

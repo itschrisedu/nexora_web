@@ -176,6 +176,12 @@ function MainApp() {
       if (e.detail?.primaryColor) {
         applyBrandingColor(e.detail.primaryColor);
       }
+      if (e.detail?.nombre) {
+        setBusinessNombre(e.detail.nombre);
+      }
+      if (e.detail?.logoUrl) {
+        setBusinessLogo(e.detail.logoUrl);
+      }
     };
     window.addEventListener('nexora:theme-changed', handleThemeChange);
 
@@ -257,17 +263,20 @@ function MainApp() {
   };
 
   const [businessLogo, setBusinessLogo] = useState<string>('');
+  const [businessNombre, setBusinessNombre] = useState<string>('');
 
   const fetchBusinessBranding = async () => {
     try {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
+        if (parsed?.tenantName) setBusinessNombre(parsed.tenantName);
         if (parsed?.rol === 'ROL_SUPER_ADMIN') return;
       }
       const config = await ApiService.get('/configuracion/negocio');
       if (config) {
         if (config.logoUrl) setBusinessLogo(config.logoUrl);
+        if (config.nombre) setBusinessNombre(config.nombre);
         if (config.primaryColor) {
           applyBrandingColor(config.primaryColor);
         }
@@ -491,27 +500,36 @@ function MainApp() {
       <div className="flex-1 min-h-0 flex flex-col justify-between h-full">
         <div className="flex-1 min-h-0 flex flex-col">
           {/* Logo + Toggle tema + Botón Cerrar (en móvil) */}
-          <div className="shrink-0 p-5 border-b border-[var(--border)] flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
+          <div className="shrink-0 p-4 sm:p-5 border-b border-[var(--border)] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               {businessLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={businessLogo} alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
+                <img
+                  src={businessLogo}
+                  alt="Logo"
+                  className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
+                />
               ) : (
                 <div
-                  className="w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center shadow-sm"
+                  className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center shadow-xs shrink-0"
                   style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
                 >
-                  N
+                  {(businessNombre || user?.tenantName || 'N').charAt(0).toUpperCase()}
                 </div>
               )}
-              <span
-                className="text-xl font-black tracking-widest"
-                style={{ color: 'var(--primary)' }}
-              >
-                NEXORA
-              </span>
+              <div className="min-w-0 flex-1 flex flex-col justify-center pr-1">
+                <span
+                  className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  {businessNombre || user?.tenantName || 'NEXORA'}
+                </span>
+                <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block mt-0.5">
+                  {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central' : 'Calzado Cevallos'}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={toggleTheme}
                 className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--muted)] hover:opacity-80 transition-opacity cursor-pointer"

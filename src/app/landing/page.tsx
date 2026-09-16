@@ -643,7 +643,7 @@ function LandingContent() {
          ══════════════════════════════════════════════ */}
       <section
         id="inicio"
-        className="relative overflow-hidden bg-slate-950 min-h-[82vh] lg:min-h-[88vh] flex items-center py-16 sm:py-20 lg:py-24 border-b border-slate-800"
+        className="relative overflow-hidden bg-slate-950 min-h-[calc(100vh-78px)] min-h-[calc(100dvh-78px)] flex items-center py-12 sm:py-16 lg:py-20 border-b border-slate-900"
       >
         {/* Imagen de Fondo General de la Portada (si está configurada) */}
         {negocio.heroBackgroundUrl && (
