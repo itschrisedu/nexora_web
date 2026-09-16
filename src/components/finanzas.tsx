@@ -639,7 +639,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
             </div>
           </div>
           <div className="text-2xl font-black text-emerald-600 font-mono">
-            ${resumenFletes.totalEmpresa.toFixed(2)}
+            ${(resumenFletes.totalEmpresa ?? 0).toFixed(2)}
           </div>
           <div className="mt-2 text-[10px] text-[var(--muted-foreground)] flex items-center justify-between">
             <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{resumenFletes.cantEmpresa} envíos asumidos</span>
@@ -716,10 +716,10 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                     </span>
                     <div className="flex items-baseline justify-between mt-1">
                       <span className={`text-sm font-black ${isSelected ? 'text-white' : 'text-[var(--foreground)]'} font-mono`}>
-                        ${cat.totalMonto.toFixed(2)}
+                        ${(cat.totalMonto ?? 0).toFixed(2)}
                       </span>
                       <span className={`text-[9px] font-bold ${isSelected ? 'text-white/60' : 'text-[var(--muted-foreground)]'}`}>
-                        {cat.porcentaje.toFixed(0)}%
+                        {(cat.porcentaje ?? 0).toFixed(0)}%
                       </span>
                     </div>
                   </button>
@@ -885,7 +885,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
 
                           <td className="px-4 py-3.5 text-right">
                             <span className="text-sm font-black text-orange-500 font-mono">
-                              ${Number(g.monto).toFixed(2)}
+                              ${Number(g.monto ?? 0).toFixed(2)}
                             </span>
                           </td>
 
@@ -949,7 +949,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                 <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase">Fletes Pagados por la Empresa</span>
                 <Truck size={16} className="text-emerald-600" />
               </div>
-              <div className="text-xl font-black text-emerald-600 font-mono">${resumenFletes.totalEmpresa.toFixed(2)}</div>
+              <div className="text-xl font-black text-emerald-600 font-mono">${(resumenFletes.totalEmpresa ?? 0).toFixed(2)}</div>
               <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1">
                 {resumenFletes.cantEmpresa} envíos donde el negocio cubrió el transporte (Costo Operativo)
               </p>
@@ -960,7 +960,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                 <span className="text-[10px] font-bold text-blue-800 dark:text-blue-300 uppercase">Fletes Pagados por el Cliente</span>
                 <Users size={16} className="text-blue-600" />
               </div>
-              <div className="text-xl font-black text-blue-600 font-mono">${resumenFletes.totalCliente.toFixed(2)}</div>
+              <div className="text-xl font-black text-blue-600 font-mono">${(resumenFletes.totalCliente ?? 0).toFixed(2)}</div>
               <p className="text-[10px] text-blue-700 dark:text-blue-400 mt-1">
                 {resumenFletes.cantCliente} envíos cobrados directamente al comprador en nota de pedido
               </p>
@@ -971,7 +971,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                 <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">Movimiento Logístico Total</span>
                 <Layers size={16} className="text-[var(--foreground)]" />
               </div>
-              <div className="text-xl font-black text-[var(--foreground)] font-mono">${resumenFletes.totalGeneral.toFixed(2)}</div>
+              <div className="text-xl font-black text-[var(--foreground)] font-mono">${(resumenFletes.totalGeneral ?? 0).toFixed(2)}</div>
               <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
                 {pedidosFletes.length} despachos despachados por encomienda / transporte
               </p>
@@ -1074,7 +1074,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
 
                           <td className="px-4 py-3.5 text-right font-mono">
                             <span className={`text-sm font-black ${esEmpresa ? 'text-emerald-600' : 'text-blue-600'}`}>
-                              ${f.costoEnvio.toFixed(2)}
+                              ${(f.costoEnvio ?? 0).toFixed(2)}
                             </span>
                           </td>
 

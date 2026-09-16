@@ -38,6 +38,7 @@ import {
   BarChart3,
   Menu,
   X,
+  Receipt,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import { ToastProvider } from '@/components/ui/toast';
