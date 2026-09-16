@@ -463,15 +463,20 @@ function MainApp() {
           realClients = Array.isArray(clientes) ? clientes.length : 0;
           if (notifRes?.metricas?.totalAlertas !== undefined) {
             setAlertaCount(notifRes.metricas.totalAlertas);
+          } else {
+            setAlertaCount(0);
           }
           
-          if (Array.isArray(productos)) {
-            // Contar productos donde la suma de stock de todas sus tallas sea menor a 15
+          if (notifRes?.metricas?.totalStockCritico !== undefined) {
+            realLowStock = notifRes.metricas.totalStockCritico;
+          } else if (Array.isArray(productos)) {
             realLowStock = productos.filter((p: any) => {
-              const totalStock = Array.isArray(p.tallas) 
-                ? p.tallas.reduce((sum: number, t: any) => sum + (t.stock || 0), 0)
+              const tallas = Array.isArray(p.tallas) ? p.tallas : (p.stockPorTalla || []);
+              const totalStock = Array.isArray(tallas)
+                ? tallas.reduce((sum: number, t: any) => sum + (t.stock ?? t.cantidad ?? t.disponible ?? 0), 0)
                 : 0;
-              return totalStock < 15;
+              const tieneTallaAgotada = Array.isArray(tallas) && tallas.some((t: any) => (t.stock ?? t.cantidad ?? t.disponible ?? 0) === 0);
+              return totalStock <= 11 || tieneTallaAgotada;
             }).length;
           }
         } catch (apiErr) {

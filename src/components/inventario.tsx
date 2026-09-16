@@ -274,11 +274,12 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   const stockBajo = (p: Producto) => {
     const list = p.tallas || (p as any).stockPorTalla || [];
     const total = stockTotal(p);
-    if (total <= 12) return true;
+    // 11 pares o menos = menos de 1 docena completa
+    if (total <= 11) return true;
+    // Si tiene 12 o más pares, verificar si alguna talla de la serie está en 0 (serie incompleta)
     return Array.isArray(list) && list.some(t => {
       const qty = t.stock ?? t.cantidad ?? t.disponible ?? 0;
-      const min = t.stockMinimo || 0;
-      return min > 0 ? qty <= min : qty === 0;
+      return qty === 0;
     });
   };
 

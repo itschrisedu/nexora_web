@@ -46,7 +46,7 @@ export default function NotificacionesModal({
   onRefreshStats,
 }: NotificacionesModalProps) {
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'cobros' | 'stock' | 'ordenes' | 'historial'>('cobros');
+  const [activeTab, setActiveTab] = useState<'cobros' | 'stock' | 'ordenes' | 'seguridad' | 'historial'>('cobros');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<{
     metricas: {
@@ -56,6 +56,7 @@ export default function NotificacionesModal({
       totalStockCritico: number;
       totalOrdenesDemoradas: number;
       totalEnviosEnTransito: number;
+      totalAlertasSeguridad?: number;
       saldoTotalVencido: number;
       saldoTotalPorVencer: number;
     };
@@ -64,6 +65,7 @@ export default function NotificacionesModal({
     stockCritico: any[];
     ordenesProveedor: any[];
     enviosEnTransito: any[];
+    alertasSeguridad?: any[];
   }>({
     metricas: {
       totalAlertas: 0,
@@ -72,6 +74,7 @@ export default function NotificacionesModal({
       totalStockCritico: 0,
       totalOrdenesDemoradas: 0,
       totalEnviosEnTransito: 0,
+      totalAlertasSeguridad: 0,
       saldoTotalVencido: 0,
       saldoTotalPorVencer: 0,
     },
@@ -80,6 +83,7 @@ export default function NotificacionesModal({
     stockCritico: [],
     ordenesProveedor: [],
     enviosEnTransito: [],
+    alertasSeguridad: [],
   });
 
   const [historialLogs, setHistorialLogs] = useState<any[]>([]);
@@ -401,6 +405,23 @@ export default function NotificacionesModal({
           </button>
 
           <button
+            onClick={() => setActiveTab('seguridad')}
+            className={`py-2.5 sm:py-3 px-2.5 sm:px-3.5 text-xs font-extrabold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+              activeTab === 'seguridad'
+                ? 'border-[var(--primary)] text-[var(--primary)]'
+                : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <ShieldAlert size={14} />
+            <span>Seguridad & GPS</span>
+            {(data.alertasSeguridad?.length || 0) > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500/10 text-rose-500 border border-rose-500/20 animate-pulse">
+                {data.alertasSeguridad?.length}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab('historial')}
             className={`py-2.5 sm:py-3 px-2.5 sm:px-3.5 text-xs font-extrabold border-b-2 transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
               activeTab === 'historial'
@@ -565,7 +586,7 @@ export default function NotificacionesModal({
               <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
                 <Info size={16} className="shrink-0" />
                 <span>
-                  Mostrando modelos de calzado con inventario por debajo del umbral mínimo o con tallas agotadas.
+                  Mostrando modelos con menos de 1 docena completa (&lt; 12 pares) o con tallas faltantes en la serie comercial.
                 </span>
               </div>
 
@@ -574,59 +595,80 @@ export default function NotificacionesModal({
                   <CheckCircle2 size={42} className="mx-auto text-emerald-500 mb-2.5" />
                   <h3 className="text-sm font-extrabold">¡Inventario en Niveles Óptimos!</h3>
                   <p className="text-xs text-[var(--muted-foreground)] mt-1 max-w-sm mx-auto">
-                    Todos los modelos disponen de stock suficiente en bodega.
+                    Todos los modelos disponen de docenas completas y series continuas en bodega.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full">
-                  {data.stockCritico.map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-2xs flex flex-col justify-between min-w-0 overflow-hidden"
-                    >
-                      <div className="space-y-1.5 min-w-0">
-                        <div className="flex items-start justify-between gap-1.5 min-w-0">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-black text-[var(--foreground)] truncate">{item.nombre}</div>
-                            <div className="text-[10px] text-[var(--muted-foreground)] truncate">{item.marca} • {item.modelo}</div>
+                  {data.stockCritico.map((item) => {
+                    const badgeLabel =
+                      item.estadoStock === 'AGOTADO'
+                        ? 'AGOTADO (0 PARES)'
+                        : item.estadoStock === 'MENOS_DE_DOCENA'
+                        ? '< 1 DOCENA'
+                        : item.estadoStock === 'SERIE_INCOMPLETA'
+                        ? 'SERIE INCOMPLETA'
+                        : item.estadoStock;
+
+                    const isRed = item.estadoStock === 'AGOTADO' || item.stockTotal === 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-2xs flex flex-col justify-between min-w-0 overflow-hidden"
+                      >
+                        <div className="space-y-2 min-w-0">
+                          <div className="flex items-start justify-between gap-1.5 min-w-0">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-black text-[var(--foreground)] truncate">{item.nombre}</div>
+                              <div className="text-[10px] text-[var(--muted-foreground)] truncate">{item.marca} • {item.modelo}</div>
+                            </div>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-black border uppercase shrink-0 whitespace-nowrap ${
+                                isRed
+                                  ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                                  : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                              }`}
+                            >
+                              {badgeLabel}
+                            </span>
                           </div>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-black border uppercase shrink-0 whitespace-nowrap ${
-                              item.estadoStock === 'AGOTADO'
-                                ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
-                                : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                            }`}
+
+                          <div className="p-2 rounded-lg bg-[var(--muted)]/40 flex items-center justify-between text-xs">
+                            <span className="text-[var(--muted-foreground)]">Stock Total:</span>
+                            <span className={`font-black ${isRed ? 'text-rose-500' : 'text-amber-500'}`}>
+                              {item.stockTotal} {item.stockTotal === 1 ? 'par' : 'pares'}
+                            </span>
+                          </div>
+
+                          {item.tallasAgotadas?.length > 0 && (
+                            <div className="p-1.5 rounded-lg bg-rose-500/5 border border-rose-500/15 text-[11px] text-rose-600 dark:text-rose-400">
+                              <span className="font-bold">⚠️ Tallas sin stock:</span> {item.tallasAgotadas.map((t: any) => `T${t}`).join(', ')}
+                            </div>
+                          )}
+
+                          {item.motivoAlerta && !item.tallasAgotadas?.length && (
+                            <div className="text-[10px] text-[var(--muted-foreground)]">
+                              {item.motivoAlerta}
+                            </div>
+                          )}
+                        </div>
+
+                        {onNavigateToView && (
+                          <button
+                            onClick={() => {
+                              onClose();
+                              onNavigateToView('inventario');
+                            }}
+                            className="mt-3 w-full py-1.5 px-2.5 rounded-lg text-xs font-bold bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-colors flex items-center justify-center gap-1 cursor-pointer"
                           >
-                            {item.estadoStock}
-                          </span>
-                        </div>
-
-                        <div className="p-2 rounded-lg bg-[var(--muted)]/40 flex items-center justify-between text-xs">
-                          <span className="text-[var(--muted-foreground)]">Stock Actual:</span>
-                          <span className="font-black text-rose-500">{item.stockTotal} pares</span>
-                        </div>
-
-                        {item.tallasAgotadas?.length > 0 && (
-                          <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                            <span className="font-bold text-rose-500">Tallas en 0:</span> {item.tallasAgotadas.join(', ')}
-                          </div>
+                            <span>Ver en Inventario</span>
+                            <ChevronRight size={13} />
+                          </button>
                         )}
                       </div>
-
-                      {onNavigateToView && (
-                        <button
-                          onClick={() => {
-                            onClose();
-                            onNavigateToView('inventario');
-                          }}
-                          className="mt-3 w-full py-1.5 px-2.5 rounded-lg text-xs font-bold bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          <span>Ver en Inventario</span>
-                          <ChevronRight size={13} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -721,7 +763,101 @@ export default function NotificacionesModal({
             </div>
           )}
 
-          {/* ═════════ TAB 4: HISTORIAL DE ENVÍOS ═════════ */}
+          {/* ═════════ TAB 4: SEGURIDAD & GPS ═════════ */}
+          {activeTab === 'seguridad' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h3 className="text-xs font-black uppercase text-[var(--muted-foreground)] tracking-wider flex items-center gap-1.5">
+                    <ShieldAlert size={14} className="text-rose-500" />
+                    Alertas Críticas y Bloqueos de Geolocalización (Últimas 48h)
+                  </h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                    Eventos de usuarios que revocaron o desactivaron la geolocalización requerida por el negocio.
+                  </p>
+                </div>
+                {onNavigateToView && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onNavigateToView('auditoria');
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Ver en Auditoría Completa</span>
+                    <ChevronRight size={13} />
+                  </button>
+                )}
+              </div>
+
+              {(!data.alertasSeguridad || data.alertasSeguridad.length === 0) ? (
+                <div className="text-xs text-[var(--muted-foreground)] p-6 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] text-center space-y-1">
+                  <div className="flex justify-center text-emerald-500 mb-2">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div className="font-bold text-[var(--foreground)]">Sin alertas de seguridad activas</div>
+                  <p className="text-[11px]">Todos los accesos y permisos de geolocalización están operando con normalidad.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {data.alertasSeguridad.map((secAlert: any) => {
+                    const isGps = secAlert.tipoEvento?.includes('GPS') || secAlert.modulo?.includes('GPS') || secAlert.descripcion?.toLowerCase().includes('ubicación') || secAlert.descripcion?.toLowerCase().includes('gps');
+                    return (
+                      <div
+                        key={secAlert.id}
+                        className="p-3.5 rounded-xl bg-[var(--card)] border border-rose-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs min-w-0 overflow-hidden"
+                      >
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5">
+                            <ShieldAlert size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black text-rose-500">
+                                {isGps ? 'ALERTA DE GEOLOCALIZACIÓN DESACTIVADA' : 'EVENTO CRÍTICO DE SEGURIDAD'}
+                              </span>
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-rose-500/15 text-rose-500 border border-rose-500/30">
+                                {secAlert.severidad || 'CRÍTICA'}
+                              </span>
+                            </div>
+                            <div className="text-xs font-bold text-[var(--foreground)]">
+                              {secAlert.descripcion || 'Se detectó una revocación del permiso obligatorio de GPS.'}
+                            </div>
+                            <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 flex-wrap">
+                              <span>Usuario: <b className="text-[var(--foreground)]">{secAlert.usuarioEmail || 'Desconocido'}</b></span>
+                              <span>•</span>
+                              <span>Fecha: {new Date(secAlert.createdAt).toLocaleString('es-EC')}</span>
+                              {secAlert.ipAddress && (
+                                <>
+                                  <span>•</span>
+                                  <span>IP: {secAlert.ipAddress}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {onNavigateToView && (
+                          <button
+                            onClick={() => {
+                              onClose();
+                              onNavigateToView('auditoria');
+                            }}
+                            className="self-end sm:self-center px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                          >
+                            <span>Auditar</span>
+                            <ChevronRight size={13} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═════════ TAB 5: HISTORIAL DE ENVÍOS ═════════ */}
           {activeTab === 'historial' && (
             <div className="space-y-3">
               <div className="text-xs text-[var(--muted-foreground)] flex items-center justify-between flex-wrap gap-1">
