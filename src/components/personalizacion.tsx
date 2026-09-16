@@ -89,6 +89,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [uploadingHeroBanner, setUploadingHeroBanner] = useState(false);
   const [uploadingHeroBg, setUploadingHeroBg] = useState(false);
   const [tenantId, setTenantId] = useState("");
+  const [autoWhatsAppAbono, setAutoWhatsAppAbono] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("nexora_auto_whatsapp_abono");
+    return stored === null ? true : stored === "true";
+  });
 
   // Transportes state
   const [transportes, setTransportes] = useState<EmpresaTransporteItem[]>([]);
@@ -756,6 +761,44 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     <option value={168}>7 Días (Semana completa)</option>
                   </select>
                 </div>
+              </div>
+            </div>
+
+            {/* CONFIGURACIÓN DE NOTIFICACIONES Y COMPROBANTES POR WHATSAPP */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <MessageCircle className="text-emerald-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Notificaciones y Comprobantes por WhatsApp</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Automatizaciones para la atención de pagos y emisión de comprobantes en Gestión de Cobros.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-500/5 dark:bg-slate-800/20 border border-[var(--border)] rounded-xl">
+                <label className="flex items-center justify-between cursor-pointer select-none gap-4">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-2">
+                      <MessageCircle size={15} className="text-emerald-500" />
+                      <span>Enviar comprobante oficial por WhatsApp al confirmar</span>
+                    </span>
+                    <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                      Abre directamente el chat de WhatsApp con el desglose del abono, saldo anterior y saldo pendiente al registrar cobros o pagos, sin descargas locales ni recargas de pantalla.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoWhatsAppAbono}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setAutoWhatsAppAbono(checked);
+                      localStorage.setItem("nexora_auto_whatsapp_abono", String(checked));
+                      window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+                    }}
+                    className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                  />
+                </label>
               </div>
             </div>
 

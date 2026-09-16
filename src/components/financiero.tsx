@@ -369,7 +369,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [notasAbono, setNotasAbono] = useState('');
   const [savingAbono, setSavingAbono] = useState(false);
   const [formatoEnvioAbono, setFormatoEnvioAbono] = useState<'PDF' | 'TEXTO'>('PDF'); // Por defecto PDF como pidió el usuario
-  const [autoEnviarWhatsAppAbono, setAutoEnviarWhatsAppAbono] = useState(true); // Envío automático por defecto
+  const [autoEnviarWhatsAppAbono, setAutoEnviarWhatsAppAbono] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = localStorage.getItem('nexora_auto_whatsapp_abono');
+    return stored === null ? true : stored === 'true';
+  });
 
   // Modal Devolución Mejorado
   const [showDevolucionModal, setShowDevolucionModal] = useState(false);
@@ -471,6 +475,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     loadCobros();
     loadBusinessConfig();
     loadGastos();
+
+    const handleConfigChange = () => {
+      const stored = localStorage.getItem('nexora_auto_whatsapp_abono');
+      setAutoEnviarWhatsAppAbono(stored === null ? true : stored === 'true');
+    };
+    window.addEventListener('storage', handleConfigChange);
+    window.addEventListener('nexora:config-changed', handleConfigChange);
+    return () => {
+      window.removeEventListener('storage', handleConfigChange);
+      window.removeEventListener('nexora:config-changed', handleConfigChange);
+    };
   }, [online, activeSucursalId]);
 
   const loadGastos = async () => {
@@ -2835,24 +2850,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     </div>
                   )}
 
-                  {/* Configuración de Envío de Comprobante por WhatsApp */}
-                  <div className="p-3 bg-slate-500/5 dark:bg-slate-800/20 border border-[var(--border)] rounded-xl space-y-1.5">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={autoEnviarWhatsAppAbono}
-                        onChange={(e) => setAutoEnviarWhatsAppAbono(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span className="text-[11px] font-bold text-[var(--foreground)] flex items-center gap-1.5">
-                        <MessageCircle size={13} className="text-emerald-600" />
-                        <span>Enviar comprobante oficial por WhatsApp al confirmar</span>
-                      </span>
-                    </label>
-                    <p className="text-[10px] text-[var(--muted-foreground)] pl-5">
-                      Abre directamente el chat de WhatsApp con el desglose del abono, saldo anterior y saldo pendiente, sin descargas locales.
-                    </p>
-                  </div>
+                  {/* Botón de Confirmación del Abono */}
 
                   <button
                     onClick={handleRegistrarAbono}
