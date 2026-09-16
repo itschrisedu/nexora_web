@@ -643,7 +643,7 @@ function LandingContent() {
          ══════════════════════════════════════════════ */}
       <section
         id="inicio"
-        className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/50 py-12 sm:py-20 border-b border-slate-200/60"
+        className="relative overflow-hidden bg-slate-950 min-h-[82vh] lg:min-h-[88vh] flex items-center py-16 sm:py-20 lg:py-24 border-b border-slate-800"
       >
         {/* Imagen de Fondo General de la Portada (si está configurada) */}
         {negocio.heroBackgroundUrl && (
@@ -654,13 +654,13 @@ function LandingContent() {
               alt="Fondo Portada Principal"
               className="w-full h-full object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/40 to-white/70" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/85 via-slate-900/75 to-slate-950/90" />
           </div>
         )}
 
         {/* Efecto de luz sutil de fondo */}
         <div
-          className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-3xl opacity-10 pointer-events-none"
+          className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-3xl opacity-20 pointer-events-none"
           style={{ backgroundColor: brandColor }}
         />
 
@@ -668,16 +668,16 @@ function LandingContent() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Texto Hero */}
             <div className="lg:col-span-7 space-y-6 text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-900 font-bold text-xs">
-                <Sparkles size={14} className="text-amber-600" />
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded-full text-amber-300 font-bold text-xs backdrop-blur-sm">
+                <Sparkles size={14} className="text-amber-400" />
                 <span>Producción Directa desde Fábrica • Cantón Cevallos</span>
               </div>
 
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] drop-shadow-xl">
                 {negocio.heroTitulo || "Calzado Ecuatoriano 100% Cuero de Cevallos"}
               </h1>
 
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal max-w-2xl">
+              <p className="text-sm sm:text-base text-slate-100 leading-relaxed font-medium max-w-2xl drop-shadow-md">
                 {negocio.heroSubtitulo ||
                   "Fabricación con los mejores estándares de calidad, acabados finos y venta directa por par y por mayor a todo el país."}
               </p>
@@ -695,7 +695,7 @@ function LandingContent() {
 
                 <a
                   href="#sucursales"
-                  className="px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 transition-all flex items-center gap-2"
+                  className="px-5 py-3.5 bg-white/20 hover:bg-white/30 text-white font-bold text-xs sm:text-sm rounded-2xl border border-white/40 transition-all flex items-center gap-2 backdrop-blur-md shadow-md"
                 >
                   <Store size={17} />
                   <span>Ver Puntos de Venta</span>
@@ -703,24 +703,24 @@ function LandingContent() {
               </div>
 
               {/* Pilares rápidos */}
-              <div className="grid grid-cols-3 gap-3 pt-6 border-t border-slate-200/80">
+              <div className="grid grid-cols-3 gap-3 pt-6 border-t border-white/25">
                 <div className="space-y-1">
-                  <div className="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
-                    <ShieldCheck size={16} className="text-emerald-600 shrink-0" /> 100% Cuero
+                  <div className="font-extrabold text-xs sm:text-sm text-white flex items-center gap-1.5 drop-shadow-sm">
+                    <ShieldCheck size={16} className="text-emerald-400 shrink-0" /> 100% Cuero
                   </div>
-                  <p className="text-[11px] text-slate-500">Material vacuno legítimo</p>
+                  <p className="text-xs text-slate-200 font-semibold drop-shadow-sm">Material vacuno legítimo</p>
                 </div>
                 <div className="space-y-1">
-                  <div className="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
-                    <Truck size={16} className="text-blue-600 shrink-0" /> Envíos Seguros
+                  <div className="font-extrabold text-xs sm:text-sm text-white flex items-center gap-1.5 drop-shadow-sm">
+                    <Truck size={16} className="text-cyan-400 shrink-0" /> Envíos Seguros
                   </div>
-                  <p className="text-[11px] text-slate-500">A todo el Ecuador</p>
+                  <p className="text-xs text-slate-200 font-semibold drop-shadow-sm">A todo el Ecuador</p>
                 </div>
                 <div className="space-y-1">
-                  <div className="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
-                    <Award size={16} className="text-amber-600 shrink-0" /> Venta por Mayor
+                  <div className="font-extrabold text-xs sm:text-sm text-white flex items-center gap-1.5 drop-shadow-sm">
+                    <Award size={16} className="text-amber-400 shrink-0" /> Venta por Mayor
                   </div>
-                  <p className="text-[11px] text-slate-500">Precios de fabricante</p>
+                  <p className="text-xs text-slate-200 font-semibold drop-shadow-sm">Precios de fabricante</p>
                 </div>
               </div>
             </div>
@@ -871,13 +871,13 @@ function LandingContent() {
                     className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col h-full group cursor-pointer"
                   >
                     {/* Imagen de la Variante con Badge */}
-                    <div className="relative aspect-4/3 bg-slate-100 overflow-hidden border-b border-slate-100 flex items-center justify-center shrink-0">
+                    <div className="relative aspect-4/3 bg-slate-50/80 overflow-hidden border-b border-slate-100 flex items-center justify-center p-3.5 shrink-0">
                       {fotoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={fotoUrl}
                           alt={`${modelo.name} - ${currentVariant?.color}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full h-full object-contain object-center group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center text-slate-400 gap-1">
@@ -1297,13 +1297,13 @@ function LandingContent() {
               {/* Cabecera del modal */}
               <div className="flex items-start justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center p-1.5">
                     {varianteConfig.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={varianteConfig.imageUrl}
                         alt={modeloConfig.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain object-center"
                       />
                     ) : (
                       <span className="text-2xl">👞</span>
@@ -1689,10 +1689,10 @@ function LandingContent() {
                       className="p-3.5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-2.5"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center p-1">
                           {item.fotoUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={item.fotoUrl} alt={item.modeloNombre} className="w-full h-full object-cover" />
+                            <img src={item.fotoUrl} alt={item.modeloNombre} className="w-full h-full object-contain object-center" />
                           ) : (
                             <span className="text-xl">👞</span>
                           )}
