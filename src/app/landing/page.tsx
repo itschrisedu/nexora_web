@@ -46,6 +46,11 @@ interface NegocioInfo {
   heroTitulo: string;
   heroSubtitulo: string;
   heroBannerUrl: string | null;
+  heroBackgroundUrl?: string | null;
+  cardTitulo?: string;
+  cardSubtitulo?: string;
+  cardEtiqueta?: string;
+  cardGarantia?: string;
   sobreNosotros: string;
   garantiaTaller?: string;
   caracteristicasCalidad?: string;
@@ -640,6 +645,19 @@ function LandingContent() {
         id="inicio"
         className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/50 py-12 sm:py-20 border-b border-slate-200/60"
       >
+        {/* Imagen de Fondo General de la Portada (si está configurada) */}
+        {negocio.heroBackgroundUrl && (
+          <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={negocio.heroBackgroundUrl}
+              alt="Fondo Portada Principal"
+              className="w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/40 to-white/70" />
+          </div>
+        )}
+
         {/* Efecto de luz sutil de fondo */}
         <div
           className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-3xl opacity-10 pointer-events-none"
@@ -707,67 +725,52 @@ function LandingContent() {
               </div>
             </div>
 
-            {/* Banner / Card Hero Mejorada */}
+            {/* Banner / Card Hero Completamente Configurable */}
             <div className="lg:col-span-5">
               <div className="relative rounded-3xl overflow-hidden border border-slate-200/90 shadow-2xl group transition-all duration-300 hover:shadow-amber-500/10 hover:border-slate-300">
-                {negocio.heroBannerUrl ? (
-                  <div className="relative aspect-4/3 sm:aspect-16/10 lg:aspect-4/3 w-full overflow-hidden bg-slate-900">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={negocio.heroBannerUrl}
-                      alt={negocio.heroTitulo}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20" />
-                    <div className="absolute bottom-4 left-4 right-4 p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 block">
-                          100% Cuero Vacuno
-                        </span>
-                        <span className="text-xs font-black tracking-tight">
-                          Calzado Artesanal de Cevallos
-                        </span>
-                      </div>
-                      <span className="text-xl">👞</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative aspect-4/3 sm:aspect-16/10 lg:aspect-4/3 w-full overflow-hidden bg-slate-950 flex flex-col justify-between p-6 sm:p-8 text-white">
-                    {/* Imagen de fondo artesanal de calzado de cuero */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=1000&q=80"
-                      alt="Taller de Calzado de Cuero Cevallos"
-                      className="absolute inset-0 w-full h-full object-cover opacity-35 group-hover:scale-105 transition-transform duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-slate-950/40" />
+                <div className="relative aspect-4/3 sm:aspect-16/10 lg:aspect-4/3 w-full overflow-hidden bg-slate-950 flex flex-col justify-between p-6 sm:p-8 text-white">
+                  {/* Foto de fondo: Si el usuario subió una se usa esa; sino, la foto artesanal de calzado */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={
+                      negocio.heroBannerUrl ||
+                      "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=1000&q=80"
+                    }
+                    alt={negocio.cardTitulo || "Taller de Calzado de Cuero Cevallos"}
+                    className={`absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${
+                      negocio.heroBannerUrl ? "opacity-55" : "opacity-35"
+                    }`}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/65 to-slate-950/40" />
 
-                    {/* Contenido superior de la card */}
-                    <div className="relative z-10 space-y-2">
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 backdrop-blur-md border border-amber-500/30 text-amber-300 text-[11px] font-extrabold shadow-sm">
-                        <Sparkles size={12} />
-                        <span>Artesanía & Confort</span>
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
-                        Hecho a Mano en Tungurahua
-                      </h3>
-                      <p className="text-xs text-slate-300 leading-relaxed max-w-sm">
-                        Cada par refleja la tradición zapatera de Cevallos con tecnología de confort y cuero vacuno genuino.
-                      </p>
+                  {/* Contenido superior de la card */}
+                  <div className="relative z-10 space-y-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 backdrop-blur-md border border-amber-500/30 text-amber-300 text-[11px] font-extrabold shadow-sm">
+                      <Sparkles size={12} />
+                      <span>{negocio.cardEtiqueta || "Artesanía & Confort"}</span>
                     </div>
-
-                    {/* Badge inferior en vidrio */}
-                    <div className="relative z-10 p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-between shadow-lg">
-                      <div className="text-xs">
-                        <span className="text-amber-300 block text-[10px] font-bold uppercase tracking-wider">
-                          Garantía de Calidad
-                        </span>
-                        <span className="font-extrabold text-white">Cuero Vacuno Seleccionado</span>
-                      </div>
-                      <span className="text-2xl">👞</span>
-                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                      {negocio.cardTitulo || "Hecho a Mano en Tungurahua"}
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed max-w-sm">
+                      {negocio.cardSubtitulo ||
+                        "Cada par refleja la tradición zapatera de Cevallos con tecnología de confort y cuero vacuno genuino."}
+                    </p>
                   </div>
-                )}
+
+                  {/* Badge inferior en vidrio */}
+                  <div className="relative z-10 p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-between shadow-lg">
+                    <div className="text-xs">
+                      <span className="text-amber-300 block text-[10px] font-bold uppercase tracking-wider">
+                        Garantía de Calidad
+                      </span>
+                      <span className="font-extrabold text-white">
+                        {negocio.cardGarantia || "Cuero Vacuno Seleccionado"}
+                      </span>
+                    </div>
+                    <span className="text-2xl">👞</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

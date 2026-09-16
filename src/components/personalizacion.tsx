@@ -58,6 +58,11 @@ interface BusinessConfig {
   heroTitulo?: string;
   heroSubtitulo?: string;
   heroBannerUrl?: string;
+  heroBackgroundUrl?: string;
+  cardTitulo?: string;
+  cardSubtitulo?: string;
+  cardEtiqueta?: string;
+  cardGarantia?: string;
   sobreNosotros?: string;
   garantiaTaller?: string;
   caracteristicasCalidad?: string;
@@ -82,6 +87,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [copiadoLink, setCopiadoLink] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingHeroBanner, setUploadingHeroBanner] = useState(false);
+  const [uploadingHeroBg, setUploadingHeroBg] = useState(false);
   const [tenantId, setTenantId] = useState("");
 
   // Transportes state
@@ -116,6 +122,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     heroTitulo: "Calzado Ecuatoriano 100% Cuero de Cevallos",
     heroSubtitulo: "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
     heroBannerUrl: "",
+    heroBackgroundUrl: "",
+    cardTitulo: "Hecho a Mano en Tungurahua",
+    cardSubtitulo: "Cada par refleja la tradición zapatera de Cevallos con tecnología de confort y cuero vacuno genuino.",
+    cardEtiqueta: "Artesanía & Confort",
+    cardGarantia: "Cuero Vacuno Seleccionado",
     sobreNosotros: "Somos productores y comercializadores de calzado de cuero en el cantón Cevallos, Tungurahua. Garantizamos calidad de exportación, acabados finos y precios directos de fabricante.",
     garantiaTaller: "Garantizamos la máxima calidad en cada par de calzado elaborado con 100% cuero vacuno ecuatoriano. Ofrecemos respaldo directo de fábrica y servicio de mantenimiento en todos nuestros puntos de venta autorizados.",
     caracteristicasCalidad: "Cueros vacunos genuinos tratados para resistir el uso continuo.\nSuelas antideslizantes de alta adherencia y costuras reforzadas.\nAtención personalizada a comerciantes mayoristas y clientes particulares.\nServicio y respaldo técnico en todos nuestros locales.",
@@ -268,6 +279,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             heroTitulo: data.heroTitulo || "Calzado Ecuatoriano 100% Cuero de Cevallos",
             heroSubtitulo: data.heroSubtitulo || "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
             heroBannerUrl: data.heroBannerUrl || "",
+            heroBackgroundUrl: data.heroBackgroundUrl || "",
+            cardTitulo: data.cardTitulo || "Hecho a Mano en Tungurahua",
+            cardSubtitulo: data.cardSubtitulo || "Cada par refleja la tradición zapatera de Cevallos con tecnología de confort y cuero vacuno genuino.",
+            cardEtiqueta: data.cardEtiqueta || "Artesanía & Confort",
+            cardGarantia: data.cardGarantia || "Cuero Vacuno Seleccionado",
             sobreNosotros: data.sobreNosotros || "Somos productores y comercializadores de calzado de cuero en el cantón Cevallos, Tungurahua.",
             garantiaTaller: data.garantiaTaller || "Garantizamos la máxima calidad en cada par de calzado elaborado con 100% cuero vacuno ecuatoriano. Ofrecemos respaldo directo de fábrica y servicio de mantenimiento en todos nuestros puntos de venta autorizados.",
             caracteristicasCalidad: data.caracteristicasCalidad || "Cueros vacunos genuinos tratados para resistir el uso continuo.\nSuelas antideslizantes de alta adherencia y costuras reforzadas.\nAtención personalizada a comerciantes mayoristas y clientes particulares.\nServicio y respaldo técnico en todos nuestros locales.",
@@ -992,75 +1008,174 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 );
               })()}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                    Título Principal
+              {/* ─── 1. TEXTOS DE LA PORTADA PRINCIPAL ─── */}
+              <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
+                  <Sparkles className="text-amber-500" size={16} />
+                  <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                    Portada Principal del Catálogo
                   </label>
-                  <input
-                    type="text"
-                    value={config.heroTitulo || ""}
-                    onChange={(e) => setConfig({ ...config, heroTitulo: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
-                  />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                    Subtítulo
-                  </label>
-                  <input
-                    type="text"
-                    value={config.heroSubtitulo || ""}
-                    onChange={(e) => setConfig({ ...config, heroSubtitulo: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                      Título Principal de la Portada
+                    </label>
+                    <input
+                      type="text"
+                      value={config.heroTitulo || ""}
+                      onChange={(e) => setConfig({ ...config, heroTitulo: e.target.value })}
+                      placeholder="Calzado Ecuatoriano 100% Cuero de Cevallos"
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                      Eslogan / Mensaje de Bienvenida
+                    </label>
+                    <input
+                      type="text"
+                      value={config.heroSubtitulo || ""}
+                      onChange={(e) => setConfig({ ...config, heroSubtitulo: e.target.value })}
+                      placeholder="Venta al por mayor y menor directamente desde fábrica..."
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* IMAGEN DE FONDO GENERAL DE LA PORTADA */}
+                <div className="pt-2 border-t border-[var(--border)] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                      <Image className="text-emerald-600" size={15} />
+                      <span>Imagen de Fondo de la Portada Principal</span>
+                    </label>
+                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                      Fotografía de tu local, taller o exhibición para el fondo del inicio
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-start gap-4">
+                    <div className="w-32 h-20 rounded-xl bg-slate-900 border border-[var(--border)] overflow-hidden flex items-center justify-center shrink-0 shadow-xs relative">
+                      {config.heroBackgroundUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={config.heroBackgroundUrl}
+                          alt="Fondo Portada"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400 gap-1 p-2 text-center">
+                          <Image size={18} />
+                          <span className="text-[9px] font-bold leading-tight">Fondo degradado estándar</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 w-full space-y-2">
+                      <input
+                        type="text"
+                        value={config.heroBackgroundUrl || ""}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, heroBackgroundUrl: e.target.value }))}
+                        placeholder="Enlace o ruta de la foto de fondo (https://...)"
+                        className="w-full px-3 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <label className="cursor-pointer px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs">
+                          <Upload size={13} />
+                          <span>{uploadingHeroBg ? "Subiendo fondo..." : "Subir Foto de Fondo"}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingHeroBg}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadingHeroBg(true);
+                              try {
+                                const reader = new FileReader();
+                                reader.onload = async (event) => {
+                                  const base64 = event.target?.result as string;
+                                  const url = await uploadToCloudinary(base64, "nexora_landing");
+                                  if (url) {
+                                    setConfig((prev) => ({ ...prev, heroBackgroundUrl: url }));
+                                  }
+                                  setUploadingHeroBg(false);
+                                };
+                                reader.readAsDataURL(file);
+                              } catch {
+                                setUploadingHeroBg(false);
+                              }
+                            }}
+                          />
+                        </label>
+
+                        {config.heroBackgroundUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setConfig((prev) => ({ ...prev, heroBackgroundUrl: "" }))}
+                            className="px-2.5 py-1.5 text-xs text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors font-semibold"
+                          >
+                            Quitar fondo (Usar estilo limpio estándar)
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* IMAGEN DESTACADA / BANNER HERO */}
-              <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl space-y-3">
-                <div className="flex items-center justify-between">
+              {/* ─── 2. TARJETA DESTACADA DE BIENVENIDA ─── */}
+              <div className="p-4 bg-[var(--muted)]/30 border border-amber-500/20 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
                   <div className="flex items-center gap-2">
-                    <Image className="text-amber-500" size={16} />
+                    <Layers className="text-amber-500" size={16} />
                     <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
-                      Imagen Destacada del Inicio (Card Lateral del Hero)
+                      Tarjeta Destacada de Bienvenida
                     </label>
                   </div>
                   <span className="text-[10px] text-[var(--muted-foreground)]">
-                    Foto de fábrica, calzado o taller
+                    Tarjeta visual del inicio (con foto, textos y distintivo)
                   </span>
                 </div>
 
+                {/* FOTO DE LA TARJETA */}
                 <div className="flex flex-col sm:flex-row items-start gap-4">
-                  <div className="w-28 h-20 rounded-xl bg-white border border-[var(--border)] overflow-hidden flex items-center justify-center shrink-0 shadow-xs">
+                  <div className="w-28 h-20 rounded-xl bg-slate-900 border border-[var(--border)] overflow-hidden flex items-center justify-center shrink-0 shadow-xs relative">
                     {config.heroBannerUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={config.heroBannerUrl}
-                        alt="Hero Banner Preview"
+                        alt="Foto de Tarjeta"
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center text-slate-400 gap-1">
-                        <Image size={20} />
-                        <span className="text-[9px] font-bold">Por defecto</span>
+                      <div className="flex flex-col items-center justify-center text-slate-400 gap-1 text-center p-1">
+                        <Image size={18} />
+                        <span className="text-[9px] font-bold">Fondo artesanal por defecto</span>
                       </div>
                     )}
                   </div>
 
                   <div className="flex-1 w-full space-y-2">
+                    <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                      Fotografía Destacada de la Tarjeta
+                    </label>
                     <input
                       type="text"
                       value={config.heroBannerUrl || ""}
                       onChange={(e) => setConfig((prev) => ({ ...prev, heroBannerUrl: e.target.value }))}
-                      placeholder="URL directa de la imagen (https://...)"
-                      className="w-full px-3 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 font-mono"
+                      placeholder="Enlace o ruta de la fotografía (https://...)"
+                      className="w-full px-3 py-1.5 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500 font-mono"
                     />
 
                     <div className="flex items-center gap-2 flex-wrap">
                       <label className="cursor-pointer px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs">
                         <Upload size={13} />
-                        <span>{uploadingHeroBanner ? 'Subiendo imagen...' : 'Subir Imagen'}</span>
+                        <span>{uploadingHeroBanner ? "Subiendo foto..." : "Subir Fotografía"}</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -1074,7 +1189,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                               const reader = new FileReader();
                               reader.onload = async (event) => {
                                 const base64 = event.target?.result as string;
-                                const url = await uploadToCloudinary(base64, 'nexora_landing');
+                                const url = await uploadToCloudinary(base64, "nexora_landing");
                                 if (url) {
                                   setConfig((prev) => ({ ...prev, heroBannerUrl: url }));
                                 }
@@ -1091,13 +1206,68 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       {config.heroBannerUrl && (
                         <button
                           type="button"
-                          onClick={() => setConfig((prev) => ({ ...prev, heroBannerUrl: '' }))}
+                          onClick={() => setConfig((prev) => ({ ...prev, heroBannerUrl: "" }))}
                           className="px-2.5 py-1.5 text-xs text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors font-semibold"
                         >
-                          Quitar imagen (Usar diseño artesanal por defecto)
+                          Quitar fotografía (Usar fondo artesanal por defecto)
                         </button>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                {/* CONTENIDO Y TEXTOS EDITABLES DE LA TARJETA */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                      🏷️ Etiqueta Superior
+                    </label>
+                    <input
+                      type="text"
+                      value={config.cardEtiqueta || ""}
+                      onChange={(e) => setConfig({ ...config, cardEtiqueta: e.target.value })}
+                      placeholder="Artesanía & Confort"
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                      🛡️ Distintivo / Garantía Destacada
+                    </label>
+                    <input
+                      type="text"
+                      value={config.cardGarantia || ""}
+                      onChange={(e) => setConfig({ ...config, cardGarantia: e.target.value })}
+                      placeholder="Cuero Vacuno Seleccionado"
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                      📌 Título de la Tarjeta
+                    </label>
+                    <input
+                      type="text"
+                      value={config.cardTitulo || ""}
+                      onChange={(e) => setConfig({ ...config, cardTitulo: e.target.value })}
+                      placeholder="Hecho a Mano en Tungurahua"
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                      📝 Mensaje / Descripción de la Tarjeta
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={config.cardSubtitulo || ""}
+                      onChange={(e) => setConfig({ ...config, cardSubtitulo: e.target.value })}
+                      placeholder="Cada par refleja la tradición zapatera de Cevallos con tecnología de confort y cuero vacuno genuino."
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500 resize-none"
+                    />
                   </div>
                 </div>
               </div>
