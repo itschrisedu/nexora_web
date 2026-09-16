@@ -626,69 +626,83 @@ function LandingContent() {
                 return (
                   <div
                     key={modelo.id}
-                    className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                    className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col h-full group"
                   >
-                    <div>
-                      {/* Imagen de la Variante con Badge */}
-                      <div className="relative aspect-4/3 bg-slate-100 overflow-hidden border-b border-slate-100 flex items-center justify-center">
-                        {fotoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={fotoUrl}
-                            alt={`${modelo.name} - ${currentVariant?.color}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center text-slate-400 gap-1">
-                            <span className="text-3xl">👞</span>
-                            <span className="text-[10px] font-bold">Foto en catálogo</span>
-                          </div>
-                        )}
-
-                        {/* Badges superiores */}
-                        <div className="absolute top-3 left-3 flex flex-col gap-1">
-                          <span
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold shadow-xs transition-colors"
-                            style={{
-                              backgroundColor: brandColor,
-                              color: getContrastColor(brandColor),
-                            }}
-                          >
-                            {modelo.brand || "Cuero"}
-                          </span>
+                    {/* Imagen de la Variante con Badge */}
+                    <div className="relative aspect-4/3 bg-slate-100 overflow-hidden border-b border-slate-100 flex items-center justify-center shrink-0">
+                      {fotoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={fotoUrl}
+                          alt={`${modelo.name} - ${currentVariant?.color}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400 gap-1">
+                          <span className="text-3xl">👞</span>
+                          <span className="text-[10px] font-bold">Foto en catálogo</span>
                         </div>
+                      )}
 
-                        {/* Badge de Serie única (si solo hay una) */}
-                        {seriesUnicas.length === 1 && seriesUnicas[0] && (
-                          <div className="absolute top-3 right-3">
-                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/90 backdrop-blur-sm border border-slate-200 text-slate-700 shadow-xs">
-                              📦 {seriesUnicas[0]}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Precio Flotante (si está habilitado) */}
-                        {negocio.mostrarPreciosPublico && currentVariant?.salePrice > 0 && (
-                          <div
-                            className="absolute bottom-3 right-3 px-3 py-1 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl font-black text-sm font-mono shadow-md"
-                            style={{ color: brandColor }}
-                          >
-                            ${currentVariant.salePrice.toFixed(2)}
-                          </div>
-                        )}
+                      {/* Badges superiores */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-1">
+                        <span
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold shadow-xs transition-colors"
+                          style={{
+                            backgroundColor: brandColor,
+                            color: getContrastColor(brandColor),
+                          }}
+                        >
+                          {modelo.brand || "Cuero"}
+                        </span>
                       </div>
 
-                      {/* Detalles del Modelo */}
-                      <div className="p-5 space-y-3.5">
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono">
-                            {modelo.baseCode} · {modelo.material}
+                      {/* Badge de Serie única (si solo hay una) */}
+                      {seriesUnicas.length === 1 && seriesUnicas[0] && (
+                        <div className="absolute top-3 right-3">
+                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/90 backdrop-blur-sm border border-slate-200 text-slate-700 shadow-xs">
+                            📦 {seriesUnicas[0]}
                           </span>
-                          <h3 className="font-extrabold text-base text-slate-900 line-clamp-1 group-hover:text-amber-700 transition-colors">
+                        </div>
+                      )}
+
+                      {/* Precio Flotante (si está habilitado) */}
+                      {negocio.mostrarPreciosPublico && currentVariant?.salePrice > 0 && (
+                        <div
+                          className="absolute bottom-3 right-3 px-3 py-1 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl font-black text-sm font-mono shadow-md"
+                          style={{ color: brandColor }}
+                        >
+                          ${currentVariant.salePrice.toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Detalles del Modelo */}
+                    <div className="p-5 flex-1 flex flex-col space-y-3.5">
+                      <div className="space-y-1">
+                        {/* Área de Nombre / Título: altura consistente para 1 o 2 líneas */}
+                        <div className="min-h-[2.75rem] flex flex-col justify-start">
+                          <h3
+                            className="font-extrabold text-base text-slate-900 line-clamp-2 leading-snug group-hover:text-amber-700 transition-colors"
+                            title={modelo.name}
+                          >
                             {modelo.name}
                           </h3>
                         </div>
 
+                        {/* Área de Descripción / Código y Material: altura consistente */}
+                        <div className="min-h-[1.25rem] flex items-center">
+                          <span
+                            className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono truncate"
+                            title={`${modelo.baseCode} · ${modelo.material || "Cuero"}`}
+                          >
+                            {modelo.baseCode} · {modelo.material}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Información adicional (Selectores y Tallas) */}
+                      <div className="flex-1 flex flex-col space-y-3.5">
                         {/* Selector de Serie (si hay múltiples) */}
                         {tieneMúltiplesSeries && (
                           <div className="space-y-1.5 pt-2 border-t border-slate-100">
@@ -812,7 +826,7 @@ function LandingContent() {
                     </div>
 
                     {/* Botón WhatsApp de la Card */}
-                    <div className="p-4 pt-0">
+                    <div className="p-4 pt-0 mt-auto shrink-0">
                       <a
                         href={getWhatsAppOrderUrl(modelo, currentVariant)}
                         target="_blank"

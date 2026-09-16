@@ -307,11 +307,11 @@ export default function CatalogoSucursalPage() {
                   return (
                     <div
                       key={variante.id}
-                      className="group bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/5 rounded-2xl overflow-hidden hover:border-amber-400/20 transition-all duration-300 hover:shadow-xl hover:shadow-amber-400/5 cursor-pointer"
+                      className="group bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/5 rounded-2xl overflow-hidden hover:border-amber-400/20 transition-all duration-300 hover:shadow-xl hover:shadow-amber-400/5 cursor-pointer flex flex-col h-full"
                       onClick={() => { setSelectedVariante(variante); setShowModal(true); }}
                     >
                       {/* Imagen */}
-                      <div className="relative aspect-square bg-slate-900/50 overflow-hidden">
+                      <div className="relative aspect-square bg-slate-900/50 overflow-hidden shrink-0">
                         {variante.imageUrl ? (
                           <img
                             src={variante.imageUrl}
@@ -339,44 +339,56 @@ export default function CatalogoSucursalPage() {
                       </div>
 
                       {/* Info */}
-                      <div className="p-4 space-y-3">
+                      <div className="p-4 flex-1 flex flex-col justify-between">
                         <div>
-                          <h3 className="font-bold text-sm text-white truncate">{modelo.name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-white/30 font-medium">{modelo.brand}</span>
+                          {/* Nombre / Título consistente */}
+                          <div className="min-h-[2.5rem] flex flex-col justify-start">
+                            <h3 className="font-bold text-sm text-white line-clamp-2 leading-snug" title={modelo.name}>
+                              {modelo.name}
+                            </h3>
+                          </div>
+
+                          {/* Descripción / Marca y Color consistente */}
+                          <div className="min-h-[1.25rem] flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-white/30 font-medium truncate">{modelo.brand}</span>
                             <span className="text-white/10">·</span>
-                            <span className="text-[10px] text-amber-400/60 font-semibold">{variante.color}</span>
+                            <span className="text-[10px] text-amber-400/60 font-semibold truncate">{variante.color}</span>
                           </div>
                         </div>
 
-                        {mostrarPrecios && (
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-lg font-black text-amber-400">${variante.salePrice.toFixed(2)}</span>
-                            <span className="text-[10px] text-white/20">c/par</span>
-                          </div>
-                        )}
+                        {/* Datos adicionales (Precio y Tallas) */}
+                        <div className="space-y-2 my-2">
+                          {mostrarPrecios && (
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-lg font-black text-amber-400">${variante.salePrice.toFixed(2)}</span>
+                              <span className="text-[10px] text-white/20">c/par</span>
+                            </div>
+                          )}
 
-                        {/* Tallas Preview */}
-                        {mostrarStock && tallasConStock.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {tallasConStock.slice(0, 8).map((t) => (
-                              <span key={t.tallaId} className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[10px] font-semibold text-white/50">
-                                {t.numero}
-                              </span>
-                            ))}
-                            {tallasConStock.length > 8 && (
-                              <span className="px-2 py-0.5 text-[10px] text-amber-400/60 font-semibold">+{tallasConStock.length - 8}</span>
-                            )}
-                          </div>
-                        )}
+                          {/* Tallas Preview */}
+                          {mostrarStock && tallasConStock.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {tallasConStock.slice(0, 8).map((t) => (
+                                <span key={t.tallaId} className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[10px] font-semibold text-white/50">
+                                  {t.numero}
+                                </span>
+                              ))}
+                              {tallasConStock.length > 8 && (
+                                <span className="px-2 py-0.5 text-[10px] text-amber-400/60 font-semibold">+{tallasConStock.length - 8}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
                         {/* CTA */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleWhatsAppPedido(variante, modelo); }}
-                          className="w-full py-2.5 bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 hover:from-emerald-500/20 hover:to-emerald-600/20 border border-emerald-500/10 text-emerald-400 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2"
-                        >
-                          📱 Pedir por WhatsApp
-                        </button>
+                        <div className="mt-auto pt-2 shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleWhatsAppPedido(variante, modelo); }}
+                            className="w-full py-2.5 bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 hover:from-emerald-500/20 hover:to-emerald-600/20 border border-emerald-500/10 text-emerald-400 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2"
+                          >
+                            📱 Pedir por WhatsApp
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

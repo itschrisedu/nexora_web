@@ -341,9 +341,9 @@ export default function CatalogoDigitalComponent() {
                 <div
                   key={modelo.id}
                   onClick={() => handleOpenModelo(modelo)}
-                  className="bg-slate-900/60 border border-slate-800 hover:border-emerald-500/50 rounded-2xl overflow-hidden cursor-pointer group transition-all transform hover:-translate-y-1 shadow-lg hover:shadow-emerald-950/20 flex flex-col justify-between"
+                  className="bg-slate-900/60 border border-slate-800 hover:border-emerald-500/50 rounded-2xl overflow-hidden cursor-pointer group transition-all transform hover:-translate-y-1 shadow-lg hover:shadow-emerald-950/20 flex flex-col h-full"
                 >
-                  <div className="relative h-48 bg-slate-950 flex items-center justify-center p-4">
+                  <div className="relative h-48 bg-slate-950 flex items-center justify-center p-4 shrink-0">
                     {primeraVariante?.imageUrl ? (
                       <img
                         src={primeraVariante.imageUrl}
@@ -358,13 +358,21 @@ export default function CatalogoDigitalComponent() {
                     </span>
                   </div>
 
-                  <div className="p-4 space-y-2">
-                    <h3 className="font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                      {modelo.name}
-                    </h3>
-                    <p className="text-xs text-slate-400">Código: {modelo.baseCode}</p>
+                  <div className="p-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      {/* Nombre / Título consistente */}
+                      <div className="min-h-[2.5rem] flex flex-col justify-start">
+                        <h3 className="font-bold text-slate-100 group-hover:text-emerald-400 transition-colors line-clamp-2 leading-snug" title={modelo.name}>
+                          {modelo.name}
+                        </h3>
+                      </div>
+                      {/* Descripción / Código consistente */}
+                      <div className="min-h-[1.25rem] flex items-center mt-1">
+                        <p className="text-xs text-slate-400 truncate">Código: {modelo.baseCode}</p>
+                      </div>
+                    </div>
 
-                    <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center justify-between pt-3 mt-auto border-t border-slate-800/60">
                       <div>
                         <span className="text-xs text-slate-500 block">Desde</span>
                         <span className="text-lg font-black text-emerald-400">
