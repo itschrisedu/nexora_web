@@ -175,6 +175,16 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   const [docErr, setDocErr] = useState("");
   const [telErr, setTelErr] = useState("");
 
+  // Saldo anterior / Deuda inicial al crear cliente
+  const [tieneDeudaAnterior, setTieneDeudaAnterior] = useState(false);
+  const [deudaAnteriorMonto, setDeudaAnteriorMonto] = useState("");
+  const [deudaAnteriorConcepto, setDeudaAnteriorConcepto] = useState("Saldo anterior pendiente");
+  const [deudaAnteriorFechaEmision, setDeudaAnteriorFechaEmision] = useState(new Date().toISOString().split('T')[0]);
+  const [deudaAnteriorFechaVencimiento, setDeudaAnteriorFechaVencimiento] = useState(
+    new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+  );
+  const [deudaAnteriorNotas, setDeudaAnteriorNotas] = useState("");
+
   useEffect(() => {
     loadClientes();
     loadBusinessInfo();
@@ -261,6 +271,12 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     setNombre(""); setApellido(""); setTelefono(""); setEmail("");
     setTipoDoc("CEDULA"); setNumDoc(""); setDireccion(""); setNotas("");
     setError(""); setDocErr(""); setTelErr("");
+    setTieneDeudaAnterior(false);
+    setDeudaAnteriorMonto("");
+    setDeudaAnteriorConcepto("Saldo anterior pendiente");
+    setDeudaAnteriorFechaEmision(new Date().toISOString().split('T')[0]);
+    setDeudaAnteriorFechaVencimiento(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+    setDeudaAnteriorNotas("");
   };
 
   const openCreate = () => { resetForm(); setShowCreate(true); };
@@ -310,6 +326,19 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       }
     }
 
+    // Validación de Deuda Anterior al crear cliente
+    if (showCreate && tieneDeudaAnterior) {
+      const montoNum = parseFloat(deudaAnteriorMonto);
+      if (isNaN(montoNum) || montoNum <= 0) {
+        setError("El monto de la deuda anterior debe ser mayor a $0.00.");
+        return false;
+      }
+      if (!deudaAnteriorConcepto.trim()) {
+        setError("Por favor especifica el concepto o motivo de la deuda anterior.");
+        return false;
+      }
+    }
+
     return valid;
   };
 
@@ -322,8 +351,9 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       const cedulaVal = tipoDoc === "CEDULA" || tipoDoc === "PASAPORTE" ? (numDoc ? numDoc.trim() : undefined) : undefined;
       const rucVal = tipoDoc === "RUC" ? (numDoc ? numDoc.trim() : undefined) : undefined;
 
+      let clienteCreadoId = "";
       if (online) {
-        await ApiService.post("/clientes", {
+        const res = await ApiService.post("/clientes", {
           nombre: nombre.trim(),
           apellido: apellido.trim(),
           telefono: telNormalizado,
@@ -333,6 +363,28 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
           direccion: direccion.trim() || undefined,
           notas: notas.trim() || undefined,
         });
+        clienteCreadoId = res?.id || res?.data?.id || (typeof res === 'string' ? res : "");
+
+        // Si se indicó saldo anterior / deuda previa, se asocia automáticamente a la cartera de cobros
+        const montoNum = parseFloat(deudaAnteriorMonto);
+        if (tieneDeudaAnterior && clienteCreadoId && !isNaN(montoNum) && montoNum > 0) {
+          try {
+            await ApiService.post('/financiero/cobros/deuda-manual', {
+              clientId: clienteCreadoId,
+              monto: montoNum,
+              concepto: deudaAnteriorConcepto.trim() || 'Saldo anterior pendiente',
+              fechaEmision: deudaAnteriorFechaEmision || new Date().toISOString().split('T')[0],
+              fechaVencimiento: deudaAnteriorFechaVencimiento || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+              notas: deudaAnteriorNotas.trim() || undefined,
+            });
+            setSuccess(`Cliente registrado exitosamente con saldo anterior de $${montoNum.toFixed(2)}.`);
+          } catch (errDeuda: any) {
+            console.error("Aviso con saldo inicial:", errDeuda);
+            setSuccess("Cliente registrado, pero ocurrió una observación al guardar el saldo inicial: " + (errDeuda.message || ''));
+          }
+        } else {
+          setSuccess("Cliente registrado correctamente.");
+        }
       } else {
         await db.clientes.add({
           id: `offline-${Date.now()}`,
@@ -342,8 +394,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
           telefono: telNormalizado,
           limiteCredito: 0, cupoDisponible: 0, score: 100, nivelCredito: "SIN_CREDITO",
         });
+        setSuccess("Cliente registrado localmente (offline).");
       }
-      setSuccess("Cliente registrado correctamente.");
       setShowCreate(false); resetForm(); loadClientes();
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
@@ -1746,6 +1798,129 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               </div>
               <div><Lbl t="Dirección" /><input type="text" value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Ej. Av. Principal 123, Guayaquil" className={INPUT} /></div>
               <div><Lbl t="Notas" /><textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2} placeholder="Observaciones del cliente..." className={`${INPUT} resize-none`} /></div>
+
+              {/* Sección Opcional: Saldo Anterior / Deuda Previa al crear cliente */}
+              {showCreate && (
+                <div className="pt-2 border-t border-[var(--border)]">
+                  <div className="bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={tieneDeudaAnterior}
+                          onChange={(e) => setTieneDeudaAnterior(e.target.checked)}
+                          className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                        />
+                        <span className="flex items-center gap-1.5">
+                          <DollarSign size={14} className="text-amber-600" />
+                          ¿Tiene saldo o deuda anterior pendiente?
+                        </span>
+                      </label>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 rounded-full border border-amber-500/20">
+                        Opcional
+                      </span>
+                    </div>
+
+                    {tieneDeudaAnterior && (
+                      <div className="space-y-3 pt-2 border-t border-amber-500/15 animate-in fade-in duration-150">
+                        <div>
+                          <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                            Monto del Saldo / Deuda ($ USD) <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700 dark:text-amber-400">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              placeholder="0.00"
+                              value={deudaAnteriorMonto}
+                              onChange={(e) => setDeudaAnteriorMonto(e.target.value)}
+                              className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-bold focus:outline-none focus:border-amber-600 transition-colors"
+                              required={tieneDeudaAnterior}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                            Concepto / Especificación del Saldo <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Saldo anterior pendiente, Libreta de pedidos previa..."
+                            value={deudaAnteriorConcepto}
+                            onChange={(e) => setDeudaAnteriorConcepto(e.target.value)}
+                            className="w-full px-3 py-2 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600 transition-colors"
+                            required={tieneDeudaAnterior}
+                          />
+                          {/* Sugerencias Rápidas */}
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {[
+                              'Saldo anterior pendiente',
+                              'Arrastre de libreta comercial',
+                              'Nota manual previa',
+                              'Cheque / pagaré anterior',
+                            ].map((sug) => (
+                              <button
+                                key={sug}
+                                type="button"
+                                onClick={() => setDeudaAnteriorConcepto(sug)}
+                                className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-white/70 dark:bg-slate-800/80 border border-amber-500/20 text-amber-900 dark:text-amber-200 hover:bg-amber-500/20 transition-all cursor-pointer"
+                              >
+                                + {sug}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                              Fecha Origen
+                            </label>
+                            <input
+                              type="date"
+                              value={deudaAnteriorFechaEmision}
+                              onChange={(e) => setDeudaAnteriorFechaEmision(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                              Fecha Vencimiento
+                            </label>
+                            <input
+                              type="date"
+                              value={deudaAnteriorFechaVencimiento}
+                              onChange={(e) => setDeudaAnteriorFechaVencimiento(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                            Observación / Respaldo (Opcional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Anotación en libreta #4 pág 12"
+                            value={deudaAnteriorNotas}
+                            onChange={(e) => setDeudaAnteriorNotas(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
+                          />
+                        </div>
+
+                        <p className="text-[10px] text-amber-800 dark:text-amber-300/80 leading-tight">
+                          💡 Al registrar al cliente, este saldo se ingresará automáticamente a la <strong>Gestión de Cobros & Crédito</strong> para su control y seguimiento.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
                   <AlertCircle size={14} /> {error}

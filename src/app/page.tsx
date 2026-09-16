@@ -48,6 +48,7 @@ const DashboardComponent = dynamic(() => import('@/components/dashboard'), { ssr
 const ClientesComponent = dynamic(() => import('@/components/clientes'), { ssr: false });
 const ComercialComponent = dynamic(() => import('@/components/comercial'), { ssr: false });
 const FinancieroComponent = dynamic(() => import('@/components/financiero'), { ssr: false });
+const FinanzasComponent = dynamic(() => import('@/components/finanzas'), { ssr: false });
 const ProveedoresComponent = dynamic(() => import('@/components/proveedores'), { ssr: false });
 const UsuariosComponent = dynamic(() => import('@/components/usuarios'), { ssr: false });
 const ModelosComponent = dynamic(() => import('@/components/modelos'), { ssr: false });
@@ -64,7 +65,7 @@ const NotificacionesModal = dynamic(() => import('@/components/notificaciones-mo
 const TermsModal = dynamic(() => import('@/components/terms-modal'), { ssr: false });
 const GpsConsentModal = dynamic(() => import('@/components/gps-consent-modal'), { ssr: false });
 
-type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
+type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'finanzas' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
 
 interface NavItem {
   id: Vista;
@@ -81,11 +82,12 @@ const NAV_ITEMS: NavItem[] = [
 
   // ── Gestión Comercial ──
   { id: 'clientes',        label: 'Clientes y Créditos',   icon: <Users size={18} /> },
-  { id: 'financiero',      label: 'Cobros y Finanzas',     icon: <DollarSign size={18} /> },
+  { id: 'financiero',      label: 'Cobros y Crédito',      icon: <Receipt size={18} /> },
   { id: 'proveedores',     label: 'Proveedores',           icon: <Truck size={18} /> },
   { id: 'modelos',         label: 'Catálogo de Modelos',   icon: <ShoppingBag size={18} /> },
 
-  // ── Analítica y Reportes ──
+  // ── Finanzas & Analítica ──
+  { id: 'finanzas',        label: 'Finanzas por Sucursal', icon: <DollarSign size={18} /> },
   { id: 'reportes',        label: 'Reportes',              icon: <BarChart3 size={18} /> },
   { id: 'prediccion-ml',   label: 'Predicción Inteligente', icon: <BrainCircuit size={18} /> },
 
@@ -477,7 +479,7 @@ function MainApp() {
     const SECTION_GROUPS: { label: string; ids: Vista[] }[] = [
       { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
       { label: 'Gestión Comercial', ids: ['clientes', 'financiero', 'proveedores', 'modelos'] },
-      { label: 'Analítica', ids: ['reportes', 'prediccion-ml'] },
+      { label: 'Finanzas & Analítica', ids: ['finanzas', 'reportes', 'prediccion-ml'] },
       { label: 'Administración', ids: ['usuarios', 'sri', 'auditoria', 'ubicaciones', 'super-admin'] },
     ];
 
@@ -488,10 +490,10 @@ function MainApp() {
       }
       if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin';
       if (user.rol === 'ROL_VENDEDOR') {
-        return !['proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
+        return !['finanzas', 'proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
       }
       if (user.rol === 'ROL_BODEGUERO') {
-        return !['clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
+        return !['finanzas', 'clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
       }
       return !['modelos', 'super-admin'].includes(item.id);
     });
@@ -896,6 +898,14 @@ function MainApp() {
               online={online}
               activeSucursalId={activeSucursalId}
               sucursales={sucursales}
+            />
+          )}
+          {vistaActual === 'finanzas' && (
+            <FinanzasComponent
+              online={online}
+              activeSucursalId={activeSucursalId}
+              sucursales={sucursales}
+              userRole={user?.rol}
             />
           )}
           {vistaActual === 'proveedores' && <ProveedoresComponent online={online} userRole={user?.rol} />}
