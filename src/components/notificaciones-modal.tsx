@@ -249,6 +249,34 @@ export default function NotificacionesModal({
 
   if (!isOpen) return null;
 
+  const handleRedirigirAOrden = (ordenId: string) => {
+    try {
+      localStorage.setItem('proveedores_initial_tab', 'ordenes');
+      localStorage.setItem('proveedores_selected_order_id', ordenId);
+    } catch (e) {}
+    onClose();
+    if (onNavigateToView) {
+      onNavigateToView('proveedores');
+    }
+  };
+
+  const handleRedirigirAEnvios = (pedidoId?: string) => {
+    try {
+      if (pedidoId) localStorage.setItem('comercial_selected_pedido_id', pedidoId);
+    } catch (e) {}
+    onClose();
+    if (onNavigateToView) {
+      onNavigateToView('comercial');
+    }
+  };
+
+  const handleRedirigirACobranzas = () => {
+    onClose();
+    if (onNavigateToView) {
+      onNavigateToView('financiero');
+    }
+  };
+
   const todosCobros = [...data.cobrosVencidos, ...data.cobrosPorVencer];
   const cobrosFiltrados = todosCobros.filter((c) => {
     if (filtroCobro === 'VENCIDOS') return c.categoria === 'VENCIDO';
@@ -677,9 +705,20 @@ export default function NotificacionesModal({
           {/* ═════════ TAB 3: TALLERES & DESPACHOS ═════════ */}
           {activeTab === 'ordenes' && (
             <div className="space-y-4">
-              <h3 className="text-xs font-black uppercase text-[var(--muted-foreground)] tracking-wider">
-                📦 Envíos con Courier / Cooperativa en Tránsito
-              </h3>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-xs font-black uppercase text-[var(--muted-foreground)] tracking-wider">
+                  📦 Envíos con Courier / Cooperativa en Tránsito
+                </h3>
+                {onNavigateToView && (
+                  <button
+                    onClick={() => handleRedirigirAEnvios()}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Ver Pedidos & Envíos</span>
+                    <ChevronRight size={13} />
+                  </button>
+                )}
+              </div>
 
               {data.enviosEnTransito.length === 0 ? (
                 <div className="text-xs text-[var(--muted-foreground)] p-4 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] text-center">
@@ -690,14 +729,15 @@ export default function NotificacionesModal({
                   {data.enviosEnTransito.map((envio) => (
                     <div
                       key={envio.id}
-                      className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)] flex items-center justify-between gap-3 shadow-2xs min-w-0 overflow-hidden flex-wrap sm:flex-nowrap"
+                      onClick={() => handleRedirigirAEnvios(envio.id)}
+                      className="p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all flex items-center justify-between gap-3 shadow-2xs min-w-0 overflow-hidden flex-wrap sm:flex-nowrap cursor-pointer group"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                           <Truck size={16} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-black text-[var(--foreground)] truncate">
+                          <div className="text-xs font-black text-[var(--foreground)] truncate group-hover:text-[var(--primary)] transition-colors">
                             {envio.numeroPedido} — {envio.clienteNombre}
                           </div>
                           <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 flex-wrap">
@@ -710,20 +750,46 @@ export default function NotificacionesModal({
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0 sm:self-center">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/15 text-blue-500 border border-blue-500/30">
-                          EN TRÁNSITO
-                        </span>
-                        <div className="text-xs font-black text-[var(--foreground)] mt-1">${Number(envio.total || 0).toFixed(2)}</div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right sm:self-center">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/15 text-blue-500 border border-blue-500/30">
+                            EN TRÁNSITO
+                          </span>
+                          <div className="text-xs font-black text-[var(--foreground)] mt-1">${Number(envio.total || 0).toFixed(2)}</div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRedirigirAEnvios(envio.id);
+                          }}
+                          className="p-1.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--primary)] hover:text-white text-[var(--muted-foreground)] transition-colors cursor-pointer"
+                          title="Ver en Pedidos"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              <h3 className="text-xs font-black uppercase text-[var(--muted-foreground)] tracking-wider pt-2">
-                🏭 Órdenes de Compra a Fabricantes / Talleres
-              </h3>
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+                <h3 className="text-xs font-black uppercase text-[var(--muted-foreground)] tracking-wider">
+                  🏭 Órdenes de Compra a Fabricantes / Talleres
+                </h3>
+                {onNavigateToView && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onNavigateToView('proveedores');
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Ver Módulo Proveedores</span>
+                    <ChevronRight size={13} />
+                  </button>
+                )}
+              </div>
 
               {data.ordenesProveedor.length === 0 ? (
                 <div className="text-xs text-[var(--muted-foreground)] p-4 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] text-center">
@@ -734,28 +800,44 @@ export default function NotificacionesModal({
                   {data.ordenesProveedor.map((orden) => (
                     <div
                       key={orden.id}
-                      className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)] flex items-center justify-between gap-3 shadow-2xs min-w-0 overflow-hidden flex-wrap sm:flex-nowrap"
+                      onClick={() => handleRedirigirAOrden(orden.id)}
+                      className="p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all flex items-center justify-between gap-3 shadow-2xs min-w-0 overflow-hidden flex-wrap sm:flex-nowrap cursor-pointer group"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-black text-[var(--foreground)] flex items-center gap-2 flex-wrap">
-                          <span className="font-bold">{orden.numero}</span>
+                        <div className="text-xs font-black text-[var(--foreground)] flex items-center gap-2 flex-wrap group-hover:text-[var(--primary)] transition-colors">
+                          <span className="font-black">Orden #{orden.numero}</span>
                           <span className="text-[var(--muted-foreground)]">•</span>
                           <span className="truncate">{orden.proveedorNombre}</span>
                         </div>
-                        <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
-                          Emitida hace {orden.diasTranscurridos} días • Total: ${Number(orden.total || 0).toFixed(2)}
+                        <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5 flex items-center gap-2 flex-wrap">
+                          <span>Emitida hace {orden.diasTranscurridos} días</span>
+                          <span>•</span>
+                          <span className="font-bold text-[var(--foreground)]">Total: ${Number(orden.total || 0).toFixed(2)}</span>
                         </div>
                       </div>
 
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-black border uppercase shrink-0 ${
-                          orden.esDemorada
-                            ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
-                            : 'bg-blue-500/15 text-blue-500 border-blue-500/30'
-                        }`}
-                      >
-                        {orden.esDemorada ? 'Demorada' : orden.status}
-                      </span>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black border uppercase shrink-0 ${
+                            orden.esDemorada
+                              ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                              : 'bg-blue-500/15 text-blue-500 border-blue-500/30'
+                          }`}
+                        >
+                          {orden.esDemorada ? 'Demorada' : orden.status}
+                        </span>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRedirigirAOrden(orden.id);
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Gestionar</span>
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

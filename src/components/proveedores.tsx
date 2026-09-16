@@ -440,6 +440,22 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         setPagos(pgs || []);
         setEntradas(ents || []);
         setClientesList(Array.isArray(clis) ? clis : []);
+
+        try {
+          const initialTab = localStorage.getItem('proveedores_initial_tab');
+          if (initialTab && ['proveedores', 'ordenes', 'ingreso', 'pagos'].includes(initialTab)) {
+            setActiveTab(initialTab as any);
+            localStorage.removeItem('proveedores_initial_tab');
+          }
+          const initialOrderId = localStorage.getItem('proveedores_selected_order_id');
+          if (initialOrderId) {
+            localStorage.removeItem('proveedores_selected_order_id');
+            const match = (ords || []).find((o: any) => o.id === initialOrderId);
+            if (match) {
+              handleVerDetalleOrden(match.id);
+            }
+          }
+        } catch (e) {}
       } else {
         const localClis = await db.clientes.toArray();
         setClientesList(localClis || []);
