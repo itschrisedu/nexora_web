@@ -22,7 +22,13 @@ import {
   Layers,
   ArrowUpRight,
   Store,
-  Clock
+  Clock,
+  ShoppingCart,
+  Plus,
+  Minus,
+  Trash2,
+  Package,
+  Check
 } from "lucide-react";
 import { getContrastColor } from "@/components/ui/color-picker";
 
@@ -98,6 +104,22 @@ interface LandingData {
   modelos?: ModeloCalzado[];
 }
 
+interface ItemCarrito {
+  id: string;
+  modeloId: string;
+  modeloNombre: string;
+  varianteId: string;
+  color: string;
+  serieNombre: string;
+  fotoUrl?: string;
+  tipoPedido: "PAR" | "SERIE_COMPLETA";
+  tallaNumero?: number | string;
+  precioUnitario: number;
+  cantidad: number;
+  paresPorSerie?: number;
+  desgloseTallas?: string;
+}
+
 function LandingContent() {
   const searchParams = useSearchParams();
   const [effectiveTenantId, setEffectiveTenantId] = useState<string>("");
@@ -107,6 +129,25 @@ function LandingContent() {
 
   // Estado del menú móvil
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Estado del Carrito de Pedidos
+  const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Estado del Modal de Selección de Pedido (Por Par / Por Serie Completa)
+  const [modalConfigOpen, setModalConfigOpen] = useState(false);
+  const [modeloConfig, setModeloConfig] = useState<ModeloCalzado | null>(null);
+  const [varianteConfig, setVarianteConfig] = useState<Variante | null>(null);
+  const [serieConfigNombre, setSerieConfigNombre] = useState<string>("");
+  const [tipoPedidoConfig, setTipoPedidoConfig] = useState<"PAR" | "SERIE_COMPLETA">("PAR");
+  const [tallaSeleccionadaConfig, setTallaSeleccionadaConfig] = useState<number | string>("");
+  const [cantidadConfig, setCantidadConfig] = useState(1);
+
+  // Datos del cliente para el pedido
+  const [clienteNombre, setClienteNombre] = useState("");
+  const [clienteTelefono, setClienteTelefono] = useState("");
+  const [clienteDireccion, setClienteDireccion] = useState("");
+  const [notasPedido, setNotasPedido] = useState("");
 
   // Filtros del catálogo
   const [searchQuery, setSearchQuery] = useState("");
@@ -213,6 +254,25 @@ function LandingContent() {
     ];
   }, [data?.negocio?.caracteristicasCalidad]);
 
+  // Totales del carrito (useMemo para respetar las reglas de Hooks)
+  const totalParesCarrito = useMemo(() => {
+    return carrito.reduce((sum, item) => {
+      if (item.tipoPedido === "SERIE_COMPLETA") {
+        return sum + item.cantidad * (item.paresPorSerie || 6);
+      }
+      return sum + item.cantidad;
+    }, 0);
+  }, [carrito]);
+
+  const totalPrecioCarrito = useMemo(() => {
+    return carrito.reduce((sum, item) => {
+      if (item.tipoPedido === "SERIE_COMPLETA") {
+        return sum + item.cantidad * (item.paresPorSerie || 6) * item.precioUnitario;
+      }
+      return sum + item.cantidad * item.precioUnitario;
+    }, 0);
+  }, [carrito]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -289,6 +349,133 @@ function LandingContent() {
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
+  const handleOpenConfigModal = (modelo: ModeloCalzado, variante: Variante, serie: string) => {
+    setModeloConfig(modelo);
+    setVarianteConfig(variante);
+    setSerieConfigNombre(serie || variante.serieNombre || "Estándar");
+    setTipoPedidoConfig("PAR");
+    const primeraTalla = variante.tallas?.find((t) => t.stock > 0)?.numero ?? variante.tallas?.[0]?.numero ?? 38;
+    setTallaSeleccionadaConfig(primeraTalla);
+    setCantidadConfig(1);
+    setModalConfigOpen(true);
+  };
+
+  const handleCambiarSerieModal = (nuevaSerie: string) => {
+    if (!modeloConfig) return;
+    setSerieConfigNombre(nuevaSerie);
+    const varsDeNuevaSerie = modeloConfig.variantes.filter((v) => v.serieNombre === nuevaSerie);
+    const nuevaVar =
+      varsDeNuevaSerie.find((v) => v.color === varianteConfig?.color) ||
+      varsDeNuevaSerie[0] ||
+      modeloConfig.variantes[0];
+    if (nuevaVar) {
+      setVarianteConfig(nuevaVar);
+      const primeraTalla = nuevaVar.tallas?.find((t) => t.stock > 0)?.numero ?? nuevaVar.tallas?.[0]?.numero ?? 38;
+      setTallaSeleccionadaConfig(primeraTalla);
+    }
+  };
+
+  const handleCambiarColorModal = (nuevaVar: Variante) => {
+    setVarianteConfig(nuevaVar);
+    const primeraTalla = nuevaVar.tallas?.find((t) => t.stock > 0)?.numero ?? nuevaVar.tallas?.[0]?.numero ?? 38;
+    setTallaSeleccionadaConfig(primeraTalla);
+  };
+
+  const handleAgregarAlCarrito = () => {
+    if (!modeloConfig || !varianteConfig) return;
+
+    const paresPorSerieCalc = varianteConfig.tallas && varianteConfig.tallas.length > 0 ? varianteConfig.tallas.length : 6;
+    const desgloseCalc =
+      varianteConfig.tallas && varianteConfig.tallas.length > 0
+        ? varianteConfig.tallas.map((t) => `T${t.numero}`).join(", ")
+        : "Curva comercial estándar";
+
+    const nuevoItem: ItemCarrito = {
+      id: `${modeloConfig.id}-${varianteConfig.id}-${tipoPedidoConfig}-${tallaSeleccionadaConfig}-${Date.now()}`,
+      modeloId: modeloConfig.id,
+      modeloNombre: modeloConfig.name,
+      varianteId: varianteConfig.id,
+      color: varianteConfig.color,
+      serieNombre: serieConfigNombre || varianteConfig.serieNombre || "Estándar",
+      fotoUrl: varianteConfig.imageUrl,
+      tipoPedido: tipoPedidoConfig,
+      tallaNumero: tipoPedidoConfig === "PAR" ? tallaSeleccionadaConfig : undefined,
+      precioUnitario: varianteConfig.salePrice || 0,
+      cantidad: cantidadConfig,
+      paresPorSerie: tipoPedidoConfig === "SERIE_COMPLETA" ? paresPorSerieCalc : undefined,
+      desgloseTallas: tipoPedidoConfig === "SERIE_COMPLETA" ? desgloseCalc : undefined,
+    };
+
+    setCarrito((prev) => [...prev, nuevoItem]);
+    setModalConfigOpen(false);
+    setIsCartOpen(true);
+  };
+
+  const handleUpdateCantidadCarrito = (id: string, delta: number) => {
+    setCarrito((prev) =>
+      prev
+        .map((item) => {
+          if (item.id === id) {
+            const nuevaCantidad = item.cantidad + delta;
+            return nuevaCantidad > 0 ? { ...item, cantidad: nuevaCantidad } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as ItemCarrito[]
+    );
+  };
+
+  const handleEliminarItemCarrito = (id: string) => {
+    setCarrito((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleEnviarPedidoWhatsApp = () => {
+    if (carrito.length === 0) return;
+    const rawPhone = negocio.whatsappContacto || negocio.telefono || "";
+    const cleanPhone = formatWhatsAppNumber(rawPhone);
+
+    let texto = `🛒 *NUEVO PEDIDO - ${negocio.nombreNegocio.toUpperCase()}*\n`;
+    texto += `──────────────────────\n`;
+    if (clienteNombre.trim()) texto += `👤 *Cliente:* ${clienteNombre.trim()}\n`;
+    if (clienteTelefono.trim()) texto += `📱 *Teléfono:* ${clienteTelefono.trim()}\n`;
+    if (clienteDireccion.trim()) texto += `📍 *Entrega / Ciudad:* ${clienteDireccion.trim()}\n`;
+    texto += `──────────────────────\n`;
+    texto += `📦 *DETALLE DE ARTÍCULOS:*\n\n`;
+
+    carrito.forEach((item, idx) => {
+      texto += `${idx + 1}. *${item.modeloNombre}*\n`;
+      texto += `   • Color: ${item.color} | Serie: ${item.serieNombre}\n`;
+      if (item.tipoPedido === "PAR") {
+        texto += `   • Modalidad: *Por Par* (Talla: ${item.tallaNumero})\n`;
+        texto += `   • Cantidad: ${item.cantidad} par(es)\n`;
+        if (item.precioUnitario > 0) {
+          texto += `   • Subtotal: $${(item.cantidad * item.precioUnitario).toFixed(2)}\n`;
+        }
+      } else {
+        const totalParesSerie = item.cantidad * (item.paresPorSerie || 6);
+        texto += `   • Modalidad: *Por Serie Completa* (${item.desgloseTallas || "Curva comercial"})\n`;
+        texto += `   • Cantidad: ${item.cantidad} serie(s) (${totalParesSerie} pares)\n`;
+        if (item.precioUnitario > 0) {
+          texto += `   • Subtotal: $${(totalParesSerie * item.precioUnitario).toFixed(2)}\n`;
+        }
+      }
+      texto += `\n`;
+    });
+
+    texto += `──────────────────────\n`;
+    texto += `👟 *TOTAL PARES:* ${totalParesCarrito} pares\n`;
+    if (totalPrecioCarrito > 0) {
+      texto += `💰 *TOTAL ESTIMADO:* $${totalPrecioCarrito.toFixed(2)}\n`;
+    }
+    if (notasPedido.trim()) {
+      texto += `📝 *Observaciones:* ${notasPedido.trim()}\n`;
+    }
+    texto += `──────────────────────\n`;
+    texto += `_Pedido generado desde el catálogo web oficial de ${negocio.nombreNegocio}_`;
+
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(texto)}`, "_blank");
+  };
+
 
 
   return (
@@ -298,7 +485,7 @@ function LandingContent() {
          ══════════════════════════════════════════════ */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         <div className="h-1.5 w-full transition-colors" style={{ backgroundColor: brandColor }} />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
+        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 h-18 flex items-center justify-between">
           {/* Logo & Nombre */}
           <a href="#inicio" className="flex items-center gap-3 group">
             {negocio.logoUrl ? (
@@ -348,8 +535,23 @@ function LandingContent() {
             </a>
           </nav>
 
-          {/* Botón WhatsApp & Hamburguesa Móvil */}
+          {/* Botón Carrito, WhatsApp & Hamburguesa Móvil */}
           <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="relative flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs"
+              title="Ver mi pedido"
+            >
+              <ShoppingCart size={15} className="text-amber-400" />
+              <span className="hidden sm:inline">Mi Pedido</span>
+              {totalParesCarrito > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+                  {totalParesCarrito}
+                </span>
+              )}
+            </button>
+
             <a
               href={`https://wa.me/${formatWhatsAppNumber(negocio.whatsappContacto || negocio.telefono)}?text=${encodeURIComponent(`¡Hola ${negocio.nombreNegocio}! Deseo consultar sobre su catálogo de calzado de cuero.`)}`}
               target="_blank"
@@ -438,8 +640,8 @@ function LandingContent() {
         id="inicio"
         className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50/50 py-16 sm:py-24 border-b border-slate-200/60"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
             {/* Texto Hero */}
             <div className="lg:col-span-7 space-y-6 text-left">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-900 font-bold text-xs">
@@ -451,7 +653,7 @@ function LandingContent() {
                 {negocio.heroTitulo || "Calzado Ecuatoriano 100% Cuero de Cevallos"}
               </h1>
 
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal max-w-2xl">
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal max-w-3xl">
                 {negocio.heroSubtitulo ||
                   "Fabricación con los mejores estándares de calidad, acabados finos y venta directa por par y por mayor a todo el país."}
               </p>
@@ -477,22 +679,22 @@ function LandingContent() {
               </div>
 
               {/* Pilares rápidos */}
-              <div className="grid grid-cols-3 gap-3 pt-6 border-t border-slate-200/80">
+              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-200/80">
                 <div className="space-y-1">
-                  <div className="font-extrabold text-xs text-slate-900 flex items-center gap-1">
-                    <ShieldCheck size={14} className="text-emerald-600" /> 100% Cuero
+                  <div className="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
+                    <ShieldCheck size={16} className="text-emerald-600 shrink-0" /> 100% Cuero
                   </div>
                   <p className="text-[11px] text-slate-500">Material vacuno legítimo</p>
                 </div>
                 <div className="space-y-1">
-                  <div className="font-extrabold text-xs text-slate-900 flex items-center gap-1">
-                    <Truck size={14} className="text-blue-600" /> Envíos Seguros
+                  <div className="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
+                    <Truck size={16} className="text-blue-600 shrink-0" /> Envíos Seguros
                   </div>
                   <p className="text-[11px] text-slate-500">A todo el Ecuador</p>
                 </div>
                 <div className="space-y-1">
-                  <div className="font-extrabold text-xs text-slate-900 flex items-center gap-1">
-                    <Award size={14} className="text-amber-600" /> Venta por Mayor
+                  <div className="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
+                    <Award size={16} className="text-amber-600 shrink-0" /> Venta por Mayor
                   </div>
                   <p className="text-[11px] text-slate-500">Precios de fabricante</p>
                 </div>
@@ -507,10 +709,10 @@ function LandingContent() {
                   <img
                     src={negocio.heroBannerUrl}
                     alt={negocio.heroTitulo}
-                    className="w-full h-80 sm:h-96 object-cover rounded-2xl group-hover:scale-102 transition-transform duration-500"
+                    className="w-full h-80 sm:h-96 lg:h-[420px] object-cover rounded-2xl group-hover:scale-102 transition-transform duration-500"
                   />
                 ) : (
-                  <div className="w-full h-80 sm:h-96 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 flex flex-col justify-between text-white relative overflow-hidden">
+                  <div className="w-full h-80 sm:h-96 lg:h-[420px] rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 flex flex-col justify-between text-white relative overflow-hidden">
                     <div className="space-y-2">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
                         Artesanía & Confort
@@ -540,10 +742,10 @@ function LandingContent() {
           3. CATÁLOGO DE MODELOS CON VARIANTES INTEGRADAS
          ══════════════════════════════════════════════ */}
       <section id="catalogo" className="py-16 sm:py-20 bg-slate-50/60 border-b border-slate-200/60 scroll-mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
+        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 space-y-8">
           {/* Encabezado del Catálogo */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div className="space-y-2 max-w-xl">
+            <div className="space-y-2 max-w-2xl">
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: brandColor }}>
                 Colección en Exhibición
               </span>
@@ -604,7 +806,7 @@ function LandingContent() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-6">
               {filteredModelos.map((modelo) => {
                 // Extraer series únicas del modelo
                 const seriesUnicas = Array.from(
@@ -626,7 +828,8 @@ function LandingContent() {
                 return (
                   <div
                     key={modelo.id}
-                    className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col h-full group"
+                    onClick={() => handleOpenConfigModal(modelo, currentVariant, serieActual || seriesUnicas[0] || "Estándar")}
+                    className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col h-full group cursor-pointer"
                   >
                     {/* Imagen de la Variante con Badge */}
                     <div className="relative aspect-4/3 bg-slate-100 overflow-hidden border-b border-slate-100 flex items-center justify-center shrink-0">
@@ -644,7 +847,7 @@ function LandingContent() {
                         </div>
                       )}
 
-                      {/* Badges superiores */}
+                      {/* Badge de Marca */}
                       <div className="absolute top-3 left-3 flex flex-col gap-1">
                         <span
                           className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold shadow-xs transition-colors"
@@ -657,11 +860,11 @@ function LandingContent() {
                         </span>
                       </div>
 
-                      {/* Badge de Serie única (si solo hay una) */}
-                      {seriesUnicas.length === 1 && seriesUnicas[0] && (
+                      {/* Badge de Serie (en la imagen como en la foto) */}
+                      {(serieActual || seriesUnicas[0]) && (
                         <div className="absolute top-3 right-3">
-                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/90 backdrop-blur-sm border border-slate-200 text-slate-700 shadow-xs">
-                            📦 {seriesUnicas[0]}
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/95 backdrop-blur-sm border border-slate-200 text-slate-800 shadow-xs flex items-center gap-1">
+                            📦 {serieActual || seriesUnicas[0]}
                           </span>
                         </div>
                       )}
@@ -678,63 +881,30 @@ function LandingContent() {
                     </div>
 
                     {/* Detalles del Modelo */}
-                    <div className="p-5 flex-1 flex flex-col space-y-3.5">
-                      <div className="space-y-1">
-                        {/* Área de Nombre / Título: altura consistente para 1 o 2 líneas */}
-                        <div className="min-h-[2.75rem] flex flex-col justify-start">
-                          <h3
-                            className="font-extrabold text-base text-slate-900 line-clamp-2 leading-snug group-hover:text-amber-700 transition-colors"
-                            title={modelo.name}
-                          >
-                            {modelo.name}
-                          </h3>
-                        </div>
-
-                        {/* Área de Descripción / Código y Material: altura consistente */}
-                        <div className="min-h-[1.25rem] flex items-center">
-                          <span
-                            className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono truncate"
-                            title={`${modelo.baseCode} · ${modelo.material || "Cuero"}`}
-                          >
-                            {modelo.baseCode} · {modelo.material}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Información adicional (Selectores y Tallas) */}
-                      <div className="flex-1 flex flex-col space-y-3.5">
-                        {/* Selector de Serie (si hay múltiples) */}
-                        {tieneMúltiplesSeries && (
-                          <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-bold text-slate-500">Serie:</span>
-                              <span className="font-extrabold text-slate-900">
-                                {serieActual}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {seriesUnicas.map((serie) => {
-                                const isSelected = serie === serieActual;
-                                return (
-                                  <button
-                                    key={serie}
-                                    type="button"
-                                    onClick={() => handleSelectSerie(modelo.id, serie, modelo.variantes)}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
-                                      isSelected
-                                        ? "shadow-xs scale-105 bg-amber-500 text-white border-amber-500"
-                                        : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-                                    }`}
-                                    title={`Ver serie ${serie}`}
-                                  >
-                                    <Layers size={11} className="shrink-0" />
-                                    <span>{serie}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
+                    <div className="p-5 flex-1 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          {/* Área de Nombre / Título */}
+                          <div className="min-h-[2.5rem] flex flex-col justify-start">
+                            <h3
+                              className="font-extrabold text-base line-clamp-2 leading-snug group-hover:opacity-90 transition-opacity"
+                              style={{ color: "#b45309" }}
+                              title={modelo.name}
+                            >
+                              {modelo.name}
+                            </h3>
                           </div>
-                        )}
+
+                          {/* Área de Descripción / Código y Material */}
+                          <div className="min-h-[1.25rem] flex items-center">
+                            <span
+                              className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono truncate"
+                              title={`${modelo.baseCode} · ${modelo.material || "CUERO VACUNO"}`}
+                            >
+                              {modelo.baseCode} · {modelo.material || "CUERO VACUNO"}
+                            </span>
+                          </div>
+                        </div>
 
                         {/* Selector Interactivo de Colores / Variantes */}
                         {variantesFiltradas.length > 0 && (
@@ -753,8 +923,11 @@ function LandingContent() {
                                   <button
                                     key={v.id}
                                     type="button"
-                                    onClick={() => handleSelectVariant(modelo.id, v.id)}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSelectVariant(modelo.id, v.id);
+                                    }}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
                                       isSelected
                                         ? "shadow-xs scale-105"
                                         : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
@@ -796,50 +969,7 @@ function LandingContent() {
                             </div>
                           </div>
                         )}
-
-                        {/* Desglose de Tallas Disponibles (si está habilitado) */}
-                        {negocio.mostrarStockPublico && currentVariant?.tallas && currentVariant.tallas.length > 0 && (
-                          <div className="space-y-1 pt-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Tallas Disponibles:
-                            </span>
-                            <div className="flex flex-wrap gap-1">
-                              {currentVariant.tallas.map((t, tidx) => {
-                                const tieneStock = t.stock > 0;
-                                return (
-                                  <span
-                                    key={tidx}
-                                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                                      tieneStock
-                                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                        : "bg-slate-50 text-slate-400 border-slate-200 line-through opacity-60"
-                                    }`}
-                                  >
-                                    T{t.numero}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    </div>
-
-                    {/* Botón WhatsApp de la Card */}
-                    <div className="p-4 pt-0 mt-auto shrink-0">
-                      <a
-                        href={getWhatsAppOrderUrl(modelo, currentVariant)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-2.5 px-3 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md hover:scale-[1.01]"
-                        style={{
-                          backgroundColor: brandColor,
-                          color: getContrastColor(brandColor),
-                        }}
-                      >
-                        <MessageCircle size={14} />
-                        <span>Pedir / Cotizar por WhatsApp</span>
-                      </a>
                     </div>
                   </div>
                 );
@@ -853,7 +983,7 @@ function LandingContent() {
           4. SUCURSALES & PUNTOS DE VENTA
          ══════════════════════════════════════════════ */}
       <section id="sucursales" className="py-16 sm:py-20 bg-white border-b border-slate-200/60 scroll-mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
+        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 space-y-8">
           <div className="text-center space-y-2 max-w-2xl mx-auto">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: brandColor }}>
               Locales Físicos
@@ -866,7 +996,7 @@ function LandingContent() {
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center items-stretch gap-6 max-w-6xl mx-auto">
+          <div className="flex flex-wrap justify-center items-stretch gap-6 w-full max-w-[1600px] mx-auto">
             {sucursales.map((suc) => (
               <div
                 key={suc.id}
@@ -934,8 +1064,8 @@ function LandingContent() {
           5. SOBRE NOSOTROS & TRADICIÓN EN CEVALLOS
          ══════════════════════════════════════════════ */}
       <section id="nosotros" className="py-16 sm:py-20 bg-slate-50/50 border-b border-slate-200/60 scroll-mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <div className="space-y-5">
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: brandColor }}>
                 Sobre Nosotros & Garantía
@@ -1007,7 +1137,7 @@ function LandingContent() {
           6. FOOTER CORPORATIVO
          ══════════════════════════════════════════════ */}
       <footer id="contacto" className="bg-slate-900 text-white py-8 sm:py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
+        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
             <div className="space-y-2 md:col-span-2">
               <div className="flex items-center gap-2.5">
@@ -1085,6 +1215,590 @@ function LandingContent() {
           </div>
         </div>
       </footer>
+
+      {/* Botón Flotante de Carrito */}
+      {carrito.length > 0 && (
+        <aside aria-label="Acceso flotante al pedido" className="fixed bottom-6 right-6 z-40">
+          <button
+            type="button"
+            onClick={() => setIsCartOpen(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white p-3.5 sm:px-5 sm:py-3.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 transition-all hover:scale-105 active:scale-95 group animate-in fade-in slide-in-from-bottom-4 duration-300"
+          >
+            <div className="relative">
+              <ShoppingCart size={22} className="text-amber-400" />
+              <span className="absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-xs">
+                {totalParesCarrito}
+              </span>
+            </div>
+            <div className="text-left hidden sm:block">
+              <div className="text-[10px] font-black uppercase tracking-wider text-amber-400">Mi Pedido</div>
+              <div className="text-xs font-bold text-white">
+                {totalParesCarrito} {totalParesCarrito === 1 ? "par" : "pares"}
+                {totalPrecioCarrito > 0 ? ` · $${totalPrecioCarrito.toFixed(2)}` : ""}
+              </div>
+            </div>
+          </button>
+        </aside>
+      )}
+
+      {/* Modal de Configuración de Pedido (Por Par o Por Serie Completa) */}
+      {modalConfigOpen && modeloConfig && varianteConfig && (() => {
+        const seriesDelModeloConfig = Array.from(
+          new Set(modeloConfig.variantes.map((v) => v.serieNombre).filter(Boolean))
+        ) as string[];
+
+        const variantesDeSerieConfig =
+          seriesDelModeloConfig.length > 0 && serieConfigNombre
+            ? modeloConfig.variantes.filter((v) => v.serieNombre === serieConfigNombre)
+            : modeloConfig.variantes;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-200">
+              {/* Cabecera del modal */}
+              <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                    {varianteConfig.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={varianteConfig.imageUrl}
+                        alt={modeloConfig.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl">👞</span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                      {modeloConfig.brand} · {modeloConfig.baseCode} · {modeloConfig.material || "CUERO VACUNO"}
+                    </span>
+                    <h3 className="font-extrabold text-base text-slate-900 leading-snug">
+                      {modeloConfig.name}
+                    </h3>
+                    {negocio.mostrarPreciosPublico && varianteConfig.salePrice > 0 && (
+                      <div className="text-xs font-extrabold font-mono text-amber-700 mt-0.5">
+                        ${varianteConfig.salePrice.toFixed(2)} por par
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalConfigOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Selector / Indicador de Serie del Modelo */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider">Serie del Modelo:</span>
+                  <span className="font-extrabold text-amber-800">{serieConfigNombre}</span>
+                </div>
+                {seriesDelModeloConfig.length > 1 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {seriesDelModeloConfig.map((s) => {
+                      const isSelected = s === serieConfigNombre;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => handleCambiarSerieModal(s)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border flex items-center gap-1.5 ${
+                            isSelected
+                              ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                              : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                          }`}
+                        >
+                          <Package size={13} className={isSelected ? "text-amber-400" : "text-slate-500"} />
+                          <span>{s}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800">
+                    <Package size={13} className="text-amber-600" />
+                    <span>{serieConfigNombre || seriesDelModeloConfig[0] || "Serie Estándar"}</span>
+                    <span className="text-[10px] text-slate-500 font-normal">(Curva comercial completa)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Selector de Color dentro del modal */}
+              {variantesDeSerieConfig.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-700 uppercase tracking-wider">Color:</span>
+                    <span className="font-extrabold text-slate-900">{varianteConfig.color}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {variantesDeSerieConfig.map((v) => {
+                      const isSelected = v.id === varianteConfig.id;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => handleCambiarColorModal(v)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                            isSelected
+                              ? "shadow-sm scale-105"
+                              : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                          }`}
+                          style={
+                            isSelected
+                              ? {
+                                  backgroundColor: brandColor,
+                                  color: getContrastColor(brandColor),
+                                  borderColor: brandColor,
+                                }
+                              : {}
+                          }
+                        >
+                          <span
+                            className="w-2.5 h-2.5 rounded-full border border-white/40 shrink-0"
+                            style={{
+                              backgroundColor:
+                                v.color.toLowerCase().includes("negro")
+                                  ? "#111"
+                                  : v.color.toLowerCase().includes("café") || v.color.toLowerCase().includes("cafe")
+                                  ? "#6F4E37"
+                                  : v.color.toLowerCase().includes("miel")
+                                  ? "#D4A373"
+                                  : v.color.toLowerCase().includes("suela")
+                                  ? "#99582A"
+                                  : v.color.toLowerCase().includes("azul")
+                                  ? "#1D4ED8"
+                                  : v.color.toLowerCase().includes("blanco")
+                                  ? "#FFF"
+                                  : "#777",
+                            }}
+                          />
+                          <span>{v.color}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Selector de Modalidad: Por Par vs Por Serie Completa */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Modalidad de Pedido:
+                </label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setTipoPedidoConfig("PAR")}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                      tipoPedidoConfig === "PAR"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>👟</span>
+                    <span>Por Par (Individual)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoPedidoConfig("SERIE_COMPLETA")}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                      tipoPedidoConfig === "SERIE_COMPLETA"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Package size={14} className="text-amber-600" />
+                    <span>Por Serie Completa</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Vista según la modalidad */}
+              {tipoPedidoConfig === "PAR" ? (
+                <div className="space-y-4">
+                  {/* Selector de Talla */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Selecciona la Talla:
+                      </label>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        Talla elegida: <strong className="text-slate-900 font-mono">T{tallaSeleccionadaConfig}</strong>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {varianteConfig.tallas && varianteConfig.tallas.length > 0 ? (
+                        varianteConfig.tallas.map((t, idx) => {
+                          const isSelected = String(tallaSeleccionadaConfig) === String(t.numero);
+                          const tieneStock = t.stock > 0;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setTallaSeleccionadaConfig(t.numero)}
+                              className={`min-w-12 py-2 px-2.5 rounded-xl text-xs font-mono font-bold border transition-all flex flex-col items-center justify-center ${
+                                isSelected
+                                  ? "bg-amber-500 text-white border-amber-500 shadow-sm scale-105"
+                                  : tieneStock
+                                  ? "bg-white text-slate-800 border-slate-200 hover:border-slate-400"
+                                  : "bg-slate-50 text-slate-400 border-slate-200"
+                              }`}
+                            >
+                              <span>T{t.numero}</span>
+                              {negocio.mostrarStockPublico && (
+                                <span className={`text-[9px] ${isSelected ? "text-white/80" : "text-slate-400"}`}>
+                                  {t.stock > 0 ? `${t.stock}` : "0"}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        // Fallback numérico si no viene array de tallas
+                        [37, 38, 39, 40, 41, 42].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => setTallaSeleccionadaConfig(num)}
+                            className={`min-w-12 py-2 px-2.5 rounded-xl text-xs font-mono font-bold border transition-all ${
+                              String(tallaSeleccionadaConfig) === String(num)
+                                ? "bg-amber-500 text-white border-amber-500 shadow-sm scale-105"
+                                : "bg-white text-slate-800 border-slate-200 hover:border-slate-400"
+                            }`}
+                          >
+                            T{num}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Cantidad de Pares */}
+                  <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">Cantidad de pares:</span>
+                      <span className="text-[11px] text-slate-500">Unidades de la talla seleccionada</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCantidadConfig(Math.max(1, cantidadConfig - 1))}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-700 flex items-center justify-center hover:bg-slate-100 font-bold"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="w-8 text-center font-bold text-sm text-slate-900 font-mono">
+                        {cantidadConfig}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCantidadConfig(cantidadConfig + 1)}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-700 flex items-center justify-center hover:bg-slate-100 font-bold"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Detalle de Curva Comercial de la Serie */}
+                  <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs">
+                      <Package size={15} className="text-amber-700" />
+                      <span>Curva Completa de la Serie {serieConfigNombre}</span>
+                    </div>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Cada serie completa incluye el lote con todas las tallas correspondientes de la curva comercial:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {varianteConfig.tallas && varianteConfig.tallas.length > 0 ? (
+                        varianteConfig.tallas.map((t, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-md bg-white border border-amber-300 text-amber-900 font-mono font-bold text-[11px]"
+                          >
+                            T{t.numero}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-amber-700 font-semibold">Tallas completas del lote estándar</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] font-bold text-amber-900 pt-1">
+                      Total: {varianteConfig.tallas?.length || 6} pares por cada serie completa.
+                    </div>
+                  </div>
+
+                  {/* Cantidad de Series Completas */}
+                  <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">Cantidad de series completas:</span>
+                      <span className="text-[11px] text-slate-500">
+                        Total: {cantidadConfig * (varianteConfig.tallas?.length || 6)} pares en total
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCantidadConfig(Math.max(1, cantidadConfig - 1))}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-700 flex items-center justify-center hover:bg-slate-100 font-bold"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="w-8 text-center font-bold text-sm text-slate-900 font-mono">
+                        {cantidadConfig}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCantidadConfig(cantidadConfig + 1)}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-700 flex items-center justify-center hover:bg-slate-100 font-bold"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Subtotal y Botón Agregar */}
+              <div className="border-t border-slate-100 pt-4 space-y-3">
+                {negocio.mostrarPreciosPublico && varianteConfig.salePrice > 0 && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-500 uppercase tracking-wider">Subtotal estimado:</span>
+                    <span className="text-lg font-black text-slate-900 font-mono">
+                      ${(
+                        tipoPedidoConfig === "PAR"
+                          ? cantidadConfig * varianteConfig.salePrice
+                          : cantidadConfig * (varianteConfig.tallas?.length || 6) * varianteConfig.salePrice
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleAgregarAlCarrito}
+                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  <ShoppingCart size={16} className="text-amber-400" />
+                  <span>Agregar al Pedido</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Drawer Lateral del Carrito de Pedidos */}
+      {isCartOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex justify-end">
+          <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl animate-in slide-in-from-right duration-300">
+            {/* Header del Carrito */}
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center font-bold">
+                  <ShoppingCart size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 leading-tight">Mi Pedido</h3>
+                  <span className="text-[11px] text-slate-500 font-semibold">
+                    {totalParesCarrito} {totalParesCarrito === 1 ? "par seleccionado" : "pares seleccionados"}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Lista de Ítems */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3.5">
+              {carrito.length === 0 ? (
+                <div className="py-20 text-center space-y-3">
+                  <div className="text-4xl">🛒</div>
+                  <h4 className="font-bold text-sm text-slate-800">Tu pedido está vacío</h4>
+                  <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                    Explora los modelos en nuestro catálogo y añade calzado por par o por serie completa.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsCartOpen(false)}
+                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-xs hover:bg-slate-800 transition-all"
+                  >
+                    Ver Catálogo
+                  </button>
+                </div>
+              ) : (
+                carrito.map((item) => {
+                  const paresItem = item.tipoPedido === "SERIE_COMPLETA" ? item.cantidad * (item.paresPorSerie || 6) : item.cantidad;
+                  const subtotalItem = item.precioUnitario * paresItem;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-3.5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-2.5"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                          {item.fotoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={item.fotoUrl} alt={item.modeloNombre} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-xl">👞</span>
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1">
+                            <h4 className="font-extrabold text-xs text-slate-900 truncate">
+                              {item.modeloNombre}
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => handleEliminarItemCarrito(item.id)}
+                              className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                              title="Eliminar artículo"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+
+                          <div className="text-[11px] text-slate-500 mt-0.5 space-x-1">
+                            <span>Color: <strong className="text-slate-700">{item.color}</strong></span>
+                            <span>·</span>
+                            <span>Serie: <strong className="text-amber-700">{item.serieNombre}</strong></span>
+                          </div>
+
+                          <div className="mt-1">
+                            {item.tipoPedido === "PAR" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-800 rounded-md text-[10px] font-bold border border-blue-200">
+                                👟 Par suelto · Talla {item.tallaNumero}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-900 rounded-md text-[10px] font-bold border border-amber-200" title={item.desgloseTallas}>
+                                <Package size={10} />
+                                <span>Serie completa ({item.paresPorSerie || 6} pares/serie)</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Contador y Subtotal */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateCantidadCarrito(item.id, -1)}
+                            className="w-6 h-6 rounded-md bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center font-bold hover:bg-slate-200"
+                          >
+                            <Minus size={11} />
+                          </button>
+                          <span className="font-mono font-bold text-slate-900 px-1">
+                            {item.cantidad} {item.tipoPedido === "SERIE_COMPLETA" ? "serie(s)" : "par(es)"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateCantidadCarrito(item.id, 1)}
+                            className="w-6 h-6 rounded-md bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center font-bold hover:bg-slate-200"
+                          >
+                            <Plus size={11} />
+                          </button>
+                        </div>
+
+                        {subtotalItem > 0 && (
+                          <div className="font-mono font-extrabold text-slate-900 text-xs">
+                            ${subtotalItem.toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Formulario de Cliente (si hay ítems) */}
+              {carrito.length > 0 && (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 mt-4">
+                  <h4 className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">
+                    Datos para el Pedido:
+                  </h4>
+                  <div className="space-y-2 text-xs">
+                    <input
+                      type="text"
+                      placeholder="Tu nombre completo *"
+                      value={clienteNombre}
+                      onChange={(e) => setClienteNombre(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Número de WhatsApp *"
+                      value={clienteTelefono}
+                      onChange={(e) => setClienteTelefono(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Ciudad / Dirección de entrega (opcional)"
+                      value={clienteDireccion}
+                      onChange={(e) => setClienteDireccion(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900"
+                    />
+                    <textarea
+                      placeholder="Observaciones adicionales (ej. entrega a domicilio, envío interprovincial...)"
+                      rows={2}
+                      value={notasPedido}
+                      onChange={(e) => setNotasPedido(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900 resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer con Totales y Botón WhatsApp */}
+            {carrito.length > 0 && (
+              <div className="p-5 border-t border-slate-200 bg-white space-y-3.5">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-slate-600 font-semibold">
+                    <span>Total de Calzado:</span>
+                    <span className="font-bold text-slate-900 font-mono">{totalParesCarrito} pares</span>
+                  </div>
+                  {totalPrecioCarrito > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-extrabold text-slate-900">Total Estimado:</span>
+                      <span className="font-black text-lg text-emerald-700 font-mono">
+                        ${totalPrecioCarrito.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleEnviarPedidoWhatsApp}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-extrabold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={18} />
+                  <span>Enviar Pedido por WhatsApp</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
