@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   MapPin,
   Navigation,
@@ -33,12 +33,42 @@ export default function GpsConsentModal({
   const [gpsDenied, setGpsDenied] = useState(false);
   const [coordsObtained, setCoordsObtained] = useState<{ lat: number; lng: number } | null>(null);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Verificar estado de permisos inmediatamente
+    if (typeof window !== "undefined" && navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: "geolocation" }).then((perm) => {
+        if (perm.state === "denied") {
+          setGpsDenied(true);
+        } else if (perm.state === "granted") {
+          handleRequestGps();
+        } else {
+          // 'prompt': disparar solicitud de geolocalización automática
+          handleRequestGps();
+        }
+
+        perm.onchange = () => {
+          if (perm.state === "denied") {
+            setGpsDenied(true);
+          } else if (perm.state === "granted") {
+            setGpsDenied(false);
+            handleRequestGps();
+          }
+        };
+      }).catch(() => {
+        handleRequestGps();
+      });
+    } else {
+      handleRequestGps();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleRequestGps = () => {
     setLoading(true);
     setError("");
-    setGpsDenied(false);
 
     if (typeof window === "undefined" || !navigator.geolocation) {
       setError("Tu dispositivo o navegador no soporta geolocalización GPS.");
@@ -50,12 +80,13 @@ export default function GpsConsentModal({
       async (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         setCoordsObtained({ lat: latitude, lng: longitude });
+        setGpsDenied(false);
 
         try {
           // Registrar en el backend el consentimiento GPS
-          await ApiService.post("/auth/accept-gps", {});
+          await ApiService.post("/auth/accept-gps", {}).catch(() => null);
 
-          // Enviar reporte de ubicación inicial de inicio de jornada si existe el endpoint
+          // Enviar reporte de ubicación inicial de inicio de jornada
           await ApiService.post("/audit/vendor-locations", {
             lat: latitude,
             lng: longitude,
@@ -63,11 +94,16 @@ export default function GpsConsentModal({
             tipoEvento: "INICIO_JORNADA_ONBOARDING",
           }).catch(() => null);
 
+          await ApiService.post("/configuracion/geolocalizacion", {
+            lat: latitude,
+            lng: longitude,
+          }).catch(() => null);
+
           setLoading(false);
           onAccepted();
         } catch (err: any) {
-          setError(err.message || "Error al registrar la confirmación de GPS.");
           setLoading(false);
+          onAccepted();
         }
       },
       (geoError) => {
@@ -75,17 +111,17 @@ export default function GpsConsentModal({
         setGpsDenied(true);
         if (geoError.code === geoError.PERMISSION_DENIED) {
           setError(
-            "El permiso de ubicación fue denegado. Para operar como personal de ventas o bodega, debes autorizar el acceso a la ubicación en tu navegador."
+            "El permiso de ubicación fue denegado en este navegador. Para acceder y utilizar el sistema, debes permitir el acceso a tu ubicación."
           );
         } else if (geoError.code === geoError.POSITION_UNAVAILABLE) {
-          setError("No se pudo obtener la señal satelital GPS. Verifica que tu antena de ubicación esté activa.");
+          setError("No se pudo obtener la señal de ubicación. Verifica que los servicios de ubicación de tu sistema operativo estén activos.");
         } else {
-          setError("Tiempo de espera agotado al consultar la ubicación satelital.");
+          setError("Tiempo de espera agotado al consultar la ubicación. Presiona reintentar.");
         }
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 10000,
         maximumAge: 0,
       }
     );
@@ -154,16 +190,27 @@ export default function GpsConsentModal({
 
           {/* GUÍA EN CASO DE PERMISO DENEGADO */}
           {gpsDenied && (
-            <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2 text-amber-900 dark:text-amber-300">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-3 text-amber-900 dark:text-amber-200">
               <div className="flex items-center gap-2 font-bold text-xs">
-                <AlertCircle size={16} className="text-amber-600 shrink-0" />
-                <span>¿Cómo activar la ubicación en tu navegador?</span>
+                <AlertCircle size={18} className="text-amber-600 shrink-0" />
+                <span>Ubicación bloqueada por el navegador</span>
               </div>
-              <ol className="list-decimal list-inside space-y-1 text-[11px] text-[var(--foreground)] pl-1">
-                <li>Haz clic en el <strong>icono del candado 🔒</strong> junto a la dirección URL en la barra superior.</li>
-                <li>Busca la opción <strong>Ubicación / Localización</strong> y cámbiala a <strong>Permitir</strong>.</li>
-                <li>Vuelve a presionar el botón <strong>Activar Ubicación y Continuar</strong>.</li>
-              </ol>
+              
+              <div className="p-3 bg-amber-500/15 rounded-xl border border-amber-500/30 flex items-center gap-2.5">
+                <Loader2 className="animate-spin text-amber-600 shrink-0" size={16} />
+                <span className="text-[11px] font-semibold">
+                  Esperando que cambies el permiso a <strong>&quot;Permitir&quot;</strong> en tu navegador. El sistema se desbloqueará de forma automática.
+                </span>
+              </div>
+
+              <div className="space-y-1.5 text-[11px] text-[var(--foreground)]">
+                <p className="font-bold text-xs text-[var(--foreground)]">Pasos para desbloquear en tu navegador:</p>
+                <ol className="list-decimal list-inside space-y-1 pl-1">
+                  <li>Haz clic en el <strong>icono del candado 🔒 / configuración de sitio</strong> junto a la URL arriba.</li>
+                  <li>En la opción <strong>Ubicación</strong>, selecciona <strong>&quot;Permitir siempre&quot;</strong>.</li>
+                  <li>Al cambiarlo, el sistema detectará el permiso y te dará acceso inmediato.</li>
+                </ol>
+              </div>
             </div>
           )}
 
@@ -181,23 +228,30 @@ export default function GpsConsentModal({
             type="button"
             disabled={loading}
             onClick={handleRequestGps}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 cursor-pointer"
           >
             {loading ? (
               <>
                 <Loader2 className="animate-spin" size={15} />
                 <span>Consultando señal satelital GPS...</span>
               </>
+            ) : gpsDenied ? (
+              <>
+                <Compass size={15} className="text-amber-400" />
+                <span>Verificar y Reintentar Detección</span>
+              </>
             ) : (
               <>
                 <Compass size={15} className="text-blue-400" />
-                <span>Activar Ubicación y Continuar</span>
+                <span>Permitir Ubicación y Acceder</span>
               </>
             )}
           </button>
 
           <p className="text-[10px] text-center text-[var(--muted-foreground)]">
-            Requisito mandatorio para habilitar el Punto de Venta y Registro de Pedidos.
+            {gpsDenied
+              ? 'Por seguridad del navegador, debes habilitar el permiso en la barra superior.'
+              : 'Requisito mandatorio para la trazabilidad y seguridad operativa del negocio.'}
           </p>
         </div>
       </div>

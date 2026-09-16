@@ -176,16 +176,24 @@ export default function NotificacionesModal({
       bloqueBanco = `\n\n🏦 *Cuentas para Transferencia o Depósito:*\n• *Banco:* ${datosBancarios.banco}\n• *Tipo:* ${datosBancarios.tipoCuenta}\n• *Nro:* ${datosBancarios.numeroCuenta}\n• *Titular:* ${datosBancarios.titular}\n• *RUC/CI:* ${datosBancarios.identificacion}`;
     }
 
+    let bName = 'NEXORA';
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('user');
+        if (stored) bName = JSON.parse(stored)?.tenantName || 'NEXORA';
+      } catch (e) {}
+    }
+
     if (plantillaSeleccionada === 'PREVENTIVO') {
-      return `👟 *RECORDATORIO DE PAGO — NEXORA*\n\nEstimado/a *${cliente}*,\n\nLe saludamos cordialmente de *NEXORA (Calzado 100% Cuero de Cevallos)*.\n\nLe recordamos amablemente que su compra a crédito con la Nota de Entrega *#${nota}* por un saldo de *$${saldo}* tiene fecha programada de pago para el *${fechaVencStr}*.${bloqueBanco}\n\nAgradecemos de antemano su puntualidad para mantener su cupo comercial siempre activo.\n\n¡Que tenga un excelente día! ✨`;
+      return `👟 *RECORDATORIO DE PAGO — ${bName.toUpperCase()}*\n\nEstimado/a *${cliente}*,\n\nLe saludamos cordialmente de *${bName}*.\n\nLe recordamos amablemente que su compra a crédito con la Nota de Entrega *#${nota}* por un saldo de *$${saldo}* tiene fecha programada de pago para el *${fechaVencStr}*.${bloqueBanco}\n\nAgradecemos de antemano su puntualidad para mantener su cupo comercial siempre activo.\n\n¡Que tenga un excelente día! ✨`;
     }
 
     if (plantillaSeleccionada === 'FORMAL') {
-      return `⚠️ *ESTADO DE CUENTA — AVISO DE COBRO NEXORA*\n\nEstimado/a *${cliente}*,\n\nNos comunicamos de *NEXORA* para informarle que su crédito comercial asociado a la Nota de Entrega *#${nota}* presenta un saldo pendiente de *$${saldo}* con *${dias > 0 ? dias : '1'} días de vencimiento* (Fecha límite: ${fechaVencStr}).\n\nLe invitamos a realizar su abono o cancelación para mantener su calificación crediticia activa y seguir disfrutando de precios preferenciales de fabricante.${bloqueBanco}\n\nSi ya realizó su pago, por favor remítanos su comprobante por este medio.\n\nAtentamente,\n*Departamento de Cartera y Cobranzas — NEXORA*`;
+      return `⚠️ *ESTADO DE CUENTA — AVISO DE COBRO ${bName.toUpperCase()}*\n\nEstimado/a *${cliente}*,\n\nNos comunicamos de *${bName}* para informarle que su crédito comercial asociado a la Nota de Entrega *#${nota}* presenta un saldo pendiente de *$${saldo}* con *${dias > 0 ? dias : '1'} días de vencimiento* (Fecha límite: ${fechaVencStr}).\n\nLe invitamos a realizar su abono o cancelación para mantener su calificación crediticia activa y seguir disfrutando de precios preferenciales de fabricante.${bloqueBanco}\n\nSi ya realizó su pago, por favor remítanos su comprobante por este medio.\n\nAtentamente,\n*Departamento de Cartera y Cobranzas — ${bName}*`;
     }
 
     // URGENTE
-    return `🚨 *NOTIFICACIÓN DE COBRO URGENTE — NEXORA*\n\nEstimado/a *${cliente}*,\n\nRegistramos un atraso prolongado de *${dias > 0 ? dias : 'más de 15'} días* en el pago de su cuenta pendiente por el valor de *$${saldo}* (Nota de Entrega #${nota}).\n\nLe solicitamos comunicarse de manera prioritaria el día de hoy para coordinar la regularización de su saldo y evitar la suspensión definitiva de sus líneas de crédito comercial.${bloqueBanco}\n\nEsperamos su confirmación el día de hoy.\n\n*Área Legal y Cobranzas — NEXORA*`;
+    return `🚨 *NOTIFICACIÓN DE COBRO URGENTE — ${bName.toUpperCase()}*\n\nEstimado/a *${cliente}*,\n\nRegistramos un atraso prolongado de *${dias > 0 ? dias : 'más de 15'} días* en el pago de su cuenta pendiente por el valor de *$${saldo}* (Nota de Entrega #${nota}).\n\nLe solicitamos comunicarse de manera prioritaria el día de hoy para coordinar la regularización de su saldo y evitar la suspensión definitiva de sus líneas de crédito comercial.${bloqueBanco}\n\nEsperamos su confirmación el día de hoy.\n\n*Área Legal y Cobranzas — ${bName}*`;
   };
 
   const enviarWhatsAppDirecto = async () => {

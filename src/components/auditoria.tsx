@@ -176,59 +176,136 @@ export default function AuditoriaComponent() {
     }
   };
 
-  // Traducir nombres de entidades a términos comerciales amigables
+  // Traducir nombres de entidades y rutas a términos comerciales amigables
   const getEntidadInfo = (entidad: string) => {
     const e = (entidad || "").toUpperCase();
-    if (e.includes("COBRO") || e.includes("ABONO") || e.includes("PAGO")) {
+
+    // 1. Geolocalización & GPS
+    if (e.includes("GEOLOCALIZACION") || e.includes("GEOLOCATION") || e.includes("GPS") || e.includes("VENDOR-LOCATIONS") || e.includes("UBICACION")) {
       return {
-        nombre: "Cobros & Abonos",
+        nombre: "Geolocalización GPS",
+        badge: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
+      };
+    }
+
+    // 2. Sucursales & Puntos de venta
+    if (e.includes("SUCURSAL") || e.includes("BRANCH")) {
+      return {
+        nombre: "Sucursales & Locales",
+        badge: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20",
+      };
+    }
+
+    // 3. Personal & Usuarios
+    if (e.includes("PERSONAL") || e.includes("USUARIO") || e.includes("USER") || e.includes("EMPLEADO")) {
+      return {
+        nombre: "Personal & Usuarios",
+        badge: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
+      };
+    }
+
+    // 4. Configuración & Personalización del negocio
+    if (e.includes("CONFIGURACION") || e.includes("CONFIG") || e.includes("NEGOCIO") || e.includes("BRANDING") || e.includes("AJUSTES")) {
+      return {
+        nombre: "Configuración & Negocio",
+        badge: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20",
+      };
+    }
+
+    // 5. Cobros & Abonos / Créditos
+    if (e.includes("COBRO") || e.includes("ABONO") || e.includes("PAGO") || e.includes("CREDITO") || e.includes("CARTERA")) {
+      return {
+        nombre: "Cobros & Créditos",
         badge: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
       };
     }
+
+    // 6. Ventas (POS / Notas)
     if (e.includes("VENTA") || e.includes("SALE") || e.includes("POS") || e.includes("NOTA")) {
       return {
-        nombre: "Ventas (POS / Notas)",
+        nombre: "Ventas & Facturación",
         badge: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20",
       };
     }
-    if (e.includes("PEDIDO") || e.includes("ORDER") || e.includes("DESPACHO")) {
+
+    // 7. Pedidos & Envíos
+    if (e.includes("PEDIDO") || e.includes("ORDER") || e.includes("DESPACHO") || e.includes("ENVIO")) {
       return {
-        nombre: "Pedidos & Lotes",
+        nombre: "Pedidos & Logística",
         badge: "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20",
       };
     }
+
+    // 8. Clientes
     if (e.includes("CLIENTE") || e.includes("CLIENT")) {
       return {
         nombre: "Clientes",
         badge: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20",
       };
     }
-    if (e.includes("INVENTARIO") || e.includes("PRODUCT") || e.includes("STOCK")) {
+
+    // 9. Calzado / Inventario / Modelos
+    if (e.includes("INVENTARIO") || e.includes("PRODUCT") || e.includes("STOCK") || e.includes("MODELO")) {
       return {
-        nombre: "Calzado / Inventario",
+        nombre: "Calzado & Inventario",
         badge: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20",
       };
     }
-    if (e.includes("PROVEEDOR") || e.includes("SUPPLIER")) {
+
+    // 10. Proveedores & Talleres
+    if (e.includes("PROVEEDOR") || e.includes("SUPPLIER") || e.includes("TALLER")) {
       return {
-        nombre: "Talleres / Proveedores",
+        nombre: "Talleres & Proveedores",
         badge: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20",
       };
     }
-    if (e.includes("CIERRE") || e.includes("CAJA")) {
+
+    // 11. Caja & Finanzas
+    if (e.includes("CIERRE") || e.includes("CAJA") || e.includes("GASTO") || e.includes("FINANZA")) {
       return {
         nombre: "Caja & Finanzas",
         badge: "bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-500/20",
       };
     }
-    if (e.includes("AUTH") || e.includes("LOGIN")) {
+
+    // 12. Seguridad & Acceso (Login / Auth)
+    if (e.includes("AUTH") || e.includes("LOGIN") || e.includes("SESION") || e.includes("PASSWORD")) {
       return {
         nombre: "Seguridad & Acceso",
         badge: "bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20",
       };
     }
+
+    // 13. SRI & Comprobantes
+    if (e.includes("SRI") || e.includes("COMPROBANTE") || e.includes("FACTURA")) {
+      return {
+        nombre: "Comprobantes SRI",
+        badge: "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20",
+      };
+    }
+
+    // 14. Términos & Legalidad
+    if (e.includes("TERMINOS") || e.includes("TERMS") || e.includes("LEGAL") || e.includes("CONSENT")) {
+      return {
+        nombre: "Términos & Legalidad",
+        badge: "bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20",
+      };
+    }
+
+    // 15. Gestión de Empresas / Super Admin
+    if (e.includes("TENANT") || e.includes("EMPRESA")) {
+      return {
+        nombre: "Gestión de Empresas",
+        badge: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20",
+      };
+    }
+
+    // 16. Fallback limpio sin URLs crudas
+    const limpio = entidad.replace(/^\/?(api\/)?/, "").replace(/[\/-]/g, " ");
+    const capitalizado = limpio.charAt(0).toUpperCase() + limpio.slice(1);
+
     return {
-      nombre: entidad || "General",
+      nombre: capitalizado || "Operación General",
       badge: "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]",
     };
   };
@@ -254,6 +331,23 @@ export default function AuditoriaComponent() {
     const params = d.params || {};
     const url = (d.url || "").toLowerCase();
     const entidad = (log.entidad || "").toUpperCase();
+
+    // 0. Geolocalización & GPS
+    if (entidad.includes("GEOLOCALIZACION") || entidad.includes("GPS") || url.includes("/geolocalizacion") || url.includes("/vendor-locations")) {
+      if (body.tipoEvento === "INICIO_JORNADA_ONBOARDING") {
+        return "Activación y validación de ubicación satelital GPS al iniciar jornada";
+      }
+      if (body.tipoEvento === "GPS_DESACTIVADO_DURANTE_SESION") {
+        return "⚠️ Alerta de Seguridad: El usuario desactivó o bloqueó los permisos de ubicación GPS en su navegador";
+      }
+      if (body.tipoEvento === "GPS_REACTIVADO") {
+        return "Reactivación y confirmación de geolocalización satelital en el navegador";
+      }
+      if (body.lat !== undefined && body.lng !== undefined && body.lat !== 0) {
+        return `Reporte satelital de posicionamiento operativo (${Number(body.lat).toFixed(4)}, ${Number(body.lng).toFixed(4)})`;
+      }
+      return "Registro y verificación de coordenadas GPS operativas";
+    }
 
     // 1. Cobros & Abonos
     if (entidad.includes("COBRO") || entidad.includes("ABONO") || url.includes("/abono") || url.includes("/cobro")) {
@@ -296,12 +390,29 @@ export default function AuditoriaComponent() {
       return `Gestión de taller proveedor: ${nombre || "Proveedor"}`;
     }
 
-    // 7. Login
+    // 7. Sucursales
+    if (entidad.includes("SUCURSAL") || url.includes("/sucursales")) {
+      const nombre = body.name || body.nombre || "";
+      return `${log.accion === "CREAR" ? "Apertura de nueva sucursal" : "Actualización de sucursal"}: ${nombre || "Sucursal"}`;
+    }
+
+    // 8. Personal / Usuarios
+    if (entidad.includes("PERSONAL") || entidad.includes("USUARIO") || url.includes("/personal") || url.includes("/usuarios")) {
+      const nombre = body.nombre || body.email || "";
+      return `${log.accion === "CREAR" ? "Alta de colaborador" : "Modificación de personal"}: ${nombre || "Usuario"}`;
+    }
+
+    // 9. Configuración del negocio
+    if (entidad.includes("CONFIGURACION") || url.includes("/configuracion")) {
+      return "Actualización de parámetros operativos y personalización de marca";
+    }
+
+    // 10. Login
     if (log.accion === "LOGIN" || url.includes("/login")) {
       return "Inicio de sesión seguro en la plataforma";
     }
 
-    // 8. Fallback amigable
+    // 11. Fallback amigable
     const accionTexto = log.accion === "CREAR" ? "Nuevo registro" : log.accion === "ELIMINAR" ? "Eliminación" : "Modificación";
     return `${accionTexto} en ${getEntidadInfo(log.entidad).nombre}`;
   };

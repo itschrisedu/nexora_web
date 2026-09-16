@@ -35,16 +35,25 @@ export default function SriComponent() {
   const [activeTab, setActiveTab] = useState<"config" | "facturas">("config");
 
   // Configuración Emisor
-  const [config, setConfig] = useState({
-    nombre: "CALZADO CEVALLOS HNOS",
-    ruc: "1890123456001",
-    direccion: "Av. Cevallos 12-45 y Montalvo, Ambato",
-    sriEstablecimiento: "001",
-    sriPuntoEmision: "001",
-    sriAmbiente: "1", // 1: Pruebas, 2: Producción
-    tieneP12: false,
-    logoUrl: "",
-    primaryColor: "#0F172A",
+  const [config, setConfig] = useState(() => {
+    let initialName = "";
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("user");
+        if (stored) initialName = JSON.parse(stored)?.tenantName || "";
+      } catch (e) {}
+    }
+    return {
+      nombre: initialName,
+      ruc: "",
+      direccion: "",
+      sriEstablecimiento: "001",
+      sriPuntoEmision: "001",
+      sriAmbiente: "1", // 1: Pruebas, 2: Producción
+      tieneP12: false,
+      logoUrl: "",
+      primaryColor: "#0F172A",
+    };
   });
 
   const [loadingConfig, setLoadingConfig] = useState(false);

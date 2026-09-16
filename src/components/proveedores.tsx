@@ -3206,7 +3206,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 <input
                   type="text"
                   required
-                  placeholder="Ej. Curtiduría & Calzado Cevallos S.A."
+                  placeholder="Ej. Curtiduría & Cueros del Ecuador S.A."
                   value={razonSocial}
                   onChange={(e) => setRazonSocial(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
@@ -3245,7 +3245,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Av. 24 de Mayo y Calzado, Cevallos"
+                  placeholder="Ej. Parque Industrial / Av. Principal"
                   value={direccion}
                   onChange={(e) => setDireccion(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"

@@ -120,20 +120,63 @@ function MainApp() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showGpsModal, setShowGpsModal] = useState(false);
 
+  const verifyGpsPermission = () => {
+    if (typeof window === 'undefined') return;
+    if (!navigator.geolocation) {
+      setShowGpsModal(true);
+      return;
+    }
+
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'denied' || result.state === 'prompt') {
+          setShowGpsModal(true);
+        } else if (result.state === 'granted') {
+          navigator.geolocation.getCurrentPosition(
+            () => {
+              setShowGpsModal(false);
+              GeolocationService.captureAndReportLocation();
+            },
+            () => {
+              setShowGpsModal(true);
+            },
+            { timeout: 8000, maximumAge: 30000 }
+          );
+        }
+      }).catch(() => {
+        navigator.geolocation.getCurrentPosition(
+          () => {
+            setShowGpsModal(false);
+            GeolocationService.captureAndReportLocation();
+          },
+          () => {
+            setShowGpsModal(true);
+          },
+          { timeout: 8000, maximumAge: 30000 }
+        );
+      });
+    } else {
+      navigator.geolocation.getCurrentPosition(
+        () => {
+          setShowGpsModal(false);
+          GeolocationService.captureAndReportLocation();
+        },
+        () => {
+          setShowGpsModal(true);
+        },
+        { timeout: 8000, maximumAge: 30000 }
+      );
+    }
+  };
+
   const checkLegalAndGpsConsent = (userData: any) => {
     if (!userData) return;
     if (!userData.termsAcceptedAt) {
       setShowTermsModal(true);
       setShowGpsModal(false);
-    } else if (
-      (userData.rol === 'ROL_VENDEDOR' || userData.rol === 'ROL_BODEGUERO') &&
-      !userData.gpsConsentAt
-    ) {
-      setShowTermsModal(false);
-      setShowGpsModal(true);
     } else {
       setShowTermsModal(false);
-      setShowGpsModal(false);
+      verifyGpsPermission();
     }
   };
 
@@ -142,9 +185,7 @@ function MainApp() {
     setUser(updated);
     localStorage.setItem('user', JSON.stringify(updated));
     setShowTermsModal(false);
-    if ((updated.rol === 'ROL_VENDEDOR' || updated.rol === 'ROL_BODEGUERO') && !updated.gpsConsentAt) {
-      setShowGpsModal(true);
-    }
+    verifyGpsPermission();
   };
 
   const handleGpsAccepted = () => {
@@ -152,6 +193,7 @@ function MainApp() {
     setUser(updated);
     localStorage.setItem('user', JSON.stringify(updated));
     setShowGpsModal(false);
+    GeolocationService.captureAndReportLocation();
   };
 
   const [stats, setStats] = useState({
@@ -193,6 +235,42 @@ function MainApp() {
     };
     window.addEventListener('nexora:sucursales-changed', handleSucursalesChange);
 
+    let permStatus: PermissionStatus | null = null;
+    if (typeof window !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+        permStatus = status;
+        status.onchange = () => {
+          const token = localStorage.getItem('token');
+          if (token) {
+            if (status.state === 'denied' || status.state === 'prompt') {
+              setShowGpsModal(true);
+              ApiService.post('/audit/vendor-locations', {
+                lat: 0,
+                lng: 0,
+                accuracy: 0,
+                tipoEvento: 'GPS_DESACTIVADO_DURANTE_SESION',
+                observaciones: 'El usuario desactivó o revocó el permiso de ubicación en su navegador durante la sesión activa.',
+              }).catch(() => null);
+            } else if (status.state === 'granted') {
+              verifyGpsPermission();
+              ApiService.post('/audit/vendor-locations', {
+                tipoEvento: 'GPS_REACTIVADO',
+                observaciones: 'El usuario restauró los permisos de geolocalización satelital.',
+              }).catch(() => null);
+            }
+          }
+        };
+      }).catch(() => null);
+    }
+
+    const handleWindowFocus = () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        verifyGpsPermission();
+      }
+    };
+    window.addEventListener('focus', handleWindowFocus);
+
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token) { 
@@ -201,6 +279,8 @@ function MainApp() {
         const parsed = JSON.parse(storedUser);
         setUser(parsed);
         checkLegalAndGpsConsent(parsed);
+      } else {
+        verifyGpsPermission();
       }
       fetchStats();
       fetchSucursales();
@@ -211,6 +291,8 @@ function MainApp() {
     return () => {
       window.removeEventListener('nexora:theme-changed', handleThemeChange);
       window.removeEventListener('nexora:sucursales-changed', handleSucursalesChange);
+      window.removeEventListener('focus', handleWindowFocus);
+      if (permStatus) permStatus.onchange = null;
     };
   }, []);
 

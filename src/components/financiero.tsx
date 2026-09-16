@@ -1186,7 +1186,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         const monto = Number(c.montoOriginal ?? c.montoTotal ?? 0);
         agrupados.push({
           codigoProducto: `VENTA-${c.id.slice(0, 6).toUpperCase()}`,
-          descripcion: `Calzado de Cuero Cevallos Artesanal — ${numNota}`,
+          descripcion: `${businessConfig?.nombre || 'Calzado Artesanal'} — ${numNota}`,
           cantidad: 1,
           precioUnitario: monto,
           descuento: 0,
@@ -3219,9 +3219,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
         const armarDatosPdf = () => ({
           emisor: {
-            nombre: businessConfig?.nombre || 'CALZADO ARTESANAL CEVALLOS',
-            ruc: businessConfig?.ruc || '1804884664001',
-            direccion: businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador',
+            nombre: businessConfig?.nombre || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')?.tenantName : '') || 'Comercializadora de Calzado',
+            ruc: businessConfig?.ruc || '',
+            direccion: businessConfig?.direccion || 'Ecuador',
             telefono: businessConfig?.telefono,
             email: businessConfig?.email,
             obligadoContabilidad: businessConfig?.sriObligadoContabilidad,
@@ -3644,13 +3644,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 <div className="mt-2">
                                   {(() => {
                                     const grupos = agruparLineasPorModelo(lineasNota);
-                                    if (grupos.length === 0) {
-                                      return (
-                                        <div className="text-[11px] text-[var(--muted-foreground)] italic py-1">
-                                          Calzado de Cuero Cevallos Artesanal — ${monto.toFixed(2)}
-                                        </div>
-                                      );
-                                    }
+                                      if (grupos.length === 0) {
+                                        return (
+                                          <div className="text-[11px] text-[var(--muted-foreground)] italic py-1">
+                                            {businessConfig?.nombre || 'Calzado y Artículos de Cuero'} — ${monto.toFixed(2)}
+                                          </div>
+                                        );
+                                      }
 
                                     return (
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -3829,16 +3829,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         {/* Datos del Emisor (Dueño del Negocio) */}
                         <div className="space-y-1">
                           <h4 className="font-black text-sm text-slate-900 uppercase tracking-tight">
-                            {businessConfig?.nombre || 'CALZADO ARTESANAL CEVALLOS'}
+                            {businessConfig?.nombre || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')?.tenantName : '') || 'Comercializadora de Calzado'}
                           </h4>
                           <p className="text-[10px] text-slate-600 leading-tight">
                             {businessConfig?.email ? `Email: ${businessConfig.email}` : 'Comercialización y Distribución de Calzado'}
                           </p>
                           <p className="text-[10px] text-slate-700 font-bold">
-                            RUC: {businessConfig?.ruc || '1804884664001'}
+                            RUC: {businessConfig?.ruc || 'S/RUC'}
                           </p>
                           <p className="text-[10px] text-slate-600">
-                            Matriz: {businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador'}
+                            Matriz: {businessConfig?.direccion || 'Ecuador'}
                           </p>
                           <p className="text-[10px] text-slate-600">
                             Obligado a llevar Contabilidad: {businessConfig?.sriObligadoContabilidad ? 'SI' : 'NO'}

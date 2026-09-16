@@ -1023,7 +1023,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   required
                   value={newSucursal.name}
                   onChange={(e) => setNewSucursal({ ...newSucursal, name: e.target.value })}
-                  placeholder="Ej: Calzados Cevallos - Sucursal Mall"
+                  placeholder="Ej: Sucursal Centro / Sucursal Norte"
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
@@ -1034,7 +1034,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   type="text"
                   value={newSucursal.direccion}
                   onChange={(e) => setNewSucursal({ ...newSucursal, direccion: e.target.value })}
-                  placeholder="Av. Cevallos y Montalvo"
+                  placeholder="Ej: Av. Principal y Calle Secundaria"
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>

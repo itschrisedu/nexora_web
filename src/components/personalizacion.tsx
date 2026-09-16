@@ -124,15 +124,15 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     creditPlazoMaximoDias: 30,
     creditScoreMinimo: 60,
     creditTasaMoraPct: 2.5,
-    heroTitulo: "Calzado Ecuatoriano 100% Cuero de Cevallos",
+    heroTitulo: "Calzado 100% Cuero Ecuatoriano",
     heroSubtitulo: "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
     heroBannerUrl: "",
     heroBackgroundUrl: "",
-    cardTitulo: "Hecho a Mano en Tungurahua",
-    cardSubtitulo: "Cada par refleja la tradición zapatera de Cevallos con tecnología de confort y cuero vacuno genuino.",
+    cardTitulo: "Calidad Artesanal Garantizada",
+    cardSubtitulo: "Cada par refleja la tradición del calzado con tecnología de confort y cuero vacuno genuino.",
     cardEtiqueta: "Artesanía & Confort",
     cardGarantia: "Cuero Vacuno Seleccionado",
-    sobreNosotros: "Somos productores y comercializadores de calzado de cuero en el cantón Cevallos, Tungurahua. Garantizamos calidad de exportación, acabados finos y precios directos de fabricante.",
+    sobreNosotros: "Somos productores y comercializadores de calzado de cuero. Garantizamos calidad, acabados finos y precios directos de fabricante.",
     garantiaTaller: "Garantizamos la máxima calidad en cada par de calzado elaborado con 100% cuero vacuno ecuatoriano. Ofrecemos respaldo directo de fábrica y servicio de mantenimiento en todos nuestros puntos de venta autorizados.",
     caracteristicasCalidad: "Cueros vacunos genuinos tratados para resistir el uso continuo.\nSuelas antideslizantes de alta adherencia y costuras reforzadas.\nAtención personalizada a comerciantes mayoristas y clientes particulares.\nServicio y respaldo técnico en todos nuestros locales.",
     materialDestacado: "100% Cuero Vacuno",
@@ -281,15 +281,15 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             creditPlazoMaximoDias: data.creditPlazoMaximoDias ?? 30,
             creditScoreMinimo: data.creditScoreMinimo ?? 60,
             creditTasaMoraPct: data.creditTasaMoraPct ?? 2.5,
-            heroTitulo: data.heroTitulo || "Calzado Ecuatoriano 100% Cuero de Cevallos",
+            heroTitulo: data.heroTitulo || "Calzado 100% Cuero Ecuatoriano",
             heroSubtitulo: data.heroSubtitulo || "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
             heroBannerUrl: data.heroBannerUrl || "",
             heroBackgroundUrl: data.heroBackgroundUrl || "",
-            cardTitulo: data.cardTitulo || "Hecho a Mano en Tungurahua",
-            cardSubtitulo: data.cardSubtitulo || "Cada par refleja la tradición zapatera de Cevallos con tecnología de confort y cuero vacuno genuino.",
+            cardTitulo: data.cardTitulo || "Calidad Artesanal Garantizada",
+            cardSubtitulo: data.cardSubtitulo || "Cada par refleja la tradición del calzado con tecnología de confort y cuero vacuno genuino.",
             cardEtiqueta: data.cardEtiqueta || "Artesanía & Confort",
             cardGarantia: data.cardGarantia || "Cuero Vacuno Seleccionado",
-            sobreNosotros: data.sobreNosotros || "Somos productores y comercializadores de calzado de cuero en el cantón Cevallos, Tungurahua.",
+            sobreNosotros: data.sobreNosotros || "Somos productores y comercializadores de calzado de cuero. Garantizamos calidad, acabados finos y precios directos de fabricante.",
             garantiaTaller: data.garantiaTaller || "Garantizamos la máxima calidad en cada par de calzado elaborado con 100% cuero vacuno ecuatoriano. Ofrecemos respaldo directo de fábrica y servicio de mantenimiento en todos nuestros puntos de venta autorizados.",
             caracteristicasCalidad: data.caracteristicasCalidad || "Cueros vacunos genuinos tratados para resistir el uso continuo.\nSuelas antideslizantes de alta adherencia y costuras reforzadas.\nAtención personalizada a comerciantes mayoristas y clientes particulares.\nServicio y respaldo técnico en todos nuestros locales.",
             materialDestacado: data.materialDestacado || "100% Cuero Vacuno",
@@ -996,7 +996,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     : "");
                 const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
                 const fullLandingUrl = `${baseUrl}/landing${currentTenantId ? `?tenantId=${currentTenantId}` : ''}`;
-                const msgWhatsApp = `¡Hola! Te invito a conocer el catálogo digital oficial de ${config.nombre || 'nuestro calzado'} (100% Cuero de Cevallos):\n👉 ${fullLandingUrl}`;
+                const msgWhatsApp = `¡Hola! Te invito a conocer el catálogo digital oficial de ${config.nombre || 'nuestro negocio'}:\n👉 ${fullLandingUrl}`;
                 const waShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgWhatsApp)}`;
 
                 return (
