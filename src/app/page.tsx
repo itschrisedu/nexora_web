@@ -340,9 +340,14 @@ function MainApp() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('tenantId');
     setUser(null);
     setIsLoggedIn(false);
     setVistaActual('dashboard');
+    setBusinessNombre('');
+    setBusinessLogo('');
+    setSucursales([]);
   };
 
   const fetchStats = async () => {
@@ -528,7 +533,7 @@ function MainApp() {
                   {businessNombre || user?.tenantName || 'NEXORA'}
                 </span>
                 <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block mt-0.5">
-                  {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central' : 'Calzado Cevallos'}
+                  {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
                 </span>
               </div>
             </div>
