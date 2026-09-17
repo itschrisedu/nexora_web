@@ -81,9 +81,10 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   // Modal transferencia inter-sucursal
   const [showTransfModal, setShowTransfModal] = useState(false);
   const [transfProd, setTransfProd] = useState<Producto | null>(null);
-  const [transfTallaId, setTransfTallaId] = useState("");
   const [transfDestinoId, setTransfDestinoId] = useState("");
-  const [transfCantidad, setTransfCantidad] = useState("1");
+  const [transfFormato, setTransfFormato] = useState<"suelto" | "serie">("suelto");
+  const [transfMultiplicador, setTransfMultiplicador] = useState<number>(1);
+  const [transfLoteCantidades, setTransfLoteCantidades] = useState<Record<string, number>>({});
   const [transfMotivo, setTransfMotivo] = useState("");
   const [transfError, setTransfError] = useState("");
   const [transfSaving, setTransfSaving] = useState(false);
@@ -209,14 +210,33 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
   const openTransferencia = (p: Producto) => {
     setTransfProd(p);
-    const primerTallaConStock = p.tallas?.find(t => (t.stock ?? t.cantidad ?? t.disponible ?? 0) > 0) || p.tallas?.[0];
-    setTransfTallaId(primerTallaConStock?.id || "");
+    setTransfFormato("suelto");
+    setTransfMultiplicador(1);
     const otrasSucursales = (sucursales || []).filter(s => s.id !== activeSucursalId);
     setTransfDestinoId(otrasSucursales[0]?.id || "");
-    setTransfCantidad("1");
     setTransfMotivo("Despacho para exhibición y venta en mostrador");
     setTransfError("");
+    
+    const initialLote: Record<string, number> = {};
+    if (p.tallas && p.tallas.length > 0) {
+      p.tallas.forEach((t) => {
+        initialLote[t.id] = 0;
+      });
+    }
+    setTransfLoteCantidades(initialLote);
     setShowTransfModal(true);
+  };
+
+  const aplicarPresetTransfSerie = (mult: number) => {
+    setTransfMultiplicador(mult);
+    if (!transfProd || !transfProd.tallas || transfProd.tallas.length === 0) return;
+    const paresPorTalla = Math.max(1, Math.round((12 * mult) / transfProd.tallas.length));
+    const newLote: Record<string, number> = {};
+    transfProd.tallas.forEach((t) => {
+      const stockDisp = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+      newLote[t.id] = Math.min(stockDisp, paresPorTalla);
+    });
+    setTransfLoteCantidades(newLote);
   };
 
   const handleTransferencia = async (e: React.FormEvent) => {
@@ -228,21 +248,26 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
       setTransfError("Selecciona la sucursal de destino.");
       return;
     }
-    if (!transfTallaId) {
-      setTransfError("Selecciona la talla a despachar.");
+
+    const items = Object.entries(transfLoteCantidades)
+      .map(([tallaId, cant]) => ({ tallaId, cantidad: Number(cant) || 0 }))
+      .filter((i) => i.cantidad > 0);
+
+    if (items.length === 0) {
+      setTransfError("Ingresa al menos 1 par en alguna talla para despachar.");
       return;
     }
-    const cant = parseInt(transfCantidad);
-    if (!cant || cant <= 0) {
-      setTransfError("Ingresa una cantidad de pares mayor a cero.");
-      return;
+
+    // Validar stock disponible en origen
+    for (const item of items) {
+      const tallaObj = transfProd.tallas?.find((t) => t.id === item.tallaId);
+      const stockActual = tallaObj ? (tallaObj.stock ?? tallaObj.cantidad ?? tallaObj.disponible ?? 0) : 0;
+      if (item.cantidad > stockActual) {
+        setTransfError(`Stock insuficiente en Talla ${tallaObj?.nombre || tallaObj?.numero}. Solo dispones de ${stockActual} pares.`);
+        return;
+      }
     }
-    const tallaObj = transfProd.tallas?.find(t => t.id === transfTallaId);
-    const stockActual = tallaObj ? (tallaObj.stock ?? tallaObj.cantidad ?? tallaObj.disponible ?? 0) : 0;
-    if (cant > stockActual) {
-      setTransfError(`Stock insuficiente. Solo dispones de ${stockActual} pares en esta talla.`);
-      return;
-    }
+
     if (!transfMotivo.trim()) {
       setTransfError("Ingresa el motivo del despacho.");
       return;
@@ -250,14 +275,14 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
     setTransfSaving(true);
     try {
-      const res = await ApiService.post("/inventario/transferir-stock", {
+      const res = await ApiService.post("/inventario/transferir-stock-lote", {
         destinoTenantId: transfDestinoId,
         productId: transfProd.id,
-        tallaId: transfTallaId,
-        cantidad: cant,
+        items,
         motivo: transfMotivo.trim(),
       });
-      setSuccess(res?.message || `Despacho de ${cant} pares registrado exitosamente.`);
+      const totalDespachado = items.reduce((acc, i) => acc + i.cantidad, 0);
+      setSuccess(res?.message || `Despacho de ${totalDespachado} pares registrado exitosamente.`);
       setShowTransfModal(false);
       setTransfProd(null);
       loadProducts();
@@ -287,6 +312,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   };
 
   const totalParesLote = Object.values(loteCantidades).reduce((sum, val) => sum + (Number(val) || 0), 0);
+  const totalParesTransf = Object.values(transfLoteCantidades).reduce((sum, val) => sum + (Number(val) || 0), 0);
 
   const filteredProducts = products.filter(p => {
     if (!search.trim()) return true;
@@ -778,34 +804,202 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                 </select>
               </div>
 
-              <div>
-                <Lbl t="Talla a Despachar" req />
-                <select
-                  value={transfTallaId}
-                  onChange={(e) => setTransfTallaId(e.target.value)}
-                  className={INPUT}
+              {/* Selector de modo: Pares Sueltos vs Serie Completa */}
+              <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setTransfFormato("suelto")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                    transfFormato === "suelto"
+                      ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]"
+                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  }`}
                 >
-                  {transfProd.tallas?.map((t) => {
-                    const st = t.stock ?? t.cantidad ?? t.disponible ?? 0;
-                    return (
-                      <option key={t.id} value={t.id} disabled={st === 0}>
-                        Talla {t.nombre || t.numero} (Disponible en origen: {st} pares) {st === 0 ? "— AGOTADO" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
+                  👟 Pares Sueltos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTransfFormato("serie");
+                    if (totalParesTransf === 0) {
+                      aplicarPresetTransfSerie(1);
+                    }
+                  }}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                    transfFormato === "serie"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  📦 Serie Completa
+                </button>
               </div>
 
-              <div>
-                <Lbl t="Cantidad de Pares" req />
-                <input
-                  type="number"
-                  min="1"
-                  max={transfProd.tallas?.find(t => t.id === transfTallaId)?.stock || 999}
-                  value={transfCantidad}
-                  onChange={(e) => setTransfCantidad(e.target.value)}
-                  className={INPUT}
-                />
+              {/* Componente Interactivo Idéntico */}
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-3.5">
+                {/* Cabecera del Producto */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-1 border-b border-[var(--border)]/50">
+                  <div>
+                    <h4 className="font-extrabold text-base text-[var(--foreground)] uppercase tracking-wide">
+                      {transfProd.modelo || transfProd.nombre}
+                    </h4>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      <span className="font-semibold">{transfProd.marca}</span>
+                      {transfProd.nombre && transfProd.modelo && <span> · {transfProd.nombre}</span>}
+                      {transfProd.serie?.nombre && (
+                        <span> · <span className="text-blue-600 dark:text-blue-400 font-bold">Serie: {transfProd.serie.nombre}</span></span>
+                      )}
+                      {transfProd.codigo && <span className="ml-1 opacity-70">({transfProd.codigo})</span>}
+                    </p>
+                  </div>
+
+                  {/* Resumen Derecho de Pares, Docenas y Costo */}
+                  <div className="text-left sm:text-right shrink-0">
+                    <div className="font-extrabold text-xs text-[var(--foreground)]">
+                      {totalParesTransf} {totalParesTransf === 1 ? 'par' : 'pares'} {totalParesTransf > 0 ? `(${getDocenaLabel(totalParesTransf)})` : ''}
+                    </div>
+                    <div className="text-[11px] text-[var(--muted-foreground)]">
+                      ${Number(transfProd.precioCosto || transfProd.precioVenta || 0).toFixed(2)} / par
+                    </div>
+                    <div className="font-black text-sm text-blue-600 dark:text-blue-400">
+                      ${(totalParesTransf * Number(transfProd.precioCosto || transfProd.precioVenta || 0)).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fila Principal: Foto | Pastillas de Tallas y Botones */}
+                <div className="flex items-start gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
+                    {transfProd.fotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={transfProd.fotoUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Package size={20} className="text-[var(--muted-foreground)]" />
+                    )}
+                  </div>
+
+                  <div className="space-y-2.5 flex-1 min-w-0">
+                    {/* Pastillas Interactivas por Talla */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {transfProd.tallas?.map((t) => {
+                        const qty = transfLoteCantidades[t.id] ?? 0;
+                        const stockDisp = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+                        return (
+                          <div
+                            key={t.id}
+                            className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
+                              qty > 0
+                                ? 'bg-blue-500/10 border-blue-500/40 text-[var(--foreground)]'
+                                : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
+                            }`}
+                          >
+                            <span className="font-extrabold text-xs font-mono mr-0.5">
+                              T{t.nombre || t.numero}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setTransfLoteCantidades({...transfLoteCantidades, [t.id]: Math.max(0, qty - 1)})}
+                              className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                              title={`Restar 1 par T${t.nombre || t.numero}`}
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              max={stockDisp}
+                              value={qty}
+                              onChange={(e) => {
+                                const parsed = parseInt(e.target.value) || 0;
+                                const clamped = Math.max(0, Math.min(stockDisp, parsed));
+                                setTransfLoteCantidades({...transfLoteCantidades, [t.id]: clamped});
+                              }}
+                              className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
+                            />
+                            <button
+                              type="button"
+                              disabled={qty >= stockDisp}
+                              onClick={() => setTransfLoteCantidades({...transfLoteCantidades, [t.id]: Math.min(stockDisp, qty + 1)})}
+                              className="w-5 h-5 flex items-center justify-center bg-blue-500/15 hover:bg-blue-500/30 text-blue-600 dark:text-blue-400 rounded-md text-xs font-black transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={`Sumar 1 par T${t.nombre || t.numero}`}
+                            >
+                              +
+                            </button>
+                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono ml-0.5" title={`Disponible en origen: ${stockDisp}`}>
+                              stk:{stockDisp}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Acciones Rápidas Masivas */}
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newLote: Record<string, number> = {...transfLoteCantidades};
+                          transfProd.tallas?.forEach((t) => {
+                            const stockDisp = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+                            newLote[t.id] = Math.min(stockDisp, (newLote[t.id] || 0) + 1);
+                          });
+                          setTransfLoteCantidades(newLote);
+                        }}
+                        className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                      >
+                        +1 par c/talla
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newLote: Record<string, number> = {...transfLoteCantidades};
+                          transfProd.tallas?.forEach((t) => {
+                            newLote[t.id] = Math.max(0, (newLote[t.id] || 0) - 1);
+                          });
+                          setTransfLoteCantidades(newLote);
+                        }}
+                        className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                      >
+                        −1 par c/talla
+                      </button>
+                      {transfFormato === "serie" && (
+                        <>
+                          {[0.5, 1, 2].map(m => {
+                            const label = m === 0.5 ? "½ Docena" : m === 1 ? "1 Docena" : "2 Docenas";
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => aplicarPresetTransfSerie(m)}
+                                className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer shadow-2xs ${
+                                  transfMultiplicador === m
+                                    ? "bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400"
+                                    : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                                }`}
+                              >
+                                📦 {label}
+                              </button>
+                            );
+                          })}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newLote: Record<string, number> = {};
+                          transfProd.tallas?.forEach((t) => { newLote[t.id] = 0; });
+                          setTransfLoteCantidades(newLote);
+                        }}
+                        className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                      >
+                        ↺ Poner en 0
+                      </button>
+                      <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
+                        = {totalParesTransf} {totalParesTransf === 1 ? 'par' : 'pares'} total
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -828,7 +1022,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
               <button
                 type="submit"
                 disabled={transfSaving}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {transfSaving ? (
                   <>
@@ -836,7 +1030,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                   </>
                 ) : (
                   <>
-                    <ArrowRightLeft size={16} /> Confirmar Despacho a Sucursal
+                    <ArrowRightLeft size={16} /> Confirmar Despacho a Sucursal ({transfFormato === "serie" ? `${totalParesTransf} pares` : "Pares sueltos"})
                   </>
                 )}
               </button>
