@@ -176,6 +176,15 @@ function getCurvaRatio(talla: any, tallas: any[] = []): number {
   return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
 }
 
+// Formateo de docenas para etiquetas comerciales
+function getDocenaLabel(pares: number): string {
+  if (pares === 6) return '½ Docena';
+  if (pares === 12) return '1 Docena';
+  if (pares > 0 && pares % 12 === 0) return `${pares / 12} Docenas`;
+  if (pares > 0 && pares % 6 === 0) return `${(pares / 12).toFixed(1)} Docenas`;
+  return `${(pares / 12).toFixed(1)} Doc.`;
+}
+
 // Consolidación de líneas con distribución exacta de tallas
 function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos: any[] = []) {
   const map = new Map<string, {
@@ -892,43 +901,53 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
     try {
       const order = await ApiService.get(`/proveedores/ordenes-compra/${orderId}`);
-      if (order && order.lines && order.lines.length > 0) {
-        const consolidados = consolidarLineasOrden(order.lines, productos);
-        const modelosData: typeof entryModelos = [];
+      if (order) {
+        if (order.supplierId) {
+          setEntrySupplierId(order.supplierId);
+        }
+        if (order.lines && order.lines.length > 0) {
+          const consolidados = consolidarLineasOrden(order.lines, productos);
+          const modelosData: typeof entryModelos = [];
 
-        consolidados.forEach((c) => {
-          const prodCat = productos.find((p) => p.id === c.productId);
-          const foto = c.imageUrl || obtenerFotoProducto(prodCat);
+          consolidados.forEach((c) => {
+            const prodCat = productos.find((p) => p.id === c.productId);
+            const foto = c.imageUrl || obtenerFotoProducto(prodCat) || obtenerFotoProducto(c);
 
-          const tallasArr = (c.tallasDesglose || []).map((td: any) => ({
-            tallaId: String(td.talla),
-            sizeNumber: td.talla,
-            cantidadIngresada: td.cantidad,
-            cantidadEsperada: td.cantidad,
-            diferencia: 0,
-          }));
+            const tallasArr = (c.tallasDesglose || []).map((td: any) => ({
+              tallaId: String(td.talla),
+              sizeNumber: td.talla,
+              cantidadIngresada: td.cantidad,
+              cantidadEsperada: td.cantidad,
+              diferencia: 0,
+            }));
 
-          modelosData.push({
-            productId: c.productId,
-            nombre: c.nombre,
-            marca: c.marca,
-            codigo: c.codigo,
-            color: c.color,
-            fotoUrl: foto,
-            serieNombre: c.serie,
-            precioCosto: c.precioCosto,
-            observacionLinea: c.observacionLinea || '',
-            tallas: tallasArr,
+            modelosData.push({
+              productId: c.productId,
+              nombre: c.nombre,
+              marca: c.marca,
+              codigo: c.codigo,
+              color: c.color,
+              fotoUrl: foto,
+              serieNombre: c.serie || 'Serie Estándar',
+              precioCosto: c.precioCosto,
+              observacionLinea: c.observacionLinea || '',
+              tallas: tallasArr,
+            });
           });
-        });
 
-        setEntryModelos(modelosData);
-        if (order.observaciones) {
-          setEntryObservaciones(`Ref. Orden OC-${String(order.numero).padStart(4, '0')}: ${order.observaciones}`);
+          setEntryModelos(modelosData);
+          if (order.observaciones) {
+            setEntryObservaciones(`Ref. Orden OC-${String(order.numero).padStart(4, '0')}: ${order.observaciones}`);
+          }
+          showToast(`Orden OC-${String(order.numero).padStart(4, '0')} vinculada. Se cargaron ${modelosData.length} modelos con sus tallas.`, 'info');
+        } else {
+          setEntryModelos([]);
+          showToast('La orden seleccionada no contiene líneas de productos.', 'warning');
         }
       }
     } catch (e) {
       console.warn('Error al auto-llenar modelos desde orden:', e);
+      showToast('No se pudo cargar la orden de compra.', 'error');
     }
   };
 
@@ -949,20 +968,25 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }> = [];
 
     if (prodTallas.length > 0) {
-      tallasInit = prodTallas.map((t: any) => ({
-        tallaId: t.id || String(t.sizeNumber || t.talla),
+      const sorted = [...prodTallas].sort((a: any, b: any) => {
+        const numA = Number(a.numero ?? a.sizeNumber ?? a.talla ?? a.nombre) || 0;
+        const numB = Number(b.numero ?? b.sizeNumber ?? b.talla ?? b.nombre) || 0;
+        return numA - numB;
+      });
+      tallasInit = sorted.map((t: any) => ({
+        tallaId: t.id || String(t.sizeNumber || t.talla || t.numero),
         sizeNumber: t.sizeNumber || t.talla || t.numero || '38',
-        cantidadIngresada: 2,
+        cantidadIngresada: 1,
         cantidadEsperada: 0,
-        diferencia: 2,
+        diferencia: 1,
       }));
     } else {
-      tallasInit = [34, 35, 36, 37, 38].map((t) => ({
+      tallasInit = [38, 39, 40, 41, 42].map((t) => ({
         tallaId: String(t),
         sizeNumber: t,
-        cantidadIngresada: 2,
+        cantidadIngresada: 1,
         cantidadEsperada: 0,
-        diferencia: 2,
+        diferencia: 1,
       }));
     }
 
@@ -975,9 +999,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         codigo: productoSeleccionado.codigo || productoSeleccionado.code || '',
         color: productoSeleccionado.color || '',
         fotoUrl: foto,
-        serieNombre: productoSeleccionado.serie?.name || 'Serie Estándar',
+        serieNombre: productoSeleccionado.serie?.nombre || productoSeleccionado.serie?.name || 'Serie Estándar',
         precioCosto: Number(productoSeleccionado.precioCosto || productoSeleccionado.costPrice || 10),
-        observacionLinea: 'Modelo extra no pedido',
+        observacionLinea: 'Modelo adicional fuera de orden',
         tallas: tallasInit,
       },
     ]);
@@ -1665,19 +1689,22 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     Vincular Orden de Compra (Carga Automática)
                   </label>
                   <select
-                    disabled={!entrySupplierId}
                     value={entryOrderId}
                     onChange={(e) => handleSelectOrderForEntry(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A] disabled:opacity-50"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   >
-                    <option value="">Ingreso Manual Directo</option>
+                    <option value="">Ingreso Manual Directo (Sin orden)</option>
                     {ordenes
-                      .filter((o) => o.supplierId === entrySupplierId && (o.estado === 'PENDIENTE' || o.estado === 'BORRADOR' || o.estado === 'RECIBIDA_PARCIAL'))
-                      .map((o) => (
-                        <option key={o.id} value={o.id}>
-                          OC-{String(o.numero).padStart(4, '0')} (${Number(o.total).toFixed(2)}) - {o.estado === 'PENDIENTE' ? 'ENVIADA' : o.estado}
-                        </option>
-                      ))}
+                      .filter((o) => (entrySupplierId ? o.supplierId === entrySupplierId : true) && (o.estado === 'PENDIENTE' || o.estado === 'BORRADOR' || o.estado === 'RECIBIDA_PARCIAL'))
+                      .map((o) => {
+                        const prov = proveedores.find((p) => p.id === o.supplierId);
+                        const provLabel = prov ? ` • ${prov.razonSocial || prov.nombre}` : '';
+                        return (
+                          <option key={o.id} value={o.id}>
+                            OC-{String(o.numero).padStart(4, '0')}{provLabel} (${Number(o.total).toFixed(2)}) [{o.estado === 'PENDIENTE' ? 'ENVIADA' : o.estado}]
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
               </div>
@@ -1722,14 +1749,14 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       <button
                         type="button"
                         onClick={handleAddEntryModeloExtra}
-                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700"
+                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 cursor-pointer"
                       >
                         + Agregar a Recepción
                       </button>
                       <button
                         type="button"
                         onClick={() => setProductoSeleccionado(null)}
-                        className="text-xs font-bold text-rose-500 hover:underline"
+                        className="text-xs font-bold text-rose-500 hover:underline cursor-pointer"
                       >
                         Cancelar
                       </button>
@@ -1788,127 +1815,326 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 )}
               </div>
 
-              {/* Lista de Modelos en Recepción con Acordeón */}
+              {/* Barra Resumen y Acciones Globales de Recepción */}
+              {entryModelos.length > 0 && (() => {
+                const totalParesIngresados = entryModelos.reduce(
+                  (sum, m) => sum + m.tallas.reduce((s, t) => s + (t.cantidadIngresada || 0), 0),
+                  0
+                );
+                const totalParesEsperados = entryModelos.reduce(
+                  (sum, m) => sum + m.tallas.reduce((s, t) => s + (t.cantidadEsperada || 0), 0),
+                  0
+                );
+                const difGlobal = totalParesIngresados - totalParesEsperados;
+
+                return (
+                  <div className="p-3.5 bg-[var(--muted)]/30 rounded-2xl border border-[var(--border)] flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="text-xs font-bold text-[var(--foreground)]">
+                        Conteo Global: <strong className="font-mono text-emerald-600 dark:text-emerald-400 font-black">{totalParesIngresados}</strong> pares ingresados
+                        {totalParesEsperados > 0 && (
+                          <span className="text-[var(--muted-foreground)] font-normal ml-1">
+                            (de <strong className="font-mono">{totalParesEsperados}</strong> pedidos)
+                          </span>
+                        )}
+                      </span>
+
+                      {totalParesEsperados > 0 && (
+                        <div>
+                          {difGlobal === 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                              ✓ Pedido Completo (100%)
+                            </span>
+                          ) : difGlobal < 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                              ⚠️ Faltante: {Math.abs(difGlobal)} pares
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                              ℹ️ Excedente: +{difGlobal} pares extras
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {totalParesEsperados > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = entryModelos.map((m) => ({
+                              ...m,
+                              tallas: m.tallas.map((t) => ({
+                                ...t,
+                                cantidadIngresada: t.cantidadEsperada,
+                                diferencia: 0,
+                              })),
+                            }));
+                            setEntryModelos(updated);
+                            showToast('Todas las cantidades ajustadas al 100% de lo pedido.', 'success');
+                          }}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <CheckCircle size={13} />
+                          <span>Marcar Todo Completo</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = entryModelos.map((m) => ({
+                            ...m,
+                            tallas: m.tallas.map((t) => ({
+                              ...t,
+                              cantidadIngresada: 0,
+                              diferencia: 0 - t.cantidadEsperada,
+                            })),
+                          }));
+                          setEntryModelos(updated);
+                          showToast('Contadores reiniciados a 0 para conteo físico.', 'info');
+                        }}
+                        className="px-2.5 py-1.5 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-xs font-bold transition-all cursor-pointer"
+                        title="Poner todos los pares recibidos en 0 para contar uno por uno"
+                      >
+                        <span>↺ Poner en 0</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Lista de Modelos en Recepción con Componente Estandarizado */}
               <div className="space-y-3 pt-2">
                 <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">
                   Modelos a Recepcionar ({entryModelos.length})
                 </span>
 
                 {entryModelos.length === 0 ? (
-                  <p className="text-center text-[var(--muted-foreground)] py-6 bg-[var(--muted)]/20 rounded-xl">
+                  <p className="text-center text-[var(--muted-foreground)] py-6 bg-[var(--muted)]/20 rounded-xl text-xs">
                     Seleccione una orden de compra o busque modelos para ingresar a bodega.
                   </p>
                 ) : (
                   <div className="space-y-3">
                     {entryModelos.map((m, mIdx) => {
-                      const totalParesModelo = m.tallas.reduce((acc, t) => acc + t.cantidadIngresada, 0);
-                      const isExpanded = modelosExpandidos[`recepcion_${mIdx}`] ?? true;
+                      const totalParesModelo = m.tallas.reduce((acc, t) => acc + (t.cantidadIngresada || 0), 0);
+                      const totalParesEsperadosModelo = m.tallas.reduce((acc, t) => acc + (t.cantidadEsperada || 0), 0);
+                      const totalPrecioModelo = totalParesModelo * m.precioCosto;
 
                       return (
                         <div
                           key={mIdx}
-                          className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm"
+                          className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xs space-y-3 transition-all hover:border-[var(--border)]/80"
                         >
-                          <div
-                            onClick={() => toggleExpandModelo(`recepcion_${mIdx}`)}
-                            className="p-3.5 bg-[var(--muted)]/30 hover:bg-[var(--muted)]/50 cursor-pointer flex items-center justify-between gap-3 transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center">
+                          {/* Cabecera del Producto / Modelo */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1">
+                            <div>
+                              <h4 className="font-extrabold text-sm text-[var(--foreground)] uppercase tracking-wide">
+                                {m.nombre}
+                              </h4>
+                              <p className="text-[11px] text-[var(--muted-foreground)]">
+                                <span className="font-semibold">{m.marca}</span>
+                                {m.color && <span> • {m.color}</span>}
+                                {m.serieNombre && (
+                                  <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {m.serieNombre}</span></span>
+                                )}
+                                {m.codigo && <span className="ml-1 opacity-70">({m.codigo})</span>}
+                              </p>
+                            </div>
+
+                            {totalParesEsperadosModelo > 0 && (
+                              <div className="flex items-center gap-2">
+                                {totalParesModelo === totalParesEsperadosModelo ? (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                                    ✓ Completo ({totalParesModelo} pares)
+                                  </span>
+                                ) : totalParesModelo < totalParesEsperadosModelo ? (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                                    Faltan {totalParesEsperadosModelo - totalParesModelo} pares
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                                    +{totalParesModelo - totalParesEsperadosModelo} pares extra
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Fila Principal: Foto | Pastillas de Tallas y Botones | Resumen y Eliminar */}
+                          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                            {/* Izquierda: Foto + Pastillas Interactivas */}
+                            <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+                              <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
                                 {m.fotoUrl ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={m.fotoUrl} alt="" className="w-full h-full object-cover" />
                                 ) : (
-                                  <Package size={18} className="text-[var(--muted-foreground)]" />
+                                  <Package size={20} className="text-[var(--muted-foreground)]" />
                                 )}
                               </div>
-                              <div>
-                                <h5 className="font-bold text-xs text-[var(--foreground)]">{m.nombre}</h5>
-                                <p className="text-[10px] text-[var(--muted-foreground)]">
-                                  {m.marca} • {m.color} • {m.serieNombre}
-                                </p>
+
+                              <div className="space-y-2 flex-1 min-w-0">
+                                {/* Pastillas de Tallas con Botones - y + */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {m.tallas.map((t, tIdx) => {
+                                    const dif = (t.cantidadIngresada || 0) - (t.cantidadEsperada || 0);
+
+                                    return (
+                                      <div
+                                        key={tIdx}
+                                        className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
+                                          dif > 0
+                                            ? 'bg-blue-500/10 border-blue-500/40 text-blue-700 dark:text-blue-300'
+                                            : dif < 0
+                                            ? 'bg-rose-500/10 border-rose-500/40 text-rose-700 dark:text-rose-300'
+                                            : t.cantidadIngresada > 0
+                                            ? 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)]'
+                                            : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
+                                        }`}
+                                      >
+                                        <span className="font-extrabold text-xs font-mono mr-0.5">
+                                          T{t.sizeNumber}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUpdateTallaQty(mIdx, tIdx, Math.max(0, (t.cantidadIngresada || 0) - 1))}
+                                          className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                                          title={`Restar 1 par T${t.sizeNumber}`}
+                                        >
+                                          −
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          value={t.cantidadIngresada}
+                                          onChange={(e) => handleUpdateTallaQty(mIdx, tIdx, Math.max(0, parseInt(e.target.value) || 0))}
+                                          className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUpdateTallaQty(mIdx, tIdx, (t.cantidadIngresada || 0) + 1)}
+                                          className="w-5 h-5 flex items-center justify-center bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                                          title={`Sumar 1 par T${t.sizeNumber}`}
+                                        >
+                                          +
+                                        </button>
+
+                                        {t.cantidadEsperada > 0 && (
+                                          <span className="text-[10px] text-[var(--muted-foreground)] font-mono ml-0.5" title={`Pedido en orden: ${t.cantidadEsperada} pares`}>
+                                            /{t.cantidadEsperada}
+                                          </span>
+                                        )}
+
+                                        {dif > 0 && (
+                                          <span className="text-[9px] font-black bg-blue-500 text-white px-1 py-0.2 rounded font-mono ml-0.5" title={`+${dif} pares extras entregados`}>
+                                            +{dif}
+                                          </span>
+                                        )}
+                                        {dif < 0 && (
+                                          <span className="text-[9px] font-black bg-rose-500 text-white px-1 py-0.2 rounded font-mono ml-0.5" title={`${dif} pares faltantes`}>
+                                            {dif}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Acciones Rápidas Masivas */}
+                                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...entryModelos];
+                                      updated[mIdx].tallas.forEach((t) => {
+                                        t.cantidadIngresada = (t.cantidadIngresada || 0) + 1;
+                                        t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
+                                      });
+                                      setEntryModelos(updated);
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                  >
+                                    +1 par c/talla
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...entryModelos];
+                                      updated[mIdx].tallas.forEach((t) => {
+                                        t.cantidadIngresada = Math.max(0, (t.cantidadIngresada || 0) - 1);
+                                        t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
+                                      });
+                                      setEntryModelos(updated);
+                                    }}
+                                    className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                  >
+                                    −1 par c/talla
+                                  </button>
+                                  {m.tallas.some((t) => t.cantidadEsperada > 0) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = [...entryModelos];
+                                        updated[mIdx].tallas.forEach((t) => {
+                                          t.cantidadIngresada = t.cantidadEsperada;
+                                          t.diferencia = 0;
+                                        });
+                                        setEntryModelos(updated);
+                                      }}
+                                      className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                      title="Ajustar cantidades exactamente a lo pedido en la orden para este modelo"
+                                    >
+                                      ✓ Recibir Pedido Exacto
+                                    </button>
+                                  )}
+                                  <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
+                                    = {totalParesModelo} {totalParesModelo === 1 ? 'par' : 'pares'} total
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            {/* Derecha: Resumen de Pares, Costo y Subtotal + Botón Eliminar */}
+                            <div className="flex items-center gap-4 shrink-0 self-end sm:self-center">
                               <div className="text-right">
-                                <span className="font-extrabold text-xs text-[#0F172A] dark:text-amber-400 font-mono block">
-                                  {totalParesModelo} pares ({ (totalParesModelo / 12).toFixed(1) } doc.)
+                                <span className="font-extrabold text-xs text-[var(--foreground)] block">
+                                  {totalParesModelo} {totalParesModelo === 1 ? 'par' : 'pares'} ({getDocenaLabel(totalParesModelo)})
                                 </span>
-                                <span className="text-[10px] text-[var(--muted-foreground)]">
-                                  ${m.precioCosto.toFixed(2)} c/u
+                                <span className="text-[11px] text-[var(--muted-foreground)] block font-mono">
+                                  ${m.precioCosto.toFixed(2)} / par
+                                </span>
+                                <span className="font-black text-emerald-600 dark:text-emerald-400 font-mono text-base block">
+                                  ${totalPrecioModelo.toFixed(2)}
                                 </span>
                               </div>
+
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveEntryModelo(mIdx);
-                                }}
-                                className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-lg"
-                                title="Quitar modelo"
+                                onClick={() => handleRemoveEntryModelo(mIdx)}
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-rose-500 hover:text-white hover:bg-rose-500 transition-all border border-rose-500/30 cursor-pointer shadow-2xs shrink-0"
+                                title="Quitar modelo de recepción"
                               >
-                                <Trash2 size={13} />
+                                <X size={15} />
                               </button>
-                              <div className="p-1 text-[var(--muted-foreground)]">
-                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                              </div>
                             </div>
                           </div>
 
-                          {isExpanded && (
-                            <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] space-y-3">
-                              <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase block">
-                                Pares Recibidos por Numeración:
-                              </span>
-                              <div className="flex flex-wrap gap-2.5">
-                                {m.tallas.map((t, tIdx) => {
-                                  const dif = t.diferencia;
-
-                                  return (
-                                    <div
-                                      key={tIdx}
-                                      className={`p-2 rounded-xl border flex items-center gap-2 ${
-                                        dif < 0
-                                          ? 'bg-rose-500/5 border-rose-500/30'
-                                          : dif > 0
-                                          ? 'bg-blue-500/5 border-blue-500/30'
-                                          : 'bg-[var(--muted)]/20 border-[var(--border)]'
-                                      }`}
-                                    >
-                                      <span className="font-extrabold text-xs text-[var(--foreground)] font-mono">
-                                        T{t.sizeNumber}
-                                      </span>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        value={t.cantidadIngresada}
-                                        onChange={(e) => handleUpdateTallaQty(mIdx, tIdx, parseInt(e.target.value) || 0)}
-                                        className="w-12 px-1.5 py-1 text-center font-bold text-xs bg-[var(--card)] border rounded-lg font-mono"
-                                      />
-                                      {t.cantidadEsperada > 0 && (
-                                        <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                                          / {t.cantidadEsperada} esp.
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              <input
-                                type="text"
-                                placeholder="Observación específica de este modelo (ej. faltó 1 par talla 36)"
-                                value={m.observacionLinea || ''}
-                                onChange={(e) => {
-                                  const updated = [...entryModelos];
-                                  updated[mIdx].observacionLinea = e.target.value;
-                                  setEntryModelos(updated);
-                                }}
-                                className="w-full px-2.5 py-1 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg text-[11px] focus:outline-none focus:border-[#0F172A]"
-                              />
-                            </div>
-                          )}
+                          {/* Observación específica por modelo */}
+                          <div className="pt-2 border-t border-[var(--border)]/40">
+                            <input
+                              type="text"
+                              placeholder="Observación específica de este modelo (ej. faltó 1 par talla 36, caja dañada, etc.)"
+                              value={m.observacionLinea || ''}
+                              onChange={(e) => {
+                                const updated = [...entryModelos];
+                                updated[mIdx].observacionLinea = e.target.value;
+                                setEntryModelos(updated);
+                              }}
+                              className="w-full px-3 py-1.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -1920,14 +2146,14 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 <div className="text-xs">
                   <span className="text-[var(--muted-foreground)]">Total Cargamento: </span>
                   <span className="font-extrabold text-[#0F172A] dark:text-amber-400 font-mono text-base ml-1">
-                    ${entryModelos.reduce((sum, m) => sum + m.tallas.reduce((s, t) => s + (t.cantidadIngresada * m.precioCosto), 0), 0).toFixed(2)}
+                    ${entryModelos.reduce((sum, m) => sum + m.tallas.reduce((s, t) => s + ((t.cantidadIngresada || 0) * m.precioCosto), 0), 0).toFixed(2)}
                   </span>
                 </div>
 
                 <button
                   type="submit"
                   disabled={saving || !online || entryModelos.length === 0}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 border border-slate-700 disabled:opacity-50"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 border border-slate-700 disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? (
                     <><Loader2 size={14} className="animate-spin" /><span>Guardando...</span></>
@@ -2188,8 +2414,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               <div className="flex items-center gap-2">
                                 <h5 className="font-bold text-xs text-[var(--foreground)]">{line.nombre}</h5>
                                 {line.reordenAutomatica === false && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
-                                    🚫 Ya no se vende (Auto-reorden desactivada)
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                    <Ban size={10} className="shrink-0" /> Descontinuado (Auto-reorden desactivada)
                                   </span>
                                 )}
                               </div>
@@ -2460,8 +2686,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       className="px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white border border-rose-500/30 text-rose-600 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Cancelar orden y desactivar reorden automática de estos productos (ya no se venden)"
                     >
-                      <Ban size={13} />
-                      <span>🚫 No Volver a Generar (Ya no se vende)</span>
+                      <Ban size={14} className="shrink-0" />
+                      <span>Descontinuar (No volver a generar)</span>
                     </button>
                   </>
                 )}
