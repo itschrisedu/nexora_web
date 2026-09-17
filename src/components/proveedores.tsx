@@ -566,6 +566,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         const ratio = getCurvaRatio(t, prodTallas);
         const factor = ratio * (subtipoCurva === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadCurvas || 1);
         return {
+          tallaId: t.id || t.tallaId || '',
           talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre,
           cantidad: factor,
         };
@@ -576,6 +577,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     const ratios = [1, 1, 2, 1, 1]; // 6 pares base
     const tallas = [34, 35, 36, 37, 38];
     return tallas.map((t, i) => ({
+      tallaId: '',
       talla: t,
       cantidad: ratios[i] * (subtipoCurva === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadCurvas || 1),
     }));
