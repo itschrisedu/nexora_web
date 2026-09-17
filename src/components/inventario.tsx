@@ -133,9 +133,8 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
     const initialLote: Record<string, number> = {};
     if (p.tallas && p.tallas.length > 0) {
-      const paresPorTallaDefault = Math.max(1, Math.floor(12 / p.tallas.length));
       p.tallas.forEach((t) => {
-        initialLote[t.id] = paresPorTallaDefault;
+        initialLote[t.id] = 0;
       });
     }
     setLoteCantidades(initialLote);
@@ -165,13 +164,13 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
     setMovSaving(true);
     try {
-      if (movType === "entrada" && ingresoFormato === "serie") {
+      if (movType === "entrada") {
         const items = Object.entries(loteCantidades)
           .map(([tallaId, cant]) => ({ tallaId, cantidad: Number(cant) || 0 }))
           .filter((i) => i.cantidad > 0);
 
         if (items.length === 0) {
-          setMovError("Ingresa al menos 1 par en alguna talla de la serie.");
+          setMovError("Ingresa al menos 1 par en alguna talla.");
           setMovSaving(false);
           return;
         }
@@ -182,23 +181,19 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
         });
 
         const totalPares = items.reduce((s, i) => s + i.cantidad, 0);
-        setSuccess(`Entrada por Serie Completa (${totalPares} pares) registrada correctamente.`);
+        setSuccess(`Entrada de mercancía (${totalPares} pares) registrada correctamente.`);
       } else {
         if (!movTallaId || !movCantidad || parseInt(movCantidad) <= 0) {
           setMovError("Selecciona una talla y una cantidad mayor a cero.");
           setMovSaving(false);
           return;
         }
-        const endpoint =
-          movType === "entrada"
-            ? `/inventario/productos/${movProd.id}/entrada`
-            : `/inventario/productos/${movProd.id}/salida`;
-        await ApiService.post(endpoint, {
+        await ApiService.post(`/inventario/productos/${movProd.id}/salida`, {
           tallaId: movTallaId,
           cantidad: parseInt(movCantidad),
           motivo: movMotivo.trim(),
         });
-        setSuccess(`${movType === "entrada" ? "Entrada" : "Salida"} de stock registrada correctamente.`);
+        setSuccess(`Salida de stock registrada correctamente.`);
       }
 
       setShowMovModal(false);
@@ -513,32 +508,72 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
             </div>
             <form onSubmit={handleMovimiento} className="p-5 space-y-4">
               {movType === "entrada" && (
-                <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
-                  <button type="button" onClick={() => setIngresoFormato("suelto")} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${ingresoFormato === "suelto" ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>👟 Pares Sueltos</button>
-                  <button type="button" onClick={() => setIngresoFormato("serie")} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${ingresoFormato === "serie" ? "bg-emerald-600 text-white shadow-sm" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>📦 Serie Completa</button>
-                </div>
-              )}
-              {(movType === "salida" || ingresoFormato === "suelto") && (
-                <>
-                  <div>
-                    <Lbl t="Talla Seleccionada" req />
-                    <select value={movTallaId} onChange={(e) => setMovTallaId(e.target.value)} className={INPUT}>
-                      <option value="">Seleccionar talla...</option>
-                      {movProd.tallas?.map((t) => <option key={t.id} value={t.id}>Talla {t.nombre || t.numero} (stock: {t.stock})</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <Lbl t="Cantidad de Pares" req />
-                    <input type="number" min="1" value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} className={INPUT} />
-                  </div>
-                </>
-              )}
-              {movType === "entrada" && ingresoFormato === "serie" && (
                 <div className="space-y-4">
-                  {/* Tarjeta del Producto con Foto + Pastillas Interactivas */}
-                  <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl p-4">
+                  {/* Selector de modo: Pares Sueltos vs Serie Completa */}
+                  <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setIngresoFormato("suelto")}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                        ingresoFormato === "suelto"
+                          ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]"
+                          : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      }`}
+                    >
+                      👟 Pares Sueltos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIngresoFormato("serie");
+                        if (totalParesLote === 0) {
+                          aplicarPresetSerie(1);
+                        }
+                      }}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                        ingresoFormato === "serie"
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      }`}
+                    >
+                      📦 Serie Completa
+                    </button>
+                  </div>
+
+                  {/* Componente Interactivo Idéntico */}
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-3.5">
+                    {/* Cabecera del Producto */}
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-1 border-b border-[var(--border)]/50">
+                      <div>
+                        <h4 className="font-extrabold text-base text-[var(--foreground)] uppercase tracking-wide">
+                          {movProd.modelo || movProd.nombre}
+                        </h4>
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                          <span className="font-semibold">{movProd.marca}</span>
+                          {movProd.nombre && movProd.modelo && <span> · {movProd.nombre}</span>}
+                          {movProd.serie?.nombre && (
+                            <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {movProd.serie.nombre}</span></span>
+                          )}
+                          {movProd.codigo && <span className="ml-1 opacity-70">({movProd.codigo})</span>}
+                        </p>
+                      </div>
+
+                      {/* Resumen Derecho de Pares, Docenas y Costo */}
+                      <div className="text-left sm:text-right shrink-0">
+                        <div className="font-extrabold text-xs text-[var(--foreground)]">
+                          {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} {totalParesLote > 0 ? `(${getDocenaLabel(totalParesLote)})` : ''}
+                        </div>
+                        <div className="text-[11px] text-[var(--muted-foreground)]">
+                          ${Number(movProd.precioCosto).toFixed(2)} / par
+                        </div>
+                        <div className="font-black text-sm text-emerald-600">
+                          ${(totalParesLote * Number(movProd.precioCosto)).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fila Principal: Foto | Pastillas de Tallas y Botones */}
                     <div className="flex items-start gap-3.5">
-                      {/* Foto del producto */}
                       <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
                         {movProd.fotoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -548,8 +583,8 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                         )}
                       </div>
 
-                      {/* Pastillas Interactivas por Talla */}
                       <div className="space-y-2.5 flex-1 min-w-0">
+                        {/* Pastillas Interactivas por Talla */}
                         <div className="flex flex-wrap items-center gap-2">
                           {movProd.tallas?.map((t) => {
                             const qty = loteCantidades[t.id] ?? 0;
@@ -558,7 +593,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                                 key={t.id}
                                 className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
                                   qty > 0
-                                    ? 'bg-[var(--card)] border-emerald-500/40 text-[var(--foreground)]'
+                                    ? 'bg-emerald-500/10 border-emerald-500/40 text-[var(--foreground)]'
                                     : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
                                 }`}
                               >
@@ -620,23 +655,27 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                           >
                             −1 par c/talla
                           </button>
-                          {[0.5, 1, 2].map(m => {
-                            const label = m === 0.5 ? "½ Docena" : m === 1 ? "1 Docena" : "2 Docenas";
-                            return (
-                              <button
-                                key={m}
-                                type="button"
-                                onClick={() => aplicarPresetSerie(m)}
-                                className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer shadow-2xs ${
-                                  serieMultiplicador === m
-                                    ? "bg-emerald-500/10 border-emerald-500 text-emerald-600"
-                                    : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
-                                }`}
-                              >
-                                📦 {label}
-                              </button>
-                            );
-                          })}
+                          {ingresoFormato === "serie" && (
+                            <>
+                              {[0.5, 1, 2].map(m => {
+                                const label = m === 0.5 ? "½ Docena" : m === 1 ? "1 Docena" : "2 Docenas";
+                                return (
+                                  <button
+                                    key={m}
+                                    type="button"
+                                    onClick={() => aplicarPresetSerie(m)}
+                                    className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer shadow-2xs ${
+                                      serieMultiplicador === m
+                                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-600"
+                                        : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                                    }`}
+                                  >
+                                    📦 {label}
+                                  </button>
+                                );
+                              })}
+                            </>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -654,18 +693,24 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                         </div>
                       </div>
                     </div>
-
-                    {/* Resumen derecho */}
-                    <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
-                      <div className="text-xs text-[var(--muted-foreground)]">
-                        {movProd.serie?.nombre && <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {movProd.serie.nombre}</span>}
-                      </div>
-                      <span className="text-sm font-black text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                        {totalParesLote} pares ({(totalParesLote / 12).toFixed(1)} doc)
-                      </span>
-                    </div>
                   </div>
                 </div>
+              )}
+
+              {movType === "salida" && (
+                <>
+                  <div>
+                    <Lbl t="Talla Seleccionada" req />
+                    <select value={movTallaId} onChange={(e) => setMovTallaId(e.target.value)} className={INPUT}>
+                      <option value="">Seleccionar talla...</option>
+                      {movProd.tallas?.map((t) => <option key={t.id} value={t.id}>Talla {t.nombre || t.numero} (stock: {t.stock})</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Lbl t="Cantidad de Pares a Descargar" req />
+                    <input type="number" min="1" value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} className={INPUT} />
+                  </div>
+                </>
               )}
               <div>
                 <Lbl t="Motivo / Documento" req />
