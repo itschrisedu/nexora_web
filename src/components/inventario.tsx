@@ -45,6 +45,14 @@ interface Producto {
 
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
 
+function getDocenaLabel(pares: number): string {
+  if (pares === 6) return '½ Docena';
+  if (pares === 12) return '1 Docena';
+  if (pares > 0 && pares % 12 === 0) return `${pares / 12} Docenas`;
+  if (pares > 0 && pares % 6 === 0) return `${(pares / 12).toFixed(1)} Docenas`;
+  return `${(pares / 12).toFixed(1)} Doc.`;
+}
+
 function Lbl({ t, req }: { t: string; req?: boolean }) {
   return (
     <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
@@ -527,29 +535,134 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
               )}
               {movType === "entrada" && ingresoFormato === "serie" && (
                 <div className="space-y-4">
-                  <div>
-                    <Lbl t="Multiplicador de Serie" />
-                    <div className="grid grid-cols-3 gap-2">
-                      {[0.5, 1, 2].map(m => (
-                        <button key={m} type="button" onClick={() => aplicarPresetSerie(m)} className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${serieMultiplicador === m ? "bg-emerald-500/10 border-emerald-500 text-emerald-600" : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"}`}>
-                          {m === 0.5 ? "½ Docena (6p)" : m === 1 ? "1 Docena (12p)" : "2 Docenas (24p)"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <Lbl t="Desglose por Talla" />
-                      <span className="text-xs font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Total: {totalParesLote} pares</span>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto space-y-2 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
-                      {movProd.tallas?.map((t) => (
-                        <div key={t.id} className="flex items-center justify-between gap-3 text-xs">
-                          <span className="font-bold text-[var(--foreground)] w-20">Talla {t.nombre || t.numero}</span>
-                          <span className="text-[10px] text-[var(--muted-foreground)]">Stock: {t.stock}</span>
-                          <input type="number" min="0" value={loteCantidades[t.id] ?? 0} onChange={(e) => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, parseInt(e.target.value) || 0)})} className="w-16 px-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-center font-bold text-xs" />
+                  {/* Tarjeta del Producto con Foto + Pastillas Interactivas */}
+                  <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl p-4">
+                    <div className="flex items-start gap-3.5">
+                      {/* Foto del producto */}
+                      <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
+                        {movProd.fotoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={movProd.fotoUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Package size={20} className="text-[var(--muted-foreground)]" />
+                        )}
+                      </div>
+
+                      {/* Pastillas Interactivas por Talla */}
+                      <div className="space-y-2.5 flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {movProd.tallas?.map((t) => {
+                            const qty = loteCantidades[t.id] ?? 0;
+                            return (
+                              <div
+                                key={t.id}
+                                className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
+                                  qty > 0
+                                    ? 'bg-[var(--card)] border-emerald-500/40 text-[var(--foreground)]'
+                                    : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
+                                }`}
+                              >
+                                <span className="font-extrabold text-xs font-mono mr-0.5">
+                                  T{t.nombre || t.numero}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, qty - 1)})}
+                                  className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                                  title={`Restar 1 par T${t.nombre || t.numero}`}
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={qty}
+                                  onChange={(e) => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, parseInt(e.target.value) || 0)})}
+                                  className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setLoteCantidades({...loteCantidades, [t.id]: qty + 1})}
+                                  className="w-5 h-5 flex items-center justify-center bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                                  title={`Sumar 1 par T${t.nombre || t.numero}`}
+                                >
+                                  +
+                                </button>
+                                <span className="text-[10px] text-[var(--muted-foreground)] font-mono ml-0.5" title={`Stock actual: ${t.stock}`}>
+                                  stk:{t.stock}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
+
+                        {/* Acciones Rápidas Masivas */}
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newLote: Record<string, number> = {...loteCantidades};
+                              movProd.tallas?.forEach((t) => { newLote[t.id] = (newLote[t.id] || 0) + 1; });
+                              setLoteCantidades(newLote);
+                            }}
+                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          >
+                            +1 par c/talla
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newLote: Record<string, number> = {...loteCantidades};
+                              movProd.tallas?.forEach((t) => { newLote[t.id] = Math.max(0, (newLote[t.id] || 0) - 1); });
+                              setLoteCantidades(newLote);
+                            }}
+                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          >
+                            −1 par c/talla
+                          </button>
+                          {[0.5, 1, 2].map(m => {
+                            const label = m === 0.5 ? "½ Docena" : m === 1 ? "1 Docena" : "2 Docenas";
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => aplicarPresetSerie(m)}
+                                className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer shadow-2xs ${
+                                  serieMultiplicador === m
+                                    ? "bg-emerald-500/10 border-emerald-500 text-emerald-600"
+                                    : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                                }`}
+                              >
+                                📦 {label}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newLote: Record<string, number> = {};
+                              movProd.tallas?.forEach((t) => { newLote[t.id] = 0; });
+                              setLoteCantidades(newLote);
+                            }}
+                            className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          >
+                            ↺ Poner en 0
+                          </button>
+                          <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
+                            = {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} total
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Resumen derecho */}
+                    <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between">
+                      <div className="text-xs text-[var(--muted-foreground)]">
+                        {movProd.serie?.nombre && <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {movProd.serie.nombre}</span>}
+                      </div>
+                      <span className="text-sm font-black text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                        {totalParesLote} pares ({(totalParesLote / 12).toFixed(1)} doc)
+                      </span>
                     </div>
                   </div>
                 </div>

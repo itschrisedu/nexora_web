@@ -237,13 +237,14 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
           const sumRatios = sortedProdTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, sortedProdTallas), 0);
           const factor = sumRatios > 0 ? existing.cantidadPedida / sumRatios : 1;
           existing.tallasDesglose = sortedProdTallas.map((t: any) => ({
+            tallaId: t.id || t.tallaId || '',
             talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
             cantidad: Math.round(getCurvaRatio(t, sortedProdTallas) * factor),
           }));
         }
       }
     } else {
-      let tallasCalc: Array<{ talla: string | number; cantidad: number }> = [];
+      let tallasCalc: Array<{ tallaId?: string; talla: string | number; cantidad: number }> = [];
 
       if (tallasOverride && tallasOverride.length > 0) {
         // Usar las tallas editadas manualmente
@@ -260,6 +261,7 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
           const sumRatios = sortedProdTallas.reduce((acc: number, t: any) => acc + getCurvaRatio(t, sortedProdTallas), 0);
           const factor = sumRatios > 0 ? l.cantidadPedida / sumRatios : 1;
           tallasCalc = sortedProdTallas.map((t: any) => ({
+            tallaId: t.id || t.tallaId || '',
             talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre ?? '38',
             cantidad: Math.round(getCurvaRatio(t, sortedProdTallas) * factor),
           }));
@@ -269,6 +271,7 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
           const sumRatios = ratios.reduce((a, b) => a + b, 0);
           const factor = l.cantidadPedida / sumRatios;
           tallasCalc = tallasEstandar.map((t, i) => ({
+            tallaId: '',
             talla: t,
             cantidad: Math.round(ratios[i] * factor),
           }));
@@ -913,13 +916,18 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             const prodCat = productos.find((p) => p.id === c.productId);
             const foto = c.imageUrl || obtenerFotoProducto(prodCat) || obtenerFotoProducto(c);
 
-            const tallasArr = (c.tallasDesglose || []).map((td: any) => ({
-              tallaId: String(td.talla),
-              sizeNumber: td.talla,
-              cantidadIngresada: td.cantidad,
-              cantidadEsperada: td.cantidad,
-              diferencia: 0,
-            }));
+            const tallasArr = (c.tallasDesglose || []).map((td: any) => {
+              const matchedTalla = (prodCat?.tallas || prodCat?.stockByTalla || []).find(
+                (pt: any) => String(pt.numero ?? pt.sizeNumber ?? pt.talla ?? pt.nombre) === String(td.talla)
+              );
+              return {
+                tallaId: td.tallaId || matchedTalla?.id || matchedTalla?.tallaId || String(td.talla),
+                sizeNumber: td.talla,
+                cantidadIngresada: td.cantidad,
+                cantidadEsperada: td.cantidad,
+                diferencia: 0,
+              };
+            });
 
             modelosData.push({
               productId: c.productId,
@@ -974,7 +982,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         return numA - numB;
       });
       tallasInit = sorted.map((t: any) => ({
-        tallaId: t.id || String(t.sizeNumber || t.talla || t.numero),
+        tallaId: t.id || t.tallaId || String(t.sizeNumber || t.talla || t.numero),
         sizeNumber: t.sizeNumber || t.talla || t.numero || '38',
         cantidadIngresada: 1,
         cantidadEsperada: 0,
@@ -1039,11 +1047,23 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     let hayFaltantes = false;
 
     entryModelos.forEach((m) => {
+      const prodCat = productos.find((p) => p.id === m.productId);
       m.tallas.forEach((t) => {
         if (t.diferencia < 0) hayFaltantes = true;
+
+        let resolvedTallaId = t.tallaId;
+        if (!resolvedTallaId || resolvedTallaId === String(t.sizeNumber)) {
+          const matchedTalla = (prodCat?.tallas || prodCat?.stockByTalla || []).find(
+            (pt: any) => String(pt.numero ?? pt.sizeNumber ?? pt.talla ?? pt.nombre) === String(t.sizeNumber)
+          );
+          if (matchedTalla) {
+            resolvedTallaId = matchedTalla.id || matchedTalla.tallaId || resolvedTallaId;
+          }
+        }
+
         flatLines.push({
           productId: m.productId,
-          tallaId: t.tallaId || 'TALLA_STANDAR',
+          tallaId: resolvedTallaId || String(t.sizeNumber) || 'TALLA_STANDAR',
           cantidadIngresada: t.cantidadIngresada,
           cantidadEsperada: t.cantidadEsperada,
           diferencia: t.diferencia,
