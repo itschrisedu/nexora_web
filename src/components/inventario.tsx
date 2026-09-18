@@ -6,7 +6,7 @@ import { ApiService } from "../services/api.service";
 import {
   Search, Loader2, Package, TrendingUp, TrendingDown,
   RefreshCw, AlertTriangle, X, CheckCircle, AlertCircle, ImageIcon,
-  ArrowRightLeft, Building2
+  ArrowRightLeft, Building2, ChevronDown, ChevronUp, Palette
 } from "lucide-react";
 
 interface InventarioProps {
@@ -34,16 +34,57 @@ interface Producto {
   marca: string;
   modelo: string;
   material?: string;
+  color?: string;
   fotoUrl?: string;
   precioCosto: number;
   precioVenta: number;
-  serie?: { nombre: string };
+  serie?: { id?: string; nombre: string };
   tallas: Talla[];
   tenantId?: string;
   sucursalNombre?: string;
 }
 
+interface ModeloAgrupadoInventario {
+  id: string;
+  name: string;
+  brand: string;
+  baseCode: string;
+  material?: string;
+  fotoUrl?: string;
+  sucursalNombre?: string;
+  products: Producto[];
+}
+
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
+
+const SERIES_NOMBRES: Record<string, string> = {
+  ADULTO: "adulto (38-43)",
+  JUVENIL: "juvenil (34-38)",
+  NINO: "junior (27-32)",
+  NINO_PEQUENO_A: "niño (21-26)",
+  BEBE: "bebe (18-20)",
+  TALLA_GRANDE: "Adulto Grande (43-45)"
+};
+
+const getNombreSerie = (s: any, tallas?: any[]): string => {
+  if (!s) return "—";
+  const nombre = typeof s === "string" ? s : s?.nombre;
+  if (!nombre) return "—";
+
+  if (tallas && tallas.length > 0) {
+    const nums = tallas
+      .map(t => Number(t.numero ?? t.nombre))
+      .filter(n => !isNaN(n) && n > 0);
+    if (nums.length > 0) {
+      const min = Math.min(...nums);
+      const max = Math.max(...nums);
+      const nombreClean = nombre.toLowerCase().replace(/_/g, " ");
+      return `${nombreClean} (${min}-${max})`;
+    }
+  }
+
+  return SERIES_NOMBRES[nombre] || nombre.toLowerCase().replace(/_/g, " ");
+};
 
 function getDocenaLabel(pares: number): string {
   if (pares === 6) return '½ Docena';
@@ -65,8 +106,11 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   const [products, setProducts] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Producto | null>(null);
   const [success, setSuccess] = useState("");
+
+  // Estado de acordeones expandidos por modelo y color activo seleccionado
+  const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
+  const [selectedColorForModel, setSelectedColorForModel] = useState<Record<string, string>>({});
 
   // Modal movimiento (Entrada / Salida)
   const [showMovModal, setShowMovModal] = useState(false);
@@ -120,6 +164,10 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleExpandModel = (modelId: string) => {
+    setExpandedModels(prev => ({ ...prev, [modelId]: !prev[modelId] }));
   };
 
   const openMovimiento = (p: Producto, tipo: "entrada" | "salida") => {
@@ -302,9 +350,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   const stockBajo = (p: Producto) => {
     const list = p.tallas || (p as any).stockPorTalla || [];
     const total = stockTotal(p);
-    // 11 pares o menos = menos de 1 docena completa
     if (total <= 11) return true;
-    // Si tiene 12 o más pares, verificar si alguna talla de la serie está en 0 (serie incompleta)
     return Array.isArray(list) && list.some(t => {
       const qty = t.stock ?? t.cantidad ?? t.disponible ?? 0;
       return qty === 0;
@@ -314,19 +360,58 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   const totalParesLote = Object.values(loteCantidades).reduce((sum, val) => sum + (Number(val) || 0), 0);
   const totalParesTransf = Object.values(transfLoteCantidades).reduce((sum, val) => sum + (Number(val) || 0), 0);
 
-  const filteredProducts = products.filter(p => {
+  // Agrupar productos por Modelo
+  const groupedModelos: ModeloAgrupadoInventario[] = (() => {
+    const map = new Map<string, ModeloAgrupadoInventario>();
+
+    products.forEach(p => {
+      const baseCode = p.modelo || (p.codigo ? p.codigo.split('-')[0] : '') || p.nombre || 'MOD';
+      const key = `${baseCode}___${p.nombre || ''}___${p.marca || ''}___${p.tenantId || ''}`;
+      
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          name: p.nombre || p.modelo,
+          brand: p.marca || '',
+          baseCode: baseCode,
+          material: p.material,
+          fotoUrl: p.fotoUrl,
+          sucursalNombre: p.sucursalNombre,
+          products: [],
+        });
+      }
+      const m = map.get(key)!;
+      if (!m.fotoUrl && p.fotoUrl) {
+        m.fotoUrl = p.fotoUrl;
+      }
+      m.products.push(p);
+    });
+
+    return Array.from(map.values());
+  })();
+
+  // Filtro de búsqueda por modelo, marca, código, color o serie
+  const filteredModelos = groupedModelos.filter(m => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return (
-      p.nombre.toLowerCase().includes(q) ||
+    const matchModel =
+      m.name.toLowerCase().includes(q) ||
+      m.brand.toLowerCase().includes(q) ||
+      m.baseCode.toLowerCase().includes(q) ||
+      (m.material && m.material.toLowerCase().includes(q));
+
+    const matchVariant = m.products.some(p =>
       p.codigo.toLowerCase().includes(q) ||
-      p.marca.toLowerCase().includes(q) ||
-      p.modelo.toLowerCase().includes(q)
+      (p.color && p.color.toLowerCase().includes(q)) ||
+      (p.serie?.nombre && p.serie.nombre.toLowerCase().includes(q))
     );
+
+    return matchModel || matchVariant;
   });
 
   return (
-    <div className="space-y-6">      {/* Header */}
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -337,15 +422,15 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
               </span>
             )}
           </div>
-          <p className="text-xs text-[var(--muted-foreground)] font-medium mt-0.5">Control físico de existencias por modelo y talla en tiempo real</p>
+          <p className="text-xs text-[var(--muted-foreground)] font-medium mt-0.5">Control físico de existencias por modelo, serie y talla en tiempo real</p>
         </div>
         <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto">
-          <button onClick={loadProducts} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors shrink-0">
+          <button onClick={loadProducts} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors shrink-0 cursor-pointer">
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
           <div className="relative flex-1 sm:flex-none sm:w-64">
             <Search size={16} className="absolute left-3 top-3 text-[var(--muted-foreground)]" />
-            <input type="text" placeholder="Buscar calzado..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]" />
+            <input type="text" placeholder="Buscar modelo, código o serie..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]" />
           </div>
         </div>
       </div>
@@ -356,148 +441,248 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
         </div>
       )}
 
-      {/* Grid de Productos */}
+      {/* Listado de Modelos Agrupados estilo Catálogo */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 text-[var(--muted-foreground)]">
           <Loader2 className="animate-spin text-[#0F172A]" size={32} />
-          <span className="text-sm">Cargando inventario...</span>
+          <span className="text-sm mt-2">Cargando inventario...</span>
         </div>
-      ) : filteredProducts.length === 0 ? (
+      ) : filteredModelos.length === 0 ? (
         <div className="p-12 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
           No se encontraron productos en el inventario de esta sucursal.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
-          {filteredProducts.map((p) => {
-            const total = stockTotal(p);
-            const bajo = stockBajo(p);
+        <div className="space-y-4">
+          {filteredModelos.map((m) => {
+            const modelProducts = m.products || [];
+            const uniqueColors = Array.from(new Set(modelProducts.map(p => p.color || 'Único')));
+            const activeColor = selectedColorForModel[m.id] || uniqueColors[0] || '';
+            const activeProduct = modelProducts.find(p => (p.color || 'Único') === activeColor) || modelProducts[0];
+            const isExpanded = expandedModels[m.id];
+            const totalStockModelo = modelProducts.reduce((acc, p) => acc + stockTotal(p), 0);
+
             return (
               <div
-                key={p.id}
-                onClick={() => setSelected(selected?.id === p.id ? null : p)}
-                className={`bg-[var(--card)] border rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden w-full min-w-0 ${
-                  selected?.id === p.id
-                    ? "border-[#0F172A] ring-1 ring-[#0F172A]"
-                    : "border-[var(--border)]"
-                }`}
+                key={m.id}
+                className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all"
               >
-                <div className="flex items-start gap-3 sm:gap-4 w-full min-w-0">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0">
-                    {p.fotoUrl ? (
-                      <img
-                        src={p.fotoUrl}
-                        alt={p.nombre}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ImageIcon
-                        size={24}
-                        className="text-[var(--muted-foreground)] opacity-40"
-                      />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <div className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-1.5 min-w-0">
-                      <div className="min-w-0 flex-1 pr-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate block max-w-full">
-                            {p.marca} · {p.modelo}
-                          </span>
-                          {activeSucursalId === "TODAS" && (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
-                              <Building2 size={10} /> {p.sucursalNombre || "Matriz"}
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="font-bold text-sm truncate text-[var(--foreground)] mt-0.5">
-                          {p.nombre}
-                        </h4>
-                      </div>
-                      <span
-                        className={`text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap self-start ${
-                          total === 0
-                            ? "bg-red-500/10 text-red-500"
-                            : bajo
-                            ? "bg-amber-500/10 text-amber-600"
-                            : "bg-emerald-500/10 text-emerald-600"
-                        }`}
-                      >
-                        {total} pares
-                      </span>
+                {/* Resumen Cabecera del Modelo */}
+                <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start sm:items-center gap-4">
+                    <div className="w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                      {activeProduct?.fotoUrl || m.fotoUrl ? (
+                        <img
+                          src={activeProduct?.fotoUrl || m.fotoUrl}
+                          alt={m.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon size={20} className="text-[var(--muted-foreground)] opacity-40" />
+                      )}
                     </div>
-
-                    {/* Desglose de tallas con wrap limpio */}
-                    <div className="mt-2.5 flex flex-wrap gap-1.5 w-full overflow-hidden">
-                      {(p.tallas || []).map((t, idx) => {
-                        const st = t.stock ?? t.cantidad ?? t.disponible ?? 0;
-                        const min = t.stockMinimo || 0;
-                        const num = t.nombre || t.numero;
-                        return (
-                          <span
-                            key={t.id || idx}
-                            className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-[10px] font-bold border whitespace-nowrap inline-flex items-center ${
-                              st === 0
-                                ? "bg-red-500/10 text-red-500 border-red-500/20"
-                                : min > 0 && st <= min
-                                ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                                : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                            }`}
-                          >
-                            T{num}: {st}
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-bold text-base text-[var(--foreground)]">{m.name}</h4>
+                        <span className="px-2 py-0.5 bg-slate-900 text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider">
+                          {m.baseCode}
+                        </span>
+                        {m.material && (
+                          <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded-lg text-[10px] font-semibold">
+                            {m.material}
                           </span>
-                        );
-                      })}
-                    </div>
-
-                    {/* Acciones expandidas */}
-                    {selected?.id === p.id && (
-                      <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-2.5 w-full">
-                        <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] flex-wrap gap-2">
-                          <span>
-                            Costo: <strong className="text-[var(--foreground)]">${Number(p.precioCosto).toFixed(2)}</strong>
+                        )}
+                        {activeSucursalId === "TODAS" && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                            <Building2 size={10} /> {m.sucursalNombre || "Matriz"}
                           </span>
-                          <span>
-                            Venta: <strong className="text-emerald-600 font-bold">${Number(p.precioVenta).toFixed(2)}</strong>
-                          </span>
-                        </div>
-                        {canMove && (
-                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1 w-full">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openMovimiento(p, "entrada");
-                              }}
-                              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl text-xs font-semibold hover:bg-emerald-500/20 transition-colors"
-                            >
-                              <TrendingUp size={13} /> Entrada
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openMovimiento(p, "salida");
-                              }}
-                              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-xs font-semibold hover:bg-red-500/20 transition-colors"
-                            >
-                              <TrendingDown size={13} /> Salida
-                            </button>
-                            {isAdmin && (sucursales || []).length > 1 && total > 0 && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openTransferencia(p);
-                                }}
-                                className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-xl text-xs font-semibold hover:bg-blue-500/20 transition-colors"
-                                title="Despachar pares a otra sucursal"
-                              >
-                                <ArrowRightLeft size={13} /> Despachar
-                              </button>
-                            )}
-                          </div>
                         )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                          {m.brand} · {uniqueColors.length} {uniqueColors.length === 1 ? 'color' : 'colores'}
+                        </p>
+                        <span
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                            totalStockModelo === 0
+                              ? "bg-red-500/10 text-red-500"
+                              : "bg-emerald-500/10 text-emerald-600"
+                          }`}
+                        >
+                          {totalStockModelo} {totalStockModelo === 1 ? 'par' : 'pares'} en stock
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Acciones principales / Precios / Botón Expandir */}
+                  <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+                    <div className="text-left md:text-right">
+                      <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">
+                        Precios Variantes
+                      </span>
+                      <span className="text-sm font-extrabold text-[#0F172A] dark:text-white">
+                        {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
+                      </span>
+                      {isAdmin && activeProduct && (
+                        <span className="text-[10px] text-[var(--muted-foreground)] block">
+                          Costo: ${Number(activeProduct.precioCosto).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandModel(m.id)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                      >
+                        {isExpanded ? (
+                          <><span>Ocultar Variantes</span><ChevronUp size={14} /></>
+                        ) : (
+                          <><span>Ver Variantes ({modelProducts.length})</span><ChevronDown size={14} /></>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {/* Vista Detallada de Variantes (Expandible) */}
+                {isExpanded && (
+                  <div className="border-t border-[var(--border)] bg-[var(--muted)]/10 p-4 sm:p-5 space-y-4">
+                    {/* Selector de Color Activo */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
+                        <Palette size={12}/> Color Activo:
+                      </span>
+                      {uniqueColors.map(col => (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: col }))}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                            activeColor === col
+                              ? "bg-slate-900 text-white border-slate-900"
+                              : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
+                          }`}
+                        >
+                          <span>{col}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Grid de Tarjetas de Variantes (Series) para el Color Seleccionado */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {modelProducts
+                        .filter(p => (p.color || 'Único') === activeColor)
+                        .map(p => {
+                          const tallas = p.tallas || (p as any).stockPorTalla || [];
+                          const totalStock = tallas.reduce((acc: number, t: any) => acc + (t.stock ?? t.cantidad ?? t.disponible ?? 0), 0);
+                          const bajo = stockBajo(p);
+
+                          return (
+                            <div
+                              key={p.id}
+                              className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-xs transition-all"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Código Variante</span>
+                                  <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">{p.codigo}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Serie</span>
+                                  <span className="text-xs font-semibold text-[var(--foreground)]">
+                                    {p.serie?.nombre ? getNombreSerie(p.serie.nombre, tallas) : "—"}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precio</span>
+                                  <span className="text-xs font-extrabold text-[#0F172A] dark:text-emerald-400">
+                                    ${Number(p.precioVenta).toFixed(2)}
+                                  </span>
+                                  {/* COSTO VISIBLE EXCLUSIVAMENTE PARA ADMINISTRADOR */}
+                                  {isAdmin && (
+                                    <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                                      Costo: <strong className="text-[var(--foreground)]">${Number(p.precioCosto).toFixed(2)}</strong>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Detalle de Tallas y Stocks */}
+                              <div className="bg-[var(--muted)]/20 rounded-lg p-2.5 space-y-1.5">
+                                <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">
+                                  Stock Físico por Talla
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {tallas.map((t: any, idx: number) => {
+                                    const st = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+                                    const min = t.stockMinimo || 0;
+                                    const num = t.nombre || t.numero;
+                                    return (
+                                      <span
+                                        key={t.id || t.tallaId || idx}
+                                        title={`Stock: ${st} pares`}
+                                        className={`px-2 py-1 rounded-md text-[10px] font-bold border whitespace-nowrap inline-flex items-center ${
+                                          st === 0
+                                            ? "bg-red-500/10 text-red-500 border-red-500/20"
+                                            : min > 0 && st <= min
+                                            ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                                            : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                        }`}
+                                      >
+                                        T{num}: {st}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                                <div className="text-[10px] text-[var(--muted-foreground)] pt-1 flex justify-between items-center">
+                                  <span>Total: <b>{totalStock} pares</b> {getDocenaLabel(totalStock)}</span>
+                                  {totalStock === 0 ? (
+                                    <span className="text-red-500 font-bold">Sin Stock</span>
+                                  ) : bajo ? (
+                                    <span className="text-amber-600 font-bold">Stock Bajo</span>
+                                  ) : (
+                                    <span className="text-emerald-600 font-semibold">Disponible</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Botones de acción de inventario */}
+                              {canMove && (
+                                <div className="flex items-center justify-end gap-2 pt-1 border-t border-[var(--border)]/40 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => openMovimiento(p, "entrada")}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-xl hover:bg-emerald-500/20 transition-all cursor-pointer"
+                                  >
+                                    <TrendingUp size={13} /> <span>Entrada</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openMovimiento(p, "salida")}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-all cursor-pointer"
+                                  >
+                                    <TrendingDown size={13} /> <span>Salida</span>
+                                  </button>
+                                  {isAdmin && (sucursales || []).length > 1 && totalStock > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openTransferencia(p)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-all cursor-pointer"
+                                      title="Despachar pares a otra sucursal"
+                                    >
+                                      <ArrowRightLeft size={13} /> <span>Despachar</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -589,12 +774,16 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                         <div className="font-extrabold text-xs text-[var(--foreground)]">
                           {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} {totalParesLote > 0 ? `(${getDocenaLabel(totalParesLote)})` : ''}
                         </div>
-                        <div className="text-[11px] text-[var(--muted-foreground)]">
-                          ${Number(movProd.precioCosto).toFixed(2)} / par
-                        </div>
-                        <div className="font-black text-sm text-emerald-600">
-                          ${(totalParesLote * Number(movProd.precioCosto)).toFixed(2)}
-                        </div>
+                        {isAdmin && (
+                          <>
+                            <div className="text-[11px] text-[var(--muted-foreground)]">
+                              ${Number(movProd.precioCosto).toFixed(2)} / par
+                            </div>
+                            <div className="font-black text-sm text-emerald-600">
+                              ${(totalParesLote * Number(movProd.precioCosto)).toFixed(2)}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -858,12 +1047,16 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                     <div className="font-extrabold text-xs text-[var(--foreground)]">
                       {totalParesTransf} {totalParesTransf === 1 ? 'par' : 'pares'} {totalParesTransf > 0 ? `(${getDocenaLabel(totalParesTransf)})` : ''}
                     </div>
-                    <div className="text-[11px] text-[var(--muted-foreground)]">
-                      ${Number(transfProd.precioCosto || transfProd.precioVenta || 0).toFixed(2)} / par
-                    </div>
-                    <div className="font-black text-sm text-blue-600 dark:text-blue-400">
-                      ${(totalParesTransf * Number(transfProd.precioCosto || transfProd.precioVenta || 0)).toFixed(2)}
-                    </div>
+                    {isAdmin && (
+                      <>
+                        <div className="text-[11px] text-[var(--muted-foreground)]">
+                          ${Number(transfProd.precioCosto || transfProd.precioVenta || 0).toFixed(2)} / par
+                        </div>
+                        <div className="font-black text-sm text-blue-600 dark:text-blue-400">
+                          ${(totalParesTransf * Number(transfProd.precioCosto || transfProd.precioVenta || 0)).toFixed(2)}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
