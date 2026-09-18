@@ -171,6 +171,7 @@ interface ClienteCartera {
   totalComprasPendientes: number;
   estadoGlobal: EstadoCobro;
   proximoVencimiento?: string;
+  saldoAFavorCliente: number;
   cobros: Cobro[];
 }
 
@@ -665,6 +666,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         totalComprasPendientes: comprasPendientes.length,
         estadoGlobal,
         proximoVencimiento: fechasPendientes[0],
+        saldoAFavorCliente: clienteDb?.saldoAFavor ? Number(clienteDb.saldoAFavor) : 0,
         cobros: listaCobros.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
       });
     });
@@ -1329,7 +1331,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         notasModelos.length > 0 ? `[Notas: ${notasModelos.join('; ')}]` : ''
       ].filter(Boolean).join(' - ');
 
-      await ApiService.post('/devoluciones/cliente', {
+      const resultado = await ApiService.post('/devoluciones/cliente', {
         clientId: carteraSeleccionada.clientId,
         saleNoteId: selectedCobro?.saleNote?.id || undefined,
         motivo: motivoFinal,
@@ -1338,10 +1340,24 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         lines: linesPayload,
       });
 
-      showToast(
-        `¡Devolución de ${totalPares} pares ($${totalMonto.toFixed(2)}) procesada exitosamente!`,
-        'success'
-      );
+      // Mostrar resultado financiero detallado
+      const resumen = resultado?.resumenFinanciero;
+      if (resumen) {
+        const msgParts = [
+          `Devolucion de ${totalPares} pares procesada.`,
+          `Deuda descontada: $${Number(resumen.deudaDescontada || 0).toFixed(2)}.`,
+        ];
+        if (Number(resumen.saldoAFavor || 0) > 0) {
+          msgParts.push(`Saldo a favor del cliente: $${Number(resumen.saldoAFavor).toFixed(2)}.`);
+        }
+        showToast(msgParts.join(' '), 'success');
+      } else {
+        showToast(
+          `Devolucion de ${totalPares} pares ($${totalMonto.toFixed(2)}) procesada exitosamente!`,
+          'success'
+        );
+      }
+
       setShowDevolucionModal(false);
       setLineasDevolucion([]);
       setMotivoDevolucion('');
@@ -1349,7 +1365,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       setDevolucionPrecioUnitario(0);
       await loadCobros();
     } catch (err: any) {
-      showToast(err.message || 'Error al registrar devolución.', 'error');
+      showToast(err.message || 'Error al registrar devolucion.', 'error');
     } finally {
       setSavingDevolucion(false);
     }
@@ -1825,6 +1841,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 >
                                   ${cliente.saldoTotalPendiente.toFixed(2)}
                                 </span>
+                                {cliente.saldoAFavorCliente > 0 && (
+                                  <div className="text-[10px] font-bold text-emerald-600 mt-0.5">💰 A favor: ${cliente.saldoAFavorCliente.toFixed(2)}</div>
+                                )}
                               </td>
 
                               <td className="px-5 py-4 text-right text-[11px] text-[var(--muted-foreground)]">
@@ -2182,6 +2201,43 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   </span>
                 </div>
               </div>
+
+              {/* Badge Saldo a Favor del Cliente */}
+              {carteraSeleccionada.saldoAFavorCliente > 0 && (
+                <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💰</span>
+                    <div>
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 block font-semibold">Saldo a Favor del Cliente</span>
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-300">
+                        ${carteraSeleccionada.saldoAFavorCliente.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!cobroSeleccionado || Number(cobroSeleccionado.saldoPendiente) <= 0) {
+                        showToast('Selecciona una nota con saldo pendiente para aplicar el credito.', 'warning');
+                        return;
+                      }
+                      try {
+                        const res = await ApiService.post('/devoluciones/aplicar-saldo-cliente', {
+                          clientId: carteraSeleccionada.clientId,
+                          cobroId: cobroSeleccionado.id,
+                        });
+                        showToast(`Paso aplicado: $${Number(res.montoAplicado || 0).toFixed(2)} descontados. Saldo restante: $${Number(res.saldoRestanteCliente || 0).toFixed(2)}`, 'success');
+                        await loadCobros();
+                      } catch (err: any) {
+                        showToast(err.message || 'Error al aplicar saldo a favor.', 'error');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl transition-all shadow-sm"
+                  >
+                    Hacer Paso
+                  </button>
+                </div>
+              )}
 
               {/* Componente Unificado de Nota Activa y Selector Acordeón */}
               {cobroSeleccionado && (
