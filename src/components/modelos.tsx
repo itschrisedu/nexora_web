@@ -121,6 +121,38 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
   return SERIES_NOMBRES[nombreClean] || nombreClean.toLowerCase().replace(/_/g, " ");
 };
 
+// Curvas estándar de distribución por serie
+const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B'): Record<number, number> => {
+  const name = serieName.toUpperCase();
+  if (name.includes('ADULTO') || name === 'TALLA_GRANDE') {
+    if (tipo === 'DOCENA') return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
+    if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
+    return { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1 };
+  }
+  if (name.includes('JUVENIL')) {
+    if (tipo === 'DOCENA') return { 34: 2, 35: 3, 36: 3, 37: 2, 38: 2 };
+    if (tipo === 'MEDIA_A') return { 34: 1, 35: 2, 36: 1, 37: 1, 38: 1 };
+    return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1 };
+  }
+  // Junior, Niño, Bebé: 1 par por talla para media, 2 para docena
+  return {}; // vacío => se usa fallback genérico
+};
+
+const buildTallaIdsFromCurva = (sObj: SerieConfig, curva: Record<number, number>): string[] => {
+  if (!sObj.tallas) return [];
+  const result: string[] = [];
+  for (const t of sObj.tallas) {
+    const qty = curva[t.numero];
+    if (qty !== undefined) {
+      for (let i = 0; i < qty; i++) result.push(t.id);
+    } else {
+      // fallback: 2 para docena genérica, pero no sabemos tipo aquí
+      // se maneja fuera
+    }
+  }
+  return result;
+};
+
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
 
 function Lbl({ t, req }: { t: string; req?: boolean }) {
@@ -260,7 +292,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [editProductTallas, setEditProductTallas] = useState<{ tallaId: string; numero: number; cantidad: number }[]>([]);
   const [newTallaNumeroInput, setNewTallaNumeroInput] = useState("");
 
-  // ── Estado para modal de Edición del Modelo Base ──
+  // ── Estado para modal de Edición del Modelo Base y sus Series ──
   const [showEditModel, setShowEditModel] = useState(false);
   const [editModel, setEditModel] = useState<ModeloAgrupado | null>(null);
   const [editModelName, setEditModelName] = useState("");
@@ -269,6 +301,19 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [editModelMaterial, setEditModelMaterial] = useState("");
   const [editModelSupplierId, setEditModelSupplierId] = useState("");
   const [editModelAlternateIds, setEditModelAlternateIds] = useState<string[]>([]);
+  const [editModelSerieIds, setEditModelSerieIds] = useState<string[]>([]);
+  const [editModelSeriesPrices, setEditModelSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+  const [editModelCustomTallas, setEditModelCustomTallas] = useState<Record<string, string[]>>({});
+  const [editModelVariants, setEditModelVariants] = useState<{
+    productId: string;
+    color: string;
+    fotoUrl?: string;
+    serieId: string;
+    costPrice: number;
+    salePrice: number;
+    tallas: { tallaId: string; numero: number; cantidad: number }[];
+  }[]>([]);
+  const [editModelSelectedVariantId, setEditModelSelectedVariantId] = useState<string>("");
 
   // ── Estado para Proveedor Alternos en Creación ──
   const [createAlternateIds, setCreateAlternateIds] = useState<string[]>([]);
@@ -417,8 +462,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
         return prev.filter(x => x !== id);
       } else {
         const sObj = series.find(s => s.id === id);
-        const defaultTallaIds = sObj?.tallas?.map(t => t.id) || [];
-        setCustomTallas(ct => ({ ...ct, [id]: defaultTallaIds }));
+        if (sObj) {
+          // Auto-aplicar curva DOCENA estándar por defecto
+          const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
+          const hasCustomCurva = Object.keys(curva).length > 0;
+          if (hasCustomCurva) {
+            const ids = buildTallaIdsFromCurva(sObj, curva);
+            setCustomTallas(ct => ({ ...ct, [id]: ids }));
+          } else {
+            // Fallback genérico: 2 pares por talla (docena genérica)
+            const ids: string[] = [];
+            sObj.tallas?.forEach(t => { ids.push(t.id); ids.push(t.id); });
+            setCustomTallas(ct => ({ ...ct, [id]: ids }));
+          }
+        } else {
+          setCustomTallas(ct => ({ ...ct, [id]: [] }));
+        }
         setSeriesPrices(sp => ({
           ...sp,
           [id]: { costPrice: "", salePrice: "" }
@@ -426,6 +485,23 @@ export default function ModelosComponent({ online }: ModelosProps) {
         return [...prev, id];
       }
     });
+  };
+
+  // Aplicar curva estándar en el formulario de CREACIÓN
+  const aplicarCurvaEnCreacion = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
+    const sObj = series.find(s => s.id === serieId);
+    if (!sObj || !sObj.tallas) return;
+    const curva = getCurvaDocena(sObj.nombre, tipo);
+    const hasCustomCurva = Object.keys(curva).length > 0;
+    if (hasCustomCurva) {
+      const ids = buildTallaIdsFromCurva(sObj, curva);
+      setCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    } else {
+      const factor = tipo === 'DOCENA' ? 2 : 1;
+      const ids: string[] = [];
+      sObj.tallas.forEach(t => { for (let i = 0; i < factor; i++) ids.push(t.id); });
+      setCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    }
   };
 
   const toggleTallaInSerie = (serieId: string, tallaId: string) => {
@@ -481,7 +557,16 @@ export default function ModelosComponent({ online }: ModelosProps) {
         salePrice: prod ? String(prod.precioVenta) : "",
       };
       const sObj = series.find(s => s.id === sid);
-      initialCustomTallas[sid] = sObj?.tallas?.map(t => t.id) || [];
+      if (sObj?.tallas) {
+        const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
+        if (Object.keys(curva).length > 0) {
+          initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, curva);
+        } else {
+          const ids: string[] = [];
+          sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
+          initialCustomTallas[sid] = ids;
+        }
+      }
     });
 
     setNewColorSeriesPrices(initialPrices);
@@ -507,8 +592,17 @@ export default function ModelosComponent({ online }: ModelosProps) {
         return prev.filter(x => x !== id);
       } else {
         const sObj = series.find(s => s.id === id);
-        const defaultTallaIds = sObj?.tallas?.map(t => t.id) || [];
-        setNewColorCustomTallas(ct => ({ ...ct, [id]: defaultTallaIds }));
+        if (sObj && sObj.tallas) {
+          const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
+          if (Object.keys(curva).length > 0) {
+            const ids = buildTallaIdsFromCurva(sObj, curva);
+            setNewColorCustomTallas(ct => ({ ...ct, [id]: ids }));
+          } else {
+            const ids: string[] = [];
+            sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
+            setNewColorCustomTallas(ct => ({ ...ct, [id]: ids }));
+          }
+        }
         setNewColorSeriesPrices(sp => ({
           ...sp,
           [id]: { costPrice: "", salePrice: "" }
@@ -516,6 +610,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
         return [...prev, id];
       }
     });
+  };
+
+  const aplicarCurvaEnNuevoColor = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
+    const sObj = series.find(s => s.id === serieId);
+    if (!sObj || !sObj.tallas) return;
+    const curva = getCurvaDocena(sObj.nombre, tipo);
+    const hasCustomCurva = Object.keys(curva).length > 0;
+    if (hasCustomCurva) {
+      const ids = buildTallaIdsFromCurva(sObj, curva);
+      setNewColorCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    } else {
+      const factor = tipo === 'DOCENA' ? 2 : 1;
+      const ids: string[] = [];
+      sObj.tallas.forEach(t => { for (let i = 0; i < factor; i++) ids.push(t.id); });
+      setNewColorCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    }
   };
 
   const toggleTallaInNewColorSerie = (serieId: string, tallaId: string) => {
@@ -857,15 +967,35 @@ export default function ModelosComponent({ online }: ModelosProps) {
     const selectedSerie = series.find(s => s.id === newSerieId);
     if (selectedSerie && selectedSerie.tallas) {
       const existingMap: Record<number, number> = {};
-      editProductTallas.forEach(t => { existingMap[t.numero] = t.cantidad; });
+      let hasExisting = false;
+      editProductTallas.forEach(t => {
+        if (t.cantidad > 0) hasExisting = true;
+        existingMap[t.numero] = t.cantidad;
+      });
+
+      const curva = getCurvaDocena(selectedSerie.nombre, 'DOCENA');
+      const hasCurva = Object.keys(curva).length > 0;
 
       const newTallasList = selectedSerie.tallas.map(t => ({
         tallaId: t.id,
         numero: t.numero,
-        cantidad: existingMap[t.numero] ?? 0,
+        cantidad: hasExisting ? (existingMap[t.numero] ?? 0) : (hasCurva ? (curva[t.numero] ?? 2) : 2),
       }));
       setEditProductTallas(newTallasList);
     }
+  };
+
+  const aplicarCurvaInEditProduct = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
+    const selectedSerie = series.find(s => s.id === editProductSerieId);
+    if (!selectedSerie || !selectedSerie.tallas) return;
+    const curva = getCurvaDocena(selectedSerie.nombre, tipo);
+    const hasCurva = Object.keys(curva).length > 0;
+    const factor = tipo === 'DOCENA' ? 2 : 1;
+    setEditProductTallas(selectedSerie.tallas.map(t => ({
+      tallaId: t.id,
+      numero: t.numero,
+      cantidad: hasCurva ? (curva[t.numero] ?? factor) : factor,
+    })));
   };
 
   const handleAddCustomTallaToEdit = () => {
@@ -954,7 +1084,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
     }
   };
 
-  // ── Abrir modal de edición del modelo base ──
+  // ── Abrir modal de edición del modelo base y sus series ──
   const openEditModel = (m: ModeloAgrupado) => {
     setEditModel(m);
     setEditModelName(m.name);
@@ -963,8 +1093,121 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setEditModelMaterial(m.material || "");
     setEditModelSupplierId(m.supplierId || "");
     setEditModelAlternateIds(m.alternateSupplierIds || []);
+
+    const activeSerieIds: string[] = [];
+    const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+    const initialCustomTallas: Record<string, string[]> = {};
+
+    (m.products || []).forEach(p => {
+      const sid = (p.serie as any)?.id || (p as any).serieId;
+      if (sid && !activeSerieIds.includes(sid)) {
+        activeSerieIds.push(sid);
+      }
+      if (sid) {
+        if (!initialPrices[sid]) {
+          initialPrices[sid] = {
+            costPrice: p.precioCosto ? String(p.precioCosto) : "",
+            salePrice: p.precioVenta ? String(p.precioVenta) : "",
+          };
+        }
+        if (!initialCustomTallas[sid]) {
+          const sObj = series.find(s => s.id === sid);
+          const pTallas = p.tallas || (p as any).stockPorTalla || [];
+          const ids: string[] = [];
+          
+          if (pTallas.length > 0 && pTallas.some((t: any) => (t.cantidad ?? t.disponible ?? 0) > 0)) {
+            pTallas.forEach((t: any) => {
+              const qty = t.cantidad ?? t.disponible ?? 0;
+              const matchedTalla = sObj?.tallas?.find(st => st.id === t.tallaId || st.numero === t.numero);
+              const targetId = matchedTalla?.id || t.tallaId || t.id;
+              for (let i = 0; i < qty; i++) {
+                ids.push(targetId);
+              }
+            });
+            initialCustomTallas[sid] = ids;
+          } else if (sObj?.tallas) {
+            const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
+            if (Object.keys(curva).length > 0) {
+              initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, curva);
+            } else {
+              const defaultIds: string[] = [];
+              sObj.tallas.forEach(t => { defaultIds.push(t.id); defaultIds.push(t.id); });
+              initialCustomTallas[sid] = defaultIds;
+            }
+          }
+        }
+      }
+    });
+
+    setEditModelSerieIds(activeSerieIds);
+    setEditModelSeriesPrices(initialPrices);
+    setEditModelCustomTallas(initialCustomTallas);
     setError("");
     setShowEditModel(true);
+  };
+
+  const toggleEditModelSerie = (id: string) => {
+    setEditModelSerieIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(x => x !== id);
+      } else {
+        const sObj = series.find(s => s.id === id);
+        if (sObj && sObj.tallas && !editModelCustomTallas[id]) {
+          const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
+          if (Object.keys(curva).length > 0) {
+            const ids = buildTallaIdsFromCurva(sObj, curva);
+            setEditModelCustomTallas(ct => ({ ...ct, [id]: ids }));
+          } else {
+            const ids: string[] = [];
+            sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
+            setEditModelCustomTallas(ct => ({ ...ct, [id]: ids }));
+          }
+        }
+        if (!editModelSeriesPrices[id]) {
+          setEditModelSeriesPrices(sp => ({
+            ...sp,
+            [id]: { costPrice: "", salePrice: "" }
+          }));
+        }
+        return [...prev, id];
+      }
+    });
+  };
+
+  const aplicarCurvaEnEditModelSerie = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
+    const sObj = series.find(s => s.id === serieId);
+    if (!sObj || !sObj.tallas) return;
+    const curva = getCurvaDocena(sObj.nombre, tipo);
+    const hasCustomCurva = Object.keys(curva).length > 0;
+    if (hasCustomCurva) {
+      const ids = buildTallaIdsFromCurva(sObj, curva);
+      setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    } else {
+      const factor = tipo === 'DOCENA' ? 2 : 1;
+      const ids: string[] = [];
+      sObj.tallas.forEach(t => { for (let i = 0; i < factor; i++) ids.push(t.id); });
+      setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    }
+  };
+
+  const addTallaRepeatInEditModel = (serieId: string, tallaId: string) => {
+    setEditModelCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      return { ...prev, [serieId]: [...current, tallaId] };
+    });
+  };
+
+  const removeOneTallaInEditModel = (serieId: string, tallaId: string) => {
+    setEditModelCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      const idx = current.indexOf(tallaId);
+      if (idx > -1) {
+        const copy = [...current];
+        copy.splice(idx, 1);
+        return { ...prev, [serieId]: copy };
+      }
+      return prev;
+    });
   };
 
   const handleUpdateModel = async (e: React.FormEvent) => {
@@ -988,7 +1231,38 @@ export default function ModelosComponent({ online }: ModelosProps) {
         alternateSupplierIds: editModelAlternateIds.filter(Boolean),
       });
 
-      setSuccess("Modelo actualizado exitosamente.");
+      // Actualizar precios y curva de tallas en las variantes existentes
+      for (const p of editModel.products || []) {
+        const sid = (p.serie as any)?.id || (p as any).serieId;
+        if (sid && editModelSerieIds.includes(sid)) {
+          const prices = editModelSeriesPrices[sid];
+          const sObj = series.find(s => s.id === sid);
+          const selectedTallaIds = editModelCustomTallas[sid] || [];
+          
+          const tallasMap = new Map<string, number>();
+          selectedTallaIds.forEach(tid => {
+            tallasMap.set(tid, (tallasMap.get(tid) || 0) + 1);
+          });
+
+          const tallasPayload = (sObj?.tallas || []).map(t => ({
+            tallaId: t.id,
+            numero: t.numero,
+            cantidad: tallasMap.get(t.id) || 0,
+          }));
+
+          const costVal = parseFloat(prices?.costPrice || String(p.precioCosto));
+          const saleVal = parseFloat(prices?.salePrice || String(p.precioVenta));
+
+          await ApiService.put(`/inventario/productos/${p.id}`, {
+            serieId: sid,
+            costPrice: isNaN(costVal) ? Number(p.precioCosto) : costVal,
+            salePrice: isNaN(saleVal) ? Number(p.precioVenta) : saleVal,
+            tallas: tallasPayload,
+          });
+        }
+      }
+
+      setSuccess("Modelo y series actualizados exitosamente.");
       setShowEditModel(false);
       setEditModel(null);
       loadData();
@@ -1609,51 +1883,80 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                 </div>
                               )}
 
-                              {/* Personalizador de Tallas y Media Docena */}
-                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-1.5">
+                              {/* Componente de Curva de Tallas con Steppers */}
+                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-                                    Tallas para esta serie ({selectedTallaIds.length} pares)
+                                    Serie: {getNombreSerie(s, series).toUpperCase()}
                                   </span>
-                                  {selectedTallaIds.length === 6 ? (
-                                    <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                      <CheckCircle size={12} /> Media Docena (6 pares) ✅
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                                      {selectedTallaIds.length}/6 pares (sugerido 6 para media docena)
-                                    </span>
-                                  )}
+                                  <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+                                    = {selectedTallaIds.length} pares total
+                                  </span>
                                 </div>
 
-                                <div className="flex flex-wrap gap-1.5">
-                                  {s.tallas?.map(t => {
+                                {/* Steppers por talla */}
+                                <div className="flex flex-wrap gap-2">
+                                  {s.tallas?.sort((a, b) => a.numero - b.numero).map(t => {
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
                                     return (
-                                      <div key={t.id} className="flex items-center">
-                                        <button type="button" onClick={() => toggleTallaInSerie(s.id, t.id)}
-                                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
-                                            count > 0
-                                              ? "bg-[#0F172A] text-white border-[#0F172A] shadow-sm"
-                                              : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] opacity-60 hover:opacity-100"
-                                          }`}>
-                                          <span>T{t.numero}</span>
-                                          {count > 1 && (
-                                            <span className="bg-amber-400 text-slate-900 px-1.5 py-0.2 text-[9px] font-black rounded-full">
-                                              x{count}
-                                            </span>
-                                          )}
-                                        </button>
-                                        {count > 0 && (
-                                          <button type="button" onClick={() => addTallaRepeatInSerie(s.id, t.id)}
-                                            title={`Repetir talla ${t.numero} para sumar un par extra (media docena)`}
-                                            className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-[#0F172A] bg-[#0F172A]/10 hover:bg-[#0F172A]/20 rounded-md transition-colors">
-                                            +1
-                                          </button>
-                                        )}
+                                      <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+                                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+                                        <button type="button"
+                                          onClick={() => removeOneTallaInSerie(s.id, t.id)}
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
+                                        >−</button>
+                                        <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+                                        <button type="button"
+                                          onClick={() => addTallaRepeatInSerie(s.id, t.id)}
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
+                                        >+</button>
                                       </div>
                                     );
                                   })}
+                                </div>
+
+                                {/* Botones rápidos: +1/-1 par c/talla */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const ids = sObj2.tallas.map(t => t.id);
+                                        setCustomTallas(ct => ({ ...ct, [s.id]: [...(ct[s.id] || []), ...ids] }));
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors"
+                                  >+1 par c/talla</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        setCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const idx = arr.indexOf(t.id);
+                                            if (idx > -1) arr.splice(idx, 1);
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
+                                  >−1 par c/talla</button>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium">= {selectedTallaIds.length} pares total</span>
+                                </div>
+
+                                {/* Preset de Curvas */}
+                                <div className="flex flex-wrap gap-1.5">
+                                  <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'DOCENA')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Docena (12 pares)</button>
+                                  <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'MEDIA_A')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Media Docena A (6 pares)</button>
+                                  <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'MEDIA_B')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Media Docena B (6 pares)</button>
                                 </div>
                               </div>
                             </div>
@@ -1853,51 +2156,80 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                 </div>
                               )}
 
-                              {/* Personalizador de Tallas */}
-                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-1.5">
+                              {/* Componente de Curva de Tallas con Steppers */}
+                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-                                    Tallas para este color ({selectedTallaIds.length} pares)
+                                    Serie: {getNombreSerie(s, series).toUpperCase()}
                                   </span>
-                                  {selectedTallaIds.length === 6 ? (
-                                    <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                      <CheckCircle size={12} /> Media Docena (6 pares) ✅
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-semibold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                                      {selectedTallaIds.length}/6 pares (sugerido 6 para media docena)
-                                    </span>
-                                  )}
+                                  <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+                                    = {selectedTallaIds.length} pares total
+                                  </span>
                                 </div>
 
-                                <div className="flex flex-wrap gap-1.5">
-                                  {s.tallas?.map(t => {
+                                {/* Steppers por talla */}
+                                <div className="flex flex-wrap gap-2">
+                                  {s.tallas?.sort((a, b) => a.numero - b.numero).map(t => {
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
                                     return (
-                                      <div key={t.id} className="flex items-center">
-                                        <button type="button" onClick={() => toggleTallaInNewColorSerie(s.id, t.id)}
-                                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
-                                            count > 0
-                                              ? "bg-[#0F172A] text-white border-[#0F172A] shadow-sm"
-                                              : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] opacity-60 hover:opacity-100"
-                                          }`}>
-                                          <span>T{t.numero}</span>
-                                          {count > 1 && (
-                                            <span className="bg-amber-400 text-slate-900 px-1.5 py-0.2 text-[9px] font-black rounded-full">
-                                              x{count}
-                                            </span>
-                                          )}
-                                        </button>
-                                        {count > 0 && (
-                                          <button type="button" onClick={() => addTallaRepeatInNewColorSerie(s.id, t.id)}
-                                            title={`Repetir talla ${t.numero} para sumar un par extra (media docena)`}
-                                            className="ml-0.5 px-1.5 py-0.5 text-[10px] font-black text-[#0F172A] bg-[#0F172A]/10 hover:bg-[#0F172A]/20 rounded-md transition-colors">
-                                            +1
-                                          </button>
-                                        )}
+                                      <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+                                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+                                        <button type="button"
+                                          onClick={() => removeOneTallaInNewColorSerie(s.id, t.id)}
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
+                                        >−</button>
+                                        <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+                                        <button type="button"
+                                          onClick={() => addTallaRepeatInNewColorSerie(s.id, t.id)}
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
+                                        >+</button>
                                       </div>
                                     );
                                   })}
+                                </div>
+
+                                {/* Botones rápidos: +1/-1 par c/talla */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const ids = sObj2.tallas.map(t => t.id);
+                                        setNewColorCustomTallas(ct => ({ ...ct, [s.id]: [...(ct[s.id] || []), ...ids] }));
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors"
+                                  >+1 par c/talla</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        setNewColorCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const idx = arr.indexOf(t.id);
+                                            if (idx > -1) arr.splice(idx, 1);
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
+                                  >−1 par c/talla</button>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium">= {selectedTallaIds.length} pares total</span>
+                                </div>
+
+                                {/* Preset de Curvas */}
+                                <div className="flex flex-wrap gap-1.5">
+                                  <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'DOCENA')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Docena (12 pares)</button>
+                                  <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'MEDIA_A')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Media Docena A (6 pares)</button>
+                                  <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'MEDIA_B')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Media Docena B (6 pares)</button>
                                 </div>
                               </div>
                             </div>
@@ -2242,35 +2574,68 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   </span>
                 </div>
 
+                {/* Presets de Curvas para la variante en edición */}
+                {editProductSerieId && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button type="button" onClick={() => aplicarCurvaInEditProduct('DOCENA')}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                      >Docena (12 pares)</button>
+                      <button type="button" onClick={() => aplicarCurvaInEditProduct('MEDIA_A')}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                      >Media Docena A (6 pares)</button>
+                      <button type="button" onClick={() => aplicarCurvaInEditProduct('MEDIA_B')}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                      >Media Docena B (6 pares)</button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button type="button"
+                        onClick={() => setEditProductTallas(prev => prev.map(t => ({ ...t, cantidad: t.cantidad + 1 })))}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors"
+                      >+1 par c/talla</button>
+                      <button type="button"
+                        onClick={() => setEditProductTallas(prev => prev.map(t => ({ ...t, cantidad: Math.max(0, t.cantidad - 1) })))}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
+                      >−1 par c/talla</button>
+                    </div>
+                  </div>
+                )}
+
                 {editProductTallas.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl">
+                  <div className="flex flex-wrap gap-2 p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl">
                     {editProductTallas.sort((a, b) => a.numero - b.numero).map((t, i) => (
-                      <div key={t.tallaId || `t-${t.numero}`} className="p-2 bg-[var(--card)] border border-[var(--border)] rounded-lg flex flex-col justify-between gap-1 shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-black text-[var(--foreground)]">Talla #{t.numero}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTallaFromEdit(t.numero)}
-                            className="text-slate-400 hover:text-red-500 transition-colors p-0.5"
-                            title="Quitar esta talla de la variante"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="0"
-                            value={t.cantidad}
-                            onChange={e => {
-                              const val = Math.max(0, parseInt(e.target.value) || 0);
-                              setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: val } : tt));
-                            }}
-                            className="w-full px-2 py-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded text-xs text-center font-bold focus:outline-none focus:border-blue-600"
-                            placeholder="0"
-                          />
-                          <span className="text-[10px] text-[var(--muted-foreground)] font-medium">pares</span>
-                        </div>
+                      <div key={t.tallaId || `t-${t.numero}`} className="flex items-center gap-0 bg-[var(--card)] border border-[var(--border)] rounded-lg px-1.5 py-1 shadow-xs">
+                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+                        <button type="button"
+                          onClick={() => {
+                            setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: Math.max(0, tt.cantidad - 1) } : tt));
+                          }}
+                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
+                        >−</button>
+                        <input
+                          type="number"
+                          min="0"
+                          value={t.cantidad}
+                          onChange={e => {
+                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: val } : tt));
+                          }}
+                          className="w-8 text-center text-sm font-extrabold text-[var(--foreground)] bg-transparent border-0 focus:outline-none"
+                        />
+                        <button type="button"
+                          onClick={() => {
+                            setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: tt.cantidad + 1 } : tt));
+                          }}
+                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
+                        >+</button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTallaFromEdit(t.numero)}
+                          className="ml-1 text-slate-400 hover:text-red-500 transition-colors p-1"
+                          title="Quitar esta talla de la variante"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -2345,7 +2710,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {/* ── MODAL EDITAR MODELO BASE ── */}
       {showEditModel && editModel && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-blue-400 font-bold">
@@ -2353,7 +2718,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base text-white">Editar Modelo Base</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Modifica los datos base del modelo</p>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Modifica los datos base del modelo y sus series configuradas</p>
                 </div>
               </div>
               <button
@@ -2430,6 +2795,208 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   ))}
                 </select>
               </div>
+
+              {/* ── Sección: Series y Precios del Modelo ── */}
+              <div className="space-y-4 pt-2 border-t border-[var(--border)]">
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">Series y Precios del Modelo</h5>
+                  <button type="button" onClick={() => { setNewSerieNombre(""); setNewSerieTallasDesde("38"); setNewSerieTallasHasta("43"); setError(""); setShowCreateSeriesModal(true); }}
+                    className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:underline">
+                    <Plus size={13} /> <span>Crear Nueva Serie</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
+                  Modifica las series asignadas al modelo, sus precios de compra y venta, y su distribución de curva de tallas.
+                </p>
+
+                <div className="space-y-3">
+                  {series.map(s => {
+                    const isActive = editModelSerieIds.includes(s.id);
+                    const prices = editModelSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
+                    const selectedTallaIds = editModelCustomTallas[s.id] || [];
+
+                    return (
+                      <div key={s.id} className={`rounded-xl border transition-all overflow-hidden ${
+                        isActive
+                          ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
+                          : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
+                      }`}>
+                        {/* Toggle Header */}
+                        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+                          <div className="flex items-center gap-3 cursor-pointer" onClick={() => toggleEditModelSerie(s.id)}>
+                            <div className={`w-10 h-5 rounded-full relative transition-colors ${
+                              isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
+                            }`}>
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                isActive ? "translate-x-5" : "translate-x-0.5"
+                              }`} />
+                            </div>
+                            <span className={`text-sm font-bold ${
+                              isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+                            }`}>{getNombreSerie(s, series)}</span>
+                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({s.nombre})</span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => openEditSeriesModal(s)}
+                              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+                              title="Editar rango o nombre de esta serie">
+                              <Edit2 size={13} />
+                              <span>Editar</span>
+                            </button>
+                            {isActive && (
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">ACTIVA</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Detalle si la serie está activa */}
+                        {isActive && (() => {
+                          const costVal = parseFloat(prices.costPrice);
+                          const saleVal = parseFloat(prices.salePrice);
+                          const hasCost = !isNaN(costVal) && costVal > 0;
+                          const hasSale = !isNaN(saleVal) && saleVal > 0;
+                          const suggestedSale = hasCost ? (costVal * 1.30).toFixed(2) : "";
+                          const isLoss = hasCost && hasSale && saleVal < costVal;
+                          const marginPercent = hasCost && hasSale ? ((saleVal - costVal) / costVal) * 100 : 0;
+                          const profitAmount = hasCost && hasSale ? saleVal - costVal : 0;
+
+                          return (
+                            <div className="px-4 pb-4 pt-3 space-y-3">
+                              {/* Inputs de Precio */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Lbl t="Precio de Compra ($)" req />
+                                  <input type="number" min="0.01" step="0.01"
+                                    value={prices.costPrice}
+                                    onChange={e => setEditModelSeriesPrices(prev => ({
+                                      ...prev,
+                                      [s.id]: { ...prev[s.id], costPrice: e.target.value }
+                                    }))}
+                                    placeholder="0.00" className={INPUT} />
+                                </div>
+                                <div>
+                                  <Lbl t="Precio de Venta ($)" req />
+                                  <input type="number" min="0.01" step="0.01"
+                                    value={prices.salePrice}
+                                    onChange={e => setEditModelSeriesPrices(prev => ({
+                                      ...prev,
+                                      [s.id]: { ...prev[s.id], salePrice: e.target.value }
+                                    }))}
+                                    placeholder={suggestedSale ? `$${suggestedSale} (+30%)` : "0.00"}
+                                    className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
+                                </div>
+                              </div>
+
+                              {/* Indicador de Margen */}
+                              {hasCost && (
+                                <div className="text-[11px] font-semibold">
+                                  {hasSale ? (
+                                    isLoss ? (
+                                      <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+                                        <AlertCircle size={14} className="shrink-0 animate-bounce" />
+                                        <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                      </div>
+                                    ) : (
+                                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+                                        <CheckCircle size={14} />
+                                        <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+                                      <DollarSign size={14} className="shrink-0" />
+                                      <span>Precio sugerido (30% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${(costVal * 0.30).toFixed(2)})</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Componente de Curva de Tallas con Steppers */}
+                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                                    Serie: {getNombreSerie(s, series).toUpperCase()}
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+                                    = {selectedTallaIds.length} pares total
+                                  </span>
+                                </div>
+
+                                {/* Steppers por talla */}
+                                <div className="flex flex-wrap gap-2">
+                                  {s.tallas?.sort((a, b) => a.numero - b.numero).map(t => {
+                                    const count = selectedTallaIds.filter(id => id === t.id).length;
+                                    return (
+                                      <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+                                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+                                        <button type="button"
+                                          onClick={() => removeOneTallaInEditModel(s.id, t.id)}
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
+                                        >−</button>
+                                        <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+                                        <button type="button"
+                                          onClick={() => addTallaRepeatInEditModel(s.id, t.id)}
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
+                                        >+</button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Botones rápidos: +1/-1 par c/talla */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const ids = sObj2.tallas.map(t => t.id);
+                                        setEditModelCustomTallas(ct => ({ ...ct, [s.id]: [...(ct[s.id] || []), ...ids] }));
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors"
+                                  >+1 par c/talla</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        setEditModelCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const idx = arr.indexOf(t.id);
+                                            if (idx > -1) arr.splice(idx, 1);
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
+                                  >−1 par c/talla</button>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium">= {selectedTallaIds.length} pares total</span>
+                                </div>
+
+                                {/* Preset de Curvas */}
+                                <div className="flex flex-wrap gap-1.5">
+                                  <button type="button" onClick={() => aplicarCurvaEnEditModelSerie(s.id, 'DOCENA')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Docena (12 pares)</button>
+                                  <button type="button" onClick={() => aplicarCurvaEnEditModelSerie(s.id, 'MEDIA_A')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Media Docena A (6 pares)</button>
+                                  <button type="button" onClick={() => aplicarCurvaEnEditModelSerie(s.id, 'MEDIA_B')}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                                  >Media Docena B (6 pares)</button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
                   <AlertCircle size={14} /> {error}
