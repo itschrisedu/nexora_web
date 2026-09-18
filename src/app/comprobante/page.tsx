@@ -59,6 +59,41 @@ function ComprobanteContent() {
     }
   }, [rawData]);
 
+  // Cargar fotos reales y nítidas de los modelos desde el backend si se trata de una orden de compra
+  useEffect(() => {
+    if (!data || data.t !== 'ORDEN' || !data.num) return;
+
+    const fetchOrderImages = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const numClean = String(data.num).replace(/[^0-9]/g, '');
+        const res = await fetch(`${apiUrl}/catalogo/orden-publica/${encodeURIComponent(numClean || data.num)}`);
+        if (res.ok) {
+          const remoteOrder = await res.json();
+          if (remoteOrder && remoteOrder.lineas && Array.isArray(remoteOrder.lineas)) {
+            setData((prev: any) => {
+              if (!prev || !prev.lineas) return prev;
+              const updatedLineas = prev.lineas.map((line: any, idx: number) => {
+                const matchRemote = remoteOrder.lineas.find(
+                  (rl: any) => rl.codigo === line.c || (rl.color === line.col && rl.modelo === line.m),
+                ) || remoteOrder.lineas[idx];
+                return {
+                  ...line,
+                  img: matchRemote?.imageUrl || line.img,
+                };
+              });
+              return { ...prev, lineas: updatedLineas };
+            });
+          }
+        }
+      } catch (e) {
+        // En caso de estar offline o sin conexión al backend, mantiene la información decodificada
+      }
+    };
+
+    fetchOrderImages();
+  }, [data?.t, data?.num]);
+
   const handleDescargarPdf = () => {
     if (!data) return;
 
@@ -437,47 +472,60 @@ function ComprobanteContent() {
                 Modelos y Numeración para Producción
               </span>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+              <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-2xs">
+                <table className="w-full text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-200 text-slate-500 text-left">
-                      <th className="py-2 font-bold">Modelo / Detalle</th>
-                      <th className="py-2 font-bold">Color</th>
-                      <th className="py-2 font-bold">Curva / Numeración</th>
-                      <th className="py-2 text-right font-bold">Pares</th>
-                      <th className="py-2 text-right font-bold">Subtotal</th>
+                    <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                      <th className="py-3 px-3.5 text-left font-bold tracking-tight">Modelo / Detalle</th>
+                      <th className="py-3 px-3.5 text-left font-bold tracking-tight">Color</th>
+                      <th className="py-3 px-3.5 text-left font-bold tracking-tight">Curva / Numeración</th>
+                      <th className="py-3 px-4 text-center font-bold tracking-tight">Pares</th>
+                      <th className="py-3 px-4 text-right font-bold tracking-tight">Subtotal</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
                     {(data.lineas || []).map((l: any, idx: number) => (
-                      <tr key={idx}>
-                        <td className="py-2.5">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                      <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                        <td className="py-3 px-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
                               {l.img ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={l.img} alt="" className="w-full h-full object-cover" />
+                                <img
+                                  src={l.img}
+                                  alt={l.m || "Modelo"}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
                               ) : (
-                                <Package size={16} className="text-slate-400" />
+                                <Package size={18} className="text-slate-400 dark:text-slate-500" />
                               )}
                             </div>
-                            <div>
-                              <span className="font-bold text-slate-900 block">{l.m}</span>
-                              <span className="text-[10px] text-slate-500 font-mono">
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-900 dark:text-slate-100 block truncate">{l.m}</span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
                                 {l.c} {l.ser ? `• ${l.ser}` : ''}
                               </span>
                               {l.obs && (
-                                <span className="text-[10px] text-amber-800 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 block mt-0.5 font-medium max-w-xs">
+                                <span className="text-[10px] text-amber-800 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 block mt-1 font-medium max-w-xs">
                                   Nota: {l.obs}
                                 </span>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="py-2.5 text-slate-700">{l.col || '—'}</td>
-                        <td className="py-2.5 text-slate-600 font-mono text-[11px]">{l.num || 'Serie Estándar'}</td>
-                        <td className="py-2.5 text-right font-mono font-bold">{l.qty}</td>
-                        <td className="py-2.5 text-right font-mono font-bold text-slate-900">${Number(l.tot || 0).toFixed(2)}</td>
+                        <td className="py-3 px-3.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">{l.col || '—'}</td>
+                        <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 font-mono text-[11px] leading-relaxed">
+                          {l.num || 'Serie Estándar'}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono font-bold text-xs border border-slate-200/80 dark:border-slate-700">
+                            {l.qty} pares
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 text-xs whitespace-nowrap">
+                          ${Number(l.tot || 0).toFixed(2)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

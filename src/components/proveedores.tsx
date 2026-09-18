@@ -164,7 +164,16 @@ interface EntradaMercancia {
 // Función auxiliar para obtener la URL de imagen limpia
 function obtenerFotoProducto(prod: any): string {
   if (!prod) return '';
-  return prod.fotoUrl || prod.imageUrl || prod.model?.imageUrl || prod.images?.[0] || '';
+  return (
+    prod.imageUrl ||
+    prod.fotoUrl ||
+    prod.foto ||
+    prod.image ||
+    prod.model?.imageUrl ||
+    prod.model?.products?.find((p: any) => p.imageUrl)?.imageUrl ||
+    prod.images?.[0] ||
+    ''
+  );
 }
 
 // Cálculo del ratio de curva de una talla
@@ -209,7 +218,12 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
     const existing = map.get(key);
     const subtotal = l.subtotal || (l.cantidadPedida * l.precioCosto);
     const prodCat = catalogoProductos.find((p) => p.id === l.productId);
-    const foto = obtenerFotoProducto(l.producto) || obtenerFotoProducto(prodCat);
+    const foto =
+      obtenerFotoProducto(l.producto) ||
+      obtenerFotoProducto(prodCat) ||
+      (l as any).imageUrl ||
+      (l as any).fotoUrl ||
+      '';
 
     // Si el usuario editó manualmente las tallas, usar esa versión
     const tallasOverride = (l as any)._tallasOverride as Array<{ talla: string | number; cantidad: number }> | undefined;
@@ -851,7 +865,15 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
 
     try {
-      const pdfData = construirPdfData(order);
+      let orderToUse = order;
+      if (!order.lines || order.lines.length === 0 || !order.lines[0]?.producto?.imageUrl) {
+        try {
+          const fullOrder = await ApiService.get(`/proveedores/ordenes-compra/${order.id}`);
+          if (fullOrder && fullOrder.lines) orderToUse = fullOrder;
+        } catch (e) {}
+      }
+
+      const pdfData = construirPdfData(orderToUse);
       await compartirOrdenCompraPdf(pdfData, telefono);
       showToast('Abriendo WhatsApp con la Orden de Compra y enlace digital oficial...', 'success');
     } catch (e: any) {

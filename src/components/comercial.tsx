@@ -333,14 +333,20 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const lineasInter: any[] = [];
     (sucursalStockInfo.tallasDisponibles || []).forEach((t: any) => {
       if (t.cantidad > 0) {
+        const num = Number(t.talla ?? t.numero);
+        const matchedTalla = (productoSeleccionadoObj.tallas || []).find(
+          (pt: any) => Number(pt.numero) === num,
+        );
+        const resolvedTallaId = matchedTalla?.tallaId || matchedTalla?.id || t.tallaId || `t-${num}`;
+
         lineasInter.push({
           productId: productoSeleccionadoObj.id,
           modelName: `${productoSeleccionadoObj.modelName} [Origen: ${sucursalStockInfo.sucursalNombre}]`,
           color: productoSeleccionadoObj.color,
           serieNombre: `${productoSeleccionadoObj.serieNombre || 'Serie'} (Despacho Inter-Sucursal Urgente)`,
           imageUrl: productoSeleccionadoObj.imageUrl,
-          tallaId: `t-${t.talla}`,
-          numeroTalla: t.talla,
+          tallaId: resolvedTallaId,
+          numeroTalla: num,
           cantidad: 1,
           precioUnitario: Number(precioItem) || Number(sucursalStockInfo.precioVenta) || 15,
           tipoVenta: 'TALLA_ESPECIFICA' as const,
@@ -815,14 +821,18 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       const sortedTallasSerie = [...tallasSerie].sort((a: any, b: any) => (Number(a.numero) || 0) - (Number(b.numero) || 0));
       const lineasSerieEspecial = sortedTallasSerie.map((t: any) => {
         const factor = (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
+        const num = Number(t.numero);
+        const matchedTalla = (prodObj.tallas || []).find((pt: any) => Number(pt.numero) === num);
+        const resolvedTallaId = matchedTalla?.tallaId || matchedTalla?.id || t.id || t.tallaId || `t-${num}`;
+
         return {
           productId: prodObj.id,
           modelName: prodObj.modelName,
           color: prodObj.color,
           serieNombre: `${nombreSerieClean} (${tallasSerie[0]?.numero}-${tallasSerie[tallasSerie.length - 1]?.numero}) [Bajo Pedido]`,
           imageUrl: prodObj.imageUrl,
-          tallaId: t.id || t.tallaId || `t-${t.numero}`,
-          numeroTalla: t.numero,
+          tallaId: resolvedTallaId,
+          numeroTalla: num,
           cantidad: factor,
           precioUnitario: Number(precioItem),
           tipoVenta: 'SERIE_ESPECIAL' as const,

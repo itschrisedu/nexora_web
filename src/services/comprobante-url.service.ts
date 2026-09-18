@@ -162,7 +162,7 @@ export function generarUrlPublicaOrden(data: OrdenCompraPdfData): string {
       c: l.codigo,
       col: l.color || '',
       ser: l.serie || '',
-      img: l.imageUrl || undefined,
+      img: l.imageUrl && l.imageUrl.length < 500 ? l.imageUrl : undefined,
       num: l.numeracion || '',
       obs: l.observacion || undefined,
       qty: l.cantidadPares,
