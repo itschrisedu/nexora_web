@@ -146,7 +146,12 @@ interface Cobro {
   sucursalNombre?: string;
   tipoEntrega?: 'PRESENCIAL' | 'ENVIO';
   courier?: string;
+  guiaEnvio?: string;
+  direccionEnvio?: string;
   ciudadEnvio?: string;
+  asumeFlete?: string;
+  costoEnvio?: number;
+  notasPedido?: string;
   lines?: any[];
 }
 
@@ -227,6 +232,91 @@ interface GrupoModeloResumen {
   tipoVenta?: string;
   etiquetaVolumen: string;
   tallas: { numero: string | number; cantidad: number }[];
+}
+
+interface LineaDevolucionItem {
+  id: string;
+  productId: string;
+  modelName: string;
+  color: string;
+  serieNombre: string;
+  imageUrl?: string | null;
+  tallaId: string;
+  numeroTalla: string | number;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+  tipoVenta: 'SERIE_COMPLETA' | 'POR_TALLA';
+  subtipoSerie?: 'MEDIA_DOCENA' | 'DOCENA_COMPLETA';
+  observacionModelo?: string;
+}
+
+interface GrupoModeloDevolucion {
+  key: string;
+  productId: string;
+  modelName: string;
+  color: string;
+  serieNombre: string;
+  imageUrl?: string | null;
+  totalPares: number;
+  precioUnitario: number;
+  subtotal: number;
+  tipoVenta: string;
+  subtipoSerie?: string;
+  etiquetaVolumen: string;
+  observacionModelo?: string;
+  lineas: LineaDevolucionItem[];
+}
+
+function agruparLineasDevolucion(lines: LineaDevolucionItem[]): GrupoModeloDevolucion[] {
+  if (!lines || lines.length === 0) return [];
+  const map = new Map<string, GrupoModeloDevolucion>();
+
+  lines.forEach((l) => {
+    const key = l.productId;
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        productId: l.productId,
+        modelName: l.modelName,
+        color: l.color,
+        serieNombre: l.serieNombre,
+        imageUrl: l.imageUrl,
+        totalPares: 0,
+        precioUnitario: l.precioUnitario,
+        subtotal: 0,
+        tipoVenta: l.tipoVenta,
+        subtipoSerie: l.subtipoSerie,
+        etiquetaVolumen: '',
+        observacionModelo: l.observacionModelo,
+        lineas: [],
+      });
+    }
+
+    const g = map.get(key)!;
+    g.totalPares += l.cantidad;
+    g.subtotal += l.subtotal;
+    g.lineas.push(l);
+    if (l.observacionModelo) g.observacionModelo = l.observacionModelo;
+  });
+
+  return Array.from(map.values()).map((g) => {
+    g.lineas.sort((a, b) => Number(a.numeroTalla) - Number(b.numeroTalla));
+
+    if (g.totalPares >= 12 && g.totalPares % 12 === 0) {
+      const doc = g.totalPares / 12;
+      g.etiquetaVolumen = doc === 1 ? '1 Docena (12 pares)' : `${doc} Docenas (${g.totalPares} pares)`;
+    } else if (g.totalPares === 6) {
+      g.etiquetaVolumen = 'Media Docena (6 pares)';
+    } else if (g.totalPares >= 6 && g.totalPares % 6 === 0) {
+      const med = g.totalPares / 6;
+      g.etiquetaVolumen = `${med * 0.5} Docenas (${g.totalPares} pares)`;
+    } else {
+      g.etiquetaVolumen = `${g.totalPares} ${g.totalPares === 1 ? 'par' : 'pares'}`;
+    }
+
+    return g;
+  });
 }
 
 function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
@@ -331,6 +421,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [devolucionPrecioUnitario, setDevolucionPrecioUnitario] = useState<number>(0);
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [savingDevolucion, setSavingDevolucion] = useState(false);
+  const [lineasDevolucion, setLineasDevolucion] = useState<LineaDevolucionItem[]>([]);
 
   // Modelos comprados por el cliente para devolución
   const [productosVendidosCliente, setProductosVendidosCliente] = useState<any[]>([]);
@@ -583,6 +674,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   })();
 
   const [acordeonNotasAbierto, setAcordeonNotasAbierto] = useState(false);
+  const [detalleNotaModalAbierto, setDetalleNotaModalAbierto] = useState(true);
 
   // ── Selección activa (FIFO: La nota más antigua con deuda por defecto) ──────────
   const carteraSeleccionada = clientesCartera.find((c) => c.clientId === clienteSeleccionadoId) || (clientesCartera.length > 0 ? clientesCartera[0] : null);
@@ -958,6 +1050,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const handleAbrirDevolucion = async (cartera: ClienteCartera) => {
     setClienteSeleccionadoId(cartera.clientId);
     setShowDevolucionModal(true);
+    setLineasDevolucion([]);
     setLoadingProductosVendidos(true);
     setBusquedaModeloDevolucion('');
     setProductoSeleccionadoDevolucionObj(null);
@@ -1049,66 +1142,208 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     }
   };
 
+  const handleAgregarModeloADevolucion = () => {
+    const prod = productoSeleccionadoDevolucionObj || catalogoProductos.find((p) => p.id === devolucionProductoId);
+    if (!prod) {
+      showToast('Selecciona un modelo de calzado primero.', 'warning');
+      return;
+    }
+
+    const precio = Number(devolucionPrecioUnitario || prod.precioUnitario || prod.salePrice || 0);
+    if (precio <= 0) {
+      showToast('Ingresa un precio unitario válido.', 'warning');
+      return;
+    }
+
+    const nuevasLineas: LineaDevolucionItem[] = [...lineasDevolucion];
+
+    if (devolucionTipo === 'SERIE_COMPLETA') {
+      const totalParesSerie = (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * Math.max(1, devolucionCantidadSeries || 1);
+      const tallas = prod.tallas && prod.tallas.length > 0
+        ? prod.tallas
+        : [
+            { id: 't38', numeroTalla: 38 },
+            { id: 't39', numeroTalla: 39 },
+            { id: 't40', numeroTalla: 40 },
+            { id: 't41', numeroTalla: 41 },
+            { id: 't42', numeroTalla: 42 },
+            { id: 't43', numeroTalla: 43 },
+          ];
+
+      const porTalla = Math.floor(totalParesSerie / tallas.length) || 1;
+      let acumulado = 0;
+
+      tallas.forEach((t: any, idx: number) => {
+        const cant = idx === tallas.length - 1 ? (totalParesSerie - acumulado) : porTalla;
+        acumulado += cant;
+        const tId = t.id || String(t.numeroTalla || t.numero);
+        const numTalla = t.numeroTalla || t.numero || 38;
+
+        const existingIdx = nuevasLineas.findIndex(
+          (l) => l.productId === prod.id && l.tallaId === tId
+        );
+
+        if (existingIdx !== -1) {
+          nuevasLineas[existingIdx].cantidad += cant;
+          nuevasLineas[existingIdx].subtotal = nuevasLineas[existingIdx].cantidad * precio;
+          nuevasLineas[existingIdx].precioUnitario = precio;
+        } else {
+          nuevasLineas.push({
+            id: `dev-${prod.id}-${tId}-${Date.now()}-${Math.random()}`,
+            productId: prod.id,
+            modelName: prod.modelName || 'Calzado',
+            color: prod.color || '',
+            serieNombre: prod.serieNombre || 'Serie',
+            imageUrl: prod.imageUrl || null,
+            tallaId: tId,
+            numeroTalla: numTalla,
+            cantidad: cant,
+            precioUnitario: precio,
+            subtotal: cant * precio,
+            tipoVenta: 'SERIE_COMPLETA',
+            subtipoSerie: devolucionSubtipoSerie,
+          });
+        }
+      });
+    } else {
+      // Por talla específica
+      const pares = Math.max(1, parseInt(devolucionCantidadParesInput) || 1);
+      const tId = devolucionTallaId || (prod.tallas?.[0]?.id ? String(prod.tallas[0].id) : 'default');
+      const tallaObj = prod.tallas?.find((t: any) => t.id === tId || String(t.numeroTalla || t.numero) === tId);
+      const numTalla = tallaObj ? (tallaObj.numeroTalla || tallaObj.numero) : (devolucionTallaId || 38);
+
+      const existingIdx = nuevasLineas.findIndex(
+        (l) => l.productId === prod.id && l.tallaId === tId
+      );
+
+      if (existingIdx !== -1) {
+        nuevasLineas[existingIdx].cantidad += pares;
+        nuevasLineas[existingIdx].subtotal = nuevasLineas[existingIdx].cantidad * precio;
+        nuevasLineas[existingIdx].precioUnitario = precio;
+      } else {
+        nuevasLineas.push({
+          id: `dev-${prod.id}-${tId}-${Date.now()}-${Math.random()}`,
+          productId: prod.id,
+          modelName: prod.modelName || 'Calzado',
+          color: prod.color || '',
+          serieNombre: prod.serieNombre || 'Serie',
+          imageUrl: prod.imageUrl || null,
+          tallaId: tId,
+          numeroTalla: numTalla,
+          cantidad: pares,
+          precioUnitario: precio,
+          subtotal: pares * precio,
+          tipoVenta: 'POR_TALLA',
+        });
+      }
+    }
+
+    setLineasDevolucion(nuevasLineas);
+    showToast(`¡${prod.modelName} añadido a la devolución!`, 'success');
+  };
+
+  const handleCambiarCantidadTallaDevolucion = (productId: string, tallaId: string, delta: number) => {
+    setLineasDevolucion((prev) => {
+      const nuevas = [...prev];
+      const idx = nuevas.findIndex((l) => l.productId === productId && l.tallaId === tallaId);
+      if (idx !== -1) {
+        const nuevaCant = nuevas[idx].cantidad + delta;
+        if (nuevaCant <= 0) {
+          nuevas.splice(idx, 1);
+        } else {
+          nuevas[idx] = {
+            ...nuevas[idx],
+            cantidad: nuevaCant,
+            subtotal: nuevaCant * nuevas[idx].precioUnitario,
+          };
+        }
+      }
+      return nuevas;
+    });
+  };
+
+  const handleSumarParTodasTallasDevolucion = (productId: string) => {
+    setLineasDevolucion((prev) =>
+      prev.map((l) =>
+        l.productId === productId
+          ? { ...l, cantidad: l.cantidad + 1, subtotal: (l.cantidad + 1) * l.precioUnitario }
+          : l
+      )
+    );
+  };
+
+  const handleRestarParTodasTallasDevolucion = (productId: string) => {
+    setLineasDevolucion((prev) =>
+      prev.map((l) =>
+        l.productId === productId
+          ? { ...l, cantidad: Math.max(1, l.cantidad - 1), subtotal: Math.max(1, l.cantidad - 1) * l.precioUnitario }
+          : l
+      )
+    );
+  };
+
+  const handleEliminarModeloDevolucion = (productId: string) => {
+    setLineasDevolucion((prev) => prev.filter((l) => l.productId !== productId));
+    showToast('Modelo eliminado de la devolución.', 'info');
+  };
+
+  const handleSetObservacionModeloDevolucion = (productId: string, observacion?: string) => {
+    setLineasDevolucion((prev) =>
+      prev.map((l) => (l.productId === productId ? { ...l, observacionModelo: observacion } : l))
+    );
+  };
+
   const handleRegistrarDevolucion = async () => {
     if (!carteraSeleccionada) return;
 
-    const pares = devolucionTipo === 'SERIE_COMPLETA'
-      ? (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * Math.max(1, devolucionCantidadSeries || 1)
-      : Math.max(1, parseInt(devolucionCantidadParesInput) || 1);
+    if (lineasDevolucion.length === 0) {
+      showToast('Añade al menos un modelo de calzado a la devolución antes de procesar.', 'warning');
+      return;
+    }
 
-    const precio = Number(devolucionPrecioUnitario || 0);
-    const totalMonto = pares * precio;
+    const totalPares = lineasDevolucion.reduce((sum, l) => sum + l.cantidad, 0);
+    const totalMonto = lineasDevolucion.reduce((sum, l) => sum + l.subtotal, 0);
 
-    if (totalMonto <= 0) {
-      showToast('Ingresa un precio y cantidad válidos para calcular la devolución.', 'warning');
+    if (totalMonto <= 0 || totalPares <= 0) {
+      showToast('Ingresa cantidades y precios válidos para procesar la devolución.', 'warning');
       return;
     }
 
     setSavingDevolucion(true);
     try {
       const selectedCobro = carteraSeleccionada.cobros.find((c) => c.id === devolucionCobroId);
-      const prod = productoSeleccionadoDevolucionObj || catalogoProductos.find((p) => p.id === devolucionProductoId);
 
-      const linesPayload: any[] = [];
-      if (devolucionTipo === 'SERIE_COMPLETA' && prod?.tallas && prod.tallas.length > 0) {
-        const tallas = prod.tallas;
-        const porTalla = Math.floor(pares / tallas.length) || 1;
-        let acumulado = 0;
-        tallas.forEach((t: any, idx: number) => {
-          const cant = idx === tallas.length - 1 ? (pares - acumulado) : porTalla;
-          acumulado += cant;
-          if (cant > 0) {
-            linesPayload.push({
-              productId: prod.id,
-              tallaId: t.id,
-              cantidad: cant,
-              precioUnitario: precio,
-            });
-          }
-        });
-      } else {
-        linesPayload.push({
-          productId: devolucionProductoId || prod?.id || 'sin-especificar',
-          tallaId: devolucionTallaId || 'sin-especificar',
-          cantidad: pares,
-          precioUnitario: precio,
-        });
-      }
+      const linesPayload = lineasDevolucion.map((l) => ({
+        productId: l.productId,
+        tallaId: l.tallaId,
+        cantidad: l.cantidad,
+        precioUnitario: l.precioUnitario,
+      }));
+
+      const notasModelos = lineasDevolucion
+        .filter((l) => l.observacionModelo)
+        .map((l) => `${l.modelName} (T${l.numeroTalla}): ${l.observacionModelo}`);
+
+      const motivoFinal = [
+        motivoDevolucion.trim() || (devolucionDestino === 'BAJA_POR_FALLA' ? 'Defecto de Fábrica / Falla de Calzado' : 'Devolución Comercial / Cambio'),
+        notasModelos.length > 0 ? `[Notas: ${notasModelos.join('; ')}]` : ''
+      ].filter(Boolean).join(' - ');
 
       await ApiService.post('/devoluciones/cliente', {
         clientId: carteraSeleccionada.clientId,
         saleNoteId: selectedCobro?.saleNote?.id || undefined,
-        motivo: motivoDevolucion.trim() || (devolucionDestino === 'BAJA_POR_FALLA' ? 'Defecto de Fábrica / Falla de Calzado' : 'Devolución Comercial / Cambio'),
-        tipoDevolucion: devolucionTipo,
+        motivo: motivoFinal,
+        tipoDevolucion: 'TALLA_ESPECIFICA',
         destinoStock: devolucionDestino,
         lines: linesPayload,
       });
 
       showToast(
-        `¡Devolución de ${pares} pares ($${totalMonto.toFixed(2)}) procesada exitosamente!`,
+        `¡Devolución de ${totalPares} pares ($${totalMonto.toFixed(2)}) procesada exitosamente!`,
         'success'
       );
       setShowDevolucionModal(false);
+      setLineasDevolucion([]);
       setMotivoDevolucion('');
       setDevolucionProductoId('');
       setDevolucionPrecioUnitario(0);
@@ -1951,14 +2186,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               {/* Componente Unificado de Nota Activa y Selector Acordeón */}
               {cobroSeleccionado && (
                 <div className="border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--card)] shadow-xs">
-                  {/* Tarjeta Principal de la Nota Activa (Auto-seleccionada) */}
-                  <div className="p-3.5 bg-emerald-500/5 border-b border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {/* Tarjeta Principal de la Nota Activa (Auto-seleccionada / Clic para desplegar artículos) */}
+                  <div 
+                    onClick={() => setDetalleNotaModalAbierto(!detalleNotaModalAbierto)}
+                    className="p-3.5 bg-emerald-500/5 hover:bg-emerald-500/10 border-b border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-colors"
+                  >
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl border border-emerald-500/20 shrink-0">
                         <FileText size={16} />
                       </div>
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-extrabold text-xs text-[var(--foreground)]">
                             {cobroSeleccionado.saleNote?.numero
                               ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
@@ -1967,6 +2205,18 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                           <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 rounded text-[9px] font-bold">
                             Nota Más Antigua (Por orden de llegada)
                           </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDetalleNotaModalAbierto(!detalleNotaModalAbierto);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 text-[9px] font-extrabold border border-emerald-500/30 transition-colors"
+                          >
+                            <Eye size={10} />
+                            <span>{detalleNotaModalAbierto ? 'Ocultar Artículos' : 'Ver Artículos'}</span>
+                            {detalleNotaModalAbierto ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                          </button>
                         </div>
                         <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5 flex items-center gap-2 flex-wrap">
                           <span>Monto Original: <strong>${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)}</strong> ({cobroSeleccionado.tipo || 'Crédito'})</span>
@@ -1986,7 +2236,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center">
+                    <div className="flex items-center gap-2 self-end sm:self-center" onClick={(e) => e.stopPropagation()}>
                       <div className="text-right mr-1">
                         <span className="text-[9px] text-[var(--muted-foreground)] block font-semibold uppercase">Saldo:</span>
                         <span className="text-sm font-black text-red-500">
@@ -2007,6 +2257,142 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       </button>
                     </div>
                   </div>
+
+                  {/* Detalle Desplegable de Logística y Artículos de la Nota Activa */}
+                  {detalleNotaModalAbierto && (
+                    <div className="p-3 bg-[var(--muted)]/15 border-b border-[var(--border)] space-y-2.5 animate-in fade-in duration-200">
+                      {/* Logística de Entrega */}
+                      <div className="p-2.5 rounded-xl border border-blue-500/20 bg-blue-500/5 text-xs text-[var(--foreground)] flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600">
+                            <Truck size={14} />
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-[11px] block text-[var(--foreground)]">
+                              Logística: {cobroSeleccionado.tipoEntrega === 'ENVIO' ? '🚚 Envío a Domicilio / Courier' : '🏪 Entrega Presencial en Local'}
+                            </span>
+                            <span className="text-[10px] text-[var(--muted-foreground)]">
+                              {cobroSeleccionado.tipoEntrega === 'ENVIO'
+                                ? `${cobroSeleccionado.courier || 'Transporte'}${cobroSeleccionado.guiaEnvio ? ` · Guía: ${cobroSeleccionado.guiaEnvio}` : ''}${cobroSeleccionado.ciudadEnvio ? ` · Destino: ${cobroSeleccionado.ciudadEnvio}` : ''}${cobroSeleccionado.direccionEnvio ? ` (${cobroSeleccionado.direccionEnvio})` : ''}`
+                                : 'El cliente retiró directamente en el mostrador del local comercial.'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Header de Artículos Solicitados */}
+                      <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-xs text-[var(--foreground)] flex items-center gap-1.5">
+                            <Package size={13} className="text-[#0F172A]" />
+                            <span>
+                              Detalle de Artículos — {cobroSeleccionado.saleNote?.numero
+                                ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+                                : cobroSeleccionado.numeroCobro || ''}
+                            </span>
+                          </span>
+                          {cobroSeleccionado.vendedorNombre && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[10px] font-semibold">
+                              <User size={10} />
+                              <span>Vendedor: {cobroSeleccionado.vendedorNombre}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Botón directo para iniciar devolución si lo requiere */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCuentaModal(false);
+                            handleAbrirDevolucion(carteraSeleccionada);
+                          }}
+                          className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-[10px] font-bold border border-amber-500/30 transition-colors flex items-center gap-1"
+                          title="Hacer devolución de calzado por fallas o cambio de talla"
+                        >
+                          <ArrowDownRight size={11} />
+                          <span>Hacer Devolución</span>
+                        </button>
+                      </div>
+
+                      {/* Tarjetas agrupadas por modelo con fotos y pastillas de tallas */}
+                      {(() => {
+                        const grupos = agruparLineasPorModelo(cobroSeleccionado.lines || []);
+                        if (grupos.length === 0) {
+                          return (
+                            <div className="p-3 bg-[var(--card)] rounded-xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--muted-foreground)] italic">
+                              No hay artículos detallados registrados para esta nota.
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {grupos.map((g) => (
+                              <div
+                                key={g.key}
+                                className="p-3 bg-[var(--card)] dark:bg-slate-900/60 border border-[var(--border)] rounded-2xl flex items-start gap-3 shadow-2xs hover:border-slate-400 transition-all"
+                              >
+                                {/* Miniatura del calzado */}
+                                <div className="w-13 h-13 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                                  {g.imageUrl ? (
+                                    <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Package className="text-slate-400" size={20} />
+                                  )}
+                                </div>
+
+                                {/* Detalle del modelo y pastillas de tallas */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-1">
+                                    <div className="min-w-0">
+                                      <div className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate">
+                                        {g.color ? `${g.color} · ${g.serieNombre || 'Calzado'}` : (g.serieNombre || 'Calzado')}
+                                      </div>
+                                      <h4 className="font-extrabold text-xs text-[var(--foreground)] truncate">
+                                        {g.modelName}
+                                      </h4>
+                                    </div>
+
+                                    {/* Badge de Volumen */}
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 ${
+                                      g.totalPares >= 6
+                                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                    }`}>
+                                      {g.etiquetaVolumen}
+                                    </span>
+                                  </div>
+
+                                  {/* Pastillas de tallas estilo inventario */}
+                                  <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {g.tallas.map((t) => (
+                                      <span
+                                        key={t.numero}
+                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/60 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-[9px] font-bold"
+                                      >
+                                        <span>T{t.numero}:</span>
+                                        <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+
+                                  {/* Subtotal del modelo */}
+                                  <div className="mt-2 pt-1 border-t border-[var(--border)]/60 flex items-center justify-between text-[10px]">
+                                    <span className="text-[var(--muted-foreground)]">
+                                      ${g.precioUnitario.toFixed(2)} c/u
+                                    </span>
+                                    <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                                      Total: ${g.subtotal.toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* Toggle para cambiar a otra nota si el cliente tiene más de 1 nota */}
                   {carteraSeleccionada.cobros.length > 1 && (
@@ -2270,50 +2656,29 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             {/* ── Footer del Modal ── */}
             <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col gap-2">
 
-              {/* Acciones directas de Comprobante / Estado de Cuenta */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Acciones directas de WhatsApp */}
+              {carteraSeleccionada.clienteTelefono && (
                 <button
                   type="button"
                   disabled={!montoAbono}
                   onClick={() => {
-                    const dataAbono = armarDatosComprobanteAbono(carteraSeleccionada, {
-                      monto: 0,
-                      metodo: 'ESTADO_CUENTA',
-                      fecha: new Date().toLocaleDateString('es-EC'),
-                    });
-                    descargarComprobanteAbonoPdf(dataAbono);
-                    showToast('Comprobante PDF de cuenta generado y descargado.', 'success');
+                    handleEnviarComprobanteAbono(
+                      carteraSeleccionada,
+                      {
+                        monto: 0,
+                        metodo: 'ESTADO_CUENTA',
+                        fecha: new Date().toLocaleDateString('es-EC'),
+                      },
+                      formatoEnvioAbono
+                    );
                   }}
-                  className="py-2 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-[var(--border)] shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={montoAbono ? 'Descargar Comprobante Oficial de Caja en PDF' : 'Ingrese un monto de abono primero'}
+                  className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={montoAbono ? `Enviar Comprobante por WhatsApp (${formatoEnvioAbono})` : 'Ingrese un monto de abono primero'}
                 >
-                  <Download size={13} className="text-emerald-600" />
-                  <span>Descargar Comprobante PDF</span>
+                  <MessageCircle size={13} />
+                  <span>Enviar a WhatsApp</span>
                 </button>
-
-                {carteraSeleccionada.clienteTelefono && (
-                  <button
-                    type="button"
-                    disabled={!montoAbono}
-                    onClick={() => {
-                      handleEnviarComprobanteAbono(
-                        carteraSeleccionada,
-                        {
-                          monto: 0,
-                          metodo: 'ESTADO_CUENTA',
-                          fecha: new Date().toLocaleDateString('es-EC'),
-                        },
-                        formatoEnvioAbono
-                      );
-                    }}
-                    className="py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    title={montoAbono ? `Enviar Comprobante por WhatsApp (${formatoEnvioAbono})` : 'Ingrese un monto de abono primero'}
-                  >
-                    <MessageCircle size={13} />
-                    <span>Enviar a WhatsApp</span>
-                  </button>
-                )}
-              </div>
+              )}
 
               <button
                 onClick={() => {
@@ -2693,10 +3058,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         </div>
       )}
 
-      {/* Modal Devolución de Cliente Mejorado */}
+      {/* Modal Devolución de Cliente Mejorado Multimodelo */}
       {showDevolucionModal && carteraSeleccionada && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh] animate-in fade-in">
             {/* Header del Modal */}
             <div className="p-4 border-b border-[var(--border)] bg-gradient-to-r from-rose-950 via-slate-900 to-[#0F172A] text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -2732,7 +3097,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             </div>
 
             {/* Formulario */}
-            <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+            <div className="p-5 space-y-5 overflow-y-auto flex-1 text-xs">
               {/* Tarjeta de Sugerencia Comercial / Descuento de Retención */}
               <div className="p-3.5 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-0.5">
@@ -2756,11 +3121,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   🎁 Aplicar Descuento
                 </button>
               </div>
+
               {/* 1. Selector de Modelos VENDIDOS A ESTE CLIENTE */}
-              <div className="space-y-2">
+              <div className="space-y-2 p-3.5 bg-[var(--muted)]/15 border border-[var(--border)] rounded-2xl">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-bold text-[var(--foreground)]">
-                    1. Modelo de Calzado a Devolver (Comprado por el Cliente) *
+                  <label className="block text-xs font-extrabold text-[var(--foreground)] flex items-center gap-1.5">
+                    <span>1. Seleccionar Modelo Comprado por el Cliente</span>
                   </label>
                   <span className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                     {productosVendidosCliente.length} modelos comprados
@@ -2794,7 +3160,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     <span>Cargando productos comprados por el cliente...</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-36 overflow-y-auto pr-1">
                     {productosVendidosCliente
                       .filter((p) => {
                         const q = busquedaModeloDevolucion.toLowerCase().trim();
@@ -2837,251 +3203,406 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       })}
                   </div>
                 )}
-              </div>
 
-              {/* 3. Modalidad de Devolución */}
-              <div>
-                <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1.5">
-                  3. Modalidad de Devolución
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDevolucionTipo('TALLA_ESPECIFICA');
-                      setDevolucionCantidadParesInput('1');
-                    }}
-                    className={`p-2.5 rounded-xl border text-left font-bold transition-all cursor-pointer ${
-                      devolucionTipo === 'TALLA_ESPECIFICA'
-                        ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
-                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span>👟</span>
-                      <span>Por Talla Específica</span>
+                {/* 2. Modalidad y Añadir a la Devolución para el modelo seleccionado */}
+                {productoSeleccionadoDevolucionObj && (
+                  <div className="pt-3 border-t border-[var(--border)] space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="font-bold text-xs text-[var(--foreground)]">
+                        Configurar: <strong className="text-emerald-700">{productoSeleccionadoDevolucionObj.modelName}</strong> ({productoSeleccionadoDevolucionObj.color})
+                      </span>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDevolucionTipo('TALLA_ESPECIFICA');
+                            setDevolucionCantidadParesInput('1');
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                            devolucionTipo === 'TALLA_ESPECIFICA'
+                              ? 'bg-[#0F172A] text-white border-transparent'
+                              : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)]'
+                          }`}
+                        >
+                          👟 Por Talla
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDevolucionTipo('SERIE_COMPLETA');
+                            setDevolucionSubtipoSerie('MEDIA_DOCENA');
+                            setDevolucionCantidadSeries(1);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                            devolucionTipo === 'SERIE_COMPLETA'
+                              ? 'bg-[#0F172A] text-white border-transparent'
+                              : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)]'
+                          }`}
+                        >
+                          📦 Por Serie Completa
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-normal opacity-80 block">Devolución de pares por numeración</span>
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDevolucionTipo('SERIE_COMPLETA');
-                      setDevolucionSubtipoSerie('MEDIA_DOCENA');
-                      setDevolucionCantidadSeries(1);
-                    }}
-                    className={`p-2.5 rounded-xl border text-left font-bold transition-all cursor-pointer ${
-                      devolucionTipo === 'SERIE_COMPLETA'
-                        ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
-                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span>📦</span>
-                      <span>Por Serie Completa</span>
-                    </div>
-                    <span className="text-[10px] font-normal opacity-80 block">Curva completa (6 o 12 pares)</span>
-                  </button>
-                </div>
-              </div>
+                    {devolucionTipo === 'SERIE_COMPLETA' ? (
+                      <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          {/* Selector de tipo de serie */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setDevolucionSubtipoSerie('MEDIA_DOCENA')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                                devolucionSubtipoSerie === 'MEDIA_DOCENA'
+                                  ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
+                                  : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
+                              }`}
+                            >
+                              ½ Media Docena (6 pares)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDevolucionSubtipoSerie('DOCENA_COMPLETA')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                                devolucionSubtipoSerie === 'DOCENA_COMPLETA'
+                                  ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
+                                  : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
+                              }`}
+                            >
+                              1 Docena (12 pares)
+                            </button>
+                          </div>
 
-              {/* 4. Configuración de Tallas / Curva y Cantidades */}
-              {devolucionTipo === 'SERIE_COMPLETA' ? (
-                <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-emerald-800">Curva de Serie:</span>
-                    <div className="flex gap-2">
+                          {/* Cantidad de series con contador +/- */}
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold text-[var(--muted-foreground)]">Series:</label>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setDevolucionCantidadSeries(Math.max(1, (devolucionCantidadSeries || 1) - 1))}
+                                className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] cursor-pointer"
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={devolucionCantidadSeries || ''}
+                                onChange={(e) => setDevolucionCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
+                                className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setDevolucionCantidadSeries((devolucionCantidadSeries || 1) + 1)}
+                                className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] cursor-pointer"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <span className="text-xs font-black text-emerald-700 dark:text-emerald-400">
+                              = { (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (devolucionCantidadSeries || 1) } pares
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Precio por par y subtotal para serie completa */}
+                        <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]/60">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold text-[var(--muted-foreground)]">Precio/par:</label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={devolucionPrecioUnitario || ''}
+                                onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
+                                className="w-24 pl-5 pr-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-right"
+                              />
+                            </div>
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-[var(--muted-foreground)]">Subtotal serie: </span>
+                            <strong className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
+                              ${(((devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (devolucionCantidadSeries || 1)) * (devolucionPrecioUnitario || 0)).toFixed(2)}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-2.5">
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1">Talla:</span>
+                          {(productoSeleccionadoDevolucionObj?.tallas || [
+                            { id: 't38', numeroTalla: 38 },
+                            { id: 't39', numeroTalla: 39 },
+                            { id: 't40', numeroTalla: 40 },
+                            { id: 't41', numeroTalla: 41 },
+                            { id: 't42', numeroTalla: 42 },
+                            { id: 't43', numeroTalla: 43 },
+                          ]).map((t: any, idx: number) => {
+                            const tallaVal = t.id || String(t.numeroTalla || t.numero);
+                            const isTallaSelected = (devolucionTallaId === tallaVal || devolucionTallaId === String(t.numeroTalla));
+                            return (
+                              <button
+                                key={t.id ? `talla-btn-${t.id}` : `talla-btn-${t.numeroTalla || t.numero || idx}`}
+                                type="button"
+                                onClick={() => setDevolucionTallaId(tallaVal)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                  isTallaSelected
+                                    ? 'bg-[#0F172A] text-white border-[#0F172A]'
+                                    : 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:border-[#0F172A]'
+                                }`}
+                              >
+                                T{t.numeroTalla || t.numero}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[var(--border)]/60">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5">
+                              <label className="text-xs font-semibold text-[var(--muted-foreground)]">Pares:</label>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setDevolucionCantidadParesInput(String(Math.max(1, (parseInt(devolucionCantidadParesInput) || 1) - 1)))}
+                                  className="w-6 h-6 rounded border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] cursor-pointer"
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={devolucionCantidadParesInput}
+                                  onChange={(e) => setDevolucionCantidadParesInput(e.target.value)}
+                                  className="w-14 h-6 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setDevolucionCantidadParesInput(String((parseInt(devolucionCantidadParesInput) || 1) + 1))}
+                                  className="w-6 h-6 rounded border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <label className="text-xs font-semibold text-[var(--muted-foreground)]">Precio/par:</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={devolucionPrecioUnitario || ''}
+                                  onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
+                                  className="w-20 pl-5 pr-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-right"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-[var(--muted-foreground)]">Subtotal: </span>
+                            <strong className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
+                              ${((parseInt(devolucionCantidadParesInput) || 1) * (devolucionPrecioUnitario || 0)).toFixed(2)}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Botón Añadir a la Devolución */}
+                    <div className="flex justify-end pt-1">
                       <button
                         type="button"
-                        onClick={() => setDevolucionSubtipoSerie('MEDIA_DOCENA')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
-                          devolucionSubtipoSerie === 'MEDIA_DOCENA'
-                            ? 'bg-emerald-600 text-white border-transparent shadow-xs'
-                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
-                        }`}
+                        onClick={handleAgregarModeloADevolucion}
+                        className="px-4 py-2 bg-gradient-to-r from-slate-900 to-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer border border-slate-700"
                       >
-                        <span>½ Media Docena (6 pares)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDevolucionSubtipoSerie('DOCENA_COMPLETA')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
-                          devolucionSubtipoSerie === 'DOCENA_COMPLETA'
-                            ? 'bg-emerald-600 text-white border-transparent shadow-xs'
-                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
-                        }`}
-                      >
-                        <span>1 Docena Completa (12 pares)</span>
+                        <Plus size={14} className="text-emerald-400" />
+                        <span>
+                          {devolucionTipo === 'SERIE_COMPLETA' ? 'Añadir Serie Completa a la Devolución' : 'Añadir Talla a la Devolución'}
+                        </span>
                       </button>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-emerald-500/20">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs font-semibold text-[var(--muted-foreground)] shrink-0">
-                        ¿Cuántas {devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}?:
-                      </label>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setDevolucionCantidadSeries(Math.max(1, (devolucionCantidadSeries || 1) - 1))}
-                          className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-xs cursor-pointer"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          value={devolucionCantidadSeries || ''}
-                          onChange={(e) => setDevolucionCantidadSeries(e.target.value === '' ? 0 : Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setDevolucionCantidadSeries((devolucionCantidadSeries || 1) + 1)}
-                          className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-xs cursor-pointer"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <span className="text-xs font-black text-emerald-700 ml-1">
-                        = { (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (devolucionCantidadSeries || 1) } pares
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <label className="text-xs font-semibold text-[var(--muted-foreground)]">Precio Venta/Par:</label>
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={devolucionPrecioUnitario || ''}
-                          onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
-                          className="w-20 pl-5 pr-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-right"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Vista de curva del modelo */}
-                  {productoSeleccionadoDevolucionObj?.tallas && productoSeleccionadoDevolucionObj.tallas.length > 0 && (
-                    <div className="pt-2 border-t border-emerald-500/20">
-                      <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] block mb-1">
-                        Curva de Tallas Distribuidas ({productoSeleccionadoDevolucionObj.serieNombre || 'Serie'}):
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {productoSeleccionadoDevolucionObj.tallas.map((t: any, idx: number) => (
-                          <span
-                            key={t.id ? `curva-${t.id}` : `curva-talla-${t.numeroTalla || t.numero || idx}`}
-                            className="px-2 py-0.5 bg-emerald-500/10 text-emerald-800 rounded-md border border-emerald-500/20 text-[10px] font-bold"
-                          >
-                            T{t.numeroTalla || t.numero}: {t.stock || 1} par
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+              {/* 3. LISTA DE MODELOS AÑADIDOS A LA DEVOLUCIÓN (Estilo Pedidos Exacto) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                  <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
+                    <Package size={14} className="text-rose-600" />
+                    <span>2. Modelos Añadidos a la Devolución ({lineasDevolucion.length} ítems)</span>
+                  </span>
+                  {lineasDevolucion.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setLineasDevolucion([])}
+                      className="text-[11px] text-rose-500 hover:underline font-bold"
+                    >
+                      Limpiar todos
+                    </button>
                   )}
                 </div>
-              ) : (
-                <div className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-3">
-                  {/* Selector de Tallas con Chips */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
-                      Seleccionar Talla a Devolver:
-                    </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(productoSeleccionadoDevolucionObj?.tallas || [
-                        { id: 't38', numeroTalla: 38 },
-                        { id: 't39', numeroTalla: 39 },
-                        { id: 't40', numeroTalla: 40 },
-                        { id: 't41', numeroTalla: 41 },
-                        { id: 't42', numeroTalla: 42 },
-                      ]).map((t: any, idx: number) => {
-                        const tallaVal = t.id || String(t.numeroTalla || t.numero);
-                        const isTallaSelected = (devolucionTallaId === tallaVal || devolucionTallaId === String(t.numeroTalla));
-                        return (
-                          <button
-                            key={t.id ? `talla-btn-${t.id}` : `talla-btn-${t.numeroTalla || t.numero || idx}`}
-                            type="button"
-                            onClick={() => setDevolucionTallaId(tallaVal)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              isTallaSelected
-                                ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-xs'
-                                : 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:border-[#0F172A]'
-                            }`}
-                          >
-                            Talla {t.numeroTalla || t.numero}
-                          </button>
-                        );
-                      })}
-                    </div>
+
+                {lineasDevolucion.length === 0 ? (
+                  <div className="p-6 bg-[var(--card)] border border-dashed border-[var(--border)] rounded-2xl text-center space-y-1 text-[var(--muted-foreground)]">
+                    <p className="font-bold text-xs text-[var(--foreground)]">Aún no hay modelos añadidos a la devolución</p>
+                    <p className="text-[11px]">Selecciona un modelo arriba, configura las tallas o series y pulsa <strong>"Añadir a la Devolución"</strong>.</p>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
-                    {/* Número de pares con botones +/- y campo libre */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                        Número de Pares:
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const val = Math.max(1, (parseInt(devolucionCantidadParesInput) || 1) - 1);
-                            setDevolucionCantidadParesInput(String(val));
-                          }}
-                          className="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-sm hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                ) : (
+                  <div className="space-y-3">
+                    {agruparLineasDevolucion(lineasDevolucion).map((grupo) => {
+                      return (
+                        <div
+                          key={grupo.key}
+                          className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs hover:border-slate-400 transition-all"
                         >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder="1"
-                          value={devolucionCantidadParesInput}
-                          onChange={(e) => setDevolucionCantidadParesInput(e.target.value)}
-                          className="w-20 h-8 text-center font-black text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const val = (parseInt(devolucionCantidadParesInput) || 0) + 1;
-                            setDevolucionCantidadParesInput(String(val));
-                          }}
-                          className="w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-sm hover:bg-[var(--muted)] transition-colors cursor-pointer"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
+                          <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                            {/* Miniatura */}
+                            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                              {grupo.imageUrl ? (
+                                <img src={grupo.imageUrl} alt={grupo.modelName} className="w-full h-full object-cover" />
+                              ) : (
+                                <Package className="text-slate-400" size={24} />
+                              )}
+                            </div>
 
-                    {/* Precio Unitario de Venta */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase mb-1">
-                        Precio Unitario de Venta ($):
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={devolucionPrecioUnitario || ''}
-                          onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
-                          className="w-full pl-6 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-emerald-600 focus:outline-none focus:border-[#0F172A]"
-                        />
-                      </div>
-                    </div>
+                            {/* Detalle y pastillas de tallas interactivas (Estilo exacto Pedidos) */}
+                            <div className="flex-1 min-w-0 space-y-2">
+                              <div>
+                                <h4 className="font-extrabold text-sm text-[var(--foreground)] leading-tight">
+                                  {grupo.modelName}
+                                </h4>
+                                <div className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                                  {grupo.color} · <span className="font-semibold text-emerald-600 dark:text-emerald-400">Serie: {grupo.serieNombre || 'ADULTO'}</span>
+                                </div>
+                              </div>
+
+                              {/* Chips de tallas con contador +/- por cada talla (Estilo exacto Pedidos) */}
+                              <div className="flex flex-wrap gap-2 pt-0.5">
+                                {grupo.lineas.map((l) => (
+                                  <div
+                                    key={l.id}
+                                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-white shadow-2xs"
+                                  >
+                                    <span className="font-extrabold text-xs text-slate-900">T{l.numeroTalla}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCambiarCantidadTallaDevolucion(grupo.productId, l.tallaId, -1)}
+                                        className="w-5 h-5 flex items-center justify-center bg-[#FFE4E6] hover:bg-rose-200 text-[#E11D48] rounded text-xs font-black transition-colors cursor-pointer"
+                                        title={`Quitar 1 par T${l.numeroTalla}`}
+                                      >
+                                        −
+                                      </button>
+                                      <span className="w-4 text-center text-xs font-bold text-slate-900 font-mono">
+                                        {l.cantidad}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCambiarCantidadTallaDevolucion(grupo.productId, l.tallaId, 1)}
+                                        className="w-5 h-5 flex items-center justify-center bg-[#DCFCE7] hover:bg-emerald-200 text-[#16A34A] rounded text-xs font-black transition-colors cursor-pointer"
+                                        title={`Agregar 1 par T${l.numeroTalla}`}
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Botones de acción masiva +1 / -1 par c/talla */}
+                              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSumarParTodasTallasDevolucion(grupo.productId)}
+                                  className="px-3.5 py-1 bg-[#E6F4EA] hover:bg-emerald-100 text-[#0D9488] border border-[#A7F3D0] rounded-full text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  +1 par c/talla
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRestarParTodasTallasDevolucion(grupo.productId)}
+                                  className="px-3.5 py-1 bg-[#FFE4E6] hover:bg-rose-100 text-[#E11D48] border border-[#FECDD3] rounded-full text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  −1 par c/talla
+                                </button>
+                                <span className="text-xs text-slate-600 font-mono font-medium ml-0.5">
+                                  = {grupo.totalPares} pares total
+                                </span>
+                              </div>
+
+                              {/* Observación por modelo */}
+                              {grupo.observacionModelo ? (
+                                <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-1.5 text-amber-900 dark:text-amber-200 min-w-0">
+                                    <span className="font-extrabold text-[10px] uppercase text-amber-700 dark:text-amber-400 shrink-0">📝 Nota:</span>
+                                    <span className="truncate text-xs font-medium">{grupo.observacionModelo}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetObservacionModeloDevolucion(grupo.productId, undefined)}
+                                    className="text-xs font-bold text-rose-500 hover:underline shrink-0 cursor-pointer"
+                                    title="Eliminar nota"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nota = window.prompt(`Observación para ${grupo.modelName} (ej. falla en costura, cambio por talla):`);
+                                      if (nota !== null && nota.trim().length > 0) {
+                                        handleSetObservacionModeloDevolucion(grupo.productId, nota.trim());
+                                      }
+                                    }}
+                                    className="text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <span>+ Agregar observación a este modelo</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Resumen lateral exacto y botón de eliminar X */}
+                          <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
+                            <div className="text-right">
+                              <div className="text-xs font-extrabold text-[var(--foreground)]">
+                                {grupo.totalPares} pares ({grupo.etiquetaVolumen})
+                              </div>
+                              <div className="text-xs text-[var(--muted-foreground)]">
+                                ${grupo.precioUnitario.toFixed(2)} / par
+                              </div>
+                              <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                                ${grupo.subtotal.toFixed(2)}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleEliminarModeloDevolucion(grupo.productId)}
+                              className="w-6 h-6 rounded-full border-2 border-rose-500 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                              title="Eliminar este modelo de la devolución"
+                            >
+                              <X size={14} strokeWidth={2.5} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {/* 3. Destino del Calzado / Clasificación del Stock */}
+              {/* 4. Destino del Calzado / Clasificación del Stock */}
               <div>
-                <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1.5">
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1.5">
                   3. Destino del Calzado (Impacto en Stock)
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -3119,32 +3640,30 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 </div>
               </div>
 
-              {/* 4. Motivo / Detalle */}
+              {/* 5. Motivo General */}
               <div>
-                <label className="block text-[11px] font-bold text-[var(--foreground)] mb-1">
-                  4. Motivo o Detalle de la Devolución
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                  4. Motivo o Detalle General de la Devolución
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Falla en costura lateral, cambio de modelo solicitado por cliente..."
+                  placeholder="Ej. Devolución de mercadería por cambio de temporada o defecto de costura..."
                   value={motivoDevolucion}
                   onChange={(e) => setMotivoDevolucion(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold"
+                  className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
 
               {/* Resumen del Impacto y Total a Descontar */}
               {(() => {
-                const totalPares = devolucionTipo === 'SERIE_COMPLETA'
-                  ? (devolucionSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * Math.max(1, devolucionCantidadSeries || 1)
-                  : Math.max(1, parseInt(devolucionCantidadParesInput) || 1);
-                const totalMonto = totalPares * Number(devolucionPrecioUnitario || 0);
+                const totalPares = lineasDevolucion.reduce((sum, l) => sum + l.cantidad, 0);
+                const totalMonto = lineasDevolucion.reduce((sum, l) => sum + l.subtotal, 0);
 
                 return (
-                  <div className="p-3.5 bg-slate-900 text-white rounded-xl space-y-1.5 shadow-sm">
+                  <div className="p-3.5 bg-slate-900 text-white rounded-2xl space-y-1.5 shadow-sm">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-300">Total Pares a Devolver:</span>
-                      <strong className="text-white">{totalPares} pares ({devolucionTipo === 'SERIE_COMPLETA' ? 'Serie Completa' : 'Por Talla'})</strong>
+                      <strong className="text-white">{totalPares} pares ({lineasDevolucion.length} modelos)</strong>
                     </div>
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-300">Destino de Stock:</span>
@@ -3186,8 +3705,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               <button
                 type="button"
                 onClick={handleRegistrarDevolucion}
-                disabled={savingDevolucion}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                disabled={savingDevolucion || lineasDevolucion.length === 0}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title={lineasDevolucion.length === 0 ? 'Añade al menos un modelo a la devolución primero' : 'Procesar devolución'}
               >
                 {savingDevolucion ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                 <span>{savingDevolucion ? 'Procesando...' : 'Procesar Devolución'}</span>
