@@ -392,6 +392,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   // Form: Nueva Orden
   const [orderSupplierId, setOrderSupplierId] = useState('');
   const [orderObservaciones, setOrderObservaciones] = useState('');
+  const [mostrarObsGeneralOrden, setMostrarObsGeneralOrden] = useState(false);
 
   // Selector Interactivo de Modelos con Curva exacta
   const [busquedaModelo, setBusquedaModelo] = useState('');
@@ -401,6 +402,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [cantidadCurvas, setCantidadCurvas] = useState<number>(2); // Por defecto 2 medias docenas = 12 pares
   const [precioCostoInput, setPrecioCostoInput] = useState<number>(0);
   const [observacionItemInput, setObservacionItemInput] = useState<string>('');
+  const [mostrarObsModeloOrden, setMostrarObsModeloOrden] = useState(false);
 
   const [orderLines, setOrderLines] = useState<Array<{
     productId: string;
@@ -647,6 +649,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     setCantidadCurvas(2);
     setPrecioCostoInput(0);
     setObservacionItemInput('');
+    setMostrarObsModeloOrden(false);
     showToast(`Modelo agregado a la orden (${paresCalculados} pares).`, 'success');
   };
 
@@ -3220,17 +3223,42 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 </div>
               </div>
 
+              {/* Observación General Opcional (Toggle compacto para ahorrar espacio) */}
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Observaciones Generales de la Orden
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Entrega antes del fin de mes, empacar en cajas individuales..."
-                  value={orderObservaciones}
-                  onChange={(e) => setOrderObservaciones(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-                />
+                {!mostrarObsGeneralOrden && !orderObservaciones ? (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarObsGeneralOrden(true)}
+                    className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>+ Agregar observación general de la orden (opcional)</span>
+                  </button>
+                ) : (
+                  <div className="space-y-1.5 animate-in fade-in duration-150">
+                    <div className="flex justify-between items-center">
+                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                        Observaciones Generales de la Orden (Opcional)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMostrarObsGeneralOrden(false);
+                          setOrderObservaciones('');
+                        }}
+                        className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
+                      >
+                        Quitar observación
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Ej. Entrega antes del fin de mes, empacar en cajas individuales..."
+                      value={orderObservaciones}
+                      onChange={(e) => setOrderObservaciones(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Selector de Modelos con Curva Exacta */}
@@ -3409,9 +3437,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Precio Costo Unit ($)</label>
+                    <div className="space-y-2 pt-2">
+                      <div className="w-full">
+                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Precio Costo Unit ($) *</label>
                         <input
                           type="number"
                           step="0.01"
@@ -3422,15 +3450,42 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                         />
                       </div>
 
+                      {/* Observación por Modelo Opcional (Toggle compacto para ahorrar espacio) */}
                       <div>
-                        <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Observación del Modelo</label>
-                        <input
-                          type="text"
-                          placeholder="Ej. Hebilla dorada..."
-                          value={observacionItemInput}
-                          onChange={(e) => setObservacionItemInput(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-[var(--card)] border rounded-lg text-xs"
-                        />
+                        {!mostrarObsModeloOrden && !observacionItemInput ? (
+                          <button
+                            type="button"
+                            onClick={() => setMostrarObsModeloOrden(true)}
+                            className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>+ Agregar observación a este modelo (opcional)</span>
+                          </button>
+                        ) : (
+                          <div className="space-y-1 animate-in fade-in duration-150">
+                            <div className="flex justify-between items-center">
+                              <label className="block text-[10px] font-bold text-[var(--muted-foreground)]">
+                                Observación Específica del Modelo (Opcional)
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMostrarObsModeloOrden(false);
+                                  setObservacionItemInput('');
+                                }}
+                                className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
+                              >
+                                Quitar observación
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Ej. Hebilla dorada, cuero charol, suela cocida..."
+                              value={observacionItemInput}
+                              onChange={(e) => setObservacionItemInput(e.target.value)}
+                              className="w-full px-3 py-1.5 bg-[var(--card)] border rounded-lg text-xs"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
 

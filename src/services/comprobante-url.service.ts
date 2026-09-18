@@ -176,3 +176,84 @@ export function generarUrlPublicaOrden(data: OrdenCompraPdfData): string {
   const base = obtenerUrlBase();
   return `${base}/comprobante?d=${encodeURIComponent(encoded)}`;
 }
+
+export interface PedidoClienteComprobanteData {
+  pedido: {
+    id: string;
+    numero?: number;
+    numeroCodigo?: string;
+    fecha: string;
+    hora?: string;
+    tipoPago?: string;
+    observaciones?: string;
+  };
+  cliente: {
+    nombre: string;
+    cedula?: string;
+    telefono?: string;
+    direccion?: string;
+  };
+  emisor: {
+    nombre: string;
+    ruc?: string;
+    direccion?: string;
+    telefono?: string;
+  };
+  lineas: Array<{
+    modelo: string;
+    codigo?: string;
+    color?: string;
+    serie?: string;
+    imageUrl?: string;
+    numeracion?: string;
+    observacion?: string;
+    cantidadPares: number;
+    precioUnitario: number;
+    subtotal: number;
+  }>;
+  totales: {
+    totalPares: number;
+    totalPagar: number;
+  };
+}
+
+/**
+ * Genera el enlace público dinámico para un Pedido de Cliente
+ */
+export function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteData): string {
+  const payload = {
+    t: 'PEDIDO',
+    num: data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : `#${data.pedido.id.slice(0, 6).toUpperCase()}`),
+    f: data.pedido.fecha,
+    h: data.pedido.hora || '',
+    fp: data.pedido.tipoPago || 'CONTADO',
+    c_nom: data.cliente.nombre,
+    c_id: data.cliente.cedula || '',
+    c_tel: data.cliente.telefono || '',
+    c_dir: data.cliente.direccion || '',
+    pares: data.totales.totalPares,
+    tot: data.totales.totalPagar,
+    e_nom: data.emisor.nombre,
+    e_ruc: data.emisor.ruc,
+    e_dir: data.emisor.direccion,
+    e_tel: data.emisor.telefono,
+    lineas: (data.lineas || []).slice(0, 20).map((l) => ({
+      m: l.modelo,
+      c: l.codigo || '',
+      col: l.color || '',
+      ser: l.serie || '',
+      img: l.imageUrl && l.imageUrl.length < 500 ? l.imageUrl : undefined,
+      num: l.numeracion || '',
+      obs: l.observacion?.trim() || undefined,
+      qty: l.cantidadPares,
+      u: l.precioUnitario,
+      tot: l.subtotal,
+    })),
+    obs: data.pedido.observaciones?.trim() || undefined,
+  };
+
+  const encoded = codificarPayload(payload);
+  const base = obtenerUrlBase();
+  return `${base}/comprobante?d=${encodeURIComponent(encoded)}`;
+}
+

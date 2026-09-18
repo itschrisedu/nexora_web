@@ -22,10 +22,13 @@ import {
   AlertCircle,
   User,
   Building,
+  FileText,
+  Edit3,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
+import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
 
 interface ComercialProps {
   online: boolean;
@@ -186,6 +189,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       esPedidoEspecial?: boolean;
       subtipoSerie?: 'MEDIA_DOCENA' | 'DOCENA';
       cantidadSeries?: number;
+      observacionModelo?: string;
     }[]
   >([]);
 
@@ -197,6 +201,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [subtipoSerie, setSubtipoSerie] = useState<'MEDIA_DOCENA' | 'DOCENA'>('MEDIA_DOCENA');
   const [cantidadSeries, setCantidadSeries] = useState(1);
   const [tallaCantidadesMap, setTallaCantidadesMap] = useState<Record<string, number>>({});
+  const [observacionModeloActual, setObservacionModeloActual] = useState('');
+  const [mostrarObsModeloActual, setMostrarObsModeloActual] = useState(false);
 
   // Series Disponibles para Pedidos Especiales
   const [listaSeriesDisponibles, setListaSeriesDisponibles] = useState<any[]>([]);
@@ -219,6 +225,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [metodoPagoContado, setMetodoPagoContado] = useState<'EFECTIVO' | 'TRANSFERENCIA' | 'DEPOSITO' | 'CHEQUE'>('EFECTIVO');
   const [referenciaComprobante, setReferenciaComprobante] = useState('');
   const [notasPedido, setNotasPedido] = useState('');
+  const [mostrarObservacionGeneral, setMostrarObservacionGeneral] = useState(false);
 
   // ── Logística de Entrega (Fase E1) ──
   const [tipoEntrega, setTipoEntrega] = useState<'PRESENCIAL' | 'ENVIO'>('PRESENCIAL');
@@ -607,6 +614,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const negocioNombre = businessConfig?.nombre || 'NEXORA';
 
     let desgloseTexto = '';
+    const lineasComprobante: any[] = [];
+
     if (p.lines && p.lines.length > 0) {
       // Agrupar por producto
       const grupos: { [key: string]: any[] } = {};
@@ -620,16 +629,60 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         const item = lineas[0];
         const totalPares = lineas.reduce((sum, l) => sum + l.cantidad, 0);
         const subtotal = lineas.reduce((sum, l) => sum + (l.subtotal ?? (l.cantidad * Number(l.precioUnitario || 0))), 0);
+        const obsItem = item.observacionModelo || item.observacion;
 
         let formato = `${totalPares} pares`;
         if (totalPares === 6) formato = 'Media Docena';
         else if (totalPares === 12) formato = '1 Docena';
 
-        desgloseTexto += `\n• ${formato} - ${item.modelName || 'Calzado'} (${item.color || ''} / ${item.serieNombre || 'Serie'}) x $${Number(item.precioUnitario).toFixed(2)} = $${subtotal.toFixed(2)}`;
+        const notaExtra = obsItem ? ` (Nota: ${obsItem})` : '';
+        desgloseTexto += `\n• ${formato} - ${item.modelName || 'Calzado'} (${item.color || ''} / ${item.serieNombre || 'Serie'}) x $${Number(item.precioUnitario).toFixed(2)} = $${subtotal.toFixed(2)}${notaExtra}`;
+
+        lineasComprobante.push({
+          modelo: item.modelName || 'Calzado',
+          codigo: item.codigo || item.code,
+          color: item.color,
+          serie: item.serieNombre || item.serie,
+          imageUrl: item.imageUrl,
+          numeracion: `${totalPares} pares (${formato})`,
+          observacion: obsItem,
+          cantidadPares: totalPares,
+          precioUnitario: Number(item.precioUnitario || 0),
+          subtotal: Number(subtotal || 0),
+        });
       });
     }
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!`;
+    // Generar enlace digital oficial del comprobante
+    const urlComprobante = generarUrlPublicaPedidoCliente({
+      pedido: {
+        id: p.id,
+        numero: p.numero,
+        numeroCodigo: p.numeroCodigo,
+        fecha: new Date(p.createdAt || new Date()).toLocaleDateString('es-EC'),
+        tipoPago: p.tipoPago,
+        observaciones: (p as any).notas || (p as any).observaciones,
+      },
+      cliente: {
+        nombre: clienteNombre,
+        cedula: cliente?.cedula,
+        telefono: telefono,
+        direccion: p.direccionEnvio || cliente?.direccion,
+      },
+      emisor: {
+        nombre: negocioNombre,
+        ruc: businessConfig?.ruc,
+        direccion: businessConfig?.direccion,
+        telefono: businessConfig?.telefono,
+      },
+      lineas: lineasComprobante,
+      totales: {
+        totalPares: (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0),
+        totalPagar: Number(p.montoTotal || 0),
+      },
+    });
+
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\n📄 *Comprobante Digital Oficial:* ${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!`;
 
     let numLimpio = telefono.replace(/\D/g, '');
     if (numLimpio.startsWith('09') && numLimpio.length === 10) {
@@ -797,6 +850,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           tipoVenta: 'SERIE_COMPLETA' as const,
           subtipoSerie,
           cantidadSeries,
+          observacionModelo: observacionModeloActual.trim() || undefined,
         };
       });
 
@@ -839,6 +893,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           esPedidoEspecial: true,
           subtipoSerie,
           cantidadSeries,
+          observacionModelo: observacionModeloActual.trim() || undefined,
         };
       });
 
@@ -861,6 +916,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
               cantidad: Number(qty),
               precioUnitario: Number(precioItem),
               tipoVenta: 'TALLA_ESPECIFICA' as const,
+              observacionModelo: observacionModeloActual.trim() || undefined,
             });
           }
         }
@@ -875,7 +931,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       setLineasPedido([...lineasPedido, ...lineasNumeracion]);
     }
 
-    // Limpiar selección de producto
+    // Limpiar selección de producto y observación del modelo
     setSelectedProductId('');
     setProductoSeleccionadoObj(null);
     setBusquedaModelo('');
@@ -884,6 +940,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setTallaCantidadesMap({});
     setCantidadSeries(1);
     setUltimoPrecioCliente(null);
+    setObservacionModeloActual('');
+    setMostrarObsModeloActual(false);
   };
 
   const handleEliminarLinea = (index: number) => {
@@ -1004,6 +1062,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           tallaId: l.tallaId,
           cantidad: l.cantidad,
           tipoVenta: l.tipoVenta,
+          observacion: l.observacionModelo || undefined,
         })),
         notas: notasFinales || undefined,
         tipoEntrega,
@@ -1069,6 +1128,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       setClienteSeleccionado(null);
       setLineasPedido([]);
       setNotasPedido('');
+      setMostrarObservacionGeneral(false);
+      setObservacionModeloActual('');
+      setMostrarObsModeloActual(false);
       setMetodoPagoContado('EFECTIVO');
       setReferenciaComprobante('');
       setBusquedaCliente('');
@@ -1845,6 +1907,46 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       </div>
                     </div>
                   )}
+
+                  {/* Observación General del Pedido (Compacta y Opcional) */}
+                  <div className="sm:col-span-2 pt-1">
+                    {!mostrarObservacionGeneral && !notasPedido ? (
+                      <button
+                        type="button"
+                        onClick={() => setMostrarObservacionGeneral(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[var(--border)] text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:border-[#0F172A] hover:bg-[var(--card)] transition-all cursor-pointer"
+                      >
+                        <FileText size={13} />
+                        <span>+ Agregar Observación General del Pedido</span>
+                      </button>
+                    ) : (
+                      <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-2 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
+                            <FileText size={12} />
+                            <span>Observación General del Pedido (Opcional)</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNotasPedido('');
+                              setMostrarObservacionGeneral(false);
+                            }}
+                            className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer"
+                          >
+                            ✕ Quitar / Cerrar
+                          </button>
+                        </div>
+                        <textarea
+                          rows={2}
+                          placeholder="Instrucciones generales de entrega, empaque o solicitud del cliente (opcional)..."
+                          value={notasPedido}
+                          onChange={(e) => setNotasPedido(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2664,6 +2766,48 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       }`}
                     />
                   </div>
+
+                  {/* Observación Opcional por Modelo */}
+                  {productoSeleccionadoObj && (
+                    <div className="sm:col-span-2 pt-1">
+                      {!mostrarObsModeloActual && !observacionModeloActual ? (
+                        <button
+                          type="button"
+                          onClick={() => setMostrarObsModeloActual(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-[var(--border)] text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:border-emerald-600 transition-all cursor-pointer"
+                        >
+                          <FileText size={12} />
+                          <span>+ Agregar Observación a este Modelo (Opcional)</span>
+                        </button>
+                      ) : (
+                        <div className="p-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-1.5 animate-in fade-in duration-150">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
+                              <FileText size={11} />
+                              <span>Observación Específica para {productoSeleccionadoObj.modelName} (Opcional)</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setObservacionModeloActual('');
+                                setMostrarObsModeloActual(false);
+                              }}
+                              className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer"
+                            >
+                              ✕ Quitar
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Ej: Suela especial, hebilla dorada, cuero café mate..."
+                            value={observacionModeloActual}
+                            onChange={(e) => setObservacionModeloActual(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-lg text-xs text-[var(--foreground)] focus:outline-none focus:border-emerald-600"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Información de último precio al cliente */}
@@ -2825,6 +2969,54 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                       = {totalPares} pares total
                                     </span>
                                   </div>
+
+                                  {/* Observación específica de este modelo en el resumen */}
+                                  {primerItem.observacionModelo ? (
+                                    <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/25 rounded-lg flex items-center justify-between gap-2 text-xs">
+                                      <div className="flex items-center gap-1.5 text-amber-900 dark:text-amber-200 min-w-0">
+                                        <span className="font-extrabold text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">📝 Nota:</span>
+                                        <span className="truncate text-[11px] font-medium">{primerItem.observacionModelo}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nuevasLineas = lineasPedido.map(item => {
+                                            if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                              return { ...item, observacionModelo: undefined };
+                                            }
+                                            return item;
+                                          });
+                                          setLineasPedido(nuevasLineas);
+                                        }}
+                                        className="text-[10px] font-bold text-rose-500 hover:underline shrink-0 cursor-pointer"
+                                        title="Eliminar observación de este modelo"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="mt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nota = window.prompt(`Observación para ${primerItem.modelName} (ej. hebilla dorada, suela especial):`);
+                                          if (nota !== null && nota.trim().length > 0) {
+                                            const nuevasLineas = lineasPedido.map(item => {
+                                              if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                                return { ...item, observacionModelo: nota.trim() };
+                                              }
+                                              return item;
+                                            });
+                                            setLineasPedido(nuevasLineas);
+                                          }
+                                        }}
+                                        className="text-[10px] font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Plus size={10} />
+                                        <span>Agregar observación a este modelo</span>
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>

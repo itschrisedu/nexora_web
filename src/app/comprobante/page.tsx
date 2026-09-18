@@ -235,6 +235,7 @@ function ComprobanteContent() {
   const esAbono = data.t === 'ABONO';
   const esFactura = data.t === 'FACTURA';
   const esOrden = data.t === 'ORDEN';
+  const esPedido = data.t === 'PEDIDO';
 
   return (
     <div className="min-h-screen w-full bg-slate-100 dark:bg-slate-950 py-6 sm:py-10 px-3 sm:px-6 pb-24 flex flex-col items-center justify-start overflow-y-auto">
@@ -296,6 +297,8 @@ function ComprobanteContent() {
               <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">
                 {esAbono
                   ? 'Recibo Oficial de Abono'
+                  : esPedido
+                  ? 'Comprobante de Pedido'
                   : esFactura
                   ? 'Factura Electrónica'
                   : 'Orden de Compra'}
@@ -456,20 +459,20 @@ function ComprobanteContent() {
             </div>
           )}
 
-          {/* ═══ CUERPO: ORDEN DE COMPRA ═══ */}
-          {esOrden && (
+          {/* ═══ CUERPO: ORDEN DE COMPRA / PEDIDO DE CLIENTE ═══ */}
+          {(esOrden || esPedido) && (
             <div className="space-y-4">
               {data.obs && (
                 <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-900 dark:text-amber-200">
                   <span className="font-extrabold text-[11px] uppercase tracking-wider block text-amber-800 dark:text-amber-300">
-                    📝 Observaciones / Instrucciones de Producción:
+                    📝 {esPedido ? 'Observaciones del Pedido:' : 'Observaciones / Instrucciones de Producción:'}
                   </span>
                   <p className="mt-1 leading-relaxed text-slate-700 dark:text-slate-200">{data.obs}</p>
                 </div>
               )}
 
               <span className="text-xs font-extrabold uppercase text-slate-700 tracking-wider block">
-                Modelos y Numeración para Producción
+                {esPedido ? 'Artículos y Modelos del Pedido' : 'Modelos y Numeración para Producción'}
               </span>
 
               <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-2xs">
@@ -534,10 +537,10 @@ function ComprobanteContent() {
 
               <div className="flex justify-between items-center pt-3 border-t border-slate-200">
                 <span className="text-xs text-slate-500 font-medium">
-                  Total de producción: <strong className="text-slate-900 font-mono">{data.pares} pares</strong>
+                  Total de pares: <strong className="text-slate-900 font-mono">{data.pares} pares</strong>
                 </span>
                 <div className="text-right">
-                  <span className="text-xs text-slate-500 block">Total a Liquidar:</span>
+                  <span className="text-xs text-slate-500 block">{esPedido ? 'Total del Pedido:' : 'Total a Liquidar:'}</span>
                   <span className="text-lg font-black font-mono text-emerald-700">${Number(data.tot || 0).toFixed(2)}</span>
                 </div>
               </div>
