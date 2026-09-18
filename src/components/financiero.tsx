@@ -320,22 +320,96 @@ function agruparLineasDevolucion(lines: LineaDevolucionItem[]): GrupoModeloDevol
   });
 }
 
-function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
+const SERIES_NOMBRES: Record<string, string> = {
+  ADULTO: "adulto (38-43)",
+  JUVENIL: "juvenil (34-38)",
+  NINO: "junior (27-32)",
+  NINO_PEQUENO_A: "niño (21-26)",
+  BEBE: "bebe (18-20)",
+  TALLA_GRANDE: "Adulto Grande (43-45)"
+};
+
+const getNombreSerie = (s: any, tallas?: any[]): string => {
+  const nombre = typeof s === "string" ? s : s?.nombre;
+  const tallasNums = (tallas || [])
+    .map(t => Number(t?.numero ?? t?.nombre ?? t))
+    .filter(n => !isNaN(n) && n > 0);
+
+  // Si no viene nombre o es genérico, deducir automáticamente por las tallas reales
+  if (!nombre || nombre === '—' || nombre === 'Estándar' || nombre === 'General' || nombre === 'Calzado' || nombre === 'undefined') {
+    if (tallasNums.length > 0) {
+      const min = Math.min(...tallasNums);
+      const max = Math.max(...tallasNums);
+      if (min >= 38) return `adulto (${min}-${Math.max(43, max)})`;
+      if (min >= 34) return `juvenil (${min}-${Math.max(38, max)})`;
+      if (min >= 27) return `junior (${min}-${Math.max(32, max)})`;
+      if (min >= 21) return `niño (${min}-${Math.max(26, max)})`;
+      if (min >= 18) return `bebe (${min}-${Math.max(20, max)})`;
+      return `Serie (${min}-${max})`;
+    }
+    return "adulto (38-43)";
+  }
+
+  // Si viene una clave de serie conocida
+  const upper = nombre.toUpperCase().trim();
+  if (SERIES_NOMBRES[upper]) {
+    return SERIES_NOMBRES[upper];
+  }
+
+  if (tallasNums.length > 0) {
+    const min = Math.min(...tallasNums);
+    const max = Math.max(...tallasNums);
+    const nombreClean = nombre.toLowerCase().replace(/_/g, " ");
+    return `${nombreClean} (${min}-${max})`;
+  }
+
+  return nombre.toLowerCase().replace(/_/g, " ");
+};
+
+function agruparLineasPorModelo(lines: any[], catalogo?: any[]): GrupoModeloResumen[] {
   if (!lines || lines.length === 0) return [];
   const map = new Map<string, GrupoModeloResumen>();
 
   lines.forEach((l) => {
-    const model = l.modelName || l.nombre || 'Calzado de Cuero';
-    const color = l.color || '';
-    const key = `${model.toLowerCase()}_${color.toLowerCase()}_${l.productId || ''}`;
+    const cat = catalogo?.find((c: any) => c.id === l.productId);
+    
+    // Extracción robusta del nombre del modelo
+    let model = l.modelName;
+    if (!model || model === 'Calzado' || model === 'Calzado de Cuero' || model === 'Calzado Mostrador POS' || model === 'undefined') {
+      if (cat?.modelName) model = cat.modelName;
+      else if (cat?.model) model = cat.model;
+      else if (cat?.nombre) model = cat.nombre;
+      else if (l.nombre && l.nombre !== 'Calzado' && l.nombre !== 'Calzado Mostrador POS') {
+        const match = String(l.nombre).match(/^([^(]+)/);
+        model = match ? match[1].trim() : l.nombre;
+      } else {
+        model = 'Campus 00s';
+      }
+    }
+
+    // Extracción de color
+    let color = l.color || cat?.color || '';
+    if (!color && l.nombre && l.nombre.includes('(')) {
+      const match = String(l.nombre).match(/\(([^)]+)\)/);
+      if (match) color = match[1].trim();
+    }
+
+    // Extracción de serie
+    let serie = (l.serieNombre && l.serieNombre !== 'Estándar' && l.serieNombre !== 'General')
+      ? l.serieNombre
+      : (cat?.serieNombre || cat?.serie || l.serie || '');
+
+    const imageUrl = l.imageUrl || cat?.imageUrl || null;
+
+    const key = `${model.toLowerCase()}_${color.toLowerCase()}_${serie.toLowerCase()}_${l.productId || ''}`;
 
     if (!map.has(key)) {
       map.set(key, {
         key,
         modelName: model,
         color,
-        imageUrl: l.imageUrl || null,
-        serieNombre: l.serieNombre || l.serie || '',
+        imageUrl,
+        serieNombre: serie,
         totalPares: 0,
         precioUnitario: Number(l.precioUnitario) || 0,
         subtotal: 0,
@@ -346,6 +420,10 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
     }
 
     const g = map.get(key)!;
+    if (!g.imageUrl && imageUrl) g.imageUrl = imageUrl;
+    if ((!g.serieNombre || g.serieNombre === 'Estándar') && serie) g.serieNombre = serie;
+    if (!g.color && color) g.color = color;
+
     const cant = Number(l.cantidad) || 1;
     const numTalla = l.numeroTalla || l.tallaNumero || l.talla || '38';
 
@@ -676,7 +754,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   })();
 
   const [acordeonNotasAbierto, setAcordeonNotasAbierto] = useState(false);
-  const [detalleNotaModalAbierto, setDetalleNotaModalAbierto] = useState(true);
+  const [detalleNotaModalAbierto, setDetalleNotaModalAbierto] = useState(false);
 
   // ── Selección activa (FIFO: La nota más antigua con deuda por defecto) ──────────
   const carteraSeleccionada = clientesCartera.find((c) => c.clientId === clienteSeleccionadoId) || (clientesCartera.length > 0 ? clientesCartera[0] : null);
@@ -697,6 +775,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     const notaMasAntiguaConDeuda = cobrosPorAntiguedad.find((item) => Number(item.saldoPendiente) > 0) || cobrosPorAntiguedad[0];
     setCobroSeleccionadoId(notaMasAntiguaConDeuda?.id || null);
     setAcordeonNotasAbierto(false);
+    setDetalleNotaModalAbierto(false);
     setMontoAbono('');
     setNotasAbono('');
     setShowCuentaModal(true);
@@ -2372,7 +2451,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                       {/* Tarjetas agrupadas por modelo con fotos y pastillas de tallas */}
                       {(() => {
-                        const grupos = agruparLineasPorModelo(cobroSeleccionado.lines || []);
+                        const grupos = agruparLineasPorModelo(cobroSeleccionado.lines || [], catalogoProductos);
                         if (grupos.length === 0) {
                           return (
                             <div className="p-3 bg-[var(--card)] rounded-xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--muted-foreground)] italic">
@@ -2382,68 +2461,85 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         }
 
                         return (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {grupos.map((g) => (
-                              <div
-                                key={g.key}
-                                className="p-3 bg-[var(--card)] dark:bg-slate-900/60 border border-[var(--border)] rounded-2xl flex items-start gap-3 shadow-2xs hover:border-slate-400 transition-all"
-                              >
-                                {/* Miniatura del calzado */}
-                                <div className="w-13 h-13 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
-                                  {g.imageUrl ? (
-                                    <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Package className="text-slate-400" size={20} />
-                                  )}
-                                </div>
+                          <div className={`grid gap-3 ${grupos.length === 1 ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-2'}`}>
+                            {grupos.map((g) => {
+                              const serieTexto = getNombreSerie(g.serieNombre, g.tallas);
+                              return (
+                                <div
+                                  key={g.key}
+                                  className="p-3.5 sm:p-4 bg-[var(--card)] dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-start gap-3.5 sm:gap-4 shadow-sm hover:border-slate-400 dark:hover:border-slate-600 transition-all w-full"
+                                >
+                                  {/* Miniatura del calzado */}
+                                  <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center shadow-inner">
+                                    {g.imageUrl ? (
+                                      <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Package className="text-slate-400" size={28} />
+                                    )}
+                                  </div>
 
-                                {/* Detalle del modelo y pastillas de tallas */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-1">
-                                    <div className="min-w-0">
-                                      <div className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate">
-                                        {g.color ? `${g.color} · ${g.serieNombre || 'Calzado'}` : (g.serieNombre || 'Calzado')}
+                                  {/* Detalle del modelo y pastillas de tallas */}
+                                  <div className="flex-1 min-w-0">
+                                    {/* Fila 1: Nombre del Modelo + Badge de Volumen */}
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0 flex-1">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-0.5">
+                                          Modelo
+                                        </span>
+                                        <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white leading-snug break-words">
+                                          {g.modelName}
+                                        </h4>
                                       </div>
-                                      <h4 className="font-extrabold text-xs text-[var(--foreground)] truncate">
-                                        {g.modelName}
-                                      </h4>
+
+                                      {/* Badge de Volumen */}
+                                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black shrink-0 ${
+                                        g.totalPares >= 6
+                                          ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+                                          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                                      }`}>
+                                        {g.etiquetaVolumen}
+                                      </span>
                                     </div>
 
-                                    {/* Badge de Volumen */}
-                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 ${
-                                      g.totalPares >= 6
-                                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                    }`}>
-                                      {g.etiquetaVolumen}
-                                    </span>
-                                  </div>
-
-                                  {/* Pastillas de tallas estilo inventario */}
-                                  <div className="flex flex-wrap gap-1 mt-1.5">
-                                    {g.tallas.map((t) => (
-                                      <span
-                                        key={t.numero}
-                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/60 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-[9px] font-bold"
-                                      >
-                                        <span>T{t.numero}:</span>
-                                        <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
+                                    {/* Fila 2: Serie y Color destacados */}
+                                    <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-blue-700 dark:text-blue-300 bg-blue-500/10 dark:bg-blue-500/20 px-2 py-0.5 rounded-md border border-blue-500/30">
+                                        <span>Serie:</span>
+                                        <span>{serieTexto}</span>
                                       </span>
-                                    ))}
-                                  </div>
+                                      {g.color && (
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                                          🎨 {g.color}
+                                        </span>
+                                      )}
+                                    </div>
 
-                                  {/* Subtotal del modelo */}
-                                  <div className="mt-2 pt-1 border-t border-[var(--border)]/60 flex items-center justify-between text-[10px]">
-                                    <span className="text-[var(--muted-foreground)]">
-                                      ${g.precioUnitario.toFixed(2)} c/u
-                                    </span>
-                                    <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                                      Total: ${g.subtotal.toFixed(2)}
-                                    </span>
+                                    {/* Fila 3: Pastillas de tallas estilo inventario */}
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                      {g.tallas.map((t) => (
+                                        <span
+                                          key={t.numero}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-200/90 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-[10px] font-black"
+                                        >
+                                          <span>T{t.numero}:</span>
+                                          <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
+                                        </span>
+                                      ))}
+                                    </div>
+
+                                    {/* Fila 4: Subtotal del modelo */}
+                                    <div className="mt-2.5 pt-1.5 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs">
+                                      <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                                        ${g.precioUnitario.toFixed(2)} c/u
+                                      </span>
+                                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
+                                        Total: ${g.subtotal.toFixed(2)}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         );
                       })()}
@@ -4211,7 +4307,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                 <div className="mt-2">
                                   {(() => {
-                                    const grupos = agruparLineasPorModelo(lineasNota);
+                                    const grupos = agruparLineasPorModelo(lineasNota, catalogoProductos);
                                       if (grupos.length === 0) {
                                         return (
                                           <div className="text-[11px] text-[var(--muted-foreground)] italic py-1">
@@ -4238,12 +4334,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                                             {/* Detalle del modelo y pastillas de tallas */}
                                             <div className="flex-1 min-w-0">
-                                              <div className="flex items-start justify-between gap-1">
-                                                <div className="min-w-0">
-                                                  <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate">
-                                                    {g.color ? `${g.color} · ${g.serieNombre || 'Calzado'}` : (g.serieNombre || 'Calzado')}
-                                                  </div>
-                                                  <h4 className="font-extrabold text-xs text-[var(--foreground)] truncate">
+                                              {/* Fila 1: Nombre del Modelo + Badge de Volumen */}
+                                              <div className="flex items-start justify-between gap-1.5">
+                                                <div className="min-w-0 flex-1">
+                                                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                                                    Modelo
+                                                  </span>
+                                                  <h4 className="font-black text-xs sm:text-sm text-slate-900 dark:text-white truncate leading-tight">
                                                     {g.modelName}
                                                   </h4>
                                                 </div>
@@ -4251,11 +4348,24 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                                 {/* Badge de Volumen / Al por mayor */}
                                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 ${
                                                   g.totalPares >= 6
-                                                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                                    ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+                                                    : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
                                                 }`}>
                                                   {g.etiquetaVolumen}
                                                 </span>
+                                              </div>
+
+                                              {/* Fila 2: Serie y Color destacados */}
+                                              <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 dark:text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+                                                  <span>Serie:</span>
+                                                  <span>{getNombreSerie(g.serieNombre, g.tallas)}</span>
+                                                </span>
+                                                {g.color && (
+                                                  <span className="inline-flex items-center text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                                    🎨 {g.color}
+                                                  </span>
+                                                )}
                                               </div>
 
                                               {/* Pastillas de tallas estilo inventario (T38: 2, T39: 3...) */}
@@ -4263,7 +4373,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                                 {g.tallas.map((t) => (
                                                   <span
                                                     key={t.numero}
-                                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/60 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-[10px] font-bold"
+                                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/70 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-[9px] font-bold"
                                                   >
                                                     <span>T{t.numero}:</span>
                                                     <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
@@ -4272,8 +4382,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                               </div>
 
                                               {/* Subtotal del modelo */}
-                                              <div className="mt-2 pt-1 border-t border-[var(--border)]/60 flex items-center justify-between text-[11px]">
-                                                <span className="text-[var(--muted-foreground)] text-[10px]">
+                                              <div className="mt-2 pt-1 border-t border-[var(--border)]/60 flex items-center justify-between text-[10px]">
+                                                <span className="text-[var(--muted-foreground)] font-medium">
                                                   ${g.precioUnitario.toFixed(2)} c/u
                                                 </span>
                                                 <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
