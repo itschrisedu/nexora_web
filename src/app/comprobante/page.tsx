@@ -27,8 +27,10 @@ import {
 import {
   generarFacturaPdfDoc,
   descargarOrdenCompraPdf,
+  descargarPedidoClientePdf,
   FacturaPdfData,
   OrdenCompraPdfData,
+  PedidoClientePdfData,
 } from '@/services/pdf-factura.service';
 
 function ComprobanteContent() {
@@ -196,6 +198,42 @@ function ComprobanteContent() {
         },
       };
       descargarOrdenCompraPdf(pdfData);
+    } else if (data.t === 'PEDIDO') {
+      const pdfData: PedidoClientePdfData = {
+        emisor: {
+          nombre: data.e_nom || 'Establecimiento Comercial',
+          ruc: data.e_ruc || '',
+          direccion: data.e_dir || '',
+          telefono: data.e_tel || '',
+        },
+        cliente: {
+          nombre: data.c_nom || 'Cliente',
+          cedula: data.c_id || '',
+          telefono: data.c_tel || '',
+          direccion: data.c_dir || '',
+        },
+        pedido: {
+          numero: data.num || 'PED-0000',
+          fecha: data.f || '',
+          tipoPago: data.fp || 'Contado',
+          observaciones: data.obs || '',
+        },
+        lineas: (data.lineas || []).map((l: any) => ({
+          modelo: l.m,
+          codigo: l.c,
+          color: l.col,
+          numeracion: l.num,
+          cantidadPares: l.qty,
+          precioUnitario: l.u || 0,
+          subtotal: l.tot || 0,
+          observacion: l.obs,
+        })),
+        totales: {
+          totalPares: Number(data.pares || 0),
+          totalPagar: Number(data.tot || 0),
+        },
+      };
+      descargarPedidoClientePdf(pdfData);
     }
   };
 

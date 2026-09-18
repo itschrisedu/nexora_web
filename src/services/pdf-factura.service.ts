@@ -584,3 +584,260 @@ export async function compartirOrdenCompraPdf(
   return { metodo: "DOWNLOAD_WHATSAPP" };
 }
 
+// ══════════════════════════════════════════
+// GENERACIÓN DE PDF PARA PEDIDOS DE CLIENTES
+// ══════════════════════════════════════════
+
+export interface PedidoClientePdfData {
+  emisor: {
+    nombre: string;
+    ruc?: string;
+    direccion?: string;
+    telefono?: string;
+    email?: string;
+  };
+  pedido: {
+    numero: string;
+    fecha: string;
+    tipoPago?: string;
+    tipoEntrega?: string;
+    courier?: string;
+    guiaEnvio?: string;
+    observaciones?: string;
+  };
+  cliente: {
+    nombre: string;
+    cedula?: string;
+    telefono?: string;
+    direccion?: string;
+    ciudad?: string;
+  };
+  lineas: {
+    modelo: string;
+    marca?: string;
+    color?: string;
+    codigo?: string;
+    serie?: string;
+    numeracion?: string;
+    imageUrl?: string;
+    cantidadPares: number;
+    precioUnitario: number;
+    subtotal: number;
+    observacion?: string;
+  }[];
+  totales: {
+    totalPares: number;
+    subtotal?: number;
+    descuento?: number;
+    costoEnvio?: number;
+    totalPagar: number;
+  };
+}
+
+export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 15;
+
+  // ── 1. Encabezado / Emisor ──
+  doc.setFillColor(15, 23, 42); // Slate 900
+  doc.roundedRect(12, y, pageWidth - 24, 34, 2, 2, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text(data.emisor.nombre || "COMERCIAL DE CALZADO", 18, y + 8);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(203, 213, 225);
+  doc.text(`RUC: ${data.emisor.ruc || "1804884664001"}`, 18, y + 15);
+  doc.text(`Dirección: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 20);
+  if (data.emisor.telefono) {
+    doc.text(`Teléfono / Atención: ${data.emisor.telefono}`, 18, y + 25);
+  }
+
+  // Cuadro Número de Pedido (derecha)
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(pageWidth - 75, y + 4, 58, 26, 1.5, 1.5, "F");
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("COMPROBANTE DE PEDIDO", pageWidth - 46, y + 11, { align: "center" });
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(5, 150, 105); // Emerald 600
+  doc.text(`No. ${data.pedido.numero}`, pageWidth - 46, y + 17, { align: "center" });
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Fecha: ${data.pedido.fecha}`, pageWidth - 46, y + 23, { align: "center" });
+
+  y += 38;
+
+  // ── 2. Datos del Cliente & Logística ──
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(12, y, pageWidth - 24, 26, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text("DATOS DEL CLIENTE & ENTREGA", 16, y + 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Cliente: ${data.cliente.nombre}`, 16, y + 11);
+  if (data.cliente.cedula) {
+    doc.text(`C.I / RUC: ${data.cliente.cedula}`, 16, y + 16);
+  }
+  if (data.cliente.telefono) {
+    doc.text(`Teléfono: ${data.cliente.telefono}`, 16, y + 21);
+  }
+
+  const entregaStr = data.pedido.tipoEntrega === "ENVIO"
+    ? `Envío (${data.pedido.courier || "Courier"}${data.pedido.guiaEnvio ? " - Guía: " + data.pedido.guiaEnvio : ""})`
+    : "Retiro Presencial en Local";
+  doc.text(`Entrega: ${entregaStr}`, pageWidth / 2 + 10, y + 11);
+  doc.text(`Pago: ${data.pedido.tipoPago || "Contado"}`, pageWidth / 2 + 10, y + 16);
+  if (data.cliente.direccion) {
+    doc.text(`Dirección: ${data.cliente.direccion}`, pageWidth / 2 + 10, y + 21);
+  }
+
+  y += 30;
+
+  // ── 3. Observaciones Generales si existen ──
+  if (data.pedido.observaciones && data.pedido.observaciones.trim()) {
+    doc.setFillColor(254, 243, 199); // Amber 100
+    doc.setDrawColor(251, 191, 36);
+    doc.roundedRect(12, y, pageWidth - 24, 11, 1.5, 1.5, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(146, 64, 14);
+    doc.text("OBSERVACIONES GENERALES DEL PEDIDO:", 16, y + 4.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(data.pedido.observaciones.trim(), 16, y + 8.5);
+    y += 15;
+  }
+
+  // ── 4. Tabla de Artículos ──
+  doc.setFillColor(15, 23, 42);
+  doc.rect(12, y, pageWidth - 24, 7, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("MODELO / DETALLE DEL ARTÍCULO", 16, y + 4.5);
+  doc.text("CANTIDAD", pageWidth - 75, y + 4.5, { align: "center" });
+  doc.text("P. UNITARIO", pageWidth - 48, y + 4.5, { align: "right" });
+  doc.text("SUBTOTAL", pageWidth - 16, y + 4.5, { align: "right" });
+
+  y += 7;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+
+  data.lineas.forEach((line, i) => {
+    let extraLines = 0;
+    if (line.numeracion) extraLines += 4;
+    if (line.observacion && line.observacion.trim()) extraLines += 4;
+    const rowHeight = 8 + extraLines;
+
+    if (i % 2 === 1) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(12, y, pageWidth - 24, rowHeight, "F");
+    }
+    doc.setDrawColor(241, 245, 249);
+    doc.line(12, y + rowHeight, pageWidth - 12, y + rowHeight);
+
+    let currentLineY = y + 4.5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${line.marca ? line.marca + " " : ""}${line.modelo}${line.color ? " - " + line.color : ""}${line.codigo ? " (" + line.codigo + ")" : ""}`, 16, currentLineY);
+
+    if (line.numeracion) {
+      currentLineY += 4;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Numeración: ${line.numeracion}`, 16, currentLineY);
+    }
+
+    if (line.observacion && line.observacion.trim()) {
+      currentLineY += 4;
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(7);
+      doc.setTextColor(180, 83, 9);
+      doc.text(`Nota: ${line.observacion.trim()}`, 16, currentLineY);
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${line.cantidadPares} pares`, pageWidth - 75, y + 4.5, { align: "center" });
+    doc.text(`$${Number(line.precioUnitario).toFixed(2)}`, pageWidth - 48, y + 4.5, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.text(`$${Number(line.subtotal).toFixed(2)}`, pageWidth - 16, y + 4.5, { align: "right" });
+
+    y += rowHeight;
+  });
+
+  y += 5;
+
+  // ── 5. Totales ──
+  const startTotalsX = pageWidth - 85;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(startTotalsX, y, 73, 20, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text("TOTAL PARES:", startTotalsX + 4, y + 6);
+  doc.setFont("helvetica", "bold");
+  doc.text(`${data.totales.totalPares} pares`, startTotalsX + 69, y + 6, { align: "right" });
+
+  doc.setDrawColor(203, 213, 225);
+  doc.line(startTotalsX + 4, y + 9, startTotalsX + 69, y + 9);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("VALOR TOTAL:", startTotalsX + 4, y + 15);
+  doc.setTextColor(5, 150, 105); // Emerald 600
+  doc.text(`$${data.totales.totalPagar.toFixed(2)}`, startTotalsX + 69, y + 15, { align: "right" });
+
+  // Footer
+  y += 26;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`Comprobante oficial de pedido emitido por ${data.emisor.nombre || "NEXORA"}`, pageWidth / 2, y, { align: "center" });
+
+  return doc;
+}
+
+export function descargarPedidoClientePdf(data: PedidoClientePdfData): void {
+  const doc = generarPedidoClientePdfDoc(data);
+  const fileName = `Pedido_${data.pedido.numero}.pdf`;
+  doc.save(fileName);
+}
+
+export function obtenerPedidoClientePdfBlobUrl(data: PedidoClientePdfData): string {
+  const doc = generarPedidoClientePdfDoc(data);
+  const blob = doc.output("blob");
+  return URL.createObjectURL(blob);
+}
+

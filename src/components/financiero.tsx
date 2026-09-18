@@ -2269,21 +2269,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
             {/* ── Footer del Modal ── */}
             <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  setShowCuentaModal(false);
-                  handleAbrirFacturacion(carteraSeleccionada, cobroSeleccionado || undefined);
-                }}
-                className="w-full py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <FileCheck size={14} />
-                <span>Emitir Factura Electrónica SRI</span>
-              </button>
 
               {/* Acciones directas de Comprobante / Estado de Cuenta */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   type="button"
+                  disabled={!montoAbono}
                   onClick={() => {
                     const dataAbono = armarDatosComprobanteAbono(carteraSeleccionada, {
                       monto: 0,
@@ -2293,8 +2284,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     descargarComprobanteAbonoPdf(dataAbono);
                     showToast('Comprobante PDF de cuenta generado y descargado.', 'success');
                   }}
-                  className="py-2 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-[var(--border)] shadow-2xs cursor-pointer"
-                  title="Descargar Comprobante Oficial de Caja en PDF"
+                  className="py-2 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-[var(--border)] shadow-2xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={montoAbono ? 'Descargar Comprobante Oficial de Caja en PDF' : 'Ingrese un monto de abono primero'}
                 >
                   <Download size={13} className="text-emerald-600" />
                   <span>Descargar Comprobante PDF</span>
@@ -2303,6 +2294,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 {carteraSeleccionada.clienteTelefono && (
                   <button
                     type="button"
+                    disabled={!montoAbono}
                     onClick={() => {
                       handleEnviarComprobanteAbono(
                         carteraSeleccionada,
@@ -2314,8 +2306,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         formatoEnvioAbono
                       );
                     }}
-                    className="py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer"
-                    title="Enviar Comprobante por WhatsApp"
+                    className="py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={montoAbono ? `Enviar Comprobante por WhatsApp (${formatoEnvioAbono})` : 'Ingrese un monto de abono primero'}
                   >
                     <MessageCircle size={13} />
                     <span>Enviar a WhatsApp</span>

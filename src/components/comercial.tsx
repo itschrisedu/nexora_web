@@ -24,11 +24,14 @@ import {
   Building,
   FileText,
   Edit3,
+  Eye,
+  Download,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
+import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
 
 interface ComercialProps {
   online: boolean;
@@ -600,6 +603,163 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
+  const construirPedidoPdfData = (p: Pedido): PedidoClientePdfData => {
+    const cliente = listaClientes.find((c) => c.id === p.clientId);
+    const clienteNombre = p.clienteNombre || cliente?.nombre || 'Estimado/a Cliente';
+    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+    const numPedido = p.numeroCodigo || (p.numero ? `#${String(p.numero).padStart(4, '0')}` : `#${p.id.slice(0, 6).toUpperCase()}`);
+    const fecha = new Date(p.createdAt || new Date()).toLocaleDateString('es-EC');
+
+    const lineasPdf: any[] = [];
+    if (p.lines && p.lines.length > 0) {
+      const grupos: { [key: string]: any[] } = {};
+      p.lines.forEach((l: any) => {
+        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+        if (!grupos[key]) grupos[key] = [];
+        grupos[key].push(l);
+      });
+
+      Object.entries(grupos).forEach(([_, lineas]) => {
+        const item = lineas[0];
+        const totalPares = lineas.reduce((sum, l) => sum + l.cantidad, 0);
+        const subtotal = lineas.reduce((sum, l) => sum + (l.subtotal ?? (l.cantidad * Number(l.precioUnitario || 0))), 0);
+        const obsItem = item.observacionModelo || item.observacion;
+
+        let formato = `${totalPares} pares`;
+        if (totalPares === 6) formato = 'Media Docena';
+        else if (totalPares === 12) formato = '1 Docena';
+
+        const tallasStr = lineas.map((l: any) => `T${l.tallaNumero || l.tallaId}: ${l.cantidad}`).join(', ');
+
+        lineasPdf.push({
+          modelo: item.modelName || 'Calzado',
+          codigo: item.codigo || item.code,
+          color: item.color,
+          serie: item.serieNombre || item.serie,
+          numeracion: tallasStr || `${totalPares} pares (${formato})`,
+          imageUrl: item.imageUrl,
+          cantidadPares: totalPares,
+          precioUnitario: Number(item.precioUnitario || 0),
+          subtotal: Number(subtotal || 0),
+          observacion: obsItem,
+        });
+      });
+    }
+
+    return {
+      emisor: {
+        nombre: negocioNombre,
+        ruc: businessConfig?.ruc,
+        direccion: businessConfig?.direccion,
+        telefono: businessConfig?.telefono,
+        email: businessConfig?.email,
+      },
+      pedido: {
+        numero: numPedido,
+        fecha,
+        tipoPago: p.tipoPago,
+        tipoEntrega: p.tipoEntrega,
+        courier: p.courier,
+        guiaEnvio: p.guiaEnvio,
+        observaciones: (p as any).notas || (p as any).observaciones,
+      },
+      cliente: {
+        nombre: clienteNombre,
+        cedula: cliente?.cedula,
+        telefono: cliente?.telefono,
+        direccion: p.direccionEnvio || cliente?.direccion,
+        ciudad: p.ciudadEnvio,
+      },
+      lineas: lineasPdf,
+      totales: {
+        totalPares: (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0),
+        costoEnvio: Number(p.costoEnvio || 0),
+        totalPagar: Number(p.montoTotal || 0),
+      },
+    };
+  };
+
+  const handleDescargarPdfPedido = (p: Pedido) => {
+    try {
+      const pdfData = construirPedidoPdfData(p);
+      descargarPedidoClientePdf(pdfData);
+      showToast('Comprobante PDF de pedido descargado.', 'success');
+    } catch (e) {
+      showToast('No se pudo generar el comprobante PDF.', 'error');
+    }
+  };
+
+  const handleVerComprobanteDigital = (p: Pedido) => {
+    const cliente = listaClientes.find((c) => c.id === p.clientId);
+    const telefono = cliente?.telefono;
+    const clienteNombre = p.clienteNombre || cliente?.nombre || 'Estimado/a Cliente';
+    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+
+    const lineasComprobante: any[] = [];
+    if (p.lines && p.lines.length > 0) {
+      const grupos: { [key: string]: any[] } = {};
+      p.lines.forEach((l: any) => {
+        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+        if (!grupos[key]) grupos[key] = [];
+        grupos[key].push(l);
+      });
+
+      Object.entries(grupos).forEach(([_, lineas]) => {
+        const item = lineas[0];
+        const totalPares = lineas.reduce((sum, l) => sum + l.cantidad, 0);
+        const subtotal = lineas.reduce((sum, l) => sum + (l.subtotal ?? (l.cantidad * Number(l.precioUnitario || 0))), 0);
+        const obsItem = item.observacionModelo || item.observacion;
+
+        let formato = `${totalPares} pares`;
+        if (totalPares === 6) formato = 'Media Docena';
+        else if (totalPares === 12) formato = '1 Docena';
+
+        lineasComprobante.push({
+          modelo: item.modelName || 'Calzado',
+          codigo: item.codigo || item.code,
+          color: item.color,
+          serie: item.serieNombre || item.serie,
+          imageUrl: item.imageUrl,
+          numeracion: `${totalPares} pares (${formato})`,
+          observacion: obsItem,
+          cantidadPares: totalPares,
+          precioUnitario: Number(item.precioUnitario || 0),
+          subtotal: Number(subtotal || 0),
+        });
+      });
+    }
+
+    const urlComprobante = generarUrlPublicaPedidoCliente({
+      pedido: {
+        id: p.id,
+        numero: p.numero,
+        numeroCodigo: p.numeroCodigo,
+        fecha: new Date(p.createdAt || new Date()).toLocaleDateString('es-EC'),
+        tipoPago: p.tipoPago,
+        observaciones: (p as any).notas || (p as any).observaciones,
+      },
+      cliente: {
+        nombre: clienteNombre,
+        cedula: cliente?.cedula,
+        telefono: telefono,
+        direccion: p.direccionEnvio || cliente?.direccion,
+      },
+      emisor: {
+        nombre: negocioNombre,
+        ruc: businessConfig?.ruc,
+        direccion: businessConfig?.direccion,
+        telefono: businessConfig?.telefono,
+      },
+      lineas: lineasComprobante,
+      totales: {
+        totalPares: (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0),
+        totalPagar: Number(p.montoTotal || 0),
+      },
+    });
+
+    window.open(urlComprobante, '_blank');
+  };
+
   const handleEnviarConfirmacionWhatsApp = (p: Pedido, clienteTel?: string) => {
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const telefono = clienteTel || cliente?.telefono;
@@ -617,7 +777,6 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const lineasComprobante: any[] = [];
 
     if (p.lines && p.lines.length > 0) {
-      // Agrupar por producto
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
         const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
@@ -682,7 +841,10 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       },
     });
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\n📄 *Comprobante Digital Oficial:* ${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!`;
+    const obsGeneral = (p as any).notas || (p as any).observaciones;
+    const obsGeneralTexto = obsGeneral && obsGeneral.trim() ? `\n📝 *Observaciones:* ${obsGeneral.trim()}` : '';
+
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Ver Comprobante Digital Oficial y Descargar PDF:*\n${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
 
     let numLimpio = telefono.replace(/\D/g, '');
     if (numLimpio.startsWith('09') && numLimpio.length === 10) {
