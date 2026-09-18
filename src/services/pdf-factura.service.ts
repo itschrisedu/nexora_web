@@ -544,6 +544,13 @@ export async function compartirOrdenCompraPdf(
   data: OrdenCompraPdfData,
   telefono: string
 ): Promise<{ metodo: "WEB_SHARE" | "DOWNLOAD_WHATSAPP" }> {
+  // Descarga automática del archivo PDF para fácil adjunto en WhatsApp
+  try {
+    descargarOrdenCompraPdf(data);
+  } catch (e) {
+    console.warn("No se pudo descargar automáticamente el PDF:", e);
+  }
+
   let numLimpio = telefono.replace(/\D/g, "");
   if (numLimpio.startsWith("09") && numLimpio.length === 10) {
     numLimpio = "593" + numLimpio.substring(1);

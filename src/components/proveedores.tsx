@@ -773,13 +773,17 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     };
   };
 
-  // Botón EXPLÍCITO para ENVIAR la orden y cambiar estado a ENVIADA
+  // Botón EXPLÍCITO para ENVIAR la orden y despachar por WhatsApp al proveedor
   const handleEnviarYGenerarPDF = async (orderId: string) => {
     setSaving(true);
     try {
       await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/confirmar`, {});
-      showToast('¡Orden de compra enviada al proveedor exitosamente! Estado: ENVIADA', 'success');
-      await handlePrevisualizarPDFOrden(orderId);
+      showToast('¡Orden enviada al proveedor exitosamente! Abriendo WhatsApp...', 'success');
+
+      const order = await ApiService.get(`/proveedores/ordenes-compra/${orderId}`);
+      if (order) {
+        await handleEnviarOrdenWhatsApp(order);
+      }
 
       if (selectedOrder && selectedOrder.id === orderId) {
         handleVerDetalleOrden(orderId);
@@ -787,6 +791,19 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Error al enviar la orden.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEjecutarAutoDespachoManual = async () => {
+    setSaving(true);
+    try {
+      const res = await ApiService.post('/proveedores/auto-despacho/ejecutar-manual', {});
+      showToast(res.message || 'Despacho automático ejecutado con éxito.', 'success');
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Error al ejecutar el despacho.', 'error');
     } finally {
       setSaving(false);
     }
@@ -821,16 +838,22 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   };
 
   const handleEnviarOrdenWhatsApp = async (order: any) => {
-    const telefono = order.supplier?.contacto;
+    let telefono = order.supplier?.contacto;
     if (!telefono) {
-      showToast('El proveedor no tiene número de teléfono registrado.', 'warning');
-      return;
+      telefono = window.prompt(
+        `El proveedor "${order.supplier?.razonSocial || order.supplier?.nombre || 'Proveedor'}" no tiene teléfono registrado en Contacto.\n\nIngrese el número de WhatsApp para enviar el pedido (ej: 0991234567):`
+      );
+      if (!telefono) {
+        showToast('No se ingresó número de teléfono. Puede previsualizar o descargar el PDF.', 'info');
+        await handlePrevisualizarPDFOrden(order.id);
+        return;
+      }
     }
 
     try {
       const pdfData = construirPdfData(order);
       await compartirOrdenCompraPdf(pdfData, telefono);
-      showToast('Abriendo WhatsApp con la Orden de Compra oficial...', 'info');
+      showToast('Abriendo WhatsApp con el pedido y descargando PDF para adjuntar...', 'success');
     } catch (e: any) {
       showToast('No se pudo enviar la orden de compra a WhatsApp.', 'error');
     }
@@ -1484,10 +1507,21 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   </span>
                 </div>
                 <p className="text-xs text-[var(--muted-foreground)] mt-1 leading-relaxed">
-                  Las órdenes generadas por ventas sin stock se acumulan en <strong className="text-[var(--foreground)]">"⏳ Pendientes por Pedir"</strong>. Cada mañana a las <strong className="text-blue-600 dark:text-blue-400">08:00 AM</strong> se envían automáticamente al fabricante. Puedes revisarlas, reasignar proveedor, cancelarlas si el modelo ya no se vende, o presionar <strong className="text-emerald-600">"Enviar"</strong> para despacharlas manualmente de inmediato.
+                  Las órdenes generadas por ventas sin stock se acumulan en <strong className="text-[var(--foreground)]">"⏳ Pendientes por Pedir"</strong>. Cada mañana a las <strong className="text-blue-600 dark:text-blue-400">08:00 AM</strong> se envían automáticamente al fabricante. Puedes revisarlas, reasignar proveedor, cancelarlas, presionar <strong className="text-emerald-600">"Enviar"</strong> individualmente o despachar todo en lote.
                 </p>
               </div>
             </div>
+            {ordenes.some((o) => o.estado === 'BORRADOR') && (
+              <button
+                onClick={handleEjecutarAutoDespachoManual}
+                disabled={saving}
+                className="shrink-0 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                title="Despachar todas las órdenes pendientes por pedir ahora mismo sin esperar a las 08:00 AM"
+              >
+                <Send size={13} />
+                <span>Despachar Todo Ahora</span>
+              </button>
+            )}
           </div>
 
           {/* Barra de Filtros: Separación clara de Pendientes por Pedir y Enviadas */}
