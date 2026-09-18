@@ -1112,20 +1112,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         }
         if (!initialCustomTallas[sid]) {
           const sObj = series.find(s => s.id === sid);
-          const pTallas = p.tallas || (p as any).stockPorTalla || [];
-          const ids: string[] = [];
-          
-          if (pTallas.length > 0 && pTallas.some((t: any) => (t.cantidad ?? t.disponible ?? 0) > 0)) {
-            pTallas.forEach((t: any) => {
-              const qty = t.cantidad ?? t.disponible ?? 0;
-              const matchedTalla = sObj?.tallas?.find(st => st.id === t.tallaId || st.numero === t.numero);
-              const targetId = matchedTalla?.id || t.tallaId || t.id;
-              for (let i = 0; i < qty; i++) {
-                ids.push(targetId);
-              }
-            });
-            initialCustomTallas[sid] = ids;
-          } else if (sObj?.tallas) {
+          if (sObj?.tallas) {
             const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
             if (Object.keys(curva).length > 0) {
               initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, curva);
@@ -1231,25 +1218,11 @@ export default function ModelosComponent({ online }: ModelosProps) {
         alternateSupplierIds: editModelAlternateIds.filter(Boolean),
       });
 
-      // Actualizar precios y curva de tallas en las variantes existentes
+      // Actualizar precios y serie en las variantes existentes
       for (const p of editModel.products || []) {
         const sid = (p.serie as any)?.id || (p as any).serieId;
         if (sid && editModelSerieIds.includes(sid)) {
           const prices = editModelSeriesPrices[sid];
-          const sObj = series.find(s => s.id === sid);
-          const selectedTallaIds = editModelCustomTallas[sid] || [];
-          
-          const tallasMap = new Map<string, number>();
-          selectedTallaIds.forEach(tid => {
-            tallasMap.set(tid, (tallasMap.get(tid) || 0) + 1);
-          });
-
-          const tallasPayload = (sObj?.tallas || []).map(t => ({
-            tallaId: t.id,
-            numero: t.numero,
-            cantidad: tallasMap.get(t.id) || 0,
-          }));
-
           const costVal = parseFloat(prices?.costPrice || String(p.precioCosto));
           const saleVal = parseFloat(prices?.salePrice || String(p.precioVenta));
 
@@ -1257,7 +1230,6 @@ export default function ModelosComponent({ online }: ModelosProps) {
             serieId: sid,
             costPrice: isNaN(costVal) ? Number(p.precioCosto) : costVal,
             salePrice: isNaN(saleVal) ? Number(p.precioVenta) : saleVal,
-            tallas: tallasPayload,
           });
         }
       }
