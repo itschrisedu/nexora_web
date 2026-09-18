@@ -1215,6 +1215,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       let matchEstado = true;
       if (filtroEstadoOrden === 'BORRADOR') matchEstado = o.estado === 'BORRADOR';
       else if (filtroEstadoOrden === 'PENDIENTE') matchEstado = o.estado === 'PENDIENTE';
+      else if (filtroEstadoOrden === 'ENVIADAS_HISTORIAL') {
+        matchEstado = o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL' || o.estado === 'RECIBIDA';
+      }
       else if (filtroEstadoOrden === 'RECIBIDA_PARCIAL') matchEstado = o.estado === 'RECIBIDA_PARCIAL';
       else if (filtroEstadoOrden === 'RECIBIDA') matchEstado = o.estado === 'RECIBIDA';
       else if (filtroEstadoOrden === 'CANCELADA') matchEstado = o.estado === 'CANCELADA';
@@ -1223,6 +1226,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         !searchQuery ||
         `OC-${String(o.numero).padStart(4, '0')}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
         o.supplier?.nombre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        o.supplier?.razonSocial?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         o.observaciones?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchEstado && matchSearch;
     });
@@ -1490,9 +1494,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {[
               { key: 'BORRADOR', label: '⏳ Pendientes por Pedir', count: ordenes.filter((o) => o.estado === 'BORRADOR').length },
-              { key: 'PENDIENTE', label: '📤 Enviadas al Proveedor', count: ordenes.filter((o) => o.estado === 'PENDIENTE').length },
-              { key: 'RECIBIDA_PARCIAL', label: '📦 Parciales', count: ordenes.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
-              { key: 'RECIBIDA', label: '✅ Recibidas', count: ordenes.filter((o) => o.estado === 'RECIBIDA').length },
+              { key: 'PENDIENTE', label: '📤 En Tránsito (Esperando Entrega)', count: ordenes.filter((o) => o.estado === 'PENDIENTE').length },
+              { key: 'ENVIADAS_HISTORIAL', label: '🚚 Historial de Enviadas', count: ordenes.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL' || o.estado === 'RECIBIDA').length },
+              { key: 'RECIBIDA_PARCIAL', label: '📦 Parciales (Con Faltantes)', count: ordenes.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
+              { key: 'RECIBIDA', label: '✅ Recibidas en Bodega', count: ordenes.filter((o) => o.estado === 'RECIBIDA').length },
               { key: 'CANCELADA', label: '🚫 Canceladas', count: ordenes.filter((o) => o.estado === 'CANCELADA').length },
               { key: 'TODOS', label: '📋 Todas las Órdenes', count: ordenes.length },
             ].map((st) => (
@@ -1523,6 +1528,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 ? 'No hay órdenes pendientes por pedir acumuladas para hoy.'
                 : filtroEstadoOrden === 'PENDIENTE'
                 ? 'No hay órdenes enviadas en tránsito hacia los proveedores.'
+                : filtroEstadoOrden === 'ENVIADAS_HISTORIAL'
+                ? 'No hay historial de órdenes enviadas a proveedores.'
                 : `No hay órdenes de compra en esta pestaña (${filtroEstadoOrden}).`}
             </div>
           ) : (
@@ -1537,7 +1544,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       <th className="px-4 py-3.5">Modelo / Curva</th>
                       <th className="px-4 py-3.5 text-center">Estado</th>
                       <th className="px-4 py-3.5 text-right">Monto Total</th>
-                      <th className="px-4 py-3.5 text-right">Fecha</th>
+                      <th className="px-4 py-3.5 text-right">Fecha / Recepción</th>
                       <th className="px-5 py-3.5 text-center">Acciones</th>
                     </tr>
                   </thead>
@@ -1603,13 +1610,42 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                             ${Number(o.total).toFixed(2)}
                           </td>
                           <td className="px-4 py-3.5 text-right text-[11px] text-[var(--muted-foreground)]">
-                            {new Date(o.createdAt).toLocaleDateString('es-EC')}
+                            {o.estado === 'RECIBIDA' || o.estado === 'RECIBIDA_PARCIAL' ? (
+                              <div className="flex flex-col items-end">
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1" title="Fecha de Ingreso de Mercancía a Bodega">
+                                  <span>📥</span>
+                                  {new Date((o as any).entry?.fechaIngreso || (o as any).entry?.createdAt || o.updatedAt || o.createdAt).toLocaleDateString('es-EC')}
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)]" title="Fecha en que se realizó el pedido">
+                                  Pedido: {new Date(o.createdAt).toLocaleDateString('es-EC')}
+                                </span>
+                              </div>
+                            ) : o.estado === 'PENDIENTE' ? (
+                              <div className="flex flex-col items-end">
+                                <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1" title="Fecha de Envío al Proveedor">
+                                  <span>📤</span>
+                                  {new Date(o.updatedAt || o.createdAt).toLocaleDateString('es-EC')}
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)]" title="Fecha en que se realizó el pedido">
+                                  Pedido: {new Date(o.createdAt).toLocaleDateString('es-EC')}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-end">
+                                <span className="font-semibold text-[var(--foreground)]">
+                                  {new Date(o.createdAt).toLocaleDateString('es-EC')}
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)]">
+                                  {o.estado === 'BORRADOR' ? 'Borrador' : ''}
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-5 py-3.5 text-center">
                             <div className="flex items-center justify-center gap-1.5">
                               <button
                                 onClick={() => handleVerDetalleOrden(o.id)}
-                                className="p-1.5 bg-[var(--muted)] hover:bg-[#0F172A] hover:text-white rounded-lg transition-colors text-[var(--foreground)]"
+                                className="p-1.5 bg-[var(--muted)] hover:bg-[#0F172A] hover:text-white rounded-lg transition-colors text-[var(--foreground)] cursor-pointer"
                                 title="Ver Detalle / Modificar / Enviar"
                               >
                                 <Eye size={13} />
@@ -1617,7 +1653,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               {o.estado === 'BORRADOR' && (
                                 <button
                                   onClick={() => handleEnviarYGenerarPDF(o.id)}
-                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
                                   title="Enviar Orden al Proveedor"
                                 >
                                   <Send size={11} />
@@ -1627,16 +1663,25 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               {(o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL') && (
                                 <button
                                   onClick={() => handleIrARecepcionDesdeOrden(o)}
-                                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg transition-all text-xs font-bold shadow-2xs"
+                                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg transition-all text-xs font-bold shadow-2xs cursor-pointer"
                                   title="Recibir Mercancía en Bodega"
                                 >
                                   <PackageCheck size={13} />
                                   <span>Recibir</span>
                                 </button>
                               )}
+                              {o.estado === 'RECIBIDA' && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-xs font-bold opacity-80 cursor-default"
+                                  title="Mercancía 100% recibida e ingresada en bodega"
+                                >
+                                  <CheckCircle size={11} className="text-emerald-500" />
+                                  <span>Recibido</span>
+                                </span>
+                              )}
                               <button
                                 onClick={() => handleDescargarPDFOrden(o.id)}
-                                className="p-1.5 bg-[var(--muted)] hover:bg-emerald-600 hover:text-white rounded-lg transition-colors text-[var(--foreground)]"
+                                className="p-1.5 bg-[var(--muted)] hover:bg-emerald-600 hover:text-white rounded-lg transition-colors text-[var(--foreground)] cursor-pointer"
                                 title="Descargar PDF"
                               >
                                 <Download size={13} />
@@ -1644,7 +1689,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               {(o.estado === 'PENDIENTE' || o.estado === 'BORRADOR') && (
                                 <button
                                   onClick={() => handleCancelarYBloquearReorden(o.id)}
-                                  className="p-1.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-600 rounded-lg transition-colors border border-rose-500/20"
+                                  className="p-1.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-600 rounded-lg transition-colors border border-rose-500/20 cursor-pointer"
                                   title="🚫 Cancelar y No Volver a Generar Automáticamente (Producto ya no se vende)"
                                 >
                                   <Ban size={13} />
@@ -2776,6 +2821,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     <PackageCheck size={14} />
                     <span>Recibir Mercancía en Bodega</span>
                   </button>
+                ) : selectedOrder.estado === 'RECIBIDA' ? (
+                  <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                    <CheckCircle size={14} className="text-emerald-500" />
+                    <span>Mercancía 100% Recibida e Ingresada a Bodega</span>
+                  </div>
                 ) : null}
               </div>
             </div>
