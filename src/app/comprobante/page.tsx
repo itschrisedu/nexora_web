@@ -237,9 +237,9 @@ function ComprobanteContent() {
   const esOrden = data.t === 'ORDEN';
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 py-8 px-4 sm:px-6 flex flex-col items-center justify-center">
+    <div className="min-h-screen w-full bg-slate-100 dark:bg-slate-950 py-6 sm:py-10 px-3 sm:px-6 pb-24 flex flex-col items-center justify-start overflow-y-auto">
       {/* Botones de acción flotantes / superiores */}
-      <div className="w-full max-w-2xl mb-4 flex items-center justify-between gap-3 print:hidden">
+      <div className="w-full max-w-3xl mb-4 flex items-center justify-between gap-3 print:hidden">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
           <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
@@ -269,7 +269,7 @@ function ComprobanteContent() {
       </div>
 
       {/* Tarjeta Oficial del Comprobante */}
-      <div className="bg-white text-slate-900 border border-slate-200 rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden print:shadow-none print:border-0">
+      <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xl w-full max-w-3xl overflow-hidden print:shadow-none print:border-0 mb-10">
         {/* Cabecera decorativa */}
         <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
