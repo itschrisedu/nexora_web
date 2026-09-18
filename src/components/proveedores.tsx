@@ -853,7 +853,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     try {
       const pdfData = construirPdfData(order);
       await compartirOrdenCompraPdf(pdfData, telefono);
-      showToast('Abriendo WhatsApp con el pedido y descargando PDF para adjuntar...', 'success');
+      showToast('Abriendo WhatsApp con la Orden de Compra y enlace digital oficial...', 'success');
     } catch (e: any) {
       showToast('No se pudo enviar la orden de compra a WhatsApp.', 'error');
     }

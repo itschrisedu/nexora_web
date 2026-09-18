@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Receipt,
   Truck,
+  Package,
 } from 'lucide-react';
 import { decodificarPayload } from '@/services/comprobante-url.service';
 import {
@@ -423,6 +424,15 @@ function ComprobanteContent() {
           {/* ═══ CUERPO: ORDEN DE COMPRA ═══ */}
           {esOrden && (
             <div className="space-y-4">
+              {data.obs && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-900 dark:text-amber-200">
+                  <span className="font-extrabold text-[11px] uppercase tracking-wider block text-amber-800 dark:text-amber-300">
+                    📝 Observaciones / Instrucciones de Producción:
+                  </span>
+                  <p className="mt-1 leading-relaxed text-slate-700 dark:text-slate-200">{data.obs}</p>
+                </div>
+              )}
+
               <span className="text-xs font-extrabold uppercase text-slate-700 tracking-wider block">
                 Modelos y Numeración para Producción
               </span>
@@ -431,7 +441,7 @@ function ComprobanteContent() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-500 text-left">
-                      <th className="py-2 font-bold">Modelo / Código</th>
+                      <th className="py-2 font-bold">Modelo / Detalle</th>
                       <th className="py-2 font-bold">Color</th>
                       <th className="py-2 font-bold">Curva / Numeración</th>
                       <th className="py-2 text-right font-bold">Pares</th>
@@ -441,7 +451,29 @@ function ComprobanteContent() {
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {(data.lineas || []).map((l: any, idx: number) => (
                       <tr key={idx}>
-                        <td className="py-2.5 font-bold text-slate-900">{l.m} <span className="text-[10px] text-slate-400">({l.c})</span></td>
+                        <td className="py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                              {l.img ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={l.img} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <Package size={16} className="text-slate-400" />
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-bold text-slate-900 block">{l.m}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                {l.c} {l.ser ? `• ${l.ser}` : ''}
+                              </span>
+                              {l.obs && (
+                                <span className="text-[10px] text-amber-800 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 block mt-0.5 font-medium max-w-xs">
+                                  Nota: {l.obs}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
                         <td className="py-2.5 text-slate-700">{l.col || '—'}</td>
                         <td className="py-2.5 text-slate-600 font-mono text-[11px]">{l.num || 'Serie Estándar'}</td>
                         <td className="py-2.5 text-right font-mono font-bold">{l.qty}</td>

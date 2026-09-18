@@ -544,13 +544,6 @@ export async function compartirOrdenCompraPdf(
   data: OrdenCompraPdfData,
   telefono: string
 ): Promise<{ metodo: "WEB_SHARE" | "DOWNLOAD_WHATSAPP" }> {
-  // Descarga automática del archivo PDF para fácil adjunto en WhatsApp
-  try {
-    descargarOrdenCompraPdf(data);
-  } catch (e) {
-    console.warn("No se pudo descargar automáticamente el PDF:", e);
-  }
-
   let numLimpio = telefono.replace(/\D/g, "");
   if (numLimpio.startsWith("09") && numLimpio.length === 10) {
     numLimpio = "593" + numLimpio.substring(1);
@@ -558,18 +551,12 @@ export async function compartirOrdenCompraPdf(
     numLimpio = "593" + numLimpio.substring(1);
   }
 
-  let desglose = "";
-  data.lineas.forEach((l) => {
-    desglose += `\n• *${l.modelo}* (${l.codigo}${l.color ? " - " + l.color : ""}): ${l.cantidadPares} pares`;
-    if (l.numeracion) desglose += `\n  ↳ _${l.numeracion}_`;
-  });
-
   let urlDigital = "";
   try {
     urlDigital = generarUrlPublicaOrden(data);
   } catch (e) {}
 
-  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe saludamos cordialmente de parte de *${data.emisor.nombre || "Gerencia de Compras"}*. Confirmamos la emisión de la orden de producción:\n\n📋 *ORDEN DE COMPRA No:* ${data.orden.numero}\n📅 *Fecha:* ${data.orden.fecha}\n\n👟 *DETALLE DE MODELOS Y NUMERACIÓN:*${desglose}\n\n━━━━━━━━━━━━━━━━━━━━━\n📦 *TOTAL PARES:* ${data.totales.totalPares} pares\n💰 *VALOR TOTAL:* $${data.totales.totalPagar.toFixed(2)}\n━━━━━━━━━━━━━━━━━━━━━\n${urlDigital ? `\n🔗 *Ver o descargar orden oficial:*\n${urlDigital}\n` : ""}\nPor favor confirmar recepción del pedido y fecha estimada de entrega. ¡Muchas gracias!\n*${data.emisor.nombre}*`;
+  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe compartimos la *Orden de Compra No. ${data.orden.numero}* (${data.totales.totalPares} pares):\n\n🔗 *Ver detalle y descargar PDF:*\n${urlDigital}\n\nPor favor confirmar recepción del pedido. ¡Muchas gracias!\n*${data.emisor.nombre || "Gerencia de Compras"}*`;
 
   // Apertura directa garantizada de WhatsApp Web / móvil
   const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
