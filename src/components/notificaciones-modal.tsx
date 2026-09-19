@@ -144,6 +144,17 @@ export default function NotificacionesModal({
     }
   };
 
+  const getDocenaLabel = (pares: number) => {
+    if (!pares || pares <= 0) return '0 pares';
+    const docenas = pares / 12;
+    if (docenas === 0.5) return '½ Docena';
+    if (docenas === 1) return '1 Docena';
+    if (docenas === 1.5) return '1½ Docenas';
+    if (docenas === 2) return '2 Docenas';
+    if (Number.isInteger(docenas)) return `${docenas} Docenas`;
+    return `${docenas.toFixed(1)} Docenas`;
+  };
+
   const ejecutarEscaneoManual = async () => {
     try {
       setLoading(true);
@@ -803,18 +814,98 @@ export default function NotificacionesModal({
                           </div>
                         </div>
 
-                        {/* Items de la orden */}
+                        {/* Items de la orden con Tarjetas de Modelo Estándar */}
                         {orden.items && orden.items.length > 0 && (
-                          <div className="mb-2.5 p-2 rounded-lg bg-[var(--muted)]/30 border border-[var(--border)]">
-                            {orden.items.slice(0, 3).map((item: any, idx: number) => (
-                              <div key={idx} className="text-[11px] text-[var(--muted-foreground)] flex items-center justify-between gap-2 py-0.5">
-                                <span className="truncate">• {item.nombre}</span>
-                                <span className="shrink-0 font-bold text-[var(--foreground)]">{item.cantidadPedida} pares</span>
+                          <div className="space-y-2 mb-3">
+                            {orden.items.map((item: any, idx: number) => (
+                              <div
+                                key={idx}
+                                className="p-3 rounded-xl bg-[var(--background)]/80 border border-[var(--border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs"
+                              >
+                                {/* Izquierda: Miniatura + Modelo / Color / Serie */}
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center">
+                                    {item.imageUrl ? (
+                                      <img src={item.imageUrl} alt={item.nombre} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Package size={20} className="text-[var(--muted-foreground)]" />
+                                    )}
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-[var(--foreground)] uppercase tracking-wide truncate">
+                                      {item.nombre}
+                                    </div>
+                                    <div className="text-[11px] text-[var(--muted-foreground)] font-medium flex items-center gap-1.5 flex-wrap">
+                                      <span className="uppercase">{item.color || 'Estándar'}</span>
+                                      <span>·</span>
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                        Serie: {item.serieNombre || 'ADULTO'}
+                                      </span>
+                                    </div>
+
+                                    {/* Curva de Tallas con Píldoras */}
+                                    {item.tallas && item.tallas.length > 0 && (
+                                      <div className="flex flex-wrap gap-2 my-2">
+                                        {item.tallas.map((t: any, tIdx: number) => (
+                                          <div
+                                            key={tIdx}
+                                            className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 shadow-2xs"
+                                          >
+                                            <span className="text-[var(--foreground)] font-black text-xs font-mono">
+                                              T{t.numeroTalla}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                              <span className="w-5 h-5 flex items-center justify-center bg-rose-500/10 text-rose-600 rounded text-xs font-black select-none">
+                                                −
+                                              </span>
+                                              <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
+                                                {t.cantidad}
+                                              </span>
+                                              <span className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 text-emerald-600 rounded text-xs font-black select-none">
+                                                +
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Acciones Rápidas Masivas */}
+                                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                      <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-xl text-[11px] font-bold">
+                                        +1 par c/talla
+                                      </span>
+                                      <span className="px-2.5 py-1 bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-xl text-[11px] font-bold">
+                                        −1 par c/talla
+                                      </span>
+                                      <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
+                                        = {item.cantidadPedida} pares total
+                                      </span>
+                                    </div>
+
+                                    {/* Observación */}
+                                    <div className="mt-1.5 text-[11px] text-[var(--muted-foreground)] flex items-center gap-1">
+                                      <span className="font-semibold text-slate-500">+ Observación:</span>
+                                      <span className="italic">{item.observacion || orden.observaciones || 'Pedido regular de producción'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Derecha: Resumen de Pares, Precio y Subtotal */}
+                                <div className="text-right shrink-0 self-end sm:self-center border-t sm:border-t-0 pt-2 sm:pt-0 w-full sm:w-auto border-[var(--border)]">
+                                  <div className="text-xs font-bold text-[var(--foreground)]">
+                                    {item.cantidadPedida} pares ({getDocenaLabel(item.cantidadPedida)})
+                                  </div>
+                                  <div className="text-[11px] text-[var(--muted-foreground)] font-medium">
+                                    ${Number(item.precioCosto || 0).toFixed(2)} / par
+                                  </div>
+                                  <div className="font-black text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    ${Number(item.subtotal || 0).toFixed(2)}
+                                  </div>
+                                </div>
                               </div>
                             ))}
-                            {orden.items.length > 3 && (
-                              <div className="text-[10px] text-[var(--muted-foreground)] text-center pt-0.5">+{orden.items.length - 3} modelo(s) más...</div>
-                            )}
                           </div>
                         )}
 
@@ -911,18 +1002,98 @@ export default function NotificacionesModal({
                           </span>
                         </div>
 
-                        {/* Items de la devolución */}
+                        {/* Items de la devolución con Tarjetas de Modelo Estándar */}
                         {dev.items && dev.items.length > 0 && (
-                          <div className="mb-2.5 p-2 rounded-lg bg-[var(--muted)]/30 border border-[var(--border)]">
-                            {dev.items.slice(0, 4).map((item: any, idx: number) => (
-                              <div key={idx} className="text-[11px] text-[var(--muted-foreground)] flex items-center justify-between gap-2 py-0.5">
-                                <span className="truncate">• {item.nombre} (T. {item.talla})</span>
-                                <span className="shrink-0 font-bold text-[var(--foreground)]">{item.cantidad} par(es)</span>
+                          <div className="space-y-2 mb-3">
+                            {dev.items.map((item: any, idx: number) => (
+                              <div
+                                key={idx}
+                                className="p-3 rounded-xl bg-[var(--background)]/80 border border-orange-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs"
+                              >
+                                {/* Izquierda: Miniatura + Modelo / Color / Serie */}
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center">
+                                    {item.imageUrl ? (
+                                      <img src={item.imageUrl} alt={item.nombre} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Package size={20} className="text-[var(--muted-foreground)]" />
+                                    )}
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-[var(--foreground)] uppercase tracking-wide truncate">
+                                      {item.nombre}
+                                    </div>
+                                    <div className="text-[11px] text-[var(--muted-foreground)] font-medium flex items-center gap-1.5 flex-wrap">
+                                      <span className="uppercase">{item.color || 'Estándar'}</span>
+                                      <span>·</span>
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                        Serie: {item.serieNombre || 'ADULTO'}
+                                      </span>
+                                    </div>
+
+                                    {/* Curva de Tallas con Píldoras T38, T39, T40, etc. */}
+                                    {item.tallas && item.tallas.length > 0 && (
+                                      <div className="flex flex-wrap gap-2 my-2">
+                                        {item.tallas.map((t: any, tIdx: number) => (
+                                          <div
+                                            key={tIdx}
+                                            className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 shadow-2xs"
+                                          >
+                                            <span className="text-[var(--foreground)] font-black text-xs font-mono">
+                                              T{t.numeroTalla}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                              <span className="w-5 h-5 flex items-center justify-center bg-rose-500/10 text-rose-600 rounded text-xs font-black select-none">
+                                                −
+                                              </span>
+                                              <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
+                                                {t.cantidad}
+                                              </span>
+                                              <span className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 text-emerald-600 rounded text-xs font-black select-none">
+                                                +
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Acciones Rápidas Masivas */}
+                                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                      <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-xl text-[11px] font-bold">
+                                        +1 par c/talla
+                                      </span>
+                                      <span className="px-2.5 py-1 bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-xl text-[11px] font-bold">
+                                        −1 par c/talla
+                                      </span>
+                                      <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
+                                        = {item.totalPares || item.cantidad} par(es) total
+                                      </span>
+                                    </div>
+
+                                    {/* Observación / Falla de Fábrica */}
+                                    <div className="mt-1.5 text-[11px] text-[var(--muted-foreground)] flex items-center gap-1">
+                                      <span className="font-semibold text-slate-500">+ Observación:</span>
+                                      <span className="italic">{dev.motivo || 'Garantía / Defecto de fábrica'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Derecha: Resumen de Pares, Precio y Subtotal */}
+                                <div className="text-right shrink-0 self-end sm:self-center border-t sm:border-t-0 pt-2 sm:pt-0 w-full sm:w-auto border-[var(--border)]">
+                                  <div className="text-xs font-bold text-[var(--foreground)]">
+                                    {item.totalPares || item.cantidad} par(es) ({getDocenaLabel(item.totalPares || item.cantidad)})
+                                  </div>
+                                  <div className="text-[11px] text-[var(--muted-foreground)] font-medium">
+                                    ${Number(item.precioUnitario || 0).toFixed(2)} / par
+                                  </div>
+                                  <div className="font-black text-base text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    ${Number(item.subtotal || 0).toFixed(2)}
+                                  </div>
+                                </div>
                               </div>
                             ))}
-                            {dev.items.length > 4 && (
-                              <div className="text-[10px] text-[var(--muted-foreground)] text-center pt-0.5">+{dev.items.length - 4} línea(s) más...</div>
-                            )}
                           </div>
                         )}
 
