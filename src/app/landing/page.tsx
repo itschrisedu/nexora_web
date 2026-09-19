@@ -45,6 +45,7 @@ interface NegocioInfo {
   ruc: string;
   heroTitulo: string;
   heroSubtitulo: string;
+  heroFraseCorta?: string;
   heroBannerUrl: string | null;
   heroBackgroundUrl?: string | null;
   cardTitulo?: string;
@@ -475,6 +476,7 @@ function LandingContent() {
     if (notasPedido.trim()) {
       texto += `📝 *Observaciones:* ${notasPedido.trim()}\n`;
     }
+    texto += `⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables (Confección artesanal directa de fábrica).\n`;
     texto += `──────────────────────\n`;
     texto += `_Pedido generado desde el catálogo web oficial de ${negocio.nombreNegocio}_`;
 
@@ -670,7 +672,7 @@ function LandingContent() {
             <div className="lg:col-span-7 space-y-6 text-left">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded-full text-amber-300 font-bold text-xs backdrop-blur-sm">
                 <Sparkles size={14} className="text-amber-400" />
-                <span>Producción Directa desde Fábrica • Cantón Cevallos</span>
+                <span>{negocio.heroFraseCorta || "Producción Directa desde Fábrica • Cantón Cevallos"}</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] drop-shadow-xl">

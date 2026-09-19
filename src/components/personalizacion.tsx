@@ -2,17 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { ApiService } from "../services/api.service";
-import { uploadToCloudinary } from "../services/cloudinary.service";
+import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
   Palette, Clock, MapPin, CheckCircle, AlertCircle,
   Loader2, Shield, Lock, Building2, DollarSign,
   Truck, Star, Trash2, Plus, Phone, Globe,
   Image, ExternalLink, Eye, EyeOff, Share2,
   Copy, Check, MessageCircle, Upload, Sparkles,
-  Layers, Sliders, Settings2, HelpCircle
+  Layers, Sliders, Settings2, HelpCircle, Crop
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
+import ImageCropperModal from "./ui/image-cropper-modal";
 
 interface CreditLevelConfigItem {
   id?: string;
@@ -57,6 +58,7 @@ interface BusinessConfig {
   creditTasaMoraPct?: number;
   heroTitulo?: string;
   heroSubtitulo?: string;
+  heroFraseCorta?: string;
   heroBannerUrl?: string;
   heroBackgroundUrl?: string;
   cardTitulo?: string;
@@ -105,6 +107,83 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [nuevoTranspPredet, setNuevoTranspPredet] = useState(false);
   const [guardandoTransporte, setGuardandoTransporte] = useState(false);
 
+  // Image Cropper Modal State
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState("");
+  const [cropperAspectRatio, setCropperAspectRatio] = useState(16 / 9);
+  const [cropperLabel, setCropperLabel] = useState("Panorámica (16:9)");
+  const [cropperTitle, setCropperTitle] = useState("Encuadrar Fotografía");
+  const [cropperTarget, setCropperTarget] = useState<"heroBg" | "heroBanner" | null>(null);
+
+  const handleSeleccionarArchivo = (file: File, target: "heroBg" | "heroBanner") => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const src = e.target?.result as string;
+      setCropperImageSrc(src);
+      setCropperTarget(target);
+      if (target === "heroBg") {
+        setCropperAspectRatio(16 / 9);
+        setCropperLabel("Panorámica de Portada (16:9)");
+        setCropperTitle("Encuadrar Fondo de Portada Hero");
+      } else {
+        setCropperAspectRatio(4 / 3);
+        setCropperLabel("Tarjeta de Bienvenida (4:3)");
+        setCropperTitle("Encuadrar Fotografía Destacada");
+      }
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = async (croppedBase64: string) => {
+    setCropperOpen(false);
+    if (cropperTarget === "heroBg") {
+      setUploadingHeroBg(true);
+      try {
+        const oldUrl = config.heroBackgroundUrl;
+        const newUrl = await uploadToCloudinary(croppedBase64, "nexora_landing");
+        if (newUrl) {
+          setConfig((prev) => ({ ...prev, heroBackgroundUrl: newUrl }));
+          if (oldUrl && oldUrl.includes("cloudinary.com") && oldUrl !== newUrl) {
+            await deleteFromCloudinary(oldUrl);
+          }
+        }
+      } finally {
+        setUploadingHeroBg(false);
+      }
+    } else if (cropperTarget === "heroBanner") {
+      setUploadingHeroBanner(true);
+      try {
+        const oldUrl = config.heroBannerUrl;
+        const newUrl = await uploadToCloudinary(croppedBase64, "nexora_landing");
+        if (newUrl) {
+          setConfig((prev) => ({ ...prev, heroBannerUrl: newUrl }));
+          if (oldUrl && oldUrl.includes("cloudinary.com") && oldUrl !== newUrl) {
+            await deleteFromCloudinary(oldUrl);
+          }
+        }
+      } finally {
+        setUploadingHeroBanner(false);
+      }
+    }
+  };
+
+  const handleQuitarHeroBg = async () => {
+    const prevUrl = config.heroBackgroundUrl;
+    setConfig((prev) => ({ ...prev, heroBackgroundUrl: "" }));
+    if (prevUrl && prevUrl.includes("cloudinary.com")) {
+      await deleteFromCloudinary(prevUrl);
+    }
+  };
+
+  const handleQuitarHeroBanner = async () => {
+    const prevUrl = config.heroBannerUrl;
+    setConfig((prev) => ({ ...prev, heroBannerUrl: "" }));
+    if (prevUrl && prevUrl.includes("cloudinary.com")) {
+      await deleteFromCloudinary(prevUrl);
+    }
+  };
+
   const [config, setConfig] = useState<BusinessConfig>({
     nombre: "",
     ruc: "",
@@ -126,6 +205,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     creditTasaMoraPct: 2.5,
     heroTitulo: "Calzado 100% Cuero Ecuatoriano",
     heroSubtitulo: "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
+    heroFraseCorta: "Producción Directa desde Fábrica • Cantón Cevallos",
     heroBannerUrl: "",
     heroBackgroundUrl: "",
     cardTitulo: "Calidad Artesanal Garantizada",
@@ -1069,6 +1149,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                      🏷️ Frase Corta / Distintivo Superior del Hero
+                    </label>
+                    <input
+                      type="text"
+                      value={config.heroFraseCorta !== undefined ? config.heroFraseCorta : "Producción Directa desde Fábrica • Cantón Cevallos"}
+                      onChange={(e) => setConfig({ ...config, heroFraseCorta: e.target.value })}
+                      placeholder="Producción Directa desde Fábrica • Cantón Cevallos"
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                    />
+                    <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
+                      Texto que aparece en el distintivo superior de la portada principal (ej: Producción Directa desde Fábrica • Cantón Cevallos).
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
                       Título Principal de la Portada
                     </label>
                     <input
@@ -1098,7 +1194,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
                       <Image className="text-emerald-600" size={15} />
-                      <span>Imagen de Fondo de la Portada Principal</span>
+                      <span>Imagen de Fondo de la Portada Principal (Con Encuadre Panorámico)</span>
                     </label>
                     <span className="text-[10px] text-[var(--muted-foreground)]">
                       Fotografía de tu local, taller o exhibición para el fondo del inicio
@@ -1133,31 +1229,17 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
                       <div className="flex items-center gap-2 flex-wrap">
                         <label className="cursor-pointer px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs">
-                          <Upload size={13} />
-                          <span>{uploadingHeroBg ? "Subiendo fondo..." : "Subir Foto de Fondo"}</span>
+                          <Crop size={13} className="text-amber-400" />
+                          <span>{uploadingHeroBg ? "Subiendo fondo..." : "Subir y Encuadrar Foto de Fondo"}</span>
                           <input
                             type="file"
                             accept="image/*"
                             className="hidden"
                             disabled={uploadingHeroBg}
-                            onChange={async (e) => {
+                            onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (!file) return;
-                              setUploadingHeroBg(true);
-                              try {
-                                const reader = new FileReader();
-                                reader.onload = async (event) => {
-                                  const base64 = event.target?.result as string;
-                                  const url = await uploadToCloudinary(base64, "nexora_landing");
-                                  if (url) {
-                                    setConfig((prev) => ({ ...prev, heroBackgroundUrl: url }));
-                                  }
-                                  setUploadingHeroBg(false);
-                                };
-                                reader.readAsDataURL(file);
-                              } catch {
-                                setUploadingHeroBg(false);
-                              }
+                              if (file) handleSeleccionarArchivo(file, "heroBg");
+                              e.target.value = "";
                             }}
                           />
                         </label>
@@ -1165,10 +1247,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                         {config.heroBackgroundUrl && (
                           <button
                             type="button"
-                            onClick={() => setConfig((prev) => ({ ...prev, heroBackgroundUrl: "" }))}
-                            className="px-2.5 py-1.5 text-xs text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors font-semibold"
+                            onClick={handleQuitarHeroBg}
+                            className="px-2.5 py-1.5 text-xs text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors font-semibold flex items-center gap-1 cursor-pointer"
                           >
-                            Quitar fondo (Usar estilo limpio estándar)
+                            <Trash2 size={12} />
+                            <span>Quitar fondo (Eliminar de la nube)</span>
                           </button>
                         )}
                       </div>
@@ -1223,31 +1306,17 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
                     <div className="flex items-center gap-2 flex-wrap">
                       <label className="cursor-pointer px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs">
-                        <Upload size={13} />
-                        <span>{uploadingHeroBanner ? "Subiendo foto..." : "Subir Fotografía"}</span>
+                        <Crop size={13} className="text-amber-400" />
+                        <span>{uploadingHeroBanner ? "Subiendo foto..." : "Subir y Encuadrar Fotografía"}</span>
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
                           disabled={uploadingHeroBanner}
-                          onChange={async (e) => {
+                          onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (!file) return;
-                            setUploadingHeroBanner(true);
-                            try {
-                              const reader = new FileReader();
-                              reader.onload = async (event) => {
-                                const base64 = event.target?.result as string;
-                                const url = await uploadToCloudinary(base64, "nexora_landing");
-                                if (url) {
-                                  setConfig((prev) => ({ ...prev, heroBannerUrl: url }));
-                                }
-                                setUploadingHeroBanner(false);
-                              };
-                              reader.readAsDataURL(file);
-                            } catch {
-                              setUploadingHeroBanner(false);
-                            }
+                            if (file) handleSeleccionarArchivo(file, "heroBanner");
+                            e.target.value = "";
                           }}
                         />
                       </label>
@@ -1255,10 +1324,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       {config.heroBannerUrl && (
                         <button
                           type="button"
-                          onClick={() => setConfig((prev) => ({ ...prev, heroBannerUrl: "" }))}
-                          className="px-2.5 py-1.5 text-xs text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors font-semibold"
+                          onClick={handleQuitarHeroBanner}
+                          className="px-2.5 py-1.5 text-xs text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors font-semibold flex items-center gap-1 cursor-pointer"
                         >
-                          Quitar fotografía (Usar fondo artesanal por defecto)
+                          <Trash2 size={12} />
+                          <span>Quitar fotografía (Eliminar de la nube)</span>
                         </button>
                       )}
                     </div>
@@ -1586,6 +1656,17 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </div>
         </div>
       )}
+
+      {/* Modal de Encuadre y Recorte Interactivo */}
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={cropperImageSrc}
+        aspectRatio={cropperAspectRatio}
+        aspectRatioLabel={cropperLabel}
+        title={cropperTitle}
+        onCancel={() => setCropperOpen(false)}
+        onCropComplete={handleCropComplete}
+      />
 
       {/* Modal de Confirmación UI */}
       <ConfirmModal

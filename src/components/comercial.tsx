@@ -886,7 +886,30 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const obsGeneral = (p as any).notas || (p as any).observaciones;
     const obsGeneralTexto = obsGeneral && obsGeneral.trim() ? `\n📝 *Observaciones:* ${obsGeneral.trim()}` : '';
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Ver Comprobante Digital Oficial y Descargar PDF:*\n${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+    // Reputación y condición de cliente para tiempo de entrega (7 a 15 días)
+    const reputacion = getClienteReputacion(cliente);
+    const esClienteHabitual = reputacion.tipo === 'VIP' || reputacion.tipo === 'CONFIABLE' || (cliente?.totalPedidos ?? 0) > 1 || (cliente?.totalVentas ?? 0) > 0;
+    
+    // Identificar si el pedido contiene líneas sin stock físico inmediato o está en espera de producción
+    const haySinStock = (p.lines || []).some((l: any) => {
+      const stockDisp = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : 999);
+      return stockDisp < (l.cantidad || 1);
+    }) || p.estado === 'EN_ESPERA_STOCK' || (p as any).bajoPedido === true;
+
+    const tieneAbono = Number((p as any).totalAbonado || (p as any).abono || 0) > 0 || (p as any).adelantoRegistrado === true || p.tipoPago === 'ANTICIPO' || p.tipoPago === 'ADELANTO';
+
+    let tiempoEntregaTexto = '';
+    if (haySinStock) {
+      if (esClienteHabitual) {
+        tiempoEntregaTexto = '\n⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables (Confección en fábrica iniciada de inmediato por ser cliente habitual).';
+      } else if (tieneAbono) {
+        tiempoEntregaTexto = '\n⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables (Confección en fábrica iniciada tras confirmación de su anticipo).';
+      } else {
+        tiempoEntregaTexto = '\n⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables una vez confirmado el anticipo para iniciar la producción en fábrica.';
+      }
+    }
+
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Ver Comprobante Digital Oficial y Descargar PDF:*\n${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
 
     let numLimpio = telefono.replace(/\D/g, '');
     if (numLimpio.startsWith('09') && numLimpio.length === 10) {
