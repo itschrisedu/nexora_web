@@ -26,6 +26,9 @@ import {
   FileText,
   DollarSign,
   Info,
+  RotateCcw,
+  Factory,
+  Clipboard,
 } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 import { useToast } from '@/components/ui/toast';
@@ -54,6 +57,8 @@ export default function NotificacionesModal({
       totalCobrosVencidos: number;
       totalCobrosPorVencer: number;
       totalStockCritico: number;
+      totalOrdenesPorPedir?: number;
+      totalMercaderiaPorDevolver?: number;
       totalOrdenesDemoradas: number;
       totalEnviosEnTransito: number;
       totalAlertasSeguridad?: number;
@@ -63,6 +68,8 @@ export default function NotificacionesModal({
     cobrosVencidos: any[];
     cobrosPorVencer: any[];
     stockCritico: any[];
+    ordenesPorPedir: any[];
+    mercaderiaPorDevolver: any[];
     ordenesProveedor: any[];
     enviosEnTransito: any[];
     alertasSeguridad?: any[];
@@ -72,6 +79,8 @@ export default function NotificacionesModal({
       totalCobrosVencidos: 0,
       totalCobrosPorVencer: 0,
       totalStockCritico: 0,
+      totalOrdenesPorPedir: 0,
+      totalMercaderiaPorDevolver: 0,
       totalOrdenesDemoradas: 0,
       totalEnviosEnTransito: 0,
       totalAlertasSeguridad: 0,
@@ -81,6 +90,8 @@ export default function NotificacionesModal({
     cobrosVencidos: [],
     cobrosPorVencer: [],
     stockCritico: [],
+    ordenesPorPedir: [],
+    mercaderiaPorDevolver: [],
     ordenesProveedor: [],
     enviosEnTransito: [],
     alertasSeguridad: [],
@@ -333,7 +344,7 @@ export default function NotificacionesModal({
         </div>
 
         {/* ── KPIS RÁPIDOS ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 p-2.5 sm:p-4 bg-[var(--muted)]/15 border-b border-[var(--border)] shrink-0">
+        <div className="grid grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5 p-2.5 sm:p-4 bg-[var(--muted)]/15 border-b border-[var(--border)] shrink-0">
           <div className="p-2 sm:p-2.5 rounded-xl bg-[var(--card)] border border-rose-500/20 flex items-center gap-2 sm:gap-3 shadow-2xs min-w-0 overflow-hidden">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
               <ShieldAlert size={15} />
@@ -342,17 +353,6 @@ export default function NotificacionesModal({
               <div className="text-[9px] sm:text-[10px] uppercase font-black text-rose-500/80 truncate">Cobros Vencidos</div>
               <div className="text-xs sm:text-sm font-black text-rose-500 truncate">${data.metricas.saldoTotalVencido.toFixed(2)}</div>
               <div className="text-[9px] sm:text-[10px] text-[var(--muted-foreground)] truncate">{data.metricas.totalCobrosVencidos} en mora</div>
-            </div>
-          </div>
-
-          <div className="p-2 sm:p-2.5 rounded-xl bg-[var(--card)] border border-amber-500/20 flex items-center gap-2 sm:gap-3 shadow-2xs min-w-0 overflow-hidden">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-              <Clock size={15} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[9px] sm:text-[10px] uppercase font-black text-amber-500/80 truncate">Por Vencer</div>
-              <div className="text-xs sm:text-sm font-black text-amber-500 truncate">${data.metricas.saldoTotalPorVencer.toFixed(2)}</div>
-              <div className="text-[9px] sm:text-[10px] text-[var(--muted-foreground)] truncate">{data.metricas.totalCobrosPorVencer} próximos</div>
             </div>
           </div>
 
@@ -367,13 +367,35 @@ export default function NotificacionesModal({
             </div>
           </div>
 
+          <div className="p-2 sm:p-2.5 rounded-xl bg-[var(--card)] border border-violet-500/20 flex items-center gap-2 sm:gap-3 shadow-2xs min-w-0 overflow-hidden">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
+              <Factory size={15} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] sm:text-[10px] uppercase font-black text-violet-500/80 truncate">Por Pedir</div>
+              <div className="text-xs sm:text-sm font-black text-violet-500 truncate">{data.metricas.totalOrdenesPorPedir || data.ordenesPorPedir.length} ordenes</div>
+              <div className="text-[9px] sm:text-[10px] text-[var(--muted-foreground)] truncate">A fabricantes</div>
+            </div>
+          </div>
+
+          <div className="p-2 sm:p-2.5 rounded-xl bg-[var(--card)] border border-orange-500/20 flex items-center gap-2 sm:gap-3 shadow-2xs min-w-0 overflow-hidden">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
+              <RotateCcw size={15} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] sm:text-[10px] uppercase font-black text-orange-500/80 truncate">Devoluciones</div>
+              <div className="text-xs sm:text-sm font-black text-orange-500 truncate">{data.metricas.totalMercaderiaPorDevolver || data.mercaderiaPorDevolver.length} pendientes</div>
+              <div className="text-[9px] sm:text-[10px] text-[var(--muted-foreground)] truncate">Garantía / falla</div>
+            </div>
+          </div>
+
           <div className="p-2 sm:p-2.5 rounded-xl bg-[var(--card)] border border-emerald-500/20 flex items-center gap-2 sm:gap-3 shadow-2xs min-w-0 overflow-hidden">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
               <Truck size={15} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[9px] sm:text-[10px] uppercase font-black text-emerald-500/80 truncate">Envíos / Pedidos</div>
-              <div className="text-xs sm:text-sm font-black text-emerald-500 truncate">{data.metricas.totalEnviosEnTransito + data.metricas.totalOrdenesDemoradas} activos</div>
+              <div className="text-[9px] sm:text-[10px] uppercase font-black text-emerald-500/80 truncate">Envíos</div>
+              <div className="text-xs sm:text-sm font-black text-emerald-500 truncate">{data.metricas.totalEnviosEnTransito} activos</div>
               <div className="text-[9px] sm:text-[10px] text-[var(--muted-foreground)] truncate">En tránsito</div>
             </div>
           </div>
@@ -423,11 +445,11 @@ export default function NotificacionesModal({
                 : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
             }`}
           >
-            <Truck size={14} />
-            <span>Talleres & Despachos</span>
-            {(data.ordenesProveedor.length > 0 || data.enviosEnTransito.length > 0) && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                {data.ordenesProveedor.length + data.enviosEnTransito.length}
+            <Factory size={14} />
+            <span>Pedidos & Garantías</span>
+            {(data.ordenesPorPedir.length > 0 || data.mercaderiaPorDevolver.length > 0 || data.enviosEnTransito.length > 0) && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-violet-500/10 text-violet-500 border border-violet-500/20">
+                {data.ordenesPorPedir.length + data.mercaderiaPorDevolver.length + data.enviosEnTransito.length}
               </span>
             )}
           </button>
@@ -702,146 +724,316 @@ export default function NotificacionesModal({
             </div>
           )}
 
-          {/* ═════════ TAB 3: TALLERES & DESPACHOS ═════════ */}
+          {/* ═════════ TAB 3: PEDIDOS A TALLERES, GARANTÍAS & DESPACHOS ═════════ */}
           {activeTab === 'ordenes' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h3 className="text-xs font-black uppercase text-[var(--muted-foreground)] tracking-wider">
-                  📦 Envíos con Courier / Cooperativa en Tránsito
-                </h3>
-                {onNavigateToView && (
-                  <button
-                    onClick={() => handleRedirigirAEnvios()}
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Ver Pedidos & Envíos</span>
-                    <ChevronRight size={13} />
-                  </button>
+            <div className="space-y-5">
+
+              {/* ── SECCIÓN A: Órdenes Pendientes de Pedir a Fabricantes ── */}
+              <div>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
+                  <h3 className="text-xs font-black uppercase text-violet-500 tracking-wider flex items-center gap-1.5">
+                    <Factory size={14} />
+                    Órdenes por Pedir a Talleres / Fabricantes
+                  </h3>
+                  {onNavigateToView && (
+                    <button
+                      onClick={() => {
+                        try { localStorage.setItem('proveedores_initial_tab', 'ordenes'); } catch (e) {}
+                        onClose();
+                        onNavigateToView('proveedores');
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-500/10 hover:bg-violet-500/20 text-violet-500 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Ir a Proveedores</span>
+                      <ChevronRight size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {data.ordenesPorPedir.length === 0 ? (
+                  <div className="text-center py-6 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)]">
+                    <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-1.5" />
+                    <div className="text-xs font-bold text-[var(--foreground)]">Sin ordenes pendientes de pedir</div>
+                    <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">Todas las ordenes de compra a talleres han sido gestionadas.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {data.ordenesPorPedir.map((orden: any) => (
+                      <div
+                        key={orden.id}
+                        className={`p-3.5 rounded-xl bg-[var(--card)] border shadow-2xs hover:shadow-md transition-all min-w-0 overflow-hidden ${
+                          orden.esDemorada
+                            ? 'border-rose-500/30 bg-rose-500/5'
+                            : orden.esBorrador
+                            ? 'border-amber-500/30 bg-amber-500/5'
+                            : 'border-violet-500/20'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-black text-[var(--foreground)] flex items-center gap-2 flex-wrap">
+                              <Clipboard size={13} className="text-violet-500 shrink-0" />
+                              <span>{orden.numero}</span>
+                              <span className="text-[var(--muted-foreground)]">→</span>
+                              <span className="truncate">{orden.proveedorNombre}</span>
+                            </div>
+                            <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5 flex items-center gap-2 flex-wrap">
+                              <span>Creada hace {orden.diasTranscurridos} días</span>
+                              <span>•</span>
+                              <span className="font-bold text-[var(--foreground)]">{orden.totalPares} pares</span>
+                              <span>•</span>
+                              <span className="font-bold text-[var(--foreground)]">${Number(orden.total || 0).toFixed(2)}</span>
+                              {orden.sucursalNombre && (
+                                <><span>•</span><span className="flex items-center gap-0.5"><Building2 size={11} /> {orden.sucursalNombre}</span></>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-black border uppercase ${
+                                orden.esDemorada
+                                  ? 'bg-rose-500/15 text-rose-500 border-rose-500/30 animate-pulse'
+                                  : orden.esBorrador
+                                  ? 'bg-amber-500/15 text-amber-600 border-amber-500/30'
+                                  : 'bg-violet-500/15 text-violet-500 border-violet-500/30'
+                              }`}
+                            >
+                              {orden.esDemorada ? `Demorada ${orden.diasTranscurridos}d` : orden.esBorrador ? 'Borrador' : 'Pendiente'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Items de la orden */}
+                        {orden.items && orden.items.length > 0 && (
+                          <div className="mb-2.5 p-2 rounded-lg bg-[var(--muted)]/30 border border-[var(--border)]">
+                            {orden.items.slice(0, 3).map((item: any, idx: number) => (
+                              <div key={idx} className="text-[11px] text-[var(--muted-foreground)] flex items-center justify-between gap-2 py-0.5">
+                                <span className="truncate">• {item.nombre}</span>
+                                <span className="shrink-0 font-bold text-[var(--foreground)]">{item.cantidadPedida} pares</span>
+                              </div>
+                            ))}
+                            {orden.items.length > 3 && (
+                              <div className="text-[10px] text-[var(--muted-foreground)] text-center pt-0.5">+{orden.items.length - 3} modelo(s) más...</div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Botones de acción */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {orden.whatsappUrl && (
+                            <a
+                              href={orden.whatsappUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex-1 py-2 px-3 rounded-lg text-xs font-black text-white bg-emerald-600 hover:bg-emerald-500 transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer min-w-0 truncate"
+                            >
+                              <MessageSquare size={14} className="shrink-0" />
+                              <span className="truncate">Pedir por WhatsApp</span>
+                            </a>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRedirigirAOrden(orden.id);
+                            }}
+                            className="px-3 py-2 rounded-lg text-xs font-bold bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                          >
+                            <span>Gestionar</span>
+                            <ChevronRight size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              {data.enviosEnTransito.length === 0 ? (
-                <div className="text-xs text-[var(--muted-foreground)] p-4 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] text-center">
-                  No hay encomiendas de calzado en tránsito en este momento.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {data.enviosEnTransito.map((envio) => (
-                    <div
-                      key={envio.id}
-                      onClick={() => handleRedirigirAEnvios(envio.id)}
-                      className="p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all flex items-center justify-between gap-3 shadow-2xs min-w-0 overflow-hidden flex-wrap sm:flex-nowrap cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                          <Truck size={16} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-black text-[var(--foreground)] truncate group-hover:text-[var(--primary)] transition-colors">
-                            {envio.numeroPedido} — {envio.clienteNombre}
-                          </div>
-                          <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 flex-wrap">
-                            <span>🚛 {envio.courier}</span>
-                            <span>•</span>
-                            <span>Guía: <b className="text-[var(--foreground)]">{envio.guia}</b></span>
-                            <span>•</span>
-                            <span className="text-emerald-500 font-bold">{envio.flete}</span>
-                          </div>
-                        </div>
-                      </div>
+              {/* ── SEPARADOR ── */}
+              <div className="border-t border-[var(--border)]" />
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right sm:self-center">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/15 text-blue-500 border border-blue-500/30">
-                            EN TRÁNSITO
+              {/* ── SECCIÓN B: Mercadería por Devolver a Proveedores (Garantías & Fallas) ── */}
+              <div>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
+                  <h3 className="text-xs font-black uppercase text-orange-500 tracking-wider flex items-center gap-1.5">
+                    <RotateCcw size={14} />
+                    Mercadería por Devolver / Garantía de Fábrica
+                  </h3>
+                  {onNavigateToView && (
+                    <button
+                      onClick={() => {
+                        try { localStorage.setItem('proveedores_initial_tab', 'devoluciones'); } catch (e) {}
+                        onClose();
+                        onNavigateToView('proveedores');
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Ir a Devoluciones</span>
+                      <ChevronRight size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {data.mercaderiaPorDevolver.length === 0 ? (
+                  <div className="text-center py-6 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)]">
+                    <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-1.5" />
+                    <div className="text-xs font-bold text-[var(--foreground)]">Sin mercadería pendiente de devolver</div>
+                    <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">No hay calzado defectuoso en custodia esperando ser devuelto a fabricantes.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {data.mercaderiaPorDevolver.map((dev: any) => (
+                      <div
+                        key={dev.id}
+                        className="p-3.5 rounded-xl bg-[var(--card)] border border-orange-500/25 bg-orange-500/5 shadow-2xs hover:shadow-md transition-all min-w-0 overflow-hidden"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-black text-[var(--foreground)] flex items-center gap-2 flex-wrap">
+                              <RotateCcw size={13} className="text-orange-500 shrink-0" />
+                              <span>Devolución de {dev.clienteNombre}</span>
+                              <span className="text-[var(--muted-foreground)]">→</span>
+                              <span className="truncate text-orange-600 dark:text-orange-400">{dev.proveedorNombre}</span>
+                            </div>
+                            <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5 flex items-center gap-2 flex-wrap">
+                              <span>Hace {dev.diasPendiente} días</span>
+                              <span>•</span>
+                              <span className="font-bold text-[var(--foreground)]">{dev.totalPares} par(es)</span>
+                              <span>•</span>
+                              <span className="font-bold text-orange-500">${Number(dev.totalDevuelto || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                              Motivo: {dev.motivo}
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-500/15 text-orange-500 border border-orange-500/30 uppercase shrink-0 animate-pulse">
+                            Pendiente
                           </span>
-                          <div className="text-xs font-black text-[var(--foreground)] mt-1">${Number(envio.total || 0).toFixed(2)}</div>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRedirigirAEnvios(envio.id);
-                          }}
-                          className="p-1.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--primary)] hover:text-white text-[var(--muted-foreground)] transition-colors cursor-pointer"
-                          title="Ver en Pedidos"
-                        >
-                          <ChevronRight size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
 
-              <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
-                <h3 className="text-xs font-black uppercase text-[var(--muted-foreground)] tracking-wider">
-                  🏭 Órdenes de Compra a Fabricantes / Talleres
-                </h3>
-                {onNavigateToView && (
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onNavigateToView('proveedores');
-                    }}
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Ver Módulo Proveedores</span>
-                    <ChevronRight size={13} />
-                  </button>
+                        {/* Items de la devolución */}
+                        {dev.items && dev.items.length > 0 && (
+                          <div className="mb-2.5 p-2 rounded-lg bg-[var(--muted)]/30 border border-[var(--border)]">
+                            {dev.items.slice(0, 4).map((item: any, idx: number) => (
+                              <div key={idx} className="text-[11px] text-[var(--muted-foreground)] flex items-center justify-between gap-2 py-0.5">
+                                <span className="truncate">• {item.nombre} (T. {item.talla})</span>
+                                <span className="shrink-0 font-bold text-[var(--foreground)]">{item.cantidad} par(es)</span>
+                              </div>
+                            ))}
+                            {dev.items.length > 4 && (
+                              <div className="text-[10px] text-[var(--muted-foreground)] text-center pt-0.5">+{dev.items.length - 4} línea(s) más...</div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Botones de acción */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {dev.whatsappUrl && (
+                            <a
+                              href={dev.whatsappUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex-1 py-2 px-3 rounded-lg text-xs font-black text-white bg-orange-600 hover:bg-orange-500 transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer min-w-0 truncate"
+                            >
+                              <MessageSquare size={14} className="shrink-0" />
+                              <span className="truncate">Coordinar Devolución</span>
+                            </a>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              try { localStorage.setItem('proveedores_initial_tab', 'devoluciones'); } catch (err) {}
+                              onClose();
+                              if (onNavigateToView) onNavigateToView('proveedores');
+                            }}
+                            className="px-3 py-2 rounded-lg text-xs font-bold bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                          >
+                            <span>Tramitar</span>
+                            <ChevronRight size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              {data.ordenesProveedor.length === 0 ? (
-                <div className="text-xs text-[var(--muted-foreground)] p-4 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] text-center">
-                  No hay órdenes a talleres pendientes o demoradas.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {data.ordenesProveedor.map((orden) => (
-                    <div
-                      key={orden.id}
-                      onClick={() => handleRedirigirAOrden(orden.id)}
-                      className="p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all flex items-center justify-between gap-3 shadow-2xs min-w-0 overflow-hidden flex-wrap sm:flex-nowrap cursor-pointer group"
+              {/* ── SEPARADOR ── */}
+              <div className="border-t border-[var(--border)]" />
+
+              {/* ── SECCIÓN C: Envíos en Tránsito ── */}
+              <div>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
+                  <h3 className="text-xs font-black uppercase text-emerald-500 tracking-wider flex items-center gap-1.5">
+                    <Truck size={14} />
+                    Envíos con Courier en Tránsito
+                  </h3>
+                  {onNavigateToView && (
+                    <button
+                      onClick={() => handleRedirigirAEnvios()}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 transition-colors flex items-center gap-1 cursor-pointer"
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-black text-[var(--foreground)] flex items-center gap-2 flex-wrap group-hover:text-[var(--primary)] transition-colors">
-                          <span className="font-black">Orden #{orden.numero}</span>
-                          <span className="text-[var(--muted-foreground)]">•</span>
-                          <span className="truncate">{orden.proveedorNombre}</span>
-                        </div>
-                        <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5 flex items-center gap-2 flex-wrap">
-                          <span>Emitida hace {orden.diasTranscurridos} días</span>
-                          <span>•</span>
-                          <span className="font-bold text-[var(--foreground)]">Total: ${Number(orden.total || 0).toFixed(2)}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-black border uppercase shrink-0 ${
-                            orden.esDemorada
-                              ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
-                              : 'bg-blue-500/15 text-blue-500 border-blue-500/30'
-                          }`}
-                        >
-                          {orden.esDemorada ? 'Demorada' : orden.status}
-                        </span>
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRedirigirAOrden(orden.id);
-                          }}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>Gestionar</span>
-                          <ChevronRight size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                      <span>Ver Pedidos</span>
+                      <ChevronRight size={13} />
+                    </button>
+                  )}
                 </div>
-              )}
+
+                {data.enviosEnTransito.length === 0 ? (
+                  <div className="text-xs text-[var(--muted-foreground)] p-4 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] text-center">
+                    No hay encomiendas de calzado en tránsito en este momento.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {data.enviosEnTransito.map((envio) => (
+                      <div
+                        key={envio.id}
+                        onClick={() => handleRedirigirAEnvios(envio.id)}
+                        className="p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] hover:shadow-md transition-all flex items-center justify-between gap-3 shadow-2xs min-w-0 overflow-hidden flex-wrap sm:flex-nowrap cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                            <Truck size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-black text-[var(--foreground)] truncate group-hover:text-[var(--primary)] transition-colors">
+                              {envio.numeroPedido} — {envio.clienteNombre}
+                            </div>
+                            <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 flex-wrap">
+                              <span>🚛 {envio.courier}</span>
+                              <span>•</span>
+                              <span>Guía: <b className="text-[var(--foreground)]">{envio.guia}</b></span>
+                              <span>•</span>
+                              <span className="text-emerald-500 font-bold">{envio.flete}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right sm:self-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/15 text-blue-500 border border-blue-500/30">
+                              EN TRÁNSITO
+                            </span>
+                            <div className="text-xs font-black text-[var(--foreground)] mt-1">${Number(envio.total || 0).toFixed(2)}</div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRedirigirAEnvios(envio.id);
+                            }}
+                            className="p-1.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--primary)] hover:text-white text-[var(--muted-foreground)] transition-colors cursor-pointer"
+                            title="Ver en Pedidos"
+                          >
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 
