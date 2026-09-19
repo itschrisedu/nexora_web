@@ -61,15 +61,16 @@ function ComprobanteContent() {
     }
   }, [rawData]);
 
-  // Cargar fotos reales y nítidas de los modelos desde el backend si se trata de una orden de compra
+  // Cargar fotos reales y nítidas de los modelos desde el backend si se trata de una orden de compra o pedido de cliente
   useEffect(() => {
-    if (!data || data.t !== 'ORDEN' || !data.num) return;
+    if (!data || (data.t !== 'ORDEN' && data.t !== 'PEDIDO') || !data.num) return;
 
     const fetchOrderImages = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
         const numClean = String(data.num).replace(/[^0-9]/g, '');
-        const res = await fetch(`${apiUrl}/catalogo/orden-publica/${encodeURIComponent(numClean || data.num)}`);
+        const endpoint = data.t === 'ORDEN' ? 'orden-publica' : 'pedido-publico';
+        const res = await fetch(`${apiUrl}/catalogo/${endpoint}/${encodeURIComponent(numClean || data.num)}`);
         if (res.ok) {
           const remoteOrder = await res.json();
           if (remoteOrder && remoteOrder.lineas && Array.isArray(remoteOrder.lineas)) {
@@ -77,7 +78,7 @@ function ComprobanteContent() {
               if (!prev || !prev.lineas) return prev;
               const updatedLineas = prev.lineas.map((line: any, idx: number) => {
                 const matchRemote = remoteOrder.lineas.find(
-                  (rl: any) => rl.codigo === line.c || (rl.color === line.col && rl.modelo === line.m),
+                  (rl: any) => (rl.codigo && rl.codigo === line.c) || (rl.color === line.col && rl.modelo === line.m),
                 ) || remoteOrder.lineas[idx];
                 return {
                   ...line,

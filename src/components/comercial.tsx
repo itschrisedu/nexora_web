@@ -792,31 +792,57 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     if (p.lines && p.lines.length > 0) {
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
-        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}`;
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(l);
       });
 
       Object.entries(grupos).forEach(([_, lineas]) => {
         const item = lineas[0];
-        const totalPares = lineas.reduce((sum, l) => sum + l.cantidad, 0);
-        const subtotal = lineas.reduce((sum, l) => sum + (l.subtotal ?? (l.cantidad * Number(l.precioUnitario || 0))), 0);
+        const catProd = (catalogoProductos || []).find(
+          (cp: any) => cp.id === (item.productId || item.varianteId) || cp.code === (item.codigo || item.code)
+        );
+        const resolvedImg = item.imageUrl || item.producto?.imageUrl || item.variante?.imageUrl || catProd?.imageUrl || null;
+        const resolvedModelName = item.modelName || item.nombre || catProd?.modelName || 'Calzado';
+        const resolvedColor = item.color || catProd?.color || 'Color estándar';
+        const resolvedSerie = item.serieNombre || item.serie || catProd?.serieNombre || 'Serie';
+        const resolvedCode = item.codigo || item.code || catProd?.code || '';
+
+        const totalPares = lineas.reduce((sum, l) => sum + (l.cantidad || 0), 0);
+        const subtotal = lineas.reduce((sum, l) => sum + (l.subtotal ?? ((l.cantidad || 0) * Number(l.precioUnitario || 0))), 0);
         const obsItem = item.observacionModelo || item.observacion;
 
         let formato = `${totalPares} pares`;
         if (totalPares === 6) formato = 'Media Docena';
         else if (totalPares === 12) formato = '1 Docena';
 
+        const resolverTallaNum = (l: any) => {
+          if (l.numeroTalla) return l.numeroTalla;
+          if (l.tallaNumero) return l.tallaNumero;
+          if (l.talla?.numero) return l.talla.numero;
+          if (l.talla?.nombre) return l.talla.nombre;
+          if (catProd && Array.isArray(catProd.tallas)) {
+            const tFound = catProd.tallas.find((t: any) => t.id === l.tallaId || t.id === l.id);
+            if (tFound) return tFound.numero || tFound.nombre;
+          }
+          if (l.tallaId && String(l.tallaId).length <= 4) return l.tallaId;
+          return '?';
+        };
+
+        const sortedLineas = [...lineas].sort((a, b) => (Number(resolverTallaNum(a)) || 0) - (Number(resolverTallaNum(b)) || 0));
+        const tallasDesglose = sortedLineas.map((l: any) => `T${resolverTallaNum(l)}: ${l.cantidad}`).join(', ');
+        const tallasNumeracionPdf = sortedLineas.map((l: any) => `T${resolverTallaNum(l)} (${l.cantidad})`).join(' | ');
         const notaExtra = obsItem ? ` (Nota: ${obsItem})` : '';
-        desgloseTexto += `\n• ${formato} - ${item.modelName || 'Calzado'} (${item.color || ''} / ${item.serieNombre || 'Serie'}) x $${Number(item.precioUnitario).toFixed(2)} = $${subtotal.toFixed(2)}${notaExtra}`;
+
+        desgloseTexto += `\n📦 *${resolvedModelName}* (${resolvedColor})\n   • Serie: *${resolvedSerie}*\n   • Numeración: ${tallasDesglose}\n   • Cantidad: *${formato}* (${totalPares} pares) x $${Number(item.precioUnitario).toFixed(2)} = *$${subtotal.toFixed(2)}*${notaExtra}`;
 
         lineasComprobante.push({
-          modelo: item.modelName || 'Calzado',
-          codigo: item.codigo || item.code,
-          color: item.color,
-          serie: item.serieNombre || item.serie,
-          imageUrl: item.imageUrl,
-          numeracion: `${totalPares} pares (${formato})`,
+          modelo: resolvedModelName,
+          codigo: resolvedCode,
+          color: resolvedColor,
+          serie: resolvedSerie,
+          imageUrl: resolvedImg,
+          numeracion: `${tallasNumeracionPdf} (${formato})`,
           observacion: obsItem,
           cantidadPares: totalPares,
           precioUnitario: Number(item.precioUnitario || 0),
@@ -857,7 +883,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const obsGeneral = (p as any).notas || (p as any).observaciones;
     const obsGeneralTexto = obsGeneral && obsGeneral.trim() ? `\n📝 *Observaciones:* ${obsGeneral.trim()}` : '';
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Ver Comprobante Digital Oficial y Descargar PDF:*\n${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Ver Comprobante Digital Oficial y Descargar PDF:*\n${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
 
     let numLimpio = telefono.replace(/\D/g, '');
     if (numLimpio.startsWith('09') && numLimpio.length === 10) {
@@ -889,34 +915,66 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     if (p.lines && p.lines.length > 0) {
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
-        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}`;
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(l);
       });
 
       Object.entries(grupos).forEach(([_, lineas]) => {
         const item = lineas[0];
-        const totalParesEntregados = lineas.reduce((sum, l) => sum + (l.cantidadEntregada || l.cantidad || 0), 0);
-        const totalParesSolicitados = lineas.reduce((sum, l) => sum + (l.cantidad || 0), 0);
-        const subtotal = lineas.reduce((sum, l) => sum + ((l.cantidadEntregada || l.cantidad || 0) * Number(l.precioUnitario || 0)), 0);
+        const catProd = (catalogoProductos || []).find(
+          (cp: any) => cp.id === (item.productId || item.varianteId) || cp.code === (item.codigo || item.code)
+        );
+        const resolvedImg = item.imageUrl || item.producto?.imageUrl || item.variante?.imageUrl || catProd?.imageUrl || null;
+        const resolvedModelName = item.modelName || item.nombre || catProd?.modelName || 'Calzado';
+        const resolvedColor = item.color || catProd?.color || 'Color estándar';
+        const resolvedSerie = item.serieNombre || item.serie || catProd?.serieNombre || 'Serie';
+        const resolvedCode = item.codigo || item.code || catProd?.code || '';
+
+        const totalParesEntregados = lineas.reduce((sum, l) => sum + Number(l.cantidadEntregada !== undefined ? l.cantidadEntregada : (l.cantidad || 0)), 0);
+        const totalParesSolicitados = lineas.reduce((sum, l) => sum + Number(l.cantidad || 0), 0);
+        const subtotal = lineas.reduce((sum, l) => sum + (Number(l.cantidadEntregada !== undefined ? l.cantidadEntregada : (l.cantidad || 0)) * Number(l.precioUnitario || 0)), 0);
         const obsItem = item.observacionModelo || item.observacion;
 
         let formato = `${totalParesEntregados} pares`;
         if (totalParesEntregados === 6) formato = 'Media Docena';
         else if (totalParesEntregados === 12) formato = '1 Docena';
 
-        const tallasDesglose = lineas.map((l: any) => `T${l.tallaNumero || l.tallaId}: ${l.cantidadEntregada || l.cantidad}`).join(', ');
+        const resolverTallaNum = (l: any) => {
+          if (l.numeroTalla) return l.numeroTalla;
+          if (l.tallaNumero) return l.tallaNumero;
+          if (l.talla?.numero) return l.talla.numero;
+          if (l.talla?.nombre) return l.talla.nombre;
+          if (catProd && Array.isArray(catProd.tallas)) {
+            const tFound = catProd.tallas.find((t: any) => t.id === l.tallaId || t.id === l.id);
+            if (tFound) return tFound.numero || tFound.nombre;
+          }
+          if (l.tallaId && String(l.tallaId).length <= 4) return l.tallaId;
+          return '?';
+        };
+
+        // Ordenar tallas numéricamente y construir desglose legible
+        const sortedLineas = [...lineas].sort((a, b) => (Number(resolverTallaNum(a)) || 0) - (Number(resolverTallaNum(b)) || 0));
+        const tallasDesglose = sortedLineas.map((l: any) => {
+          const cEnt = l.cantidadEntregada !== undefined ? l.cantidadEntregada : l.cantidad;
+          const cPed = l.cantidad || cEnt;
+          return cEnt < cPed ? `T${resolverTallaNum(l)}: ${cEnt}/${cPed}` : `T${resolverTallaNum(l)}: ${cEnt}`;
+        }).join(', ');
+        const tallasNumeracionPdf = sortedLineas.map((l: any) => {
+          const cEnt = l.cantidadEntregada !== undefined ? l.cantidadEntregada : l.cantidad;
+          return `T${resolverTallaNum(l)} (${cEnt})`;
+        }).join(' | ');
         const notaExtra = obsItem ? ` (Nota: ${obsItem})` : '';
 
-        desgloseTexto += `\n📦 *${item.modelName || 'Calzado'}* (${item.color || 'Color estándar'})\n   • Serie: *${item.serieNombre || 'Serie Oficial'}*\n   • Tallas entregadas: ${tallasDesglose}\n   • Cantidad: *${formato}* (${totalParesEntregados}/${totalParesSolicitados} pares) x $${Number(item.precioUnitario).toFixed(2)} = *$${subtotal.toFixed(2)}*${notaExtra}`;
+        desgloseTexto += `\n📦 *${resolvedModelName}* (${resolvedColor})\n   • Serie: *${resolvedSerie}*\n   • Tallas entregadas: ${tallasDesglose}\n   • Cantidad acumulada: *${formato}* (${totalParesEntregados}/${totalParesSolicitados} pares) x $${Number(item.precioUnitario).toFixed(2)} = *$${subtotal.toFixed(2)}*${notaExtra}`;
 
         lineasComprobante.push({
-          modelo: item.modelName || 'Calzado',
-          codigo: item.codigo || item.code,
-          color: item.color,
-          serie: item.serieNombre || item.serie,
-          imageUrl: item.imageUrl,
-          numeracion: `${tallasDesglose} (${formato})`,
+          modelo: resolvedModelName,
+          codigo: resolvedCode,
+          color: resolvedColor,
+          serie: resolvedSerie,
+          imageUrl: resolvedImg,
+          numeracion: `${tallasNumeracionPdf} (${formato})`,
           observacion: obsItem,
           cantidadPares: totalParesEntregados,
           precioUnitario: Number(item.precioUnitario || 0),
@@ -925,8 +983,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       });
     }
 
-    const totalParesEntregadosGeneral = (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidadEntregada || l.cantidad || 0), 0);
-    const totalParesPedidoGeneral = (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0);
+    const totalParesEntregadosGeneral = (p.lines || []).reduce((sum: number, l: any) => sum + Number(l.cantidadEntregada !== undefined ? l.cantidadEntregada : (l.cantidad || 0)), 0);
+    const totalParesPedidoGeneral = (p.lines || []).reduce((sum: number, l: any) => sum + Number(l.cantidad || 0), 0);
     const esEntregaTotal = totalParesEntregadosGeneral >= totalParesPedidoGeneral;
 
     const urlComprobante = generarUrlPublicaPedidoCliente({
@@ -958,8 +1016,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     });
 
     const estadoTexto = esEntregaTotal ? '✅ *ENTREGA COMPLETADA (100%)*' : '📦 *ENTREGA PARCIAL REALIZADA*';
+    const pendienteTexto = !esEntregaTotal ? `\n⏳ *Pares pendientes por entregar:* ${Math.max(0, totalParesPedidoGeneral - totalParesEntregadosGeneral)} pares` : '';
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📄 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares entregados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Descargar Nota de Entrega / Comprobante Oficial en PDF:*\n${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📄 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Descargar Nota de Entrega / Comprobante Oficial en PDF:*\n${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
 
     let numLimpio = telefono.replace(/\D/g, '');
     if (numLimpio.startsWith('09') && numLimpio.length === 10) {
@@ -1511,13 +1570,22 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
-  const handleAbrirEntrega = (p: Pedido) => {
-    setPedidoEntregaSeleccionado(p);
+  const handleAbrirEntrega = async (p: Pedido) => {
+    let orderToUse = p;
+    try {
+      if (online) {
+        const fresh = await ApiService.get(`/pedidos/${p.id}`);
+        if (fresh && fresh.lines) orderToUse = fresh;
+      }
+    } catch (e) {}
+
+    setPedidoEntregaSeleccionado(orderToUse);
     const initialMap: Record<string, number> = {};
-    (p.lines || []).forEach((l: any) => {
-      const pendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, l.cantidad - (l.cantidadEntregada || 0));
-      // Sugerir entregar lo disponible de la cantidad pendiente si hay stock, o la cantidad pendiente
-      const disponible = l.stockDisponible !== undefined ? l.stockDisponible : pendiente;
+    (orderToUse.lines || []).forEach((l: any) => {
+      const cantPedida = l.cantidad || 0;
+      const cantEntregada = l.cantidadEntregada !== undefined ? l.cantidadEntregada : 0;
+      const pendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, cantPedida - cantEntregada);
+      const disponible = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : pendiente);
       const sugerido = Math.min(pendiente, Math.max(0, disponible));
       initialMap[l.id] = sugerido;
     });
@@ -4290,9 +4358,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                               <div className="flex flex-wrap items-center gap-2">
                                 {sortedTallas.map((l, i) => {
                                   const cantPedida = l.cantidad || 0;
-                                  const cantEntregada = l.cantidadEntregada || 0;
+                                  const cantEntregada = l.cantidadEntregada !== undefined ? l.cantidadEntregada : 0;
                                   const cantPendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, cantPedida - cantEntregada);
-                                  const stockDisp = l.stockDisponible !== undefined ? l.stockDisponible : 0;
+                                  const stockDisp = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : cantPendiente);
                                   const aEntregar = entregaItemsMap[l.id] ?? 0;
                                   const maxPermitido = Math.min(cantPendiente, Math.max(0, stockDisp));
                                   const numTalla = l.numeroTalla || l.tallaNumero || '38';
@@ -4307,11 +4375,16 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                       </span>
 
                                       {cantPendiente === 0 ? (
-                                        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-1">
-                                          ✓ {cantEntregada}
+                                        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-1" title="Talla completada al 100%">
+                                          ✓ {cantEntregada} entregados
                                         </span>
                                       ) : (
                                         <div className="flex items-center gap-1">
+                                          {cantEntregada > 0 && (
+                                            <span className="text-[9px] font-bold text-emerald-600 bg-emerald-500/10 px-1 py-0.5 rounded mr-0.5" title={`Ya entregados: ${cantEntregada}, faltan: ${cantPendiente}`}>
+                                              {cantEntregada}/{cantPedida}
+                                            </span>
+                                          )}
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -4337,7 +4410,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                               }));
                                             }}
                                             className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-black transition-colors cursor-pointer"
-                                            title={`Agregar 1 par T${numTalla} (máx disponible: ${maxPermitido})`}
+                                            title={`Agregar 1 par T${numTalla} (máx disponible a entregar hoy: ${maxPermitido})`}
                                           >
                                             +
                                           </button>
@@ -4355,8 +4428,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   onClick={() => {
                                     const nextMap = { ...entregaItemsMap };
                                     sortedTallas.forEach((l) => {
-                                      const cantPendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, l.cantidad - (l.cantidadEntregada || 0));
-                                      const stockDisp = l.stockDisponible !== undefined ? l.stockDisponible : 0;
+                                      const cantPendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, (l.cantidad || 0) - (l.cantidadEntregada || 0));
+                                      const stockDisp = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : cantPendiente);
                                       const maxPermitido = Math.min(cantPendiente, Math.max(0, stockDisp));
                                       const actual = nextMap[l.id] ?? 0;
                                       nextMap[l.id] = Math.min(maxPermitido, actual + 1);
@@ -4382,7 +4455,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   −1 par c/talla
                                 </button>
                                 <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
-                                  = {totalParesADespacharHoy} pares total
+                                  = {totalParesADespacharHoy} pares a entregar hoy
                                 </span>
                               </div>
 
