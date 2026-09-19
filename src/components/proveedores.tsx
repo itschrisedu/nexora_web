@@ -46,8 +46,9 @@ import {
   Ban,
   Download,
   Share2,
-  Printer,
   MessageCircle,
+  RotateCcw,
+  ShieldAlert,
 } from 'lucide-react';
 import ConfirmModal from './ui/confirm-modal';
 import { useToast } from './ui/toast';
@@ -323,7 +324,39 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [productos, setProductos] = useState<any[]>([]);
   const [clientesList, setClientesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'proveedores' | 'ordenes' | 'ingreso' | 'pagos'>('proveedores');
+  const [activeTab, setActiveTab] = useState<'proveedores' | 'ordenes' | 'ingreso' | 'pagos' | 'devoluciones'>('proveedores');
+  const [pendientesDevolucion, setPendientesDevolucion] = useState<any[]>([]);
+  const [devolucionesProveedor, setDevolucionesProveedor] = useState<any[]>([]);
+
+  // Modales Devoluciones
+  const [showDevolucionModal, setShowDevolucionModal] = useState(false);
+  const [showManualDefectuosoModal, setShowManualDefectuosoModal] = useState(false);
+  const [showConstanciaModal, setShowConstanciaModal] = useState(false);
+  const [selectedConstancia, setSelectedConstancia] = useState<any | null>(null);
+
+  // Form: Devolución a Proveedor
+  const [devSupplierId, setDevSupplierId] = useState('');
+  const [devClienteDevolucionId, setDevClienteDevolucionId] = useState('');
+  const [devMotivo, setDevMotivo] = useState('');
+  const [devLines, setDevLines] = useState<Array<{
+    productId: string;
+    tallaId: string;
+    cantidad: number;
+    precioCosto: number;
+    modelName: string;
+    color: string;
+    brand: string;
+    imageUrl: string;
+    numeroTalla: number | string;
+  }>>([]);
+
+  // Form: Registro Manual de Defectuoso
+  const [manualProd, setManualProd] = useState<any | null>(null);
+  const [busquedaManualProd, setBusquedaManualProd] = useState('');
+  const [manualMotivo, setManualMotivo] = useState('');
+  const [manualTallaId, setManualTallaId] = useState('');
+  const [manualCantidad, setManualCantidad] = useState(1);
+  const [manualPrecioCosto, setManualPrecioCosto] = useState(0);
 
   const [saving, setSaving] = useState(false);
 
@@ -456,22 +489,26 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       setProductos(prods || []);
 
       if (online) {
-        const [prvs, ords, pgs, ents, clis] = await Promise.all([
+        const [prvs, ords, pgs, ents, clis, pends, devs] = await Promise.all([
           ApiService.get('/proveedores'),
           ApiService.get('/proveedores/ordenes-compra'),
           ApiService.get('/proveedores/pagos/todos'),
           ApiService.get('/proveedores/entradas'),
           ApiService.get('/clientes').catch(() => []),
+          ApiService.get('/devoluciones/cliente/pendientes-proveedor').catch(() => []),
+          ApiService.get('/devoluciones/proveedor').catch(() => []),
         ]);
         setProveedores(prvs || []);
         setOrdenes(ords || []);
         setPagos(pgs || []);
         setEntradas(ents || []);
         setClientesList(Array.isArray(clis) ? clis : []);
+        setPendientesDevolucion(pends || []);
+        setDevolucionesProveedor(devs || []);
 
         try {
           const initialTab = localStorage.getItem('proveedores_initial_tab');
-          if (initialTab && ['proveedores', 'ordenes', 'ingreso', 'pagos'].includes(initialTab)) {
+          if (initialTab && ['proveedores', 'ordenes', 'ingreso', 'pagos', 'devoluciones'].includes(initialTab)) {
             setActiveTab(initialTab as any);
             localStorage.removeItem('proveedores_initial_tab');
           }
@@ -1245,6 +1282,155 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     window.open(waUrl, "_blank");
   };
 
+  const handleAbrirDevolucionProveedor = (item?: any) => {
+    if (item) {
+      setDevClienteDevolucionId(item.id || '');
+      setDevMotivo(item.motivo || 'Devolución de calzado defectuoso / garantía');
+      
+      const firstLineWithSupplier = item.lines?.find((l: any) => l.supplierId);
+      if (firstLineWithSupplier?.supplierId) {
+        setDevSupplierId(firstLineWithSupplier.supplierId);
+      } else if (proveedores.length > 0) {
+        setDevSupplierId(proveedores[0].id);
+      } else {
+        setDevSupplierId('');
+      }
+
+      setDevLines(
+        (item.lines || []).map((l: any) => ({
+          productId: l.productId,
+          tallaId: l.tallaId,
+          cantidad: l.cantidad,
+          precioCosto: Number(l.costPrice || l.precioCosto || l.precioUnitario || 10),
+          modelName: l.modelName || 'Calzado',
+          color: l.color || '',
+          brand: l.brand || '',
+          imageUrl: l.imageUrl || '',
+          numeroTalla: l.numeroTalla || 38,
+        }))
+      );
+    } else {
+      setDevClienteDevolucionId('');
+      setDevMotivo('');
+      setDevSupplierId(proveedores[0]?.id || '');
+      setDevLines([]);
+    }
+    setShowDevolucionModal(true);
+  };
+
+  const handleGuardarDevolucionProveedor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!devSupplierId) {
+      showToast('Seleccione el proveedor al que devolverá la mercadería.', 'error');
+      return;
+    }
+    if (devLines.length === 0) {
+      showToast('Agregue al menos un modelo a la devolución.', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res: any = await ApiService.post('/devoluciones/proveedor', {
+        supplierId: devSupplierId,
+        motivo: devMotivo || 'Devolución de calzado por falla / garantía de fábrica',
+        clienteDevolucionId: devClienteDevolucionId || undefined,
+        lines: devLines.map((l) => ({
+          productId: l.productId,
+          tallaId: l.tallaId,
+          cantidad: l.cantidad,
+          precioCosto: l.precioCosto,
+        })),
+      });
+
+      showToast(`Devolución registrada con éxito (#${res.resumenFinanciero?.numeroCodigo || 'DEV'}). Se descontó $${Number(res.deudaDescontada || 0).toFixed(2)} de la deuda con el proveedor.`, 'success');
+      setShowDevolucionModal(false);
+      await loadData();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('proveedores_data_updated'));
+        window.dispatchEvent(new CustomEvent('dashboard_refresh'));
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Error al registrar la devolución al proveedor.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAbrirManualDefectuoso = () => {
+    setManualProd(null);
+    setBusquedaManualProd('');
+    setManualMotivo('');
+    setManualTallaId('');
+    setManualCantidad(1);
+    setManualPrecioCosto(0);
+    setShowManualDefectuosoModal(true);
+  };
+
+  const handleGuardarManualDefectuoso = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualProd) {
+      showToast('Seleccione un producto del catálogo.', 'error');
+      return;
+    }
+    if (!manualTallaId) {
+      showToast('Seleccione la talla del calzado defectuoso.', 'error');
+      return;
+    }
+    if (manualCantidad <= 0) {
+      showToast('La cantidad debe ser mayor a 0.', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await ApiService.post('/devoluciones/mercaderia-por-devolver/manual', {
+        motivo: manualMotivo || 'Calzado defectuoso registrado en bodega para devolución',
+        lines: [
+          {
+            productId: manualProd.id,
+            tallaId: manualTallaId,
+            cantidad: manualCantidad,
+            precioUnitario: manualPrecioCosto || Number(manualProd.costPrice || manualProd.precioCosto || 10),
+          },
+        ],
+      });
+
+      showToast('Calzado defectuoso agregado a la bandeja de mercadería por devolver.', 'success');
+      setShowManualDefectuosoModal(false);
+      await loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Error al registrar la mercadería defectuosa.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEnviarDevolucionWhatsApp = (dev: any) => {
+    const telefono = dev.supplier?.contacto || '';
+    let numLimpio = telefono.replace(/\D/g, "");
+    if (numLimpio.startsWith("09") && numLimpio.length === 10) {
+      numLimpio = "593" + numLimpio.substring(1);
+    } else if (numLimpio.startsWith("0") && numLimpio.length === 10) {
+      numLimpio = "593" + numLimpio.substring(1);
+    }
+
+    const prov = proveedores.find((pr) => pr.id === dev.supplierId);
+    const saldo = prov?.saldoPendiente ?? 0;
+
+    let itemsDetalle = (dev.lines || [])
+      .map((l: any) => `• *${l.modelName || 'Calzado'}* (${l.color || 'Estándar'}) Talla *${l.numeroTalla || '38'}*: ${l.cantidad} par(es) × $${Number(l.precioCosto || 0).toFixed(2)} = $${Number(l.subtotal || 0).toFixed(2)}`)
+      .join('\n');
+
+    const mensaje = `*CONSTANCIA DE DEVOLUCIÓN DE CALZADO (GARANTÍA / FALLA)*\n\nEstimado/a *${dev.supplier?.razonSocial || 'Proveedor'}*,\n\nLe notificamos formalmente la devolución de mercadería por defecto / garantía:\n\n📄 *Comprobante N°:* ${dev.numeroCodigo || 'DEV-0001'}\n📅 *Fecha:* ${new Date(dev.createdAt).toLocaleDateString('es-EC')}\n📝 *Motivo:* ${dev.motivo || 'Falla de fábrica / defecto de fabricación'}\n\n👟 *DETALLE DE MERCADERÍA DEVUELTA:*\n${itemsDetalle}\n\n📦 *Total Pares Devueltos:* ${dev.totalPares || (dev.lines || []).reduce((acc: number, l: any) => acc + l.cantidad, 0)} pares\n💵 *Monto Total Devuelto:* $${Number(dev.totalDevuelto || 0).toFixed(2)}\n📉 *Descontado de Deuda / Saldo:* -$${Number(dev.deudaDescontada || dev.totalDevuelto || 0).toFixed(2)}\n💼 *Nuevo Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Constancia comercial emitida por sistema NEXORA._`;
+
+    const waUrl = numLimpio
+      ? `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`
+      : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+    window.open(waUrl, "_blank");
+  };
+
   const proveedoresFiltrados = useMemo(() => {
     if (!searchQuery) return proveedores;
     const q = searchQuery.toLowerCase();
@@ -1372,15 +1558,16 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-2">
         <div className="flex gap-2">
           {([
-            ['proveedores', 'Proveedores & Deudas', Truck],
-            ['ordenes', 'Órdenes de Compra', FileText],
-            ['ingreso', 'Recepción de Mercancía', PackageCheck],
-            ['pagos', 'Historial de Pagos', DollarSign],
-          ] as const).map(([id, label, Icon]) => (
+            ['proveedores', 'Proveedores & Deudas', Truck, 0],
+            ['ordenes', 'Órdenes de Compra', FileText, 0],
+            ['ingreso', 'Recepción de Mercancía', PackageCheck, 0],
+            ['pagos', 'Historial de Pagos', DollarSign, 0],
+            ['devoluciones', 'Devoluciones & Garantías', RotateCcw, pendientesDevolucion.length],
+          ] as const).map(([id, label, Icon, badge]) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all relative ${
                 activeTab === id
                   ? 'bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900 shadow-sm'
                   : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
@@ -1388,6 +1575,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             >
               <Icon size={14} />
               <span>{label}</span>
+              {badge > 0 && (
+                <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full bg-rose-500 text-white animate-pulse">
+                  {badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -2389,6 +2581,208 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       )}
 
       {/* ══════════════════════════════════════════
+          PESTAÑA 5: DEVOLUCIONES & GARANTÍAS A PROVEEDORES
+         ══════════════════════════════════════════ */}
+      {!loading && activeTab === 'devoluciones' && (
+        <div className="space-y-6">
+          {/* Header de la sección */}
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-sm flex items-center gap-2">
+                <RotateCcw size={18} className="text-rose-500" />
+                <span>Mercadería por Devolver & Garantías a Fabricantes</span>
+              </h3>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Control de calzado defectuoso, generación manual de constancias y descuento automático de cuentas por pagar.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleAbrirManualDefectuoso}
+                className="px-3.5 py-2 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] border border-[var(--border)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <Plus size={14} className="text-rose-500" />
+                <span>Registrar Defectuoso en Bodega</span>
+              </button>
+              <button
+                onClick={() => handleAbrirDevolucionProveedor()}
+                className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm border border-slate-700 cursor-pointer"
+              >
+                <RotateCcw size={14} className="text-amber-400" />
+                <span>Nueva Devolución a Proveedor</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 1. BANDEJA DE MERCADERÍA PENDIENTE POR DEVOLVER */}
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm p-5 space-y-4">
+            <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert size={16} className="text-amber-500" />
+                <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                  Bandeja de Calzado Pendiente de Entrega al Proveedor ({pendientesDevolucion.length} ítems)
+                </h4>
+              </div>
+              <span className="text-[11px] text-[var(--muted-foreground)]">
+                Mermas de clientes y productos defectuosos sin liquidar
+              </span>
+            </div>
+
+            {pendientesDevolucion.length === 0 ? (
+              <div className="p-10 text-center text-[var(--muted-foreground)] space-y-1">
+                <CheckCircle2 size={32} className="mx-auto text-emerald-500 opacity-60 mb-2" />
+                <p className="font-bold text-xs text-[var(--foreground)]">No hay mercadería pendiente por devolver al proveedor</p>
+                <p className="text-[11px]">Cuando un cliente devuelva calzado con falla o registres mercadería defectuosa en bodega, aparecerá aquí lista para devolver al fabricante.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendientesDevolucion.map((item: any) => {
+                  const totalPares = (item.lines || []).reduce((acc: number, l: any) => acc + (l.cantidad || 0), 0);
+                  const totalCostoEst = (item.lines || []).reduce((acc: number, l: any) => acc + ((l.cantidad || 0) * (l.costPrice || l.precioUnitario || 10)), 0);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-[var(--card)] to-[var(--card)] flex flex-col justify-between space-y-3 shadow-2xs hover:shadow-sm transition-all"
+                    >
+                      <div className="space-y-2.5">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              PENDIENTE DEVOLUCIÓN
+                            </span>
+                            <h5 className="font-extrabold text-xs text-[var(--foreground)] mt-1.5">
+                              {item.motivo}
+                            </h5>
+                          </div>
+                          <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                            {new Date(item.createdAt).toLocaleDateString('es-EC')}
+                          </span>
+                        </div>
+
+                        {/* Listado de líneas del ítem */}
+                        <div className="space-y-2 pt-1 border-t border-[var(--border)]">
+                          {(item.lines || []).map((line: any, lIdx: number) => (
+                            <div key={lIdx} className="flex items-center gap-3 bg-[var(--muted)]/40 p-2 rounded-xl">
+                              {line.imageUrl ? (
+                                <img src={line.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-[var(--card)] border border-[var(--border)] flex items-center justify-center text-sm shrink-0">👟</div>
+                              )}
+                              <div className="min-w-0 flex-1 text-xs">
+                                <span className="font-bold text-[var(--foreground)] block truncate">{line.modelName}</span>
+                                <div className="text-[11px] text-[var(--muted-foreground)]">
+                                  {line.color && `${line.color} • `} Talla <strong className="text-[var(--foreground)]">T{line.numeroTalla}</strong> ({line.cantidad} pares)
+                                </div>
+                                {line.supplierNombre && (
+                                  <span className="text-[10px] text-amber-600 font-medium">Proveedor: {line.supplierNombre}</span>
+                                )}
+                              </div>
+                              <div className="text-right shrink-0 font-mono text-xs">
+                                <span className="font-extrabold text-[var(--foreground)]">${Number(line.subtotal || (line.cantidad * (line.costPrice || 10))).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Footer de la tarjeta con acción de devolución */}
+                      <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-[var(--muted-foreground)] uppercase font-bold block">Total: {totalPares} pares</span>
+                          <span className="text-sm font-black text-rose-600 font-mono">
+                            ${totalCostoEst.toFixed(2)}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleAbrirDevolucionProveedor(item)}
+                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        >
+                          <RotateCcw size={13} />
+                          <span>Devolver al Proveedor</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 2. HISTORIAL DE CONSTANCIAS DE DEVOLUCIÓN */}
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm space-y-4 p-5">
+            <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
+              <div className="flex items-center gap-2">
+                <FileText size={16} className="text-emerald-500" />
+                <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                  Historial de Devoluciones Procesadas ({devolucionesProveedor.length} constancias)
+                </h4>
+              </div>
+              <span className="text-[11px] text-[var(--muted-foreground)]">
+                Registro de calzado entregado y descuentos aplicados en cuenta corriente
+              </span>
+            </div>
+
+            {devolucionesProveedor.length === 0 ? (
+              <div className="p-12 text-center text-[var(--muted-foreground)]">
+                No hay devoluciones a proveedores procesadas aún.
+              </div>
+            ) : (
+              <div className="overflow-x-auto -mx-5">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                    <tr>
+                      <th className="px-5 py-3">Constancia</th>
+                      <th className="px-4 py-3">Fecha</th>
+                      <th className="px-4 py-3">Proveedor</th>
+                      <th className="px-4 py-3 text-center">Pares</th>
+                      <th className="px-4 py-3">Motivo / Detalle</th>
+                      <th className="px-4 py-3 text-right">Monto Descontado</th>
+                      <th className="px-5 py-3 text-center">WhatsApp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {devolucionesProveedor.map((dev: any) => (
+                      <tr key={dev.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                        <td className="px-5 py-3 font-mono font-bold text-rose-600">
+                          {dev.numeroCodigo || `DEV-${dev.id.slice(0, 4).toUpperCase()}`}
+                        </td>
+                        <td className="px-4 py-3 text-[11px] text-[var(--muted-foreground)] font-mono">
+                          {new Date(dev.createdAt).toLocaleDateString('es-EC')}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-[var(--foreground)]">
+                          {dev.supplier?.razonSocial || dev.supplier?.nombre || 'Proveedor'}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold font-mono">
+                          {dev.totalPares || (dev.lines || []).reduce((acc: number, l: any) => acc + l.cantidad, 0)} pares
+                        </td>
+                        <td className="px-4 py-3 text-[11px] text-[var(--muted-foreground)] truncate max-w-xs">
+                          {dev.motivo}
+                        </td>
+                        <td className="px-4 py-3 text-right font-extrabold text-rose-600 font-mono text-sm">
+                          -${Number(dev.totalDevuelto || dev.deudaDescontada || 0).toFixed(2)}
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <button
+                            onClick={() => handleEnviarDevolucionWhatsApp(dev)}
+                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-600 text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 mx-auto cursor-pointer"
+                            title="Enviar Constancia al WhatsApp del Proveedor"
+                          >
+                            <MessageCircle size={12} />
+                            <span>Notificar</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
           MODAL: DETALLE DE ORDEN (Con Botón Enviar Explícito)
          ══════════════════════════════════════════ */}
       {showOrderDetailModal && selectedOrder && (
@@ -2930,22 +3324,28 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               </div>
             ) : cuentaCorrienteData ? (
               <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-4 space-y-1">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 space-y-1">
                     <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Total Facturado</span>
-                    <span className="text-lg font-black text-[var(--foreground)] font-mono">
+                    <span className="text-base font-black text-[var(--foreground)] font-mono">
                       ${cuentaCorrienteData.resumen.totalFacturado.toFixed(2)}
                     </span>
                   </div>
-                  <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-4 space-y-1">
+                  <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 space-y-1">
                     <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Total Abonado</span>
-                    <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
                       ${cuentaCorrienteData.resumen.totalPagado.toFixed(2)}
                     </span>
                   </div>
-                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 space-y-1">
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider block">Devoluciones</span>
+                    <span className="text-base font-black text-amber-700 dark:text-amber-400 font-mono">
+                      ${(cuentaCorrienteData.resumen.totalDevoluciones || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3.5 space-y-1">
                     <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider block">Saldo Pendiente</span>
-                    <span className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono">
+                    <span className="text-base font-black text-rose-600 dark:text-rose-400 font-mono">
                       ${cuentaCorrienteData.resumen.saldoPendiente.toFixed(2)}
                     </span>
                   </div>
@@ -2958,7 +3358,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   </h4>
                   <button
                     onClick={() => handleAbrirModalPago(selectedSupplierId!, undefined, cuentaCorrienteData.resumen.saldoPendiente)}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
                   >
                     <DollarSign size={13} />
                     <span>Registrar Pago / Abono</span>
@@ -2972,6 +3372,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     cuentaCorrienteData.movimientos.map((mov: any, idx: number) => {
                       const isEntrega = mov.tipo === 'ENTREGA_MERCANCIA';
                       const isPago = mov.tipo === 'PAGO_PROVEEDOR';
+                      const isDevolucion = mov.tipo === 'DEVOLUCION_PROVEEDOR';
 
                       return (
                         <div
@@ -2979,6 +3380,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                           className={`p-4 rounded-2xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors ${
                             isPago
                               ? 'bg-emerald-500/5 border-emerald-500/20'
+                              : isDevolucion
+                              ? 'bg-rose-500/5 border-rose-500/20'
                               : isEntrega
                               ? 'bg-blue-500/5 border-blue-500/20'
                               : 'bg-[var(--card)] border-[var(--border)]'
@@ -2986,15 +3389,17 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                         >
                           <div className="flex items-center gap-3">
                             <div className={`p-2 rounded-xl text-white font-bold shrink-0 ${
-                              isPago ? 'bg-emerald-600' : isEntrega ? 'bg-blue-600' : 'bg-slate-700'
+                              isPago ? 'bg-emerald-600' : isDevolucion ? 'bg-rose-600' : isEntrega ? 'bg-blue-600' : 'bg-slate-700'
                             }`}>
-                              {isPago ? <DollarSign size={14} /> : isEntrega ? <Package size={14} /> : <FileText size={14} />}
+                              {isPago ? <DollarSign size={14} /> : isDevolucion ? <RotateCcw size={14} /> : isEntrega ? <Package size={14} /> : <FileText size={14} />}
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <h5 className="font-bold text-xs text-[var(--foreground)]">{mov.titulo}</h5>
                                 {mov.numeroCodigo && (
-                                  <span className="text-[10px] font-mono text-[var(--muted-foreground)] bg-[var(--muted)] px-1.5 py-0.5 rounded">
+                                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                    isDevolucion ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                                  }`}>
                                     {mov.numeroCodigo}
                                   </span>
                                 )}
@@ -3008,9 +3413,13 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                           <div className="flex items-center gap-3 self-end sm:self-center">
                             <div className="text-right">
                               <span className={`font-black font-mono text-sm ${
-                                isPago ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#0F172A] dark:text-amber-400'
+                                isPago
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : isDevolucion
+                                  ? 'text-rose-600 dark:text-rose-400'
+                                  : 'text-[#0F172A] dark:text-amber-400'
                               }`}>
-                                {isPago ? `-$${Number(mov.monto).toFixed(2)}` : `+$${Number(mov.monto).toFixed(2)}`}
+                                {isPago || isDevolucion ? `-$${Number(mov.monto).toFixed(2)}` : `+$${Number(mov.monto).toFixed(2)}`}
                               </span>
                               <span className="text-[10px] text-[var(--muted-foreground)] block font-mono">
                                 {new Date(mov.fecha).toLocaleDateString('es-EC')}
@@ -3030,8 +3439,28 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                                   createdAt: mov.fecha,
                                   supplier: cuentaCorrienteData.supplier,
                                 })}
-                                className="p-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors"
+                                className="p-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors cursor-pointer"
                                 title="Enviar Comprobante por WhatsApp"
+                              >
+                                <MessageCircle size={14} />
+                              </button>
+                            )}
+
+                            {isDevolucion && (
+                              <button
+                                onClick={() => handleEnviarDevolucionWhatsApp({
+                                  id: mov.id,
+                                  numeroCodigo: mov.numeroCodigo,
+                                  supplierId: selectedSupplierId!,
+                                  motivo: mov.descripcion,
+                                  totalDevuelto: mov.monto,
+                                  deudaDescontada: mov.detalles?.deudaDescontada || mov.monto,
+                                  lines: mov.detalles?.lines || [],
+                                  createdAt: mov.fecha,
+                                  supplier: cuentaCorrienteData.supplier,
+                                })}
+                                className="p-1.5 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors cursor-pointer"
+                                title="Enviar Constancia de Devolución por WhatsApp"
                               >
                                 <MessageCircle size={14} />
                               </button>
@@ -3761,6 +4190,583 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 title="Vista Previa de Orden de Compra"
                 className="w-full h-full rounded-2xl border border-[var(--border)] shadow-inner"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          MODAL: REGISTRAR DEVOLUCIÓN AL PROVEEDOR
+         ══════════════════════════════════════════ */}
+      {showDevolucionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30">
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+                    <span>Registrar Devolución al Fabricante</span>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      Garantía / Falla
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Descuenta automáticamente de la deuda del proveedor y genera el comprobante DEV
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDevolucionModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarDevolucionProveedor} className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Proveedor Selector */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
+                  Proveedor / Fabricante Receptor *
+                </label>
+                <select
+                  value={devSupplierId}
+                  onChange={(e) => setDevSupplierId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-semibold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-hidden"
+                  required
+                >
+                  <option value="">-- Seleccione un proveedor --</option>
+                  {proveedores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.razonSocial || p.nombre} (RUC: {p.ruc}) • Deuda Actual: ${Number(p.saldoPendiente || 0).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Motivo */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
+                  Motivo de la Devolución *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Calzado despegado de fábrica, cuero rasgado en talón, producto con defecto..."
+                  value={devMotivo}
+                  onChange={(e) => setDevMotivo(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-hidden"
+                  required
+                />
+              </div>
+
+              {/* Items a Devolver */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                    Calzado a Devolver ({devLines.length} {devLines.length === 1 ? 'modelo' : 'modelos'})
+                  </label>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Total: {devLines.reduce((acc, l) => acc + l.cantidad, 0)} pares
+                  </span>
+                </div>
+
+                {devLines.length === 0 ? (
+                  <div className="p-6 border-2 border-dashed border-[var(--border)] rounded-2xl text-center">
+                    <ShieldAlert size={28} className="mx-auto text-amber-500 mb-2 opacity-60" />
+                    <p className="text-xs font-bold text-[var(--foreground)]">No hay modelos seleccionados para devolución</p>
+                    <p className="text-[11px] text-[var(--muted-foreground)] mt-1">
+                      Puede seleccionar ítems directamente desde la pestaña de "Devoluciones & Garantías" o ingresar calzado defectuoso manualmente.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {devLines.map((line, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex items-center justify-between gap-3 shadow-xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center">
+                            {line.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={line.imageUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Package size={16} className="text-slate-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-[var(--foreground)] truncate">{line.modelName}</h4>
+                            <p className="text-[11px] text-[var(--muted-foreground)]">
+                              Talla: <span className="font-bold text-rose-600 dark:text-rose-400">{line.numeroTalla}</span>
+                              {line.color ? ` • Color: ${line.color}` : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="flex flex-col items-end">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-[var(--muted-foreground)] font-bold">Cant:</span>
+                              <input
+                                type="number"
+                                min={1}
+                                value={line.cantidad}
+                                onChange={(e) => {
+                                  const val = Math.max(1, parseInt(e.target.value) || 1);
+                                  setDevLines((prev) =>
+                                    prev.map((l, i) => (i === idx ? { ...l, cantidad: val } : l))
+                                  );
+                                }}
+                                className="w-12 h-7 px-1.5 text-center font-bold text-xs bg-[var(--muted)] border border-[var(--border)] rounded-lg font-mono"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="text-[10px] text-[var(--muted-foreground)] font-bold">Costo $:</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={line.precioCosto}
+                                onChange={(e) => {
+                                  const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                  setDevLines((prev) =>
+                                    prev.map((l, i) => (i === idx ? { ...l, precioCosto: val } : l))
+                                  );
+                                }}
+                                className="w-16 h-7 px-1.5 text-right font-bold text-xs bg-[var(--muted)] border border-[var(--border)] rounded-lg font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="text-right min-w-[70px]">
+                            <span className="text-[10px] font-bold text-slate-400 block">Subtotal</span>
+                            <span className="text-xs font-black font-mono text-rose-600 dark:text-rose-400">
+                              ${(line.cantidad * line.precioCosto).toFixed(2)}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setDevLines((prev) => prev.filter((_, i) => i !== idx))}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                            title="Eliminar de la devolución"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Impacto Financiero Card */}
+              {devLines.length > 0 && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                      <DollarSign size={18} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                        Descuento Inmediato de Cuenta
+                      </h4>
+                      <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+                        Se rebajará del saldo adeudado con el fabricante.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-lg font-black font-mono text-emerald-700 dark:text-emerald-400">
+                      -${devLines.reduce((sum, l) => sum + l.cantidad * l.precioCosto, 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Botones de acción */}
+              <div className="pt-3 border-t border-[var(--border)] flex justify-end items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDevolucionModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || devLines.length === 0 || !devSupplierId}
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Procesando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} />
+                      <span>Confirmar y Generar Acta DEV</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          MODAL: INGRESO MANUAL DE CALZADO DEFECTUOSO
+         ══════════════════════════════════════════ */}
+      {showManualDefectuosoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30">
+                  <ShieldAlert size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">
+                    Ingresar Calzado Defectuoso
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Añade calzado con fallas de bodega a la bandeja de devolución a fábrica
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowManualDefectuosoModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarManualDefectuoso} className="p-6 space-y-4">
+              {/* Buscador de Producto */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
+                  Buscar Modelo de Calzado *
+                </label>
+                <div className="relative">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Escriba el nombre, código o marca del modelo..."
+                    value={busquedaManualProd}
+                    onChange={(e) => setBusquedaManualProd(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden"
+                  />
+                </div>
+
+                {busquedaManualProd.trim().length > 0 && !manualProd && (
+                  <div className="mt-2 max-h-48 overflow-y-auto border border-[var(--border)] rounded-2xl bg-[var(--card)] shadow-lg divide-y divide-[var(--border)]">
+                    {productos
+                      .filter(
+                        (p) =>
+                          p.name?.toLowerCase().includes(busquedaManualProd.toLowerCase()) ||
+                          p.nombre?.toLowerCase().includes(busquedaManualProd.toLowerCase()) ||
+                          p.code?.toLowerCase().includes(busquedaManualProd.toLowerCase()) ||
+                          p.codigo?.toLowerCase().includes(busquedaManualProd.toLowerCase())
+                      )
+                      .slice(0, 8)
+                      .map((p) => (
+                        <div
+                          key={p.id}
+                          onClick={() => {
+                            setManualProd(p);
+                            setBusquedaManualProd('');
+                            setManualPrecioCosto(Number(p.costPrice || p.precioCosto || 10));
+                            const tallasArr = p.tallas || p.stockByTalla || [];
+                            if (tallasArr.length > 0) {
+                              setManualTallaId(tallasArr[0].id || tallasArr[0].tallaId || '');
+                            }
+                          }}
+                          className="p-2.5 flex items-center justify-between hover:bg-[var(--muted)] cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center">
+                              {p.imageUrl || p.fotoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={p.imageUrl || p.fotoUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <Package size={14} className="text-slate-400" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-[var(--foreground)]">{p.name || p.nombre}</p>
+                              <p className="text-[10px] text-[var(--muted-foreground)]">
+                                {p.brand || p.marca || 'Calzado'} • Código: {p.code || p.codigo}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-mono font-bold text-emerald-600">
+                            Costo: ${Number(p.costPrice || p.precioCosto || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Producto Seleccionado Banner */}
+              {manualProd && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white border overflow-hidden shrink-0">
+                      {manualProd.imageUrl || manualProd.fotoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={manualProd.imageUrl || manualProd.fotoUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Package size={16} className="text-amber-600" />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-[var(--foreground)]">{manualProd.name || manualProd.nombre}</h4>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">
+                        {manualProd.brand || manualProd.marca || 'Calzado'} • {manualProd.code || manualProd.codigo}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualProd(null);
+                      setManualTallaId('');
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              )}
+
+              {/* Talla y Cantidad */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
+                    Talla del Calzado *
+                  </label>
+                  <select
+                    value={manualTallaId}
+                    onChange={(e) => setManualTallaId(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden"
+                    required
+                  >
+                    <option value="">-- Seleccionar Talla --</option>
+                    {manualProd && (manualProd.tallas || manualProd.stockByTalla || []).map((t: any) => (
+                      <option key={t.id || t.tallaId} value={t.id || t.tallaId}>
+                        Talla {t.numero || t.sizeNumber || t.talla || t.nombre} (Stock: {t.stock ?? 0})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
+                    Cantidad (Pares) *
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={manualCantidad}
+                    onChange={(e) => setManualCantidad(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Precio Costo y Motivo */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
+                    Costo Unit. ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={manualPrecioCosto}
+                    onChange={(e) => setManualPrecioCosto(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden"
+                    required
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
+                    Detalle del Defecto / Falla *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Suela despegada, costura rota..."
+                    value={manualMotivo}
+                    onChange={(e) => setManualMotivo(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="pt-3 border-t border-[var(--border)] flex justify-end items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowManualDefectuosoModal(false)}
+                  className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || !manualProd || !manualTallaId}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} />
+                      <span>Ingresar a Bandeja</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          MODAL: CONSTANCIA DE DEVOLUCIÓN A PROVEEDOR
+         ══════════════════════════════════════════ */}
+      {showConstanciaModal && selectedConstancia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30">
+                  <Receipt size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+                    <span>Constancia #{selectedConstancia.numeroCodigo || 'DEV-0001'}</span>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Liquidada
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Proveedor: {selectedConstancia.supplier?.razonSocial || selectedConstancia.supplier?.nombre}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowConstanciaModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Metadatos */}
+              <div className="grid grid-cols-2 gap-3 p-3.5 bg-[var(--muted)]/40 rounded-2xl border border-[var(--border)] text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase block">Fecha de Emisión</span>
+                  <span className="font-bold text-[var(--foreground)]">
+                    {new Date(selectedConstancia.createdAt).toLocaleDateString('es-EC', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase block">RUC Proveedor</span>
+                  <span className="font-bold text-[var(--foreground)] font-mono">
+                    {selectedConstancia.supplier?.ruc || 'No especificado'}
+                  </span>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-[var(--border)]">
+                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase block">Motivo</span>
+                  <span className="font-medium text-[var(--foreground)]">{selectedConstancia.motivo}</span>
+                </div>
+              </div>
+
+              {/* Detalle de Modelos */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                  Modelos de Calzado Devueltos
+                </span>
+                <div className="border border-[var(--border)] rounded-2xl overflow-hidden divide-y divide-[var(--border)]">
+                  {(selectedConstancia.lines || []).map((l: any, i: number) => (
+                    <div key={i} className="p-3 flex items-center justify-between bg-[var(--card)]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center">
+                          {l.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={l.imageUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Package size={15} className="text-slate-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-[var(--foreground)]">{l.modelName || 'Calzado'}</p>
+                          <p className="text-[10px] text-[var(--muted-foreground)]">
+                            Talla: <strong className="text-[var(--foreground)]">{l.numeroTalla}</strong> • {l.cantidad} par(es) × ${Number(l.precioCosto || 0).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-black text-xs text-rose-600 dark:text-rose-400">
+                        ${Number(l.subtotal || l.cantidad * l.precioCosto || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Totales */}
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase block tracking-wider">
+                    Total Descontado de la Deuda
+                  </span>
+                  <span className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                    Total: {selectedConstancia.totalPares || (selectedConstancia.lines || []).reduce((acc: number, l: any) => acc + l.cantidad, 0)} pares
+                  </span>
+                </div>
+                <span className="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400">
+                  -${Number(selectedConstancia.totalDevuelto || 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 px-6 border-t border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/20">
+              <button
+                type="button"
+                onClick={() => handleEnviarDevolucionWhatsApp(selectedConstancia)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors"
+              >
+                <MessageCircle size={14} />
+                <span>Notificar por WhatsApp</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConstanciaModal(false)}
+                className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] hover:bg-[var(--card)] transition-colors"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
