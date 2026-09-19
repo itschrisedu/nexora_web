@@ -6,6 +6,7 @@ import { db } from '../db/local-db';
 import { SyncService } from '../services/sync.service';
 import {
   Package,
+  PackageCheck,
   Plus,
   Clock,
   Loader2,
@@ -41,7 +42,7 @@ interface ComercialProps {
   sucursales?: { id: string; name: string; isMatriz: boolean }[];
 }
 
-type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'EN_ESPERA_STOCK' | 'ENTREGADO' | 'CANCELADO';
+type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'EN_ESPERA_STOCK' | 'ENTREGADO' | 'ENTREGADO_PARCIAL' | 'CANCELADO';
 
 interface Pedido {
   id: string;
@@ -73,11 +74,12 @@ interface GrupoModeloResumen {
   imageUrl?: string | null;
   serieNombre?: string;
   totalPares: number;
+  totalEntregados: number;
   precioUnitario: number;
   subtotal: number;
   tipoVenta?: string;
   etiquetaVolumen: string;
-  tallas: { numero: string | number; cantidad: number }[];
+  tallas: { numero: string | number; cantidad: number; cantidadEntregada: number }[];
 }
 
 function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
@@ -97,6 +99,7 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
         imageUrl: l.imageUrl || null,
         serieNombre: l.serieNombre || l.serie || '',
         totalPares: 0,
+        totalEntregados: 0,
         precioUnitario: Number(l.precioUnitario) || 0,
         subtotal: 0,
         tipoVenta: l.tipoVenta,
@@ -107,16 +110,19 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
 
     const g = map.get(key)!;
     const cant = Number(l.cantidad) || 1;
+    const cantEntregada = Number(l.cantidadEntregada) || 0;
     const numTalla = l.numeroTalla || l.tallaNumero || l.talla || '38';
 
     g.totalPares += cant;
+    g.totalEntregados += cantEntregada;
     g.subtotal += Number(l.subtotal ?? (cant * g.precioUnitario));
 
     const existingTalla = g.tallas.find((t) => String(t.numero) === String(numTalla));
     if (existingTalla) {
       existingTalla.cantidad += cant;
+      existingTalla.cantidadEntregada += cantEntregada;
     } else {
-      g.tallas.push({ numero: numTalla, cantidad: cant });
+      g.tallas.push({ numero: numTalla, cantidad: cant, cantidadEntregada: cantEntregada });
     }
   });
 
@@ -140,11 +146,12 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
 }
 
 const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: React.ReactNode }> = {
-  PENDIENTE:       { label: 'Pendiente',        color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',       icon: <Clock size={12} /> },
-  EN_PREPARACION:  { label: 'En Preparación',   color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',          icon: <Package size={12} /> },
-  EN_ESPERA_STOCK: { label: 'Espera de Stock',   color: 'bg-orange-500/10 text-orange-600 border-orange-500/20',    icon: <Clock size={12} /> },
-  ENTREGADO:       { label: 'Entregado',        color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20', icon: <CheckCircle size={12} /> },
-  CANCELADO:       { label: 'Anulado',          color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',          icon: <XCircle size={12} /> },
+  PENDIENTE:         { label: 'Pendiente',          color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',        icon: <Clock size={12} /> },
+  EN_PREPARACION:    { label: 'En Preparación',     color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',           icon: <Package size={12} /> },
+  EN_ESPERA_STOCK:   { label: 'Espera de Stock',     color: 'bg-orange-500/10 text-orange-600 border-orange-500/20',     icon: <Clock size={12} /> },
+  ENTREGADO_PARCIAL: { label: 'Entrega Parcial',     color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',           icon: <Package size={12} /> },
+  ENTREGADO:         { label: 'Entregado',          color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',  icon: <CheckCircle size={12} /> },
+  CANCELADO:         { label: 'Anulado',            color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',           icon: <XCircle size={12} /> },
 };
 
 export default function ComercialComponent({ online, userRole, userPermissions, activeSucursalId, sucursales }: ComercialProps) {
@@ -258,6 +265,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [savingEnvioModal, setSavingEnvioModal] = useState(false);
 
   const [creatingOrder, setCreatingOrder] = useState(false);
+
+  // ── Modal de Entrega Parcial / Total de Pedido ──
+  const [showEntregaModal, setShowEntregaModal] = useState(false);
+  const [pedidoEntregaSeleccionado, setPedidoEntregaSeleccionado] = useState<Pedido | null>(null);
+  const [entregaItemsMap, setEntregaItemsMap] = useState<Record<string, number>>({});
+  const [procesandoEntrega, setProcesandoEntrega] = useState(false);
 
   // Cupones Promocionales (Fase E2)
   const [codigoCuponInput, setCodigoCuponInput] = useState('');
@@ -857,6 +870,108 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     window.open(url, '_blank');
   };
 
+  const handleEnviarPedidoEntregadoWhatsApp = (p: Pedido, clienteTel?: string) => {
+    const cliente = listaClientes.find((c) => c.id === p.clientId);
+    const telefono = clienteTel || cliente?.telefono;
+    if (!telefono) {
+      showToast('El cliente no tiene número de teléfono registrado para WhatsApp.', 'warning');
+      return;
+    }
+
+    const numPedido = p.numeroCodigo || (p.numero ? `#${String(p.numero).padStart(4, '0')}` : `#${p.id.slice(0, 6).toUpperCase()}`);
+    const fecha = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+    const clienteNombre = p.clienteNombre || cliente?.nombre || 'Estimado/a Cliente';
+    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+
+    let desgloseTexto = '';
+    const lineasComprobante: any[] = [];
+
+    if (p.lines && p.lines.length > 0) {
+      const grupos: { [key: string]: any[] } = {};
+      p.lines.forEach((l: any) => {
+        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+        if (!grupos[key]) grupos[key] = [];
+        grupos[key].push(l);
+      });
+
+      Object.entries(grupos).forEach(([_, lineas]) => {
+        const item = lineas[0];
+        const totalParesEntregados = lineas.reduce((sum, l) => sum + (l.cantidadEntregada || l.cantidad || 0), 0);
+        const totalParesSolicitados = lineas.reduce((sum, l) => sum + (l.cantidad || 0), 0);
+        const subtotal = lineas.reduce((sum, l) => sum + ((l.cantidadEntregada || l.cantidad || 0) * Number(l.precioUnitario || 0)), 0);
+        const obsItem = item.observacionModelo || item.observacion;
+
+        let formato = `${totalParesEntregados} pares`;
+        if (totalParesEntregados === 6) formato = 'Media Docena';
+        else if (totalParesEntregados === 12) formato = '1 Docena';
+
+        const tallasDesglose = lineas.map((l: any) => `T${l.tallaNumero || l.tallaId}: ${l.cantidadEntregada || l.cantidad}`).join(', ');
+        const notaExtra = obsItem ? ` (Nota: ${obsItem})` : '';
+
+        desgloseTexto += `\n📦 *${item.modelName || 'Calzado'}* (${item.color || 'Color estándar'})\n   • Serie: *${item.serieNombre || 'Serie Oficial'}*\n   • Tallas entregadas: ${tallasDesglose}\n   • Cantidad: *${formato}* (${totalParesEntregados}/${totalParesSolicitados} pares) x $${Number(item.precioUnitario).toFixed(2)} = *$${subtotal.toFixed(2)}*${notaExtra}`;
+
+        lineasComprobante.push({
+          modelo: item.modelName || 'Calzado',
+          codigo: item.codigo || item.code,
+          color: item.color,
+          serie: item.serieNombre || item.serie,
+          imageUrl: item.imageUrl,
+          numeracion: `${tallasDesglose} (${formato})`,
+          observacion: obsItem,
+          cantidadPares: totalParesEntregados,
+          precioUnitario: Number(item.precioUnitario || 0),
+          subtotal: Number(subtotal || 0),
+        });
+      });
+    }
+
+    const totalParesEntregadosGeneral = (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidadEntregada || l.cantidad || 0), 0);
+    const totalParesPedidoGeneral = (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0);
+    const esEntregaTotal = totalParesEntregadosGeneral >= totalParesPedidoGeneral;
+
+    const urlComprobante = generarUrlPublicaPedidoCliente({
+      pedido: {
+        id: p.id,
+        numero: p.numero,
+        numeroCodigo: p.numeroCodigo,
+        fecha: new Date().toLocaleDateString('es-EC'),
+        tipoPago: p.tipoPago,
+        observaciones: (p as any).notas || (p as any).observaciones,
+      },
+      cliente: {
+        nombre: clienteNombre,
+        cedula: cliente?.cedula,
+        telefono: telefono,
+        direccion: p.direccionEnvio || cliente?.direccion,
+      },
+      emisor: {
+        nombre: negocioNombre,
+        ruc: businessConfig?.ruc,
+        direccion: businessConfig?.direccion,
+        telefono: businessConfig?.telefono,
+      },
+      lineas: lineasComprobante,
+      totales: {
+        totalPares: totalParesEntregadosGeneral,
+        totalPagar: Number(p.montoTotal || 0),
+      },
+    });
+
+    const estadoTexto = esEntregaTotal ? '✅ *ENTREGA COMPLETADA (100%)*' : '📦 *ENTREGA PARCIAL REALIZADA*';
+
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📄 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares entregados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Descargar Nota de Entrega / Comprobante Oficial en PDF:*\n${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+
+    let numLimpio = telefono.replace(/\D/g, '');
+    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    }
+
+    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+    window.open(url, '_blank');
+  };
+
   const cargarCatalogo = async () => {
     try {
       if (online) {
@@ -987,12 +1102,10 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         return;
       }
 
-      const getCurvaRatio = (talla: any, tallas: any[]) => {
+      const getCurvaRatio = (talla: any, _tallas: any[]) => {
         if (talla.ratio && talla.ratio > 0) return talla.ratio;
         if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
-        const positive = tallas.map((x: any) => x.cantidad || x.stock || 1).filter((q: number) => q > 0);
-        const minQ = positive.length > 0 ? Math.min(...positive) : 1;
-        return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
+        return 1;
       };
 
       const sortedTallas = [...prodObj.tallas].sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0));
@@ -1398,6 +1511,59 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
+  const handleAbrirEntrega = (p: Pedido) => {
+    setPedidoEntregaSeleccionado(p);
+    const initialMap: Record<string, number> = {};
+    (p.lines || []).forEach((l: any) => {
+      const pendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, l.cantidad - (l.cantidadEntregada || 0));
+      // Sugerir entregar lo disponible de la cantidad pendiente si hay stock, o la cantidad pendiente
+      const disponible = l.stockDisponible !== undefined ? l.stockDisponible : pendiente;
+      const sugerido = Math.min(pendiente, Math.max(0, disponible));
+      initialMap[l.id] = sugerido;
+    });
+    setEntregaItemsMap(initialMap);
+    setShowEntregaModal(true);
+  };
+
+  const handleEntregarItems = async () => {
+    if (!pedidoEntregaSeleccionado) return;
+
+    const items = Object.entries(entregaItemsMap)
+      .map(([lineId, cant]) => ({
+        lineId,
+        cantidadAEntregar: Number(cant) || 0,
+      }))
+      .filter((i) => i.cantidadAEntregar > 0);
+
+    if (items.length === 0) {
+      showToast('Ingresa al menos una cantidad a entregar mayor a 0.', 'warning');
+      return;
+    }
+
+    setProcesandoEntrega(true);
+    try {
+      if (online) {
+        const res = await ApiService.post(`/pedidos/${pedidoEntregaSeleccionado.id}/entregar-items`, { items });
+        showToast(res.message || 'Entrega registrada correctamente. Abriendo WhatsApp...', 'success');
+        
+        const pedidoActualizado = res.pedido || pedidoEntregaSeleccionado;
+        handleEnviarPedidoEntregadoWhatsApp(pedidoActualizado);
+
+        setShowEntregaModal(false);
+        setPedidoEntregaSeleccionado(null);
+        setEntregaItemsMap({});
+        await loadPedidos();
+        await loadListaClientes();
+      } else {
+        showToast('Debes estar online para registrar entregas de pedidos.', 'warning');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Error al procesar la entrega', 'error');
+    } finally {
+      setProcesandoEntrega(false);
+    }
+  };
+
   const pedidosFiltrados = pedidos.filter((p) => {
     if (filtroEstado === 'TODOS') return true;
     return p.estado === filtroEstado;
@@ -1455,7 +1621,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         >
           Todos ({pedidos.length})
         </button>
-        {(['PENDIENTE', 'EN_PREPARACION', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
+        {(['PENDIENTE', 'EN_PREPARACION', 'ENTREGADO_PARCIAL', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
           const cfg = ESTADO_CONFIG[st];
           const count = pedidos.filter((p) => p.estado === st).length;
           const active = filtroEstado === st;
@@ -1598,7 +1764,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                               <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
                                 <Loader2 size={12} className="animate-spin text-[#0F172A]" /> Actualizando...
                               </span>
-                            ) : p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK' ? (
+                            ) : p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK' || p.estado === 'EN_PREPARACION' || p.estado === 'ENTREGADO_PARCIAL' ? (
                               <>
                                 <button
                                   onClick={() => handleAbrirEditarPedido(p)}
@@ -1606,12 +1772,32 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                 >
                                   ✏️ Editar
                                 </button>
-                                {p.estado === 'PENDIENTE' && (
+                                {(p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK') && (
                                   <button
                                     onClick={() => handleCambiarEstado(p.id, 'EN_PREPARACION')}
                                     className="px-2.5 py-1 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-600/20 flex items-center gap-1"
+                                    title="Marcar como Listo para Preparar en Bodega"
                                   >
                                     <Package size={12} /> Preparar
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleAbrirEntrega(p)}
+                                  className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
+                                  title="Entregar pares disponibles en bodega con descuento de inventario"
+                                >
+                                  <PackageCheck size={12} /> Entregar
+                                </button>
+                                {p.estado === 'ENTREGADO_PARCIAL' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEnviarPedidoEntregadoWhatsApp(p);
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1"
+                                    title="Enviar Comprobante de Entrega por WhatsApp"
+                                  >
+                                    <MessageCircle size={12} /> WhatsApp
                                   </button>
                                 )}
                                 <button
@@ -1621,27 +1807,22 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   <XCircle size={12} /> Anular
                                 </button>
                               </>
-                            ) : p.estado === 'EN_PREPARACION' ? (
-                              <>
+                            ) : p.estado === 'ENTREGADO' ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                                  <CheckCircle size={13} /> Entregado
+                                </span>
                                 <button
-                                  onClick={() => handleAbrirEditarPedido(p)}
-                                  className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEnviarPedidoEntregadoWhatsApp(p);
+                                  }}
+                                  className="px-2.5 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1"
+                                  title="Enviar Comprobante de Entrega por WhatsApp al Cliente"
                                 >
-                                  ✏️ Editar
+                                  <MessageCircle size={12} /> WhatsApp
                                 </button>
-                                <button
-                                  onClick={() => handleCambiarEstado(p.id, 'ENTREGADO')}
-                                  className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
-                                >
-                                  <CheckCircle size={12} /> Entregar
-                                </button>
-                                <button
-                                  onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
-                                  className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
-                                >
-                                  <XCircle size={12} /> Anular
-                                </button>
-                              </>
+                              </div>
                             ) : (
                               <span className="text-xs text-[var(--muted-foreground)]">Finalizado</span>
                             )}
@@ -1783,6 +1964,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                                 >
                                                   <span>T{t.numero}:</span>
                                                   <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
+                                                  {t.cantidadEntregada > 0 && (
+                                                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold ml-0.5">
+                                                      (✓{t.cantidadEntregada})
+                                                    </span>
+                                                  )}
                                                 </span>
                                               ))}
                                             </div>
@@ -2489,12 +2675,10 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                   {tipoVentaItem === 'SERIE_COMPLETA' ? (
                     <div className="sm:col-span-2 space-y-3 p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
                       {(() => {
-                        const getCurvaRatio = (talla: any, tallas: any[]) => {
+                        const getCurvaRatio = (talla: any, _tallas: any[]) => {
                           if (talla.ratio && talla.ratio > 0) return talla.ratio;
                           if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
-                          const positive = tallas.map((x: any) => x.cantidad || x.stock || 1).filter((q: number) => q > 0);
-                          const minQ = positive.length > 0 ? Math.min(...positive) : 1;
-                          return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
+                          return 1;
                         };
 
                         const baseParesPorSerie = (productoSeleccionadoObj?.tallas || []).reduce(
@@ -2615,12 +2799,10 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       {productoSeleccionadoObj && productoSeleccionadoObj.tallas && (
                         <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
                           {(() => {
-                            const getCurvaRatio = (talla: any, tallas: any[]) => {
+                            const getCurvaRatio = (talla: any, _tallas: any[]) => {
                               if (talla.ratio && talla.ratio > 0) return talla.ratio;
                               if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
-                              const positive = tallas.map((x: any) => x.cantidad || x.stock || 1).filter((q: number) => q > 0);
-                              const minQ = positive.length > 0 ? Math.min(...positive) : 1;
-                              return minQ > 0 ? Math.max(1, Math.round((talla.cantidad || talla.stock || 1) / minQ)) : 1;
+                              return 1;
                             };
 
                             return (
@@ -3934,6 +4116,391 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Entrega Parcial / Total */}
+      {showEntregaModal && pedidoEntregaSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+            {/* Cabecera */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                  <PackageCheck size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-base">Entrega de Pedido</h3>
+                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md text-xs font-mono font-black">
+                      #{getNumeroPedido(pedidoEntregaSeleccionado)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Cliente: <span className="font-bold text-white">{pedidoEntregaSeleccionado.clienteNombre || 'Consumidor'}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEntregaModal(false);
+                  setPedidoEntregaSeleccionado(null);
+                  setEntregaItemsMap({});
+                }}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Contenido scrollable */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="flex items-center justify-between flex-wrap gap-2 p-3 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs">
+                <div className="text-[var(--muted-foreground)]">
+                  Indica los pares a despachar. El sistema descontará el inventario físico y actualizará el estado a <strong className="text-cyan-600 dark:text-cyan-400">Entregado Parcial</strong> o <strong className="text-emerald-600 dark:text-emerald-400">Entregado</strong>.
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allMax: Record<string, number> = {};
+                      (pedidoEntregaSeleccionado.lines || []).forEach((l: any) => {
+                        const pend = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, l.cantidad - (l.cantidadEntregada || 0));
+                        const disp = l.stockDisponible !== undefined ? l.stockDisponible : pend;
+                        allMax[l.id] = Math.min(pend, Math.max(0, disp));
+                      });
+                      setEntregaItemsMap(allMax);
+                    }}
+                    className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white border border-emerald-600/20 rounded-lg text-xs font-bold transition-all"
+                  >
+                    ⚡ Llenar Disponibles
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allZero: Record<string, number> = {};
+                      (pedidoEntregaSeleccionado.lines || []).forEach((l: any) => {
+                        allZero[l.id] = 0;
+                      });
+                      setEntregaItemsMap(allZero);
+                    }}
+                    className="px-2.5 py-1 bg-slate-500/10 text-slate-600 hover:bg-slate-500 hover:text-white border border-slate-500/20 rounded-lg text-xs font-bold transition-all"
+                  >
+                    🔄 Poner en 0
+                  </button>
+                </div>
+              </div>
+
+              {/* Tarjetas interactivas agrupadas por Modelo / Variante (Idéntico a componente de pedidos) */}
+              <div className="space-y-3">
+                {(() => {
+                  // Agrupar líneas por modelo / variante
+                  const gruposMap = new Map<string, {
+                    key: string;
+                    productId: string;
+                    modelName: string;
+                    color: string;
+                    serieNombre: string;
+                    imageUrl?: string;
+                    precioUnitario: number;
+                    tipoVenta?: string;
+                    observacionModelo?: string;
+                    lineas: any[];
+                  }>();
+
+                  (pedidoEntregaSeleccionado.lines || []).forEach((l: any) => {
+                    const key = `${l.productId || l.modelName}_${l.color || ''}_${l.serieNombre || ''}_${l.tipoVenta || 'GENERAL'}`;
+                    if (!gruposMap.has(key)) {
+                      gruposMap.set(key, {
+                        key,
+                        productId: l.productId,
+                        modelName: l.modelName || 'Calzado',
+                        color: l.color || '',
+                        serieNombre: l.serieNombre || 'Serie Estándar',
+                        imageUrl: l.imageUrl,
+                        precioUnitario: Number(l.precioUnitario || 0),
+                        tipoVenta: l.tipoVenta,
+                        observacionModelo: l.observacionModelo || l.observacion,
+                        lineas: [],
+                      });
+                    }
+                    gruposMap.get(key)!.lineas.push(l);
+                  });
+
+                  const grupos = Array.from(gruposMap.values());
+
+                  if (grupos.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                        No hay artículos para entregar en este pedido.
+                      </div>
+                    );
+                  }
+
+                  return grupos.map((g) => {
+                    const sortedTallas = [...g.lineas].sort(
+                      (a, b) => (Number(a.numeroTalla || a.tallaNumero || 0) || 0) - (Number(b.numeroTalla || b.tallaNumero || 0) || 0)
+                    );
+
+                    const totalParesPedidoModelo = g.lineas.reduce((acc, l) => acc + (l.cantidad || 0), 0);
+                    const totalParesEntregadosAntes = g.lineas.reduce((acc, l) => acc + (l.cantidadEntregada || 0), 0);
+                    const totalParesADespacharHoy = g.lineas.reduce((acc, l) => acc + (entregaItemsMap[l.id] || 0), 0);
+                    const subtotalDespachoHoy = totalParesADespacharHoy * g.precioUnitario;
+
+                    let formato = `${totalParesADespacharHoy} pares`;
+                    if (totalParesADespacharHoy === 6) formato = '6 pares (½ Docena)';
+                    else if (totalParesADespacharHoy === 12) formato = '12 pares (1 Docena)';
+                    else if (totalParesADespacharHoy > 12 && totalParesADespacharHoy % 12 === 0) formato = `${totalParesADespacharHoy} pares (${totalParesADespacharHoy / 12} Docenas)`;
+                    else if (totalParesADespacharHoy > 6 && totalParesADespacharHoy % 6 === 0) formato = `${totalParesADespacharHoy} pares (${(totalParesADespacharHoy / 6) * 0.5} Docenas)`;
+
+                    return (
+                      <div
+                        key={g.key}
+                        className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-2xs"
+                      >
+                        {/* Izquierda: Imagen, Información y Steppers por Talla */}
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          {g.imageUrl ? (
+                            <img
+                              src={g.imageUrl}
+                              alt={g.modelName}
+                              className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] shrink-0 mt-0.5"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0 mt-0.5">
+                              👟
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="font-extrabold text-sm text-[var(--foreground)] uppercase tracking-wide truncate">
+                              {g.modelName}
+                            </div>
+                            <div className="text-xs text-[var(--muted-foreground)]">
+                              {g.color ? `${g.color.toUpperCase()} · ` : ''}
+                              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                Serie: {g.serieNombre.toUpperCase()}
+                              </span>
+                            </div>
+
+                            {/* Chips de Tallas Interactivos con diseño idéntico al pedido */}
+                            <div className="mt-2 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {sortedTallas.map((l, i) => {
+                                  const cantPedida = l.cantidad || 0;
+                                  const cantEntregada = l.cantidadEntregada || 0;
+                                  const cantPendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, cantPedida - cantEntregada);
+                                  const stockDisp = l.stockDisponible !== undefined ? l.stockDisponible : 0;
+                                  const aEntregar = entregaItemsMap[l.id] ?? 0;
+                                  const maxPermitido = Math.min(cantPendiente, Math.max(0, stockDisp));
+                                  const numTalla = l.numeroTalla || l.tallaNumero || '38';
+
+                                  return (
+                                    <div
+                                      key={i}
+                                      className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 shadow-2xs"
+                                    >
+                                      <span className="text-[var(--foreground)] font-black text-xs font-mono">
+                                        T{numTalla}
+                                      </span>
+
+                                      {cantPendiente === 0 ? (
+                                        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-1">
+                                          ✓ {cantEntregada}
+                                        </span>
+                                      ) : (
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEntregaItemsMap((prev) => ({
+                                                ...prev,
+                                                [l.id]: Math.max(0, aEntregar - 1),
+                                              }));
+                                            }}
+                                            className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                            title={`Quitar 1 par T${numTalla}`}
+                                          >
+                                            −
+                                          </button>
+                                          <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
+                                            {aEntregar}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEntregaItemsMap((prev) => ({
+                                                ...prev,
+                                                [l.id]: Math.min(maxPermitido, aEntregar + 1),
+                                              }));
+                                            }}
+                                            className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                            title={`Agregar 1 par T${numTalla} (máx disponible: ${maxPermitido})`}
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Botones de acción rápida: +1 par c/talla, -1 par c/talla */}
+                              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextMap = { ...entregaItemsMap };
+                                    sortedTallas.forEach((l) => {
+                                      const cantPendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, l.cantidad - (l.cantidadEntregada || 0));
+                                      const stockDisp = l.stockDisponible !== undefined ? l.stockDisponible : 0;
+                                      const maxPermitido = Math.min(cantPendiente, Math.max(0, stockDisp));
+                                      const actual = nextMap[l.id] ?? 0;
+                                      nextMap[l.id] = Math.min(maxPermitido, actual + 1);
+                                    });
+                                    setEntregaItemsMap(nextMap);
+                                  }}
+                                  className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                >
+                                  +1 par c/talla
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextMap = { ...entregaItemsMap };
+                                    sortedTallas.forEach((l) => {
+                                      const actual = nextMap[l.id] ?? 0;
+                                      nextMap[l.id] = Math.max(0, actual - 1);
+                                    });
+                                    setEntregaItemsMap(nextMap);
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                >
+                                  −1 par c/talla
+                                </button>
+                                <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
+                                  = {totalParesADespacharHoy} pares total
+                                </span>
+                              </div>
+
+                              {/* Observación del modelo */}
+                              {g.observacionModelo ? (
+                                <div className="mt-1.5 p-2 bg-amber-500/10 border border-amber-500/25 rounded-lg flex items-center gap-1.5 text-xs text-amber-900 dark:text-amber-200">
+                                  <span className="font-extrabold text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">
+                                    📝 Nota:
+                                  </span>
+                                  <span className="truncate text-[11px] font-medium">{g.observacionModelo}</span>
+                                </div>
+                              ) : (
+                                <div className="mt-1 text-[10px] font-semibold text-[var(--muted-foreground)] flex items-center gap-1">
+                                  <span>+ Observación:</span>
+                                  <span className="font-normal text-slate-400">Sin notas adicionales</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Derecha: Resumen de pares, precio y subtotal */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
+                          <div className="text-right">
+                            <div className="text-xs font-bold text-[var(--foreground)]">
+                              {formato}
+                            </div>
+                            <div className="text-[11px] text-[var(--muted-foreground)] font-medium">
+                              ${g.precioUnitario.toFixed(2)} / par
+                            </div>
+                            <div className="font-black text-base text-emerald-600 dark:text-emerald-400 mt-0.5">
+                              ${subtotalDespachoHoy.toFixed(2)}
+                            </div>
+                            {totalParesEntregadosAntes > 0 && (
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                                ✓ {totalParesEntregadosAntes} ya entregados
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Botón para resetear este modelo a 0 */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextMap = { ...entregaItemsMap };
+                              sortedTallas.forEach((l) => {
+                                nextMap[l.id] = 0;
+                              });
+                              setEntregaItemsMap(nextMap);
+                            }}
+                            className="w-6 h-6 rounded-full border border-rose-400/40 text-rose-500 hover:bg-rose-500/10 flex items-center justify-center text-xs font-bold cursor-pointer transition-colors"
+                            title="Poner en 0 pares a entregar para este modelo"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Resumen de la entrega */}
+              {(() => {
+                const totalEntregaActual = Object.values(entregaItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0);
+                const totalPedida = (pedidoEntregaSeleccionado.lines || []).reduce((acc: number, l: any) => acc + (l.cantidad || 0), 0);
+                const totalYaEntregada = (pedidoEntregaSeleccionado.lines || []).reduce((acc: number, l: any) => acc + (l.cantidadEntregada || 0), 0);
+                const acumulado = totalYaEntregada + totalEntregaActual;
+                const esTotal = acumulado >= totalPedida;
+
+                return (
+                  <div className="p-4 bg-slate-900 text-white rounded-xl flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="text-xs text-slate-300">Pares a despachar en esta entrega:</div>
+                      <div className="text-lg font-black text-emerald-400">
+                        {totalEntregaActual} pares <span className="text-xs text-slate-300 font-normal">({acumulado} de {totalPedida} entregados en total)</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`px-3 py-1.5 rounded-xl text-xs font-black border ${
+                        esTotal
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                      }`}>
+                        {esTotal ? '✨ Entrega Completa (ENTREGADO)' : '📦 Entrega Parcial (ENTREGADO_PARCIAL)'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Pie de modal */}
+            <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEntregaModal(false);
+                  setPedidoEntregaSeleccionado(null);
+                  setEntregaItemsMap({});
+                }}
+                className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  procesandoEntrega ||
+                  Object.values(entregaItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0) === 0
+                }
+                onClick={handleEntregarItems}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-extrabold rounded-xl transition-all shadow-md flex items-center gap-1.5"
+              >
+                {procesandoEntrega ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />}
+                <span>Confirmar y Despachar</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
