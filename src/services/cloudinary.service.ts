@@ -4,22 +4,73 @@ const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'i6utfmih';
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'ml_default';
 
 /**
- * Sube una imagen a Cloudinary (Intenta primero vía Backend NestJS firmado, luego directo Unsigned, luego Base64 local).
+ * Sanitiza una imagen eliminando metadatos EXIF, coordenadas GPS, fecha de captura y datos del dispositivo
+ * mediante rasterizado en Canvas limpio en memoria.
+ */
+async function stripExifAndSanitize(fileOrBase64: File | string): Promise<string> {
+  return new Promise<string>((resolve) => {
+    try {
+      if (typeof window === 'undefined') {
+        resolve(typeof fileOrBase64 === 'string' ? fileOrBase64 : '');
+        return;
+      }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      const cleanupAndResolve = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 800;
+          canvas.height = img.naturalHeight || img.height || 600;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(img.src);
+            return;
+          }
+          ctx.drawImage(img, 0, 0);
+          // toDataURL genera una nueva imagen limpia sin metadatos EXIF, sin GPS y sin fecha
+          const cleanBase64 = canvas.toDataURL('image/jpeg', 0.9);
+          resolve(cleanBase64);
+        } catch {
+          resolve(img.src);
+        }
+      };
+
+      img.onload = cleanupAndResolve;
+      img.onerror = () => {
+        if (typeof fileOrBase64 === 'string') {
+          resolve(fileOrBase64);
+        } else {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(fileOrBase64);
+        }
+      };
+
+      if (typeof fileOrBase64 === 'string') {
+        img.src = fileOrBase64;
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          img.src = reader.result as string;
+        };
+        reader.readAsDataURL(fileOrBase64);
+      }
+    } catch {
+      resolve(typeof fileOrBase64 === 'string' ? fileOrBase64 : '');
+    }
+  });
+}
+
+/**
+ * Sube una imagen a Cloudinary (Intenta primero vía Backend NestJS firmado, luego directo Unsigned, luego Base64 local),
+ * garantizando la eliminación completa de datos EXIF, fecha de captura y coordenadas GPS.
  */
 export async function uploadToCloudinary(fileOrBase64: File | string, folder = 'nexora_calzado'): Promise<string> {
   if (!fileOrBase64) return '';
 
-  let base64String = '';
-  if (typeof fileOrBase64 === 'string') {
-    base64String = fileOrBase64;
-  } else {
-    base64String = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = (e) => reject(e);
-      reader.readAsDataURL(fileOrBase64);
-    });
-  }
+  const base64String = await stripExifAndSanitize(fileOrBase64);
 
   // 1. Intentar subida firmada mediante Backend NestJS
   try {

@@ -2635,71 +2635,107 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 <p className="text-[11px]">Cuando un cliente devuelva calzado con falla o registres mercadería defectuosa en bodega, aparecerá aquí lista para devolver al fabricante.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
                 {pendientesDevolucion.map((item: any) => {
                   const totalPares = (item.lines || []).reduce((acc: number, l: any) => acc + (l.cantidad || 0), 0);
-                  const totalCostoEst = (item.lines || []).reduce((acc: number, l: any) => acc + ((l.cantidad || 0) * (l.costPrice || l.precioUnitario || 10)), 0);
+                  const totalCostoEst = (item.lines || []).reduce((acc: number, l: any) => acc + ((l.cantidad || 0) * Number(l.costPrice || l.precioCosto || l.precioUnitario || 10)), 0);
+                  const firstLine = item.lines?.[0] || {};
+                  const foto = firstLine.imageUrl || firstLine.fotoUrl || '';
+                  const modelName = firstLine.modelName || item.motivo || 'Calzado con Defecto';
+                  const color = firstLine.color || 'COLOR ESTÁNDAR';
+                  const serie = firstLine.serie || 'ADULTO';
+                  const precioUnit = Number(firstLine.costPrice || firstLine.precioCosto || firstLine.precioUnitario || 10);
 
                   return (
                     <div
                       key={item.id}
-                      className="p-4 rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-[var(--card)] to-[var(--card)] flex flex-col justify-between space-y-3 shadow-2xs hover:shadow-sm transition-all"
+                      className="p-3.5 sm:p-4 rounded-2xl border border-amber-500/30 bg-[var(--card)] shadow-xs transition-all flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4"
                     >
-                      <div className="space-y-2.5">
-                        <div className="flex justify-between items-start gap-2">
-                          <div>
-                            <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                              PENDIENTE DEVOLUCIÓN
-                            </span>
-                            <h5 className="font-extrabold text-xs text-[var(--foreground)] mt-1.5">
-                              {item.motivo}
-                            </h5>
-                          </div>
-                          <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                            {new Date(item.createdAt).toLocaleDateString('es-EC')}
-                          </span>
+                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                        {/* Imagen Thumbnail */}
+                        <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
+                          {foto ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={foto} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Package size={22} className="text-slate-400" />
+                          )}
                         </div>
 
-                        {/* Listado de líneas del ítem */}
-                        <div className="space-y-2 pt-1 border-t border-[var(--border)]">
-                          {(item.lines || []).map((line: any, lIdx: number) => (
-                            <div key={lIdx} className="flex items-center gap-3 bg-[var(--muted)]/40 p-2 rounded-xl">
-                              {line.imageUrl ? (
-                                <img src={line.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
-                              ) : (
-                                <div className="w-10 h-10 rounded-lg bg-[var(--card)] border border-[var(--border)] flex items-center justify-center text-sm shrink-0">👟</div>
-                              )}
-                              <div className="min-w-0 flex-1 text-xs">
-                                <span className="font-bold text-[var(--foreground)] block truncate">{line.modelName}</span>
-                                <div className="text-[11px] text-[var(--muted-foreground)]">
-                                  {line.color && `${line.color} • `} Talla <strong className="text-[var(--foreground)]">T{line.numeroTalla}</strong> ({line.cantidad} pares)
-                                </div>
-                                {line.supplierNombre && (
-                                  <span className="text-[10px] text-amber-600 font-medium">Proveedor: {line.supplierNombre}</span>
-                                )}
-                              </div>
-                              <div className="text-right shrink-0 font-mono text-xs">
-                                <span className="font-extrabold text-[var(--foreground)]">${Number(line.subtotal || (line.cantidad * (line.costPrice || 10))).toFixed(2)}</span>
-                              </div>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          {/* Título y Subtítulo */}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-extrabold text-sm text-[var(--foreground)] leading-tight uppercase tracking-tight">
+                                {modelName}
+                              </h4>
+                              <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                PENDIENTE
+                              </span>
                             </div>
-                          ))}
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--muted-foreground)] mt-0.5">
+                              <span>{color}</span>
+                              <span>·</span>
+                              <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                                Serie: {serie}
+                              </span>
+                              {firstLine.supplierNombre && (
+                                <>
+                                  <span>·</span>
+                                  <span className="text-amber-700 dark:text-amber-400 font-semibold">
+                                    Fabricante: {firstLine.supplierNombre}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Pills de Tallas */}
+                          <div className="flex flex-wrap gap-2">
+                            {(item.lines || []).map((l: any, idx: number) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--muted)]/40 px-2.5 py-1 shadow-2xs"
+                              >
+                                <span className="text-[var(--foreground)] font-black text-xs font-mono">
+                                  T{l.numeroTalla}
+                                </span>
+                                <span className="font-bold text-xs font-mono text-rose-600 dark:text-rose-400 px-1 bg-rose-500/10 rounded">
+                                  {l.cantidad} par{l.cantidad > 1 ? 'es' : ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Observación / Motivo */}
+                          <div className="text-xs text-[var(--muted-foreground)] flex items-center gap-1">
+                            <span className="font-bold text-slate-500 dark:text-slate-400">📝 Motivo:</span>
+                            <span className="italic">{item.motivo || 'Garantía / Falla de fábrica'}</span>
+                            <span className="text-[10px] text-slate-400 ml-2 font-mono">({new Date(item.createdAt).toLocaleDateString('es-EC')})</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Footer de la tarjeta con acción de devolución */}
-                      <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] text-[var(--muted-foreground)] uppercase font-bold block">Total: {totalPares} pares</span>
-                          <span className="text-sm font-black text-rose-600 font-mono">
+                      {/* Resumen Derecho con Acción */}
+                      <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-[var(--foreground)]">
+                            {totalPares} pares ({getDocenaLabel(totalPares)})
+                          </div>
+                          <div className="text-[11px] text-[var(--muted-foreground)] font-medium">
+                            ${precioUnit.toFixed(2)} / par
+                          </div>
+                          <div className="font-black text-base text-rose-600 dark:text-rose-400 mt-0.5">
                             ${totalCostoEst.toFixed(2)}
-                          </span>
+                          </div>
                         </div>
+
                         <button
                           onClick={() => handleAbrirDevolucionProveedor(item)}
-                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                          className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                         >
-                          <RotateCcw size={13} />
-                          <span>Devolver al Proveedor</span>
+                          <RotateCcw size={14} />
+                          <span>Devolver</span>
                         </button>
                       </div>
                     </div>
@@ -4282,83 +4318,219 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {devLines.map((line, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex items-center justify-between gap-3 shadow-xs"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center">
-                            {line.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={line.imageUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <Package size={16} className="text-slate-400" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-[var(--foreground)] truncate">{line.modelName}</h4>
-                            <p className="text-[11px] text-[var(--muted-foreground)]">
-                              Talla: <span className="font-bold text-rose-600 dark:text-rose-400">{line.numeroTalla}</span>
-                              {line.color ? ` • Color: ${line.color}` : ''}
-                            </p>
-                          </div>
-                        </div>
+                  <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                    {(() => {
+                      // Agrupar devLines por modelo para mostrar el componente estándar
+                      const gruposMap = new Map<string, {
+                        productId: string;
+                        modelName: string;
+                        color: string;
+                        brand: string;
+                        serie: string;
+                        imageUrl: string;
+                        precioCosto: number;
+                        tallas: Array<{ tallaId: string; numeroTalla: number | string; cantidad: number; originalIdx: number }>;
+                      }>();
 
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="flex flex-col items-end">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-[var(--muted-foreground)] font-bold">Cant:</span>
-                              <input
-                                type="number"
-                                min={1}
-                                value={line.cantidad}
-                                onChange={(e) => {
-                                  const val = Math.max(1, parseInt(e.target.value) || 1);
-                                  setDevLines((prev) =>
-                                    prev.map((l, i) => (i === idx ? { ...l, cantidad: val } : l))
-                                  );
-                                }}
-                                className="w-12 h-7 px-1.5 text-center font-bold text-xs bg-[var(--muted)] border border-[var(--border)] rounded-lg font-mono"
-                              />
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className="text-[10px] text-[var(--muted-foreground)] font-bold">Costo $:</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                value={line.precioCosto}
-                                onChange={(e) => {
-                                  const val = Math.max(0, parseFloat(e.target.value) || 0);
-                                  setDevLines((prev) =>
-                                    prev.map((l, i) => (i === idx ? { ...l, precioCosto: val } : l))
-                                  );
-                                }}
-                                className="w-16 h-7 px-1.5 text-right font-bold text-xs bg-[var(--muted)] border border-[var(--border)] rounded-lg font-mono"
-                              />
-                            </div>
-                          </div>
+                      devLines.forEach((line, idx) => {
+                        const key = line.productId || line.modelName || `line-${idx}`;
+                        const existing = gruposMap.get(key);
+                        if (existing) {
+                          existing.tallas.push({
+                            tallaId: line.tallaId,
+                            numeroTalla: line.numeroTalla,
+                            cantidad: line.cantidad,
+                            originalIdx: idx,
+                          });
+                          if (line.precioCosto) existing.precioCosto = line.precioCosto;
+                        } else {
+                          gruposMap.set(key, {
+                            productId: line.productId,
+                            modelName: line.modelName || 'Calzado',
+                            color: line.color || 'COLOR ESTÁNDAR',
+                            brand: line.brand || '',
+                            serie: (line as any).serie || 'ADULTO',
+                            imageUrl: line.imageUrl || '',
+                            precioCosto: Number(line.precioCosto || 10),
+                            tallas: [{
+                              tallaId: line.tallaId,
+                              numeroTalla: line.numeroTalla,
+                              cantidad: line.cantidad,
+                              originalIdx: idx,
+                            }],
+                          });
+                        }
+                      });
 
-                          <div className="text-right min-w-[70px]">
-                            <span className="text-[10px] font-bold text-slate-400 block">Subtotal</span>
-                            <span className="text-xs font-black font-mono text-rose-600 dark:text-rose-400">
-                              ${(line.cantidad * line.precioCosto).toFixed(2)}
-                            </span>
-                          </div>
+                      return Array.from(gruposMap.values()).map((m, mIdx) => {
+                        const totalParesModelo = m.tallas.reduce((acc, t) => acc + t.cantidad, 0);
+                        const subtotalModelo = totalParesModelo * m.precioCosto;
 
-                          <button
-                            type="button"
-                            onClick={() => setDevLines((prev) => prev.filter((_, i) => i !== idx))}
-                            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
-                            title="Eliminar de la devolución"
+                        return (
+                          <div
+                            key={mIdx}
+                            className="p-3.5 sm:p-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xs transition-all flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4"
                           >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                            <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                              {/* Imagen Thumbnail */}
+                              <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
+                                {m.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={m.imageUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package size={22} className="text-slate-400" />
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0 space-y-2">
+                                {/* Título y Subtítulo */}
+                                <div>
+                                  <h4 className="font-extrabold text-sm text-[var(--foreground)] leading-tight uppercase tracking-tight">
+                                    {m.modelName}
+                                  </h4>
+                                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--muted-foreground)] mt-0.5">
+                                    <span>{m.color}</span>
+                                    <span>·</span>
+                                    <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                                      Serie: {m.serie}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Pills de Tallas con Controles - / + */}
+                                <div className="flex flex-wrap gap-2">
+                                  {m.tallas.map((t, tIdx) => (
+                                    <div
+                                      key={tIdx}
+                                      className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 shadow-2xs"
+                                    >
+                                      <span className="text-[var(--foreground)] font-black text-xs font-mono">
+                                        T{t.numeroTalla}
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setDevLines((prev) =>
+                                              prev.map((l, i) =>
+                                                i === t.originalIdx ? { ...l, cantidad: Math.max(0, l.cantidad - 1) } : l
+                                              )
+                                            );
+                                          }}
+                                          className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                          title={`Quitar 1 par T${t.numeroTalla}`}
+                                        >
+                                          −
+                                        </button>
+                                        <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
+                                          {t.cantidad}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setDevLines((prev) =>
+                                              prev.map((l, i) =>
+                                                i === t.originalIdx ? { ...l, cantidad: l.cantidad + 1 } : l
+                                              )
+                                            );
+                                          }}
+                                          className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                          title={`Agregar 1 par T${t.numeroTalla}`}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Botones de acción rápida: +1 par c/talla, -1 par c/talla */}
+                                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDevLines((prev) =>
+                                        prev.map((l, i) =>
+                                          m.tallas.some((t) => t.originalIdx === i) ? { ...l, cantidad: l.cantidad + 1 } : l
+                                        )
+                                      );
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                  >
+                                    +1 par c/talla
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDevLines((prev) =>
+                                        prev.map((l, i) =>
+                                          m.tallas.some((t) => t.originalIdx === i) ? { ...l, cantidad: Math.max(0, l.cantidad - 1) } : l
+                                        )
+                                      );
+                                    }}
+                                    className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                  >
+                                    −1 par c/talla
+                                  </button>
+                                  <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
+                                    = {totalParesModelo} pares total
+                                  </span>
+                                </div>
+
+                                {/* Observación / Nota del modelo */}
+                                <div className="pt-0.5 text-xs text-[var(--muted-foreground)] flex items-center gap-1">
+                                  <span className="font-semibold text-slate-500 dark:text-slate-400">+ Observación:</span>
+                                  <span className="italic">{devMotivo || 'Garantía / Defecto de fábrica'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Derecha: Resumen de pares, precio y subtotal */}
+                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
+                              <div className="text-right">
+                                <div className="text-xs font-bold text-[var(--foreground)]">
+                                  {totalParesModelo} pares ({getDocenaLabel(totalParesModelo)})
+                                </div>
+                                <div className="text-[11px] text-[var(--muted-foreground)] font-medium flex items-center justify-end gap-1">
+                                  <span>$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min={0}
+                                    value={m.precioCosto}
+                                    onChange={(e) => {
+                                      const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                      setDevLines((prev) =>
+                                        prev.map((l, i) =>
+                                          m.tallas.some((t) => t.originalIdx === i) ? { ...l, precioCosto: val } : l
+                                        )
+                                      );
+                                    }}
+                                    className="w-14 px-1 py-0.5 text-right font-mono font-bold bg-[var(--muted)] border border-[var(--border)] rounded text-[11px]"
+                                    title="Editar costo unitario de devolución"
+                                  />
+                                  <span>/ par</span>
+                                </div>
+                                <div className="font-black text-base text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                  ${subtotalModelo.toFixed(2)}
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDevLines((prev) => prev.filter((_, i) => !m.tallas.some((t) => t.originalIdx === i)));
+                                }}
+                                className="p-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-full transition-colors cursor-pointer"
+                                title="Quitar este modelo de la devolución"
+                              >
+                                <X size={18} className="stroke-[2.5]" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </div>
