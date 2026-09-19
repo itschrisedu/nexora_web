@@ -27,6 +27,8 @@ import {
   Edit3,
   Eye,
   Download,
+  CreditCard,
+  DollarSign,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -89,7 +91,8 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
   lines.forEach((l) => {
     const model = l.modelName || l.nombre || 'Calzado de Cuero';
     const color = l.color || '';
-    const key = `${model.toLowerCase()}_${color.toLowerCase()}_${l.productId || ''}`;
+    const serieName = l.serieNombre || l.serie || '';
+    const key = `${model.toLowerCase()}_${color.toLowerCase()}_${l.productId || ''}_${serieName.toLowerCase()}`;
 
     if (!map.has(key)) {
       map.set(key, {
@@ -97,7 +100,7 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
         modelName: model,
         color,
         imageUrl: l.imageUrl || null,
-        serieNombre: l.serieNombre || l.serie || '',
+        serieNombre: serieName,
         totalPares: 0,
         totalEntregados: 0,
         precioUnitario: Number(l.precioUnitario) || 0,
@@ -792,7 +795,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     if (p.lines && p.lines.length > 0) {
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
-        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}`;
+        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}_${(l.serieNombre || l.serie || '').toLowerCase()}`;
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(l);
       });
@@ -915,7 +918,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     if (p.lines && p.lines.length > 0) {
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
-        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}`;
+        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}_${(l.serieNombre || l.serie || '').toLowerCase()}`;
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(l);
       });
@@ -2242,27 +2245,47 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Tipo de Pago *</label>
-                    <select
-                      value={tipoPago}
-                      onChange={(e) => {
-                        const nuevoTipo = e.target.value;
-                        setTipoPago(nuevoTipo);
-                        if (cuponAplicado?.promocion) {
-                          if (cuponAplicado.promocion.aplicaPara === 'SOLO_CONTADO' && nuevoTipo === 'CREDITO') {
-                            setCuponAplicado(null);
-                            setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para pagos de Contado.');
-                          } else if (cuponAplicado.promocion.aplicaPara === 'SOLO_CREDITO' && nuevoTipo === 'CONTADO') {
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Tipo de Pago *
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTipoPago('CONTADO');
+                          if (cuponAplicado?.promocion && cuponAplicado.promocion.aplicaPara === 'SOLO_CREDITO') {
                             setCuponAplicado(null);
                             setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para compras a Crédito.');
                           }
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
-                    >
-                      <option value="CONTADO">Contado</option>
-                      <option value="CREDITO">Crédito</option>
-                    </select>
+                        }}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          tipoPago === 'CONTADO'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                        }`}
+                      >
+                        <DollarSign size={13} />
+                        <span>Contado</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTipoPago('CREDITO');
+                          if (cuponAplicado?.promocion && cuponAplicado.promocion.aplicaPara === 'SOLO_CONTADO') {
+                            setCuponAplicado(null);
+                            setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para pagos de Contado.');
+                          }
+                        }}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          tipoPago === 'CREDITO'
+                            ? 'bg-[#0F172A] text-white shadow-xs'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                        }`}
+                      >
+                        <CreditCard size={13} />
+                        <span>Crédito</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div>
