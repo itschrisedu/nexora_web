@@ -727,17 +727,32 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
             {/* ACCIÓN DE GUARDAR PESTAÑA IDENTIDAD & NEGOCIO */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-              <span className="text-xs text-[var(--muted-foreground)]">
-                Guarda el nombre comercial, RUC, datos de contacto, logotipo corporativo y color de marca.
-              </span>
+              <div className="text-xs">
+                {hasChanges ? (
+                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Tienes cambios pendientes en Identidad & Negocio
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                    <CheckCircle size={13} className="text-emerald-500" />
+                    Identidad y negocio al día
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => handleSave(undefined, "Identidad & Negocio")}
-                disabled={saving}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+                disabled={!hasChanges || saving}
+                title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
+                  hasChanges && !saving
+                    ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
+                }`}
               >
                 {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                <span>Guardar Identidad & Negocio</span>
+                <span>{saving ? "Guardando..." : "Guardar Identidad & Negocio"}</span>
               </button>
             </div>
           </div>
@@ -841,17 +856,32 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
             {/* ACCIÓN DE GUARDAR PESTAÑA SCORING & CRÉDITO */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-              <span className="text-xs text-[var(--muted-foreground)]">
-                Guarda las escalas progresivas de crédito, límites de compra por scoring y plazos máximos en días.
-              </span>
+              <div className="text-xs">
+                {hasChanges ? (
+                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Tienes cambios pendientes en Scoring & Crédito
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                    <CheckCircle size={13} className="text-emerald-500" />
+                    Parámetros de crédito al día
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => handleSave(undefined, "Scoring & Crédito")}
-                disabled={saving}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+                disabled={!hasChanges || saving}
+                title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
+                  hasChanges && !saving
+                    ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
+                }`}
               >
                 {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                <span>Guardar Scoring & Crédito</span>
+                <span>{saving ? "Guardando..." : "Guardar Scoring & Crédito"}</span>
               </button>
             </div>
           </div>
@@ -1180,17 +1210,32 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
             {/* ACCIÓN DE GUARDAR PESTAÑA OPERACIONES & LOGÍSTICA */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-              <span className="text-xs text-[var(--muted-foreground)]">
-                Guarda los horarios de atención, tiempo de sesión y automatizaciones de comprobantes.
-              </span>
+              <div className="text-xs">
+                {hasChanges ? (
+                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Tienes cambios pendientes en Operaciones & Logística
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                    <CheckCircle size={13} className="text-emerald-500" />
+                    Operaciones y horarios al día
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => handleSave(undefined, "Operaciones & Logística")}
-                disabled={saving}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+                disabled={!hasChanges || saving}
+                title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
+                  hasChanges && !saving
+                    ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
+                }`}
               >
                 {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                <span>Guardar Operaciones & Horarios</span>
+                <span>{saving ? "Guardando..." : "Guardar Operaciones & Horarios"}</span>
               </button>
             </div>
           </div>
@@ -1271,17 +1316,32 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
             {/* ACCIÓN DE GUARDAR PESTAÑA PARÁMETROS FISCALES */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-              <span className="text-xs text-[var(--muted-foreground)]">
-                Guarda los puntos de emisión, ambiente y numeración interna de comprobantes y notas de venta.
-              </span>
+              <div className="text-xs">
+                {hasChanges ? (
+                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Tienes cambios pendientes en Parámetros Fiscales
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                    <CheckCircle size={13} className="text-emerald-500" />
+                    Parámetros de comprobantes al día
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => handleSave(undefined, "Parámetros Fiscales")}
-                disabled={saving}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+                disabled={!hasChanges || saving}
+                title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
+                  hasChanges && !saving
+                    ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
+                }`}
               >
                 {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                <span>Guardar Parámetros Fiscales</span>
+                <span>{saving ? "Guardando..." : "Guardar Parámetros Fiscales"}</span>
               </button>
             </div>
           </div>
@@ -1789,47 +1849,36 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
             {/* ACCIÓN DE GUARDAR PESTAÑA SITIO WEB & CATÁLOGO */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-              <span className="text-xs text-[var(--muted-foreground)]">
-                Guarda la portada principal, imágenes, redes sociales y textos de catálogo público.
-              </span>
+              <div className="text-xs">
+                {hasChanges ? (
+                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Tienes cambios pendientes en Sitio Web & Catálogo
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                    <CheckCircle size={13} className="text-emerald-500" />
+                    Catálogo y portada al día
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => handleSave(undefined, "Sitio Web & Catálogo")}
-                disabled={saving}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+                disabled={!hasChanges || saving}
+                title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
+                  hasChanges && !saving
+                    ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
+                }`}
               >
                 {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                <span>Guardar Sitio Web & Catálogo</span>
+                <span>{saving ? "Guardando..." : "Guardar Sitio Web & Catálogo"}</span>
               </button>
             </div>
           </div>
         )}
-
-        {/* BOTÓN GUARDAR FLOTANTE / INFERIOR */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-[var(--border)]">
-          <div className="text-xs">
-            {hasChanges ? (
-              <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                Tienes cambios pendientes por guardar
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
-                <CheckCircle size={13} className="text-emerald-500" />
-                Configuración lista
-              </span>
-            )}
-          </div>
-          <button
-            type="submit"
-            disabled={saving}
-            title="Guardar todos los cambios realizados en el sistema"
-            className="flex items-center justify-center gap-2 px-6 py-2.5 font-bold text-xs rounded-xl transition-all shadow-md bg-slate-900 hover:bg-slate-800 text-white cursor-pointer active:scale-95 hover:shadow-lg dark:bg-amber-500 dark:hover:bg-amber-600 dark:text-slate-950 disabled:opacity-60 w-full sm:w-auto"
-          >
-            {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-            <span>{saving ? "Guardando Configuración..." : "Guardar Toda la Configuración"}</span>
-          </button>
-        </div>
       </form>
 
       {/* MODAL CREAR NUEVA EMPRESA DE TRANSPORTE */}

@@ -391,17 +391,16 @@ function MainApp() {
   useEffect(() => {
     // Sincronización dinámica del favicon y título de la pestaña del navegador
     const targetIcon = businessLogo || '/logo.png';
-    let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-    if (!link) {
-      link = document.createElement('link');
+    const iconLinks = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']");
+    if (iconLinks.length > 0) {
+      iconLinks.forEach((l) => {
+        l.href = targetIcon;
+      });
+    } else {
+      const link = document.createElement('link');
       link.rel = 'icon';
+      link.href = targetIcon;
       document.head.appendChild(link);
-    }
-    link.href = targetIcon;
-
-    let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
-    if (appleLink) {
-      appleLink.href = targetIcon;
     }
 
     if (businessNombre) {
