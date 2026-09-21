@@ -549,16 +549,16 @@ function MainApp() {
     setLoading(true);
     setLoginError('');
     try {
-      const res = await ApiService.post('/auth/request-session-otp', {
+      const response = await ApiService.post('/auth/login', {
         email: conflictData.email,
         password: conflictData.password,
+        forceTransfer: true,
       });
-      setMaskedEmail(res.maskedEmail || conflictData.email);
-      setOtpMode('session-transfer');
       setShowConflictModal(false);
-      setShowOtpModal(true);
+      finalizeLogin(response);
     } catch (err: any) {
-      setLoginError(err.message || 'Error al solicitar código de verificación.');
+      setLoginError(err.message || 'Error al transferir la sesión.');
+      setShowConflictModal(false);
     } finally {
       setLoading(false);
     }
@@ -817,10 +817,10 @@ function MainApp() {
                   Sesión Activa Detectada
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Ya existe una sesión abierta para <b className="text-amber-400">{username}</b> en otro dispositivo o navegador.
+                  Existe una sesión activa previa para <b className="text-amber-400">{username}</b>.
                 </p>
                 <div className="p-3.5 rounded-2xl bg-[#1c1f24] border border-white/5 text-xs text-slate-400 mt-3 text-left leading-relaxed">
-                  Por políticas de seguridad, <b>solo se permite una sesión activa a la vez</b>. Para transferir el control y cerrar la sesión anterior, te enviaremos una clave de 4 dígitos a tu correo registrado <span className="text-emerald-400 font-bold">{maskedEmail}</span>.
+                  Por políticas de seguridad, <b>solo se permite una terminal activa simultánea</b>. ¿Deseas cerrar la sesión previa y continuar en esta ventana?
                 </div>
               </div>
 
@@ -838,7 +838,7 @@ function MainApp() {
                   disabled={loading}
                   className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : 'Continuar y Transferir'}
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : 'Cerrar Previa e Ingresar'}
                 </button>
               </div>
             </div>
