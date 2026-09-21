@@ -6,7 +6,7 @@ import {
   User, UserPlus, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
   RefreshCw, CheckCircle, AlertCircle, Building2, Store,
   Users, KeyRound, Search, Share2, Edit2, MapPin, X,
-  Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2, Eye, EyeOff
+  Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2, Eye, EyeOff, Lock, Unlock
 } from 'lucide-react';
 
 interface UsuariosProps {
@@ -37,6 +37,8 @@ interface UserListItem {
   rol: 'ROL_ADMIN' | 'ROL_VENDEDOR' | 'ROL_BODEGUERO';
   activo: boolean;
   permiteCambiarPrecio?: boolean;
+  intentosFallidos?: number;
+  bloqueadoHasta?: string | null;
   tenantId?: string;
   createdAt: string;
 }
@@ -314,6 +316,23 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al modificar permisos de precio.');
+    }
+  };
+
+  const isUserLocked = (user: UserListItem): boolean => {
+    if (!user.bloqueadoHasta) return false;
+    return new Date(user.bloqueadoHasta) > new Date();
+  };
+
+  const handleUnlockUser = async (user: UserListItem) => {
+    setErrorMsg('');
+    try {
+      await ApiService.patch(`/auth/usuarios/${user.id}/unlock`, {});
+      setSuccessMsg(`Cuenta de ${user.nombre} desbloqueada exitosamente.`);
+      loadUsers();
+      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al desbloquear cuenta.');
     }
   };
 
@@ -730,6 +749,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                             >
                               {user.activo ? 'Activo' : 'Inactivo'}
                             </button>
+                            {isUserLocked(user) && (
+                              <span className="inline-flex items-center gap-1 ml-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-red-500/15 text-red-600 border border-red-500/25">
+                                <Lock size={10} /> Bloqueada
+                              </span>
+                            )}
                           </td>
                           <td className="p-3 text-center">
                             <button
@@ -773,6 +797,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                             >
                               <ArrowRightLeft size={12} /> Transferir
                             </button>
+                            {isUserLocked(user) && (
+                              <button
+                                type="button"
+                                onClick={() => handleUnlockUser(user)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-600 text-[10px] font-bold transition-colors"
+                                title="Desbloquear Cuenta"
+                              >
+                                <Unlock size={12} /> Desbloquear
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -874,6 +908,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                       >
                         {user.activo ? 'Activo' : 'Inactivo'}
                       </button>
+                      {isUserLocked(user) && (
+                        <span className="inline-flex items-center gap-1 ml-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-red-500/15 text-red-600 border border-red-500/25">
+                          <Lock size={10} /> Bloqueada
+                        </span>
+                      )}
                     </td>
                     <td className="p-3.5 text-center">
                       <button
@@ -908,6 +947,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                       >
                         <KeyRound size={14} />
                       </button>
+                      {isUserLocked(user) && (
+                        <button
+                          type="button"
+                          onClick={() => handleUnlockUser(user)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-600 text-[10px] font-bold transition-colors"
+                          title="Desbloquear Cuenta"
+                        >
+                          <Unlock size={12} /> Desbloquear
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

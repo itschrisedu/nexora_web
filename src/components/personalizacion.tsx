@@ -844,6 +844,110 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
               </div>
             </div>
 
+            {/* MARGEN DE GANANCIA COMERCIAL */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <DollarSign className="text-emerald-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Margen de Ganancia Comercial</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Porcentaje de margen sobre precio de venta aplicado a las sugerencias de precio en todo el sistema.
+                  </p>
+                </div>
+              </div>
+
+              {(() => {
+                const currentMargin = (() => {
+                  if (typeof window === "undefined") return 30;
+                  const stored = localStorage.getItem("nexora-margen-ganancia");
+                  if (stored) {
+                    const val = parseFloat(stored);
+                    if (!isNaN(val) && val > 0 && val < 100) return val;
+                  }
+                  return 30;
+                })();
+
+                const exampleCost = 10;
+                const examplePrice = (exampleCost / (1 - currentMargin / 100)).toFixed(2);
+                const exampleProfit = (parseFloat(examplePrice) - exampleCost).toFixed(2);
+
+                return (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                          Porcentaje de Margen (%)
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="range"
+                            min="5"
+                            max="80"
+                            step="1"
+                            value={currentMargin}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value);
+                              localStorage.setItem("nexora-margen-ganancia", String(val));
+                              window.dispatchEvent(new CustomEvent("nexora:margin-changed", { detail: { marginPct: val } }));
+                              setConfig(prev => ({ ...prev }));
+                            }}
+                            className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-emerald-500"
+                          />
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="5"
+                              max="80"
+                              step="1"
+                              value={currentMargin}
+                              onChange={(e) => {
+                                const val = Math.min(80, Math.max(5, parseInt(e.target.value) || 30));
+                                localStorage.setItem("nexora-margen-ganancia", String(val));
+                                window.dispatchEvent(new CustomEvent("nexora:margin-changed", { detail: { marginPct: val } }));
+                                setConfig(prev => ({ ...prev }));
+                              }}
+                              className="w-16 px-2 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-lg text-sm font-bold text-center focus:outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-sm font-bold text-[var(--muted-foreground)]">%</span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-[var(--muted-foreground)]">
+                          Valor por defecto: 30%. Rango permitido: 5% - 80%.
+                        </p>
+                      </div>
+
+                      <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-2">
+                        <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                          Ejemplo en Vivo
+                        </span>
+                        <div className="text-xs text-[var(--foreground)] space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-[var(--muted-foreground)]">Costo de compra:</span>
+                            <span className="font-bold">${exampleCost.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--muted-foreground)]">Margen aplicado:</span>
+                            <span className="font-bold">{currentMargin}%</span>
+                          </div>
+                          <div className="border-t border-emerald-500/20 pt-1 flex justify-between">
+                            <span className="text-[var(--muted-foreground)]">Precio sugerido:</span>
+                            <span className="font-extrabold text-emerald-600 dark:text-emerald-400">${examplePrice}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--muted-foreground)]">Ganancia por par:</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">${exampleProfit}</span>
+                          </div>
+                        </div>
+                        <p className="text-[9px] text-emerald-600/60 dark:text-emerald-400/60 mt-1">
+                          Costo / (1 - {currentMargin}%) = ${examplePrice}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* CONFIGURACIÓN DE NOTIFICACIONES Y COMPROBANTES POR WHATSAPP */}
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
               <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">

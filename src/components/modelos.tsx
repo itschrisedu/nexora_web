@@ -8,6 +8,7 @@ import {
   DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette,
   Layers, Boxes, Truck
 } from "lucide-react";
+import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
 
 interface ModelosProps {
   online: boolean;
@@ -326,7 +327,17 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [qsSaving, setQsSaving] = useState(false);
   const [qsContext, setQsContext] = useState<'create' | 'edit'>('create');
 
-  useEffect(() => { loadData(); }, [online]);
+  const [marginPct, setMarginPct] = useState<number>(getStoredProfitMargin());
+
+  useEffect(() => {
+    loadData();
+    const handleMarginUpdate = (e: any) => {
+      if (e.detail?.marginPct) setMarginPct(e.detail.marginPct);
+      else setMarginPct(getStoredProfitMargin());
+    };
+    window.addEventListener("nexora:margin-changed", handleMarginUpdate);
+    return () => window.removeEventListener("nexora:margin-changed", handleMarginUpdate);
+  }, [online]);
 
   const loadData = async () => {
     setLoading(true);
@@ -1799,10 +1810,11 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           const saleVal = parseFloat(prices.salePrice);
                           const hasCost = !isNaN(costVal) && costVal > 0;
                           const hasSale = !isNaN(saleVal) && saleVal > 0;
-                          const suggestedSale = hasCost ? (costVal * 1.30).toFixed(2) : "";
+                          const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
                           const isLoss = hasCost && hasSale && saleVal < costVal;
-                          const marginPercent = hasCost && hasSale ? ((saleVal - costVal) / costVal) * 100 : 0;
-                          const profitAmount = hasCost && hasSale ? saleVal - costVal : 0;
+                          const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+                          const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+                          const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
 
                           return (
                             <div className="px-4 pb-4 pt-3 space-y-3">
@@ -1826,12 +1838,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                       ...prev,
                                       [s.id]: { ...prev[s.id], salePrice: e.target.value }
                                     }))}
-                                    placeholder={suggestedSale ? `$${suggestedSale} (+30%)` : "0.00"}
+                                    placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
                                     className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
                                 </div>
                               </div>
 
-                              {/* Indicador de Margen 30% */}
+                              {/* Indicador de Margen Configurable */}
                               {hasCost && (
                                 <div className="text-[11px] font-semibold">
                                   {hasSale ? (
@@ -1849,7 +1861,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                   ) : (
                                     <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
                                       <DollarSign size={14} className="shrink-0" />
-                                      <span>Precio sugerido (30% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${(costVal * 0.30).toFixed(2)})</span>
+                                      <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
                                     </div>
                                   )}
                                 </div>
@@ -2073,10 +2085,11 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           const saleVal = parseFloat(prices.salePrice);
                           const hasCost = !isNaN(costVal) && costVal > 0;
                           const hasSale = !isNaN(saleVal) && saleVal > 0;
-                          const suggestedSale = hasCost ? (costVal * 1.30).toFixed(2) : "";
+                          const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
                           const isLoss = hasCost && hasSale && saleVal < costVal;
-                          const marginPercent = hasCost && hasSale ? ((saleVal - costVal) / costVal) * 100 : 0;
-                          const profitAmount = hasCost && hasSale ? saleVal - costVal : 0;
+                          const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+                          const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+                          const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
 
                           return (
                             <div className="px-4 pb-4 pt-3 space-y-3">
@@ -2099,7 +2112,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                       ...prev,
                                       [s.id]: { ...prev[s.id], salePrice: e.target.value }
                                     }))}
-                                    placeholder={suggestedSale ? `$${suggestedSale} (+30%)` : "0.00"}
+                                    placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
                                     className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
                                 </div>
                               </div>
@@ -2122,7 +2135,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                   ) : (
                                     <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
                                       <DollarSign size={14} className="shrink-0" />
-                                      <span>Precio sugerido (30% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${(costVal * 0.30).toFixed(2)})</span>
+                                      <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
                                     </div>
                                   )}
                                 </div>
@@ -2828,10 +2841,11 @@ export default function ModelosComponent({ online }: ModelosProps) {
                           const saleVal = parseFloat(prices.salePrice);
                           const hasCost = !isNaN(costVal) && costVal > 0;
                           const hasSale = !isNaN(saleVal) && saleVal > 0;
-                          const suggestedSale = hasCost ? (costVal * 1.30).toFixed(2) : "";
+                          const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
                           const isLoss = hasCost && hasSale && saleVal < costVal;
-                          const marginPercent = hasCost && hasSale ? ((saleVal - costVal) / costVal) * 100 : 0;
-                          const profitAmount = hasCost && hasSale ? saleVal - costVal : 0;
+                          const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+                          const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+                          const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
 
                           return (
                             <div className="px-4 pb-4 pt-3 space-y-3">
@@ -2855,7 +2869,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                       ...prev,
                                       [s.id]: { ...prev[s.id], salePrice: e.target.value }
                                     }))}
-                                    placeholder={suggestedSale ? `$${suggestedSale} (+30%)` : "0.00"}
+                                    placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
                                     className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
                                 </div>
                               </div>
@@ -2878,7 +2892,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                   ) : (
                                     <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
                                       <DollarSign size={14} className="shrink-0" />
-                                      <span>Precio sugerido (30% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${(costVal * 0.30).toFixed(2)})</span>
+                                      <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
                                     </div>
                                   )}
                                 </div>

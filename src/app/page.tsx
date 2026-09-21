@@ -103,7 +103,7 @@ const NAV_ITEMS: NavItem[] = [
 
 function MainApp() {
   const [online, setOnline] = useState(true);
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -208,11 +208,13 @@ function MainApp() {
     SyncService.init((isOnline) => setOnline(isOnline));
 
     const savedTheme = localStorage.getItem('nexora-theme') as 'light' | 'dark' | null;
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initialTheme = savedTheme ?? (prefersDark ? 'dark' : 'light');
+    const initialTheme = savedTheme === 'dark' ? 'dark' : 'light';
     setTheme(initialTheme);
-    if (initialTheme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
+    if (initialTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
 
     const savedSucursal = localStorage.getItem('activeSucursalId');
     if (savedSucursal) setActiveSucursalId(savedSucursal);
@@ -613,13 +615,10 @@ function MainApp() {
                 </div>
               )}
               <div className="min-w-0 flex-1 flex flex-col justify-center pr-1">
-                <span
-                  className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words"
-                  style={{ color: 'var(--primary)' }}
-                >
+                <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words text-slate-900 dark:text-white">
                   {businessNombre || user?.tenantName || 'NEXORA'}
                 </span>
-                <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block mt-0.5">
+                <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mt-0.5">
                   {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
                 </span>
               </div>

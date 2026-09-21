@@ -28,6 +28,7 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env*.local
+.env.production
 
 # Cobertura de pruebas (Testing)
 coverage/
