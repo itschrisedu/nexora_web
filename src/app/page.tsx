@@ -622,11 +622,26 @@ function MainApp() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      const storedUser = localStorage.getItem('user');
+      let userId: string | undefined;
+      if (storedUser) {
+        try {
+          userId = JSON.parse(storedUser)?.id;
+        } catch (_) {}
+      }
+      if (online && (refreshToken || userId)) {
+        await ApiService.post('/auth/logout', { refreshToken, userId }).catch(() => {});
+      }
+    } catch (_) {}
+
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('tenantId');
+    clearUnsavedChanges();
     setUser(null);
     setIsLoggedIn(false);
     setVistaActual('dashboard');
