@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ApiService } from "../services/api.service";
 import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
@@ -119,6 +119,9 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [cropperLabel, setCropperLabel] = useState("Panorámica (16:9)");
   const [cropperTitle, setCropperTitle] = useState("Encuadrar Fotografía");
   const [cropperTarget, setCropperTarget] = useState<"heroBg" | "heroBanner" | null>(null);
+
+  const [initialConfig, setInitialConfig] = useState<BusinessConfig | null>(null);
+  const [initialNiveles, setInitialNiveles] = useState<CreditLevelConfigItem[] | null>(null);
 
   const handleSeleccionarArchivo = (file: File, target: "heroBg" | "heroBanner") => {
     const reader = new FileReader();
@@ -347,7 +350,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
               localStorage.setItem("tenantId", data.tenantId);
             }
           }
-          setConfig({
+          const loadedConfig: BusinessConfig = {
             nombre: data.nombre || "",
             ruc: data.ruc || "",
             direccion: data.direccion || "",
@@ -368,6 +371,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             creditTasaMoraPct: data.creditTasaMoraPct ?? 2.5,
             heroTitulo: data.heroTitulo || "Calzado 100% Cuero Ecuatoriano",
             heroSubtitulo: data.heroSubtitulo || "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
+            heroFraseCorta: data.heroFraseCorta || "Producción Directa desde Fábrica • Cantón Cevallos",
             heroBannerUrl: data.heroBannerUrl || "",
             heroBackgroundUrl: data.heroBackgroundUrl || "",
             cardTitulo: data.cardTitulo || "Calidad Artesanal Garantizada",
@@ -385,7 +389,10 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             tiktokUrl: data.tiktokUrl || "",
             mostrarPreciosPublico: data.mostrarPreciosPublico ?? true,
             mostrarStockPublico: data.mostrarStockPublico ?? true,
-          });
+          };
+
+          setConfig(loadedConfig);
+          setInitialConfig(loadedConfig);
 
           if (data.primaryColor && typeof document !== "undefined") {
             document.documentElement.style.setProperty("--primary", data.primaryColor);
@@ -394,10 +401,14 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         }
 
         if (Array.isArray(nivelesData) && nivelesData.length > 0) {
-          setNivelesCredito(nivelesData.map(n => ({
+          const loadedNiveles = nivelesData.map(n => ({
             ...n,
             limiteDolares: Number(n.limiteDolares),
-          })));
+          }));
+          setNivelesCredito(loadedNiveles);
+          setInitialNiveles(loadedNiveles);
+        } else {
+          setInitialNiveles(nivelesCredito);
         }
       }
     } catch (err: any) {
@@ -407,8 +418,16 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     }
   };
 
+  const hasChanges = useMemo(() => {
+    if (!initialConfig) return false;
+    const configChanged = JSON.stringify(config) !== JSON.stringify(initialConfig);
+    const nivelesChanged = initialNiveles ? JSON.stringify(nivelesCredito) !== JSON.stringify(initialNiveles) : false;
+    return configChanged || nivelesChanged;
+  }, [config, initialConfig, nivelesCredito, initialNiveles]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasChanges) return;
     setSaving(true);
     setSuccess("");
     setError("");
@@ -432,6 +451,9 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         ApiService.put("/configuracion/negocio", finalConfig),
         ApiService.put("/configuracion/niveles-credito", { niveles: nivelesCredito }),
       ]);
+
+      setInitialConfig({ ...finalConfig });
+      setInitialNiveles([...nivelesCredito]);
 
       setSuccess("Configuración global guardada correctamente.");
       if (typeof document !== "undefined" && config.primaryColor) {
@@ -1686,14 +1708,32 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         )}
 
         {/* BOTÓN GUARDAR FLOTANTE / INFERIOR */}
-        <div className="flex justify-end pt-2">
+        <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+          <div className="text-xs">
+            {hasChanges ? (
+              <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                Tienes cambios pendientes por guardar
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                <CheckCircle size={13} className="text-emerald-500" />
+                Toda la configuración está al día
+              </span>
+            )}
+          </div>
           <button
             type="submit"
-            disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+            disabled={saving || !hasChanges}
+            title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
+            className={`flex items-center gap-2 px-5 py-2.5 font-bold text-xs rounded-xl transition-all shadow-md ${
+              hasChanges && !saving
+                ? "bg-slate-900 hover:bg-slate-800 text-white cursor-pointer active:scale-95 hover:shadow-lg dark:bg-amber-500 dark:hover:bg-amber-600 dark:text-slate-950"
+                : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60 shadow-none border border-slate-300 dark:border-slate-700"
+            }`}
           >
             {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-            Guardar Configuración
+            <span>{hasChanges ? "Guardar Configuración" : "Configuración al Día"}</span>
           </button>
         </div>
       </form>
