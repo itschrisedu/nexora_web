@@ -125,6 +125,7 @@ function MainApp() {
   const [alertaCount, setAlertaCount] = useState(0);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showGpsModal, setShowGpsModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // ── Estados para Sesión Única, Transferencia y Desbloqueo con OTP Gyre ──
   const [showConflictModal, setShowConflictModal] = useState(false);
@@ -656,6 +657,18 @@ function MainApp() {
     setSucursales([]);
   };
 
+  // Manejador de tecla Escape para modal de confirmación de salida
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showLogoutModal) {
+        e.preventDefault();
+        setShowLogoutModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showLogoutModal]);
+
   const fetchStats = async () => {
     try {
       const storedUser = localStorage.getItem('user');
@@ -1160,7 +1173,11 @@ function MainApp() {
                 <Settings size={16} />
               </button>
             )}
-            <button onClick={handleLogout} className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer" title="Cerrar sesión">
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+              title="Cerrar sesión"
+            >
               <LogOut size={16} />
             </button>
           </div>
@@ -1510,6 +1527,95 @@ function MainApp() {
         onDiscardAndLeave={handleUnsavedDiscard}
         onSaveSuccessAndLeave={handleUnsavedSaveAndLeave}
       />
+
+      {/* ─── MODAL DE CONFIRMACIÓN DE CIERRE DE SESIÓN ─── */}
+      {showLogoutModal && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowLogoutModal(false);
+          }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Encabezado elegante oscuro */}
+            <div className="p-5 px-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl">
+                  <LogOut size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">¿Cerrar Sesión?</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Confirmación de salida segura de NEXORA</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cancelar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Cuerpo */}
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-[var(--foreground)] leading-relaxed">
+                ¿Estás seguro de que deseas salir del sistema?
+              </p>
+
+              {user && (
+                <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
+                    {user.nombre?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-[var(--foreground)] truncate">{user.nombre}</div>
+                    <div className="text-[11px] text-[var(--muted-foreground)] truncate">{user.email}</div>
+                    <span className="inline-block mt-1 px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] dark:bg-white/10 dark:text-slate-200 rounded-md text-[9px] font-bold uppercase tracking-wider">
+                      {user.rol === 'ROL_SUPER_ADMIN'
+                        ? 'Super Admin'
+                        : user.rol === 'ROL_ADMIN'
+                        ? 'Administrador'
+                        : user.rol === 'ROL_VENDEDOR'
+                        ? 'Vendedor'
+                        : user.rol === 'ROL_BODEGUERO'
+                        ? 'Bodeguero'
+                        : user.rol}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[11px] text-[var(--muted-foreground)] italic">
+                Para continuar trabajando más tarde, deberás iniciar sesión con tus credenciales nuevamente.
+              </p>
+
+              {/* Botones de Acción */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutModal(false)}
+                  className="px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLogoutModal(false);
+                    handleLogout();
+                  }}
+                  className="px-5 py-2.5 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                >
+                  <LogOut size={14} />
+                  <span>Sí, Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
