@@ -83,6 +83,20 @@ export default function AuditoriaComponent() {
     cargarLogs();
   }, [pagina, accionFiltro, segmentoActivo]);
 
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (logSeleccionado) {
+        e.preventDefault();
+        setLogSeleccionado(null);
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [logSeleccionado]);
+
   const cargarResumen = async () => {
     try {
       const data = await ApiService.get("/auditoria/stats");
@@ -695,7 +709,7 @@ export default function AuditoriaComponent() {
 
       {/* ══════ MODAL DE DETALLE AMIGABLE PARA EL ADMINISTRADOR ══════ */}
       {logSeleccionado && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setLogSeleccionado(null); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] shadow-2xl rounded-3xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header del Modal */}
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">

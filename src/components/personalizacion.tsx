@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { ApiService } from "../services/api.service";
+import UnsavedChangesModal from "./ui/unsaved-changes-modal";
 import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
   Palette, Clock, MapPin, CheckCircle, AlertCircle,
@@ -123,6 +124,24 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
   const [initialConfig, setInitialConfig] = useState<BusinessConfig | null>(null);
   const [initialNiveles, setInitialNiveles] = useState<CreditLevelConfigItem[] | null>(null);
+
+  // Control de descartes y cierre seguro de modales
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+
+  const safeDismiss = useCallback((closeFn: () => void, isDirty: boolean) => {
+    if (isDirty) {
+      pendingCloseRef.current = closeFn;
+      setShowDiscardModal(true);
+    } else {
+      closeFn();
+    }
+  }, []);
+
+  const isDirtyTransporte = useCallback(() => {
+    return showModalTransporte && (nuevoTranspNombre.trim() !== '' || nuevoTranspTel.trim() !== '' || nuevoTranspDir.trim() !== '');
+  }, [showModalTransporte, nuevoTranspNombre, nuevoTranspTel, nuevoTranspDir]);
+
 
   const handleSeleccionarArchivo = (file: File, target: "heroBg" | "heroBanner") => {
     const reader = new FileReader();
@@ -256,6 +275,31 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     message: "",
     onConfirm: () => {},
   });
+
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDiscardModal) return;
+      if (confirmModal.isOpen) {
+        e.preventDefault();
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        return;
+      }
+      if (cropperOpen) {
+        e.preventDefault();
+        setCropperOpen(false);
+        return;
+      }
+      if (showModalTransporte) {
+        e.preventDefault();
+        safeDismiss(() => setShowModalTransporte(false), isDirtyTransporte());
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showDiscardModal, confirmModal.isOpen, cropperOpen, showModalTransporte, safeDismiss, isDirtyTransporte]);
 
   useEffect(() => {
     loadConfig();
@@ -1894,7 +1938,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
       {/* MODAL CREAR NUEVA EMPRESA DE TRANSPORTE */}
       {showModalTransporte && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowModalTransporte(false), isDirtyTransporte()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
               <div className="flex items-center gap-2">
@@ -2007,6 +2051,24 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         danger={confirmModal.danger}
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Modal de confirmación de descarte de cambios */}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        targetSectionName="Personalización"
+        detail={{ hasChanges: true, sectionName: "este formulario de Transporte" }}
+        onStay={() => {
+          setShowDiscardModal(false);
+          pendingCloseRef.current = null;
+        }}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) {
+            pendingCloseRef.current();
+            pendingCloseRef.current = null;
+          }
+        }}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ApiService } from "../services/api.service";
 import { db } from "../db/local-db";
 import {
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { getClienteReputacion } from "../utils/cliente-reputacion";
 import ConfirmModal from "./ui/confirm-modal";
+import UnsavedChangesModal from "./ui/unsaved-changes-modal";
 import {
   validarCedula,
   validarRuc,
@@ -144,6 +145,12 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   });
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
 
+  // === Estado para modal de cambios sin guardar ===
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+  const clienteFormSnapshotRef = useRef<string>("");
+  const promoFormSnapshotRef = useRef<string>("");
+
   // Modal de Confirmación UI (reemplaza confirm nativo)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -191,6 +198,68 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     if (vista === 'INACTIVOS') loadInactivos();
     if (vista === 'PROMOCIONES') loadPromociones();
   }, [online, vista, activeSucursalId]);
+
+  // === Snapshot del formulario de cliente al abrir ===
+  useEffect(() => {
+    if (showCreate || showEdit) {
+      clienteFormSnapshotRef.current = JSON.stringify({ nombre, apellido, telefono, email, tipoDoc, numDoc, direccion, notas, tieneDeudaAnterior, deudaAnteriorMonto });
+    }
+  }, [showCreate, showEdit]);
+
+  // === Snapshot del formulario de promo al abrir ===
+  useEffect(() => {
+    if (showPromoModal) {
+      promoFormSnapshotRef.current = JSON.stringify(promoForm);
+    }
+  }, [showPromoModal]);
+
+  // === Dirty check helpers ===
+  const isClienteFormDirty = useCallback(() => {
+    if (!showCreate && !showEdit) return false;
+    const current = JSON.stringify({ nombre, apellido, telefono, email, tipoDoc, numDoc, direccion, notas, tieneDeudaAnterior, deudaAnteriorMonto });
+    return current !== clienteFormSnapshotRef.current;
+  }, [showCreate, showEdit, nombre, apellido, telefono, email, tipoDoc, numDoc, direccion, notas, tieneDeudaAnterior, deudaAnteriorMonto]);
+
+  const isPromoFormDirty = useCallback(() => {
+    if (!showPromoModal) return false;
+    return JSON.stringify(promoForm) !== promoFormSnapshotRef.current;
+  }, [showPromoModal, promoForm]);
+
+  // === Cierre seguro de modal (con dirty check) ===
+  const safeDismissModal = useCallback((closeFn: () => void, isDirty: boolean) => {
+    if (isDirty) {
+      pendingCloseRef.current = closeFn;
+      setShowDiscardModal(true);
+    } else {
+      closeFn();
+    }
+  }, []);
+
+  const closeClienteModal = useCallback(() => {
+    setShowCreate(false); setShowEdit(false); resetForm();
+  }, []);
+
+  const closeWhatsAppModal = useCallback(() => {
+    setShowModalWhatsApp(false);
+  }, []);
+
+  const closePromoModal = useCallback(() => {
+    setShowPromoModal(false);
+  }, []);
+
+  // === Global Escape key handler ===
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showDiscardModal) return; // Don't close if discard modal is open
+      if (confirmModal.isOpen) { setConfirmModal(p => ({ ...p, isOpen: false })); return; }
+      if (showCreate || showEdit) { e.preventDefault(); safeDismissModal(closeClienteModal, isClienteFormDirty()); return; }
+      if (showPromoModal) { e.preventDefault(); safeDismissModal(closePromoModal, isPromoFormDirty()); return; }
+      if (showModalWhatsApp) { e.preventDefault(); closeWhatsAppModal(); return; }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showCreate, showEdit, showPromoModal, showModalWhatsApp, showDiscardModal, confirmModal.isOpen, safeDismissModal, closeClienteModal, closeWhatsAppModal, closePromoModal, isClienteFormDirty, isPromoFormDirty]);
 
   const loadBusinessInfo = async () => {
     try {
@@ -1363,7 +1432,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       {/* MODAL: REACTIVACIÓN DE CLIENTE INACTIVO POR WHATSAPP           */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showModalWhatsApp && clienteWhatsApp && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) closeWhatsAppModal(); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center">
@@ -1482,7 +1551,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       {/* MODAL: CREAR NUEVA CAMPAÑA PROMOCIONAL / CUPÓN                 */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showPromoModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismissModal(closePromoModal, isPromoFormDirty()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center">
               <div className="flex items-center gap-2.5">
@@ -1708,7 +1777,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       {/* MODAL CREAR / EDITAR CLIENTE                                   */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {(showCreate || (showEdit && selected)) && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismissModal(closeClienteModal, isClienteFormDirty()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1948,6 +2017,17 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         danger={confirmModal.danger}
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Modal de cambios sin guardar */}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        detail={{ hasChanges: true, sectionName: "el formulario actual" }}
+        onStay={() => setShowDiscardModal(false)}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) { pendingCloseRef.current(); pendingCloseRef.current = null; }
+        }}
       />
     </div>
   );

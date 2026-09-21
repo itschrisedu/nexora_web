@@ -147,6 +147,20 @@ export default function PrediccionDemandaComponent() {
     cargarEstadoModelo();
   }, [horizonte, temporadaActiva]);
 
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (pedidoModalItem) {
+        e.preventDefault();
+        setPedidoModalItem(null);
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [pedidoModalItem]);
+
   const cargarPrediccion = async (dias: number, temporada: string) => {
     setLoading(true);
     setErrorMsg("");
@@ -586,7 +600,7 @@ export default function PrediccionDemandaComponent() {
 
       {/* ══════ MODAL DE REABASTECIMIENTO A TALLER / PROVEEDOR ══════ */}
       {pedidoModalItem && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setPedidoModalItem(null); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center justify-between">

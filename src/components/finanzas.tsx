@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { ApiService } from "../services/api.service";
+import UnsavedChangesModal from "./ui/unsaved-changes-modal";
 import {
   Wallet, DollarSign, Plus, Search, Filter, RefreshCw,
   Building, Truck, Users, Lightbulb, Home, Wrench, Package,
@@ -227,6 +228,23 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
     fecha: new Date().toISOString().split('T')[0],
   });
 
+  // Control de descartes y cierre seguro de modales
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+
+  const safeDismiss = useCallback((closeFn: () => void, isDirty: boolean) => {
+    if (isDirty) {
+      pendingCloseRef.current = closeFn;
+      setShowDiscardModal(true);
+    } else {
+      closeFn();
+    }
+  }, []);
+
+  const isDirtyGasto = useCallback(() => {
+    return showGastoModal && (gastoForm.concepto.trim() !== '' || gastoForm.monto.trim() !== '' || gastoForm.proveedorServicio.trim() !== '' || gastoForm.numeroComprobante.trim() !== '' || gastoForm.observaciones.trim() !== '');
+  }, [showGastoModal, gastoForm]);
+
   // Modal de Confirmación UI
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -242,6 +260,26 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
     message: '',
     onConfirm: () => {},
   });
+
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDiscardModal) return;
+      if (confirmModal.isOpen) {
+        e.preventDefault();
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        return;
+      }
+      if (showGastoModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowGastoModal(false), isDirtyGasto());
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showDiscardModal, confirmModal.isOpen, showGastoModal, safeDismiss, isDirtyGasto]);
 
   useEffect(() => {
     loadFinanzasData();
@@ -1153,7 +1191,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
       {/* MODAL: REGISTRAR / EDITAR GASTO OPERATIVO                        */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {showGastoModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowGastoModal(false), isDirtyGasto()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
             {/* Header del Modal */}
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
@@ -1380,6 +1418,24 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
         danger={confirmModal.danger}
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Modal de confirmación de descarte de cambios */}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        targetSectionName="Finanzas"
+        detail={{ hasChanges: true, sectionName: "este formulario de Gastos" }}
+        onStay={() => {
+          setShowDiscardModal(false);
+          pendingCloseRef.current = null;
+        }}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) {
+            pendingCloseRef.current();
+            pendingCloseRef.current = null;
+          }
+        }}
       />
     </div>
   );

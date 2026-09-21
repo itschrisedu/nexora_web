@@ -135,6 +135,26 @@ export default function PosComponent() {
   const [notasCierre, setNotasCierre] = useState("");
   const [resultadoCierre, setResultadoCierre] = useState<any>(null);
 
+  // Manejador global de la tecla Escape para modales
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (ticketModalOpen) {
+        e.preventDefault();
+        setTicketModalOpen(false);
+        return;
+      }
+      if (modalCierreOpen) {
+        e.preventDefault();
+        setModalCierreOpen(false);
+        setResultadoCierre(null);
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [ticketModalOpen, modalCierreOpen]);
+
   useEffect(() => {
     const inicializar = async () => {
       setLoadingInicial(true);
@@ -1136,7 +1156,7 @@ export default function PosComponent() {
 
       {/* Modal de Cierre de Caja */}
       {modalCierreOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) { setModalCierreOpen(false); setResultadoCierre(null); } }}>
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-5 relative">
             <button
               onClick={() => setModalCierreOpen(false)}
@@ -1279,7 +1299,7 @@ export default function PosComponent() {
 
       {/* ── MODAL TICKET TÉRMICO (58mm / 80mm) ── */}
       {ticketModalOpen && ultimoTicket && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setTicketModalOpen(false); }}>
           <div className="bg-white text-slate-900 rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-4 bg-slate-100 border-b flex items-center justify-between">
               <div className="flex items-center gap-2">

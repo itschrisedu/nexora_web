@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { ApiService } from '../services/api.service';
+import UnsavedChangesModal from './ui/unsaved-changes-modal';
 import {
   DollarSign,
   CheckCircle,
@@ -583,6 +584,66 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     sriPuntoEmision?: string;
     sriObligadoContabilidad?: boolean;
   } | null>(null);
+
+  // Control de descartes y cierre seguro de modales
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+
+  const safeDismiss = useCallback((closeFn: () => void, isDirty: boolean) => {
+    if (isDirty) {
+      pendingCloseRef.current = closeFn;
+      setShowDiscardModal(true);
+    } else {
+      closeFn();
+    }
+  }, []);
+
+  const isDirtyAbono = useCallback(() => {
+    return showCuentaModal && (montoAbono.trim() !== '' || notasAbono.trim() !== '');
+  }, [showCuentaModal, montoAbono, notasAbono]);
+
+  const isDirtyDevolucion = useCallback(() => {
+    return showDevolucionModal && (lineasDevolucion.length > 0 || motivoDevolucion.trim() !== '');
+  }, [showDevolucionModal, lineasDevolucion.length, motivoDevolucion]);
+
+  const isDirtyFactura = useCallback(() => {
+    return showFacturaModal && facturaCliente !== null && (facturaCliente.email.trim() !== '' || facturaCliente.direccion.trim() !== '');
+  }, [showFacturaModal, facturaCliente]);
+
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDiscardModal) return;
+      if (confirmModal.isOpen) {
+        e.preventDefault();
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        return;
+      }
+      if (showFacturaModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowFacturaModal(false), isDirtyFactura());
+        return;
+      }
+      if (showDevolucionModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion());
+        return;
+      }
+      if (showHistorialModal) {
+        e.preventDefault();
+        setShowHistorialModal(false);
+        return;
+      }
+      if (showCuentaModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowCuentaModal(false), isDirtyAbono());
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showDiscardModal, confirmModal.isOpen, showFacturaModal, showDevolucionModal, showHistorialModal, showCuentaModal, safeDismiss, isDirtyFactura, isDirtyDevolucion, isDirtyAbono]);
 
   useEffect(() => {
     loadCobros();
@@ -2227,11 +2288,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       {showCuentaModal && carteraSeleccionada && (
         <div
           className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowCuentaModal(false)}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCuentaModal(false), isDirtyAbono()); }}
         >
           <div
             className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
-            onClick={(e) => e.stopPropagation()}
           >
             {/* ── Header del Modal ── */}
             <div className="p-5 border-b border-[var(--border)] bg-gradient-to-r from-[#0F172A] to-[#1e293b]">
@@ -2887,7 +2947,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       {/* MODAL: HISTORIAL COMPLETO DE CLIENTE (Compras, Abonos, Pagos) */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {showHistorialModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowHistorialModal(false); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/20">
               <div className="flex items-center gap-2.5">
@@ -3229,7 +3289,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       {/* Modal Devolución de Cliente Mejorado Multimodelo */}
       {showDevolucionModal && carteraSeleccionada && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh] animate-in fade-in">
             {/* Header del Modal */}
             <div className="p-4 border-b border-[var(--border)] bg-gradient-to-r from-rose-950 via-slate-900 to-[#0F172A] text-white flex items-center justify-between">
@@ -3943,11 +4003,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         return (
         <div
           className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowFacturaModal(false)}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowFacturaModal(false), isDirtyFactura()); }}
         >
           <div
             className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
-            onClick={(e) => e.stopPropagation()}
           >
             {/* Header del Modal */}
             <div className="p-6 pr-52 border-b border-[var(--border)] bg-[#0F172A] text-white">
@@ -4722,6 +4781,24 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         danger={confirmModal.danger}
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Modal de confirmación de descarte de cambios */}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        targetSectionName="Financiero / Cartera"
+        detail={{ hasChanges: true, sectionName: "este formulario Financiero" }}
+        onStay={() => {
+          setShowDiscardModal(false);
+          pendingCloseRef.current = null;
+        }}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) {
+            pendingCloseRef.current();
+            pendingCloseRef.current = null;
+          }
+        }}
       />
     </div>
   );

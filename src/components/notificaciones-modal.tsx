@@ -121,6 +121,23 @@ export default function NotificacionesModal({
     }
   }, [isOpen, activeSucursalId]);
 
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (recordatorioModalOpen) {
+        e.preventDefault();
+        setRecordatorioModalOpen(false);
+        return;
+      }
+      e.preventDefault();
+      onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, recordatorioModalOpen, onClose]);
+
   const cargarNotificaciones = async () => {
     setLoading(true);
     try {
@@ -307,7 +324,7 @@ export default function NotificacionesModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
         className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] shadow-2xl overflow-hidden"
       >
@@ -1377,7 +1394,7 @@ export default function NotificacionesModal({
       {/* ── SUB-MODAL DE GENERADOR DE COBRO POR WHATSAPP ── */}
       {/* ══════════════════════════════════════════════════════════ */}
       {recordatorioModalOpen && selectedCobro && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) setRecordatorioModalOpen(false); }}>
           <div className="w-full max-w-xl rounded-2xl bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-3.5 sm:p-4 border-b border-[var(--border)] flex items-center justify-between bg-emerald-600/10 shrink-0 gap-2">
               <div className="flex items-center gap-2.5 min-w-0">

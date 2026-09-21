@@ -98,6 +98,25 @@ export default function CatalogoDigitalComponent() {
     cargarDatos();
   }, []);
 
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (modeloSeleccionado) {
+        e.preventDefault();
+        setModeloSeleccionado(null);
+        return;
+      }
+      if (isCartOpen) {
+        e.preventDefault();
+        setIsCartOpen(false);
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [modeloSeleccionado, isCartOpen]);
+
   const cargarDatos = async () => {
     try {
       setLoading(true);
@@ -399,7 +418,7 @@ export default function CatalogoDigitalComponent() {
 
       {/* Modal Detalle de Modelo */}
       {modeloSeleccionado && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setModeloSeleccionado(null); }}>
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-6 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setModeloSeleccionado(null)}
@@ -505,7 +524,7 @@ export default function CatalogoDigitalComponent() {
 
       {/* Drawer / Modal del Carrito de Pedidos WhatsApp */}
       {isCartOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex justify-end">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex justify-end" onMouseDown={(e) => { if (e.target === e.currentTarget) setIsCartOpen(false); }}>
           <div className="bg-slate-900 border-l border-slate-800 w-full max-w-md h-full p-6 flex flex-col justify-between overflow-y-auto">
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">

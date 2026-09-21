@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ApiService } from '../services/api.service';
 import {
   User, UserPlus, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
@@ -8,6 +8,7 @@ import {
   Users, KeyRound, Search, Share2, Edit2, MapPin, X,
   Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2, Eye, EyeOff, Lock, Unlock
 } from 'lucide-react';
+import UnsavedChangesModal from './ui/unsaved-changes-modal';
 
 interface UsuariosProps {
   online: boolean;
@@ -136,6 +137,53 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       loadAll();
     }
   }, [online]);
+
+  // === Estado para modal de cambios sin guardar ===
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+  const sucursalFormSnapshotRef = useRef<string>('');
+  const userFormSnapshotRef = useRef<string>('');
+  const editUserSnapshotRef = useRef<string>('');
+  const editSucursalSnapshotRef = useRef<string>('');
+  const resetPwSnapshotRef = useRef<string>('');
+  const transferSnapshotRef = useRef<string>('');
+
+  // === Snapshots al abrir modales ===
+  useEffect(() => { if (showAddSucursalModal) sucursalFormSnapshotRef.current = JSON.stringify(newSucursal); }, [showAddSucursalModal]);
+  useEffect(() => { if (showAddModal) userFormSnapshotRef.current = JSON.stringify({ nombre, email, password, rol, permiteCambiarPrecio }); }, [showAddModal]);
+  useEffect(() => { if (showEditModal && editingUser) editUserSnapshotRef.current = JSON.stringify({ nombre: editingUser.nombre, email: editingUser.email, rol: editingUser.rol, activo: editingUser.activo, permiteCambiarPrecio: editingUser.permiteCambiarPrecio }); }, [showEditModal, editingUser]);
+  useEffect(() => { if (showEditSucursalModal) editSucursalSnapshotRef.current = JSON.stringify(editSucursalForm); }, [showEditSucursalModal]);
+  useEffect(() => { if (showResetPasswordModal) resetPwSnapshotRef.current = JSON.stringify({ newPassword }); }, [showResetPasswordModal]);
+  useEffect(() => { if (showTransferModal) transferSnapshotRef.current = JSON.stringify({ targetSucursalId }); }, [showTransferModal]);
+
+  // === Dirty check helpers ===
+  const isDirtySucursal = useCallback(() => showAddSucursalModal && JSON.stringify(newSucursal) !== sucursalFormSnapshotRef.current, [showAddSucursalModal, newSucursal]);
+  const isDirtyAddUser = useCallback(() => showAddModal && JSON.stringify({ nombre, email, password, rol, permiteCambiarPrecio }) !== userFormSnapshotRef.current, [showAddModal, nombre, email, password, rol, permiteCambiarPrecio]);
+  const isDirtyEditUser = useCallback(() => showEditModal && editingUser ? JSON.stringify({ nombre: editingUser.nombre, email: editingUser.email, rol: editingUser.rol, activo: editingUser.activo, permiteCambiarPrecio: editingUser.permiteCambiarPrecio }) !== editUserSnapshotRef.current : false, [showEditModal, editingUser]);
+  const isDirtyEditSucursal = useCallback(() => showEditSucursalModal && JSON.stringify(editSucursalForm) !== editSucursalSnapshotRef.current, [showEditSucursalModal, editSucursalForm]);
+  const isDirtyResetPw = useCallback(() => showResetPasswordModal && JSON.stringify({ newPassword }) !== resetPwSnapshotRef.current, [showResetPasswordModal, newPassword]);
+  const isDirtyTransfer = useCallback(() => showTransferModal && JSON.stringify({ targetSucursalId }) !== transferSnapshotRef.current, [showTransferModal, targetSucursalId]);
+
+  // === Cierre seguro ===
+  const safeDismiss = useCallback((closeFn: () => void, dirty: boolean) => {
+    if (dirty) { pendingCloseRef.current = closeFn; setShowDiscardModal(true); } else { closeFn(); }
+  }, []);
+
+  // === Global Escape handler ===
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDiscardModal) return;
+      if (showTransferModal) { e.preventDefault(); safeDismiss(() => setShowTransferModal(false), isDirtyTransfer()); return; }
+      if (showResetPasswordModal) { e.preventDefault(); safeDismiss(() => setShowResetPasswordModal(false), isDirtyResetPw()); return; }
+      if (showEditSucursalModal) { e.preventDefault(); safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal()); return; }
+      if (showEditModal) { e.preventDefault(); safeDismiss(() => { setShowEditModal(false); setEditingUser(null); }, isDirtyEditUser()); return; }
+      if (showAddModal) { e.preventDefault(); safeDismiss(() => setShowAddModal(false), isDirtyAddUser()); return; }
+      if (showAddSucursalModal) { e.preventDefault(); safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal()); return; }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showDiscardModal, showTransferModal, showResetPasswordModal, showEditSucursalModal, showEditModal, showAddModal, showAddSucursalModal, safeDismiss, isDirtyTransfer, isDirtyResetPw, isDirtyEditSucursal, isDirtyEditUser, isDirtyAddUser, isDirtySucursal]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -1053,7 +1101,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL CREAR SUCURSAL ═══ */}
       {showAddSucursalModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1143,7 +1191,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL CREAR COLABORADOR ═══ */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddModal(false), isDirtyAddUser()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1278,7 +1326,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL EDITAR COLABORADOR ═══ */}
       {showEditModal && editingUser && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModal(false); setEditingUser(null); }, isDirtyEditUser()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1398,7 +1446,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL RESETEAR CONTRASEÑA ═══ */}
       {showResetPasswordModal && resettingUser && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowResetPasswordModal(false), isDirtyResetPw()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1474,7 +1522,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL EDITAR SUCURSAL ═══ */}
       {showEditSucursalModal && editingSucursal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1572,7 +1620,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       {/* ═══ MODAL TRANSFERIR PERSONAL ═══ */}
       {showTransferModal && transferringUser && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransferModal(false), isDirtyTransfer()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1635,6 +1683,15 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
           </div>
         </div>
       )}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        detail={{ hasChanges: true, sectionName: 'el formulario actual' }}
+        onStay={() => setShowDiscardModal(false)}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) { pendingCloseRef.current(); pendingCloseRef.current = null; }
+        }}
+      />
     </div>
   );
 }

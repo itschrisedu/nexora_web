@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ApiService } from "../services/api.service";
+import UnsavedChangesModal from "./ui/unsaved-changes-modal";
 import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
   Plus, Search, Loader2, ImageIcon, Package, Edit2, Edit3, Trash2, AlertTriangle,
@@ -328,6 +329,111 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [qsContext, setQsContext] = useState<'create' | 'edit'>('create');
 
   const [marginPct, setMarginPct] = useState<number>(getStoredProfitMargin());
+
+  // Control de descartes y cierre seguro de modales
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+
+  const safeDismiss = useCallback((closeFn: () => void, isDirty: boolean) => {
+    if (isDirty) {
+      pendingCloseRef.current = closeFn;
+      setShowDiscardModal(true);
+    } else {
+      closeFn();
+    }
+  }, []);
+
+  const isDirtyCreate = useCallback(() => {
+    return showCreate && (name.trim() !== "" || brand.trim() !== "" || baseCode.trim() !== "" || serieIds.length > 0 || colors.some(c => c.color.trim() !== "" || c.foto !== null));
+  }, [showCreate, name, brand, baseCode, serieIds.length, colors]);
+
+  const isDirtyAddColor = useCallback(() => {
+    return showAddColorModal && (newColorName.trim() !== "" || newColorFoto !== null);
+  }, [showAddColorModal, newColorName, newColorFoto]);
+
+  const isDirtyPrice = useCallback(() => {
+    return showPrice && (newCosto.trim() !== "" || newVenta.trim() !== "" || motivo.trim() !== "");
+  }, [showPrice, newCosto, newVenta, motivo]);
+
+  const isDirtyCreateSeries = useCallback(() => {
+    return showCreateSeriesModal && newSerieNombre.trim() !== "";
+  }, [showCreateSeriesModal, newSerieNombre]);
+
+  const isDirtyEditSeries = useCallback(() => {
+    return showEditSeriesModal && editingSerie !== null && (editSerieNombre !== editingSerie.nombre);
+  }, [showEditSeriesModal, editingSerie, editSerieNombre]);
+
+  const isDirtyEditProduct = useCallback(() => {
+    return showEditProduct && editProduct !== null && (editProductColor !== (editProduct.color || "") || editProductVenta !== String(editProduct.precioVenta || ""));
+  }, [showEditProduct, editProduct, editProductColor, editProductVenta]);
+
+  const isDirtyEditModel = useCallback(() => {
+    return showEditModel && editModel !== null && (editModelName !== editModel.name || editModelBrand !== (editModel.brand || ""));
+  }, [showEditModel, editModel, editModelName, editModelBrand]);
+
+  const isDirtyQuickSupplier = useCallback(() => {
+    return showQuickSupplier && (qsRuc.trim() !== "" || qsRazonSocial.trim() !== "" || qsContacto.trim() !== "");
+  }, [showQuickSupplier, qsRuc, qsRazonSocial, qsContacto]);
+
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDiscardModal) return;
+      if (confirmModal.isOpen) {
+        e.preventDefault();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        return;
+      }
+      if (showQuickSupplier) {
+        e.preventDefault();
+        safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier());
+        return;
+      }
+      if (showCreateSeriesModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowCreateSeriesModal(false), isDirtyCreateSeries());
+        return;
+      }
+      if (showEditSeriesModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowEditSeriesModal(false), isDirtyEditSeries());
+        return;
+      }
+      if (showPrice) {
+        e.preventDefault();
+        safeDismiss(() => { setShowPrice(false); setPriceProd(null); }, isDirtyPrice());
+        return;
+      }
+      if (showAddColorModal) {
+        e.preventDefault();
+        safeDismiss(() => { setShowAddColorModal(false); setSelectedModelForColor(null); }, isDirtyAddColor());
+        return;
+      }
+      if (showEditProduct) {
+        e.preventDefault();
+        safeDismiss(() => { setShowEditProduct(false); setEditProduct(null); }, isDirtyEditProduct());
+        return;
+      }
+      if (showEditModel) {
+        e.preventDefault();
+        safeDismiss(() => { setShowEditModel(false); setEditModel(null); }, isDirtyEditModel());
+        return;
+      }
+      if (showCreate) {
+        e.preventDefault();
+        safeDismiss(() => { setShowCreate(false); resetForm(); }, isDirtyCreate());
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [
+    showDiscardModal, confirmModal.isOpen, showQuickSupplier, showCreateSeriesModal,
+    showEditSeriesModal, showPrice, showAddColorModal, showEditProduct, showEditModel,
+    showCreate, safeDismiss, isDirtyQuickSupplier, isDirtyCreateSeries, isDirtyEditSeries,
+    isDirtyPrice, isDirtyAddColor, isDirtyEditProduct, isDirtyEditModel, isDirtyCreate
+  ]);
 
   useEffect(() => {
     loadData();
@@ -1628,7 +1734,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* MODAL CREAR MASIVO */}
       {showCreate && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowCreate(false); resetForm(); }, isDirtyCreate()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1979,7 +2085,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* ── MODAL AÑADIR NUEVO COLOR A MODELO EXISTENTE ── */}
       {showAddColorModal && selectedModelForColor && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowAddColorModal(false); setSelectedModelForColor(null); }, isDirtyAddColor()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -2253,7 +2359,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* MODAL PRECIOS */}
       {showPrice && priceProd && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowPrice(false); setPriceProd(null); }, isDirtyPrice()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -2354,7 +2460,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* ── MODAL CREAR SERIE PERSONALIZADA ── */}
       {showCreateSeriesModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCreateSeriesModal(false), isDirtyCreateSeries()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -2415,7 +2521,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* ── MODAL EDITAR SERIE EXISTENTE ── */}
       {showEditSeriesModal && editingSerie && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSeriesModal(false), isDirtyEditSeries()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -2476,7 +2582,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* ── MODAL EDITAR VARIANTE INTEGRAL ── */}
       {showEditProduct && editProduct && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditProduct(false); setEditProduct(null); }, isDirtyEditProduct()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
@@ -2694,7 +2800,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* ── MODAL EDITAR MODELO BASE ── */}
       {showEditModel && editModel && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModel(false); setEditModel(null); }, isDirtyEditModel()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -3048,6 +3154,65 @@ export default function ModelosComponent({ online }: ModelosProps) {
           </div>
         </div>
       )}
+
+      {/* Modal de Proveedor Rápido */}
+      {showQuickSupplier && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-150"
+             onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}>
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-4 px-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Truck size={18} className="text-emerald-400" />
+                <h3 className="font-extrabold text-sm text-white">Nuevo Proveedor Rápido</h3>
+              </div>
+              <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="text-slate-400 hover:text-white p-1">
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleQuickCreateSupplier} className="p-5 space-y-3">
+              <div>
+                <Lbl t="RUC / Cédula *" />
+                <input type="text" required placeholder="Ej. 1792348574001" value={qsRuc} onChange={e => setQsRuc(e.target.value)} className={INPUT} />
+              </div>
+              <div>
+                <Lbl t="Razón Social / Taller *" />
+                <input type="text" required placeholder="Ej. Taller Calzado Cevallos" value={qsRazonSocial} onChange={e => setQsRazonSocial(e.target.value)} className={INPUT} />
+              </div>
+              <div>
+                <Lbl t="Contacto / Teléfono" />
+                <input type="text" placeholder="Ej. 0998765432" value={qsContacto} onChange={e => setQsContacto(e.target.value)} className={INPUT} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="px-3 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={qsSaving} className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm">
+                  {qsSaving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                  <span>Guardar y Asignar</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de descarte de cambios */}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        targetSectionName="Modelos y Catálogo"
+        detail={{ hasChanges: true, sectionName: "este formulario de Modelos y Catálogo" }}
+        onStay={() => {
+          setShowDiscardModal(false);
+          pendingCloseRef.current = null;
+        }}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) {
+            pendingCloseRef.current();
+            pendingCloseRef.current = null;
+          }
+        }}
+      />
     </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { db } from "../db/local-db";
 import { ApiService } from "../services/api.service";
+import UnsavedChangesModal from "./ui/unsaved-changes-modal";
 import {
   Search, Loader2, Package, TrendingUp, TrendingDown,
   RefreshCw, AlertTriangle, X, CheckCircle, AlertCircle, ImageIcon,
@@ -137,6 +138,47 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   const [ingresoFormato, setIngresoFormato] = useState<"suelto" | "serie">("suelto");
   const [serieMultiplicador, setSerieMultiplicador] = useState<number>(1);
   const [loteCantidades, setLoteCantidades] = useState<Record<string, number>>({});
+
+  // Control de descartes y cierre seguro de modales
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+
+  const safeDismiss = useCallback((closeFn: () => void, isDirty: boolean) => {
+    if (isDirty) {
+      pendingCloseRef.current = closeFn;
+      setShowDiscardModal(true);
+    } else {
+      closeFn();
+    }
+  }, []);
+
+  const isDirtyMov = useCallback(() => {
+    return showMovModal && (movMotivo.trim() !== "" || movCantidad !== "1" || Object.keys(loteCantidades).length > 0);
+  }, [showMovModal, movMotivo, movCantidad, loteCantidades]);
+
+  const isDirtyTransf = useCallback(() => {
+    return showTransfModal && (transfDestinoId !== "" || transfMotivo.trim() !== "" || Object.keys(transfLoteCantidades).length > 0);
+  }, [showTransfModal, transfDestinoId, transfMotivo, transfLoteCantidades]);
+
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDiscardModal) return;
+      if (showTransfModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowTransfModal(false), isDirtyTransf());
+        return;
+      }
+      if (showMovModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowMovModal(false), isDirtyMov());
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showDiscardModal, showTransfModal, showMovModal, safeDismiss, isDirtyTransf, isDirtyMov]);
 
   const isAdmin = !userRole || userRole === "ROL_ADMIN";
   const isBodeguero = userRole === "ROL_BODEGUERO";
@@ -691,7 +733,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
       {/* MODAL MOVIMIENTO MULTIFORMATO */}
       {showMovModal && movProd && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowMovModal(false), isDirtyMov()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -946,7 +988,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
       {/* MODAL TRANSFERENCIA INTER-SUCURSAL */}
       {showTransfModal && transfProd && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransfModal(false), isDirtyTransf()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -1231,6 +1273,24 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
           </div>
         </div>
       )}
+
+      {/* Modal de confirmación de descarte de cambios */}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        targetSectionName="Inventario"
+        detail={{ hasChanges: true, sectionName: "este formulario de Inventario" }}
+        onStay={() => {
+          setShowDiscardModal(false);
+          pendingCloseRef.current = null;
+        }}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) {
+            pendingCloseRef.current();
+            pendingCloseRef.current = null;
+          }
+        }}
+      />
     </div>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { ApiService } from '../services/api.service';
 import { db } from '../db/local-db';
 import { SyncService } from '../services/sync.service';
+import UnsavedChangesModal from './ui/unsaved-changes-modal';
 import {
   Package,
   PackageCheck,
@@ -278,6 +279,88 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   // Cupones Promocionales (Fase E2)
   const [codigoCuponInput, setCodigoCuponInput] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState<any | null>(null);
+
+  // Control de descartes y cierre seguro de modales
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+
+  const safeDismiss = useCallback((closeFn: () => void, isDirty: boolean) => {
+    if (isDirty) {
+      pendingCloseRef.current = closeFn;
+      setShowDiscardModal(true);
+    } else {
+      closeFn();
+    }
+  }, []);
+
+  const resetPedidoForm = () => {
+    setClientId('');
+    setClienteSeleccionado(null);
+    setLineasPedido([]);
+    setNotasPedido('');
+    setEditingOrderId(null);
+    setEditingOrderNumero('');
+    setReferenciaComprobante('');
+  };
+
+  const isDirtyOrder = useCallback(() => {
+    return showModal && (lineasPedido.length > 0 || clientId !== '' || notasPedido.trim() !== '');
+  }, [showModal, lineasPedido.length, clientId, notasPedido]);
+
+  const isDirtySupplierOrder = useCallback(() => {
+    return showSupplierOrderModal && (selectedSupplierId !== '' || supplierOrderObservaciones.trim() !== '' || Object.keys(supplierOrderTallasMap).length > 0);
+  }, [showSupplierOrderModal, selectedSupplierId, supplierOrderObservaciones, supplierOrderTallasMap]);
+
+  const isDirtyNuevoTransporte = useCallback(() => {
+    return showNuevoTransporteModal && nuevoTransporteNombre.trim() !== '';
+  }, [showNuevoTransporteModal, nuevoTransporteNombre]);
+
+  const isDirtyEnvio = useCallback(() => {
+    return showModalEnvio && (envioModalGuiaEnvio.trim() !== '' || envioModalDireccionEnvio.trim() !== '' || envioModalCiudadEnvio.trim() !== '');
+  }, [showModalEnvio, envioModalGuiaEnvio, envioModalDireccionEnvio, envioModalCiudadEnvio]);
+
+  const isDirtyEntrega = useCallback(() => {
+    return showEntregaModal && Object.keys(entregaItemsMap).length > 0;
+  }, [showEntregaModal, entregaItemsMap]);
+
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDiscardModal) return;
+      if (showNuevoTransporteModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowNuevoTransporteModal(false), isDirtyNuevoTransporte());
+        return;
+      }
+      if (showModalEnvio) {
+        e.preventDefault();
+        safeDismiss(() => { setShowModalEnvio(false); setPedidoEnvioSeleccionado(null); }, isDirtyEnvio());
+        return;
+      }
+      if (showEntregaModal) {
+        e.preventDefault();
+        safeDismiss(() => { setShowEntregaModal(false); setPedidoEntregaSeleccionado(null); setEntregaItemsMap({}); }, isDirtyEntrega());
+        return;
+      }
+      if (showSupplierOrderModal) {
+        e.preventDefault();
+        safeDismiss(() => { setShowSupplierOrderModal(false); setSupplierOrderProductData(null); }, isDirtySupplierOrder());
+        return;
+      }
+      if (showModal) {
+        e.preventDefault();
+        safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder());
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [
+    showDiscardModal, showNuevoTransporteModal, showModalEnvio, showEntregaModal,
+    showSupplierOrderModal, showModal, safeDismiss, isDirtyNuevoTransporte,
+    isDirtyEnvio, isDirtyEntrega, isDirtySupplierOrder, isDirtyOrder
+  ]);
   const [validandoCupon, setValidandoCupon] = useState(false);
   const [cuponErrorMsg, setCuponErrorMsg] = useState('');
 
@@ -2098,7 +2181,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
       {/* MODAL CREAR / EDITAR PEDIDO */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header Modal Estandarizado */}
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
@@ -3644,7 +3727,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
       {/* ── MODAL GENERAR ORDEN A PROVEEDOR ── */}
       {showSupplierOrderModal && supplierOrderProductData && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowSupplierOrderModal(false); setSupplierOrderProductData(null); }, isDirtySupplierOrder()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
@@ -3919,7 +4002,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
       {/* ── MODAL GESTIONAR LOGÍSTICA DE ENVÍO Y FLETE (Fase E1) ── */}
       {showModalEnvio && pedidoEnvioSeleccionado && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModalEnvio(false); setPedidoEnvioSeleccionado(null); }, isDirtyEnvio()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
@@ -4171,7 +4254,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
       {/* ── MODAL AGREGAR NUEVA EMPRESA DE TRANSPORTE ── */}
       {showNuevoTransporteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowNuevoTransporteModal(false), isDirtyNuevoTransporte()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center">
               <div className="flex items-center gap-2.5">
@@ -4236,7 +4319,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
       {/* Modal de Entrega Parcial / Total */}
       {showEntregaModal && pedidoEntregaSeleccionado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEntregaModal(false); setPedidoEntregaSeleccionado(null); setEntregaItemsMap({}); }, isDirtyEntrega()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
             {/* Cabecera */}
             <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white flex items-center justify-between">
@@ -4623,6 +4706,24 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           </div>
         </div>
       )}
+
+      {/* Modal de confirmación de descarte de cambios */}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        targetSectionName="Comercial / Pedidos"
+        detail={{ hasChanges: true, sectionName: "este formulario de Pedidos" }}
+        onStay={() => {
+          setShowDiscardModal(false);
+          pendingCloseRef.current = null;
+        }}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) {
+            pendingCloseRef.current();
+            pendingCloseRef.current = null;
+          }
+        }}
+      />
     </div>
   );
 }

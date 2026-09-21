@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ApiService } from '../services/api.service';
 import { db } from '../db/local-db';
+import UnsavedChangesModal from './ui/unsaved-changes-modal';
 import {
   Truck,
   Plus,
@@ -468,6 +469,104 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       diferencia: number;
     }>;
   }>>([]);
+
+  // Control de descartes y cierre seguro de modales
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+
+  const safeDismiss = useCallback((closeFn: () => void, isDirty: boolean) => {
+    if (isDirty) {
+      pendingCloseRef.current = closeFn;
+      setShowDiscardModal(true);
+    } else {
+      closeFn();
+    }
+  }, []);
+
+  const isDirtySupplier = useCallback(() => {
+    return showSupplierModal && (ruc.trim() !== '' || razonSocial.trim() !== '' || contacto.trim() !== '' || direccion.trim() !== '' || email.trim() !== '');
+  }, [showSupplierModal, ruc, razonSocial, contacto, direccion, email]);
+
+  const isDirtyOrder = useCallback(() => {
+    return showOrderModal && (orderLines.length > 0 || orderSupplierId !== '' || orderObservaciones.trim() !== '');
+  }, [showOrderModal, orderLines.length, orderSupplierId, orderObservaciones]);
+
+  const isDirtyPayment = useCallback(() => {
+    return showPaymentModal && (montoPago.trim() !== '' || comprobantePago.trim() !== '' || notasPago.trim() !== '' || bancoPago.trim() !== '');
+  }, [showPaymentModal, montoPago, comprobantePago, notasPago, bancoPago]);
+
+  const isDirtyDevolucion = useCallback(() => {
+    return showDevolucionModal && (devSupplierId !== '' || devMotivo.trim() !== '' || devLines.length > 0);
+  }, [showDevolucionModal, devSupplierId, devMotivo, devLines.length]);
+
+  const isDirtyManualDefectuoso = useCallback(() => {
+    return showManualDefectuosoModal && (manualProd !== null || manualMotivo.trim() !== '' || busquedaManualProd.trim() !== '');
+  }, [showManualDefectuosoModal, manualProd, manualMotivo, busquedaManualProd]);
+
+  // Manejador global de la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showDiscardModal) return;
+      if (confirmModal.isOpen) {
+        e.preventDefault();
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        return;
+      }
+      if (showPdfPreviewModal) {
+        e.preventDefault();
+        setShowPdfPreviewModal(false);
+        return;
+      }
+      if (showConstanciaModal) {
+        e.preventDefault();
+        setShowConstanciaModal(false);
+        return;
+      }
+      if (showManualDefectuosoModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowManualDefectuosoModal(false), isDirtyManualDefectuoso());
+        return;
+      }
+      if (showDevolucionModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion());
+        return;
+      }
+      if (showSupplierModal) {
+        e.preventDefault();
+        safeDismiss(() => { setShowSupplierModal(false); resetSupplierForm(); }, isDirtySupplier());
+        return;
+      }
+      if (showOrderModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowOrderModal(false), isDirtyOrder());
+        return;
+      }
+      if (showPaymentModal) {
+        e.preventDefault();
+        safeDismiss(() => setShowPaymentModal(false), isDirtyPayment());
+        return;
+      }
+      if (showCuentaModal) {
+        e.preventDefault();
+        setShowCuentaModal(false);
+        return;
+      }
+      if (showOrderDetailModal) {
+        e.preventDefault();
+        setShowOrderDetailModal(false);
+        return;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [
+    showDiscardModal, confirmModal.isOpen, showPdfPreviewModal, showConstanciaModal,
+    showManualDefectuosoModal, showDevolucionModal, showSupplierModal, showOrderModal,
+    showPaymentModal, showCuentaModal, showOrderDetailModal, safeDismiss,
+    isDirtyManualDefectuoso, isDirtyDevolucion, isDirtySupplier, isDirtyOrder, isDirtyPayment
+  ]);
 
   useEffect(() => {
     loadData();
@@ -2822,7 +2921,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: DETALLE DE ORDEN (Con Botón Enviar Explícito)
          ══════════════════════════════════════════ */}
       {showOrderDetailModal && selectedOrder && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowOrderDetailModal(false); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
             {/* Header del Modal Estandarizado (Azul Oscuro #0F172A / Blanco) */}
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
@@ -3326,7 +3425,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: ESTADO DE CUENTA MASTER-DETAIL
          ══════════════════════════════════════════ */}
       {showCuentaModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCuentaModal(false); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
@@ -3517,7 +3616,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: REGISTRAR PAGO A PROVEEDOR
          ══════════════════════════════════════════ */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowPaymentModal(false), isDirtyPayment()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -3633,7 +3732,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: EMITIR NUEVA ORDEN (Borrador con Curva Exacta)
          ══════════════════════════════════════════ */}
       {showOrderModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowOrderModal(false), isDirtyOrder()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
@@ -4051,7 +4150,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: REGISTRAR NUEVO PROVEEDOR
          ══════════════════════════════════════════ */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowSupplierModal(false); resetSupplierForm(); }, isDirtySupplier()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -4174,7 +4273,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: PREVISUALIZADOR DE PDF DE ORDEN
          ══════════════════════════════════════════ */}
       {showPdfPreviewModal && pdfPreviewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowPdfPreviewModal(false); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="p-4 px-6 pr-16 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
@@ -4235,7 +4334,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: REGISTRAR DEVOLUCIÓN AL PROVEEDOR
          ══════════════════════════════════════════ */}
       {showDevolucionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -4595,7 +4694,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: INGRESO MANUAL DE CALZADO DEFECTUOSO
          ══════════════════════════════════════════ */}
       {showManualDefectuosoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowManualDefectuosoModal(false), isDirtyManualDefectuoso()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -4822,7 +4921,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           MODAL: CONSTANCIA DE DEVOLUCIÓN A PROVEEDOR
          ══════════════════════════════════════════ */}
       {showConstanciaModal && selectedConstancia && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowConstanciaModal(false); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
             <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -4954,6 +5053,24 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         danger={confirmModal.danger}
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Modal de confirmación de descarte de cambios */}
+      <UnsavedChangesModal
+        isOpen={showDiscardModal}
+        targetSectionName="Proveedores"
+        detail={{ hasChanges: true, sectionName: "este formulario de Proveedores" }}
+        onStay={() => {
+          setShowDiscardModal(false);
+          pendingCloseRef.current = null;
+        }}
+        onDiscardAndLeave={() => {
+          setShowDiscardModal(false);
+          if (pendingCloseRef.current) {
+            pendingCloseRef.current();
+            pendingCloseRef.current = null;
+          }
+        }}
       />
     </div>
   );
