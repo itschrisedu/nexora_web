@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "./ui/toast";
+import { useUnsavedChanges } from "../utils/unsaved-changes";
 import {
   Store,
   DollarSign,
@@ -81,6 +82,13 @@ export default function PosComponent() {
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TARJETA" | "TRANSFERENCIA">("EFECTIVO");
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [ventaExitosa, setVentaExitosa] = useState(false);
+
+  // Proteger venta en curso si el usuario intenta cambiar de sección
+  useUnsavedChanges(
+    itemsVenta.length > 0 && !ventaExitosa,
+    undefined,
+    `Caja POS (${itemsVenta.length} producto${itemsVenta.length > 1 ? "s" : ""} en venta actual)`
+  );
 
   // Cupones de Campaña POS (Fase E2)
   const [codigoCuponPOS, setCodigoCuponPOS] = useState("");

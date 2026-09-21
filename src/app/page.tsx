@@ -46,6 +46,8 @@ import { GeolocationService } from '@/services/geolocation.service';
 import { ToastProvider } from '@/components/ui/toast';
 import { GyreOtpVerification } from '@/components/ui/GyreOtpVerification';
 import SubscriptionGraceBanner from '@/components/ui/SubscriptionGraceBanner';
+import UnsavedChangesModal from '@/components/ui/unsaved-changes-modal';
+import { getUnsavedChanges, clearUnsavedChanges, UnsavedChangesDetail } from '@/utils/unsaved-changes';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
@@ -135,6 +137,11 @@ function MainApp() {
   const [unlockNewPassword, setUnlockNewPassword] = useState('');
   const [unlockLoading, setUnlockLoading] = useState(false);
   const [unlockError, setUnlockError] = useState('');
+
+  // ── Estados para Prevención de Pérdida de Cambios Sin Guardar ──
+  const [unsavedDetail, setUnsavedDetail] = useState<UnsavedChangesDetail>({ hasChanges: false });
+  const [pendingVista, setPendingVista] = useState<Vista | null>(null);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
   const verifyGpsPermission = () => {
     if (typeof window === 'undefined') return;
@@ -306,10 +313,29 @@ function MainApp() {
       GeolocationService.captureAndReportLocation();
     }
 
+    const handleUnsavedEvent = (e: any) => {
+      if (e.detail) {
+        setUnsavedDetail(e.detail);
+      }
+    };
+    window.addEventListener('app_unsaved_changes', handleUnsavedEvent);
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const cur = getUnsavedChanges();
+      if (cur.hasChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
       window.removeEventListener('nexora:theme-changed', handleThemeChange);
       window.removeEventListener('nexora:sucursales-changed', handleSucursalesChange);
       window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('app_unsaved_changes', handleUnsavedEvent);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (permStatus) permStatus.onchange = null;
     };
   }, []);
@@ -416,6 +442,42 @@ function MainApp() {
     localStorage.setItem('nexora-theme', next);
     if (next === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
+  };
+
+  // ── Navegación Segura: verificar cambios sin guardar antes de cambiar de vista ──
+  const navigateToView = (target: Vista) => {
+    if (target === vistaActual) return;
+    const current = getUnsavedChanges();
+    if (current.hasChanges) {
+      setUnsavedDetail(current);
+      setPendingVista(target);
+      setShowUnsavedModal(true);
+    } else {
+      setVistaActual(target);
+    }
+  };
+
+  const handleUnsavedStay = () => {
+    setShowUnsavedModal(false);
+    setPendingVista(null);
+  };
+
+  const handleUnsavedDiscard = () => {
+    clearUnsavedChanges();
+    setShowUnsavedModal(false);
+    if (pendingVista) {
+      setVistaActual(pendingVista);
+      setPendingVista(null);
+    }
+  };
+
+  const handleUnsavedSaveAndLeave = () => {
+    clearUnsavedChanges();
+    setShowUnsavedModal(false);
+    if (pendingVista) {
+      setVistaActual(pendingVista);
+      setPendingVista(null);
+    }
   };
 
   const finalizeLogin = (response: any) => {
@@ -993,7 +1055,7 @@ function MainApp() {
                       <button
                         key={item.id}
                         onClick={() => {
-                          setVistaActual(item.id);
+                          navigateToView(item.id);
                           if (isMobile) setMobileMenuOpen(false);
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer ${
@@ -1056,7 +1118,7 @@ function MainApp() {
             {(user?.rol === 'ROL_ADMIN' || user?.rol === 'ROL_SUPER_ADMIN') && (
               <button
                 onClick={() => {
-                  setVistaActual('personalizacion');
+                  navigateToView('personalizacion');
                   if (isMobile) setMobileMenuOpen(false);
                 }}
                 className="p-1.5 rounded-lg transition-colors cursor-pointer"
@@ -1256,7 +1318,7 @@ function MainApp() {
           {/* Renderizado condicional de vistas */}
           {vistaActual === 'dashboard' && (
             user?.rol === 'ROL_SUPER_ADMIN' ? (
-              <SuperAdminDashboard online={online} onNavigateToTenants={() => setVistaActual('super-admin')} />
+              <SuperAdminDashboard online={online} onNavigateToTenants={() => navigateToView('super-admin')} />
             ) : (
               <DashboardComponent
                 online={online}
@@ -1324,7 +1386,7 @@ function MainApp() {
         className="md:hidden fixed bottom-0 left-0 right-0 z-30 h-16 bg-[var(--card)]/95 backdrop-blur-md border-t border-[var(--border)] flex items-center justify-around px-1 shadow-lg"
       >
         <button
-          onClick={() => setVistaActual('dashboard')}
+          onClick={() => navigateToView('dashboard')}
           className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
             vistaActual === 'dashboard' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
           }`}
@@ -1335,7 +1397,7 @@ function MainApp() {
         </button>
 
         <button
-          onClick={() => setVistaActual('pos')}
+          onClick={() => navigateToView('pos')}
           className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
             vistaActual === 'pos' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
           }`}
@@ -1346,7 +1408,7 @@ function MainApp() {
         </button>
 
         <button
-          onClick={() => setVistaActual('comercial')}
+          onClick={() => navigateToView('comercial')}
           className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
             vistaActual === 'comercial' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
           }`}
@@ -1357,7 +1419,7 @@ function MainApp() {
         </button>
 
         <button
-          onClick={() => setVistaActual('clientes')}
+          onClick={() => navigateToView('clientes')}
           className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
             vistaActual === 'clientes' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
           }`}
@@ -1385,7 +1447,7 @@ function MainApp() {
         }}
         activeSucursalId={activeSucursalId}
         onNavigateToView={(v) => {
-          setVistaActual(v as Vista);
+          navigateToView(v as Vista);
           setNotificacionesModalOpen(false);
         }}
         onRefreshStats={fetchStats}
@@ -1410,6 +1472,16 @@ function MainApp() {
           onAccepted={handleGpsAccepted}
         />
       )}
+
+      {/* ─── MODAL DE ADVERTENCIA DE CAMBIOS SIN GUARDAR ─── */}
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        targetSectionName={pendingVista ? pendingVista.toUpperCase() : undefined}
+        detail={unsavedDetail}
+        onStay={handleUnsavedStay}
+        onDiscardAndLeave={handleUnsavedDiscard}
+        onSaveSuccessAndLeave={handleUnsavedSaveAndLeave}
+      />
     </div>
   );
 }

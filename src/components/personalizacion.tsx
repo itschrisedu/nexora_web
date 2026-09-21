@@ -14,6 +14,7 @@ import {
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
 import ImageCropperModal from "./ui/image-cropper-modal";
+import { useUnsavedChanges } from "../utils/unsaved-changes";
 
 interface CreditLevelConfigItem {
   id?: string;
@@ -491,6 +492,16 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
       setSaving(false);
     }
   };
+
+  // Protección contra navegación si hay cambios sin guardar
+  useUnsavedChanges(
+    hasChanges,
+    async () => {
+      await handleSave();
+      return true;
+    },
+    "Configuración Global"
+  );
 
   if (loading) {
     return (
