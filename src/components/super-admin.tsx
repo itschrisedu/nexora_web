@@ -26,6 +26,13 @@ import {
   KeyRound,
   X,
   ShieldAlert,
+  CreditCard,
+  Calendar,
+  DollarSign,
+  Receipt,
+  Sparkles,
+  Clock,
+  Send,
 } from "lucide-react";
 
 interface TenantStats {
@@ -53,10 +60,32 @@ interface TenantUser {
   createdAt: string;
 }
 
+interface SubscriptionPaymentItem {
+  id: string;
+  monto: number;
+  periodoMeses: number;
+  metodoPago: string;
+  plan: string;
+  fechaPago: string;
+  fechaInicio: string;
+  fechaFin: string;
+  numeroFacturaSri?: string;
+  facturaAutorizada: boolean;
+  notas?: string;
+}
+
 interface Tenant {
   id: string;
   name: string;
   active: boolean;
+  plan?: "PLAN_BASICO" | "PLAN_COMERCIAL" | "PLAN_MAYORISTA";
+  estadoSuscripcion?: "EN_PRUEBA" | "ACTIVA" | "GRACIA" | "SUSPENDIDA";
+  fechaVencimientoPlan?: string;
+  diasPruebaGratis?: number;
+  diasRestantes?: number;
+  maxSucursales?: number;
+  maxUsuarios?: number;
+  precioMensualPlan?: number;
   createdAt: string;
   stats: TenantStats;
   admins: TenantAdmin[];
@@ -66,6 +95,14 @@ interface TenantDetail {
   id: string;
   name: string;
   active: boolean;
+  plan?: "PLAN_BASICO" | "PLAN_COMERCIAL" | "PLAN_MAYORISTA";
+  estadoSuscripcion?: "EN_PRUEBA" | "ACTIVA" | "GRACIA" | "SUSPENDIDA";
+  fechaVencimientoPlan?: string;
+  diasPruebaGratis?: number;
+  diasRestantes?: number;
+  maxSucursales?: number;
+  maxUsuarios?: number;
+  precioMensualPlan?: number;
   createdAt: string;
   stats: TenantStats;
   users: TenantUser[];
@@ -75,6 +112,7 @@ interface TenantDetail {
     direccion: string;
     telefono?: string;
   } | null;
+  subscriptionPayments?: SubscriptionPaymentItem[];
 }
 
 export default function SuperAdminComponent({ online }: { online: boolean }) {
@@ -91,16 +129,37 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     adminEmail: "",
     adminNombre: "",
     adminPassword: "",
+    plan: "PLAN_COMERCIAL",
+    diasPruebaGratis: 15,
+    precioMensualPlan: 50,
   });
   const [showPassTenant, setShowPassTenant] = useState(false);
   const [showPassCreateUser, setShowPassCreateUser] = useState(false);
   const [showPassEditUser, setShowPassEditUser] = useState(false);
+
+  // Modal Suscripción & Facturación
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [subscribingTenant, setSubscribingTenant] = useState<Tenant | null>(null);
+  const [subLoading, setSubLoading] = useState(false);
+  const [subPayments, setSubPayments] = useState<SubscriptionPaymentItem[]>([]);
+  const [newPayment, setNewPayment] = useState({
+    monto: 50,
+    periodoMeses: 1,
+    metodoPago: "TRANSFERENCIA",
+    plan: "PLAN_COMERCIAL",
+    numeroFacturaSri: "",
+    facturaAutorizada: true,
+    notas: "",
+  });
 
   const [showEditTenantModal, setShowEditTenantModal] = useState(false);
   const [editTenantLoading, setEditTenantLoading] = useState(false);
   const [editingTenant, setEditingTenant] = useState<{
     id: string;
     name: string;
+    plan: string;
+    estadoSuscripcion: string;
+    precioMensualPlan: number;
     ruc: string;
     direccion: string;
     telefono: string;
@@ -178,9 +237,17 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     setErrorMsg("");
     try {
       await ApiService.post("/tenants", newTenant);
-      setSuccessMsg(`Tenant "${newTenant.name}" creado exitosamente.`);
+      setSuccessMsg(`Tenant "${newTenant.name}" creado con ${newTenant.plan} y ${newTenant.diasPruebaGratis} días de prueba.`);
       setShowCreateModal(false);
-      setNewTenant({ name: "", adminEmail: "", adminNombre: "", adminPassword: "" });
+      setNewTenant({
+        name: "",
+        adminEmail: "",
+        adminNombre: "",
+        adminPassword: "",
+        plan: "PLAN_COMERCIAL",
+        diasPruebaGratis: 15,
+        precioMensualPlan: 50,
+      });
       await fetchTenants();
     } catch (err: any) {
       setErrorMsg(err.message || "Error al crear el tenant");
@@ -193,16 +260,21 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     setEditingTenant({
       id: tenant.id,
       name: tenant.name,
+      plan: tenant.plan || "PLAN_COMERCIAL",
+      estadoSuscripcion: tenant.estadoSuscripcion || "ACTIVA",
+      precioMensualPlan: tenant.precioMensualPlan || 50,
       ruc: "",
       direccion: "",
       telefono: "",
     });
     setShowEditTenantModal(true);
-    // Cargar config actual si está abierta el detalle o mediante endpoint
     ApiService.get(`/tenants/${tenant.id}`).then((detail) => {
       setEditingTenant({
         id: tenant.id,
         name: detail.name,
+        plan: detail.plan || "PLAN_COMERCIAL",
+        estadoSuscripcion: detail.estadoSuscripcion || "ACTIVA",
+        precioMensualPlan: detail.precioMensualPlan || 50,
         ruc: detail.businessConfig?.ruc || "",
         direccion: detail.businessConfig?.direccion || "",
         telefono: detail.businessConfig?.telefono || "",
@@ -217,6 +289,9 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     try {
       const updated = await ApiService.patch(`/tenants/${editingTenant.id}`, {
         name: editingTenant.name,
+        plan: editingTenant.plan,
+        estadoSuscripcion: editingTenant.estadoSuscripcion,
+        precioMensualPlan: Number(editingTenant.precioMensualPlan),
         businessConfig: {
           nombre: editingTenant.name,
           ruc: editingTenant.ruc,
@@ -235,6 +310,47 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       setErrorMsg(err.message || "Error al actualizar el tenant");
     } finally {
       setEditTenantLoading(false);
+    }
+  };
+
+  const handleOpenSubscriptionModal = async (tenant: Tenant) => {
+    setSubscribingTenant(tenant);
+    const defaultMonto = tenant.precioMensualPlan || (tenant.plan === "PLAN_BASICO" ? 30 : tenant.plan === "PLAN_MAYORISTA" ? 90 : 50);
+    setNewPayment({
+      monto: defaultMonto,
+      periodoMeses: 1,
+      metodoPago: "TRANSFERENCIA",
+      plan: tenant.plan || "PLAN_COMERCIAL",
+      numeroFacturaSri: "",
+      facturaAutorizada: true,
+      notas: "",
+    });
+    setShowSubscriptionModal(true);
+    setSubLoading(true);
+    try {
+      const payments = await ApiService.get(`/tenants/${tenant.id}/subscription-payments`);
+      setSubPayments(payments || []);
+    } catch {
+      setSubPayments([]);
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
+  const handleRegisterSubscriptionPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subscribingTenant) return;
+    setSubLoading(true);
+    try {
+      await ApiService.post(`/tenants/${subscribingTenant.id}/subscription-payment`, newPayment);
+      setSuccessMsg(`Pago de $${newPayment.monto} registrado para ${subscribingTenant.name}. Vigencia renovada.`);
+      const updatedPayments = await ApiService.get(`/tenants/${subscribingTenant.id}/subscription-payments`);
+      setSubPayments(updatedPayments || []);
+      await fetchTenants();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al registrar el pago");
+    } finally {
+      setSubLoading(false);
     }
   };
 
@@ -424,184 +540,240 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {tenants.map((tenant) => (
-            <div
-              key={tenant.id}
-              className={`bg-[var(--card)] border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all ${
-                tenant.active ? "border-[var(--border)]" : "border-rose-500/30 opacity-70"
-              }`}
-            >
-              {/* Tenant header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm ${
-                      tenant.active
-                        ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
-                        : "bg-slate-500"
-                    }`}
-                  >
-                    {tenant.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base">{tenant.name}</h3>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          {tenants.map((tenant) => {
+            const planBadge =
+              tenant.plan === "PLAN_BASICO"
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                : tenant.plan === "PLAN_MAYORISTA"
+                ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                : "bg-blue-500/10 text-blue-400 border-blue-500/20";
+
+            const planName =
+              tenant.plan === "PLAN_BASICO"
+                ? "Básico ($30/m)"
+                : tenant.plan === "PLAN_MAYORISTA"
+                ? "Mayorista ($90/m)"
+                : "Comercial ($50/m)";
+
+            const isOverdue = tenant.diasRestantes !== undefined && tenant.diasRestantes < 0;
+            const isNearRenewal = tenant.diasRestantes !== undefined && tenant.diasRestantes >= 0 && tenant.diasRestantes <= 3;
+
+            return (
+              <div
+                key={tenant.id}
+                className={`bg-[var(--card)] border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all ${
+                  tenant.active ? "border-[var(--border)]" : "border-rose-500/30 opacity-70"
+                }`}
+              >
+                {/* Tenant header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm ${
                         tenant.active
-                          ? "bg-emerald-500/10 text-emerald-500"
-                          : "bg-rose-500/10 text-rose-500"
+                          ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
+                          : "bg-slate-500"
                       }`}
                     >
-                      {tenant.active ? "ACTIVO" : "INACTIVO"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Acciones principales */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleViewDetail(tenant.id)}
-                    className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-                    title="Ver detalle y usuarios"
-                  >
-                    <Eye size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleOpenEditTenant(tenant)}
-                    className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors"
-                    title="Editar Tenant y Negocio"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    onClick={() =>
-                      setConfirmToggle({
-                        id: tenant.id,
-                        name: tenant.name,
-                        active: tenant.active,
-                      })
-                    }
-                    className={`p-2 rounded-lg transition-colors ${
-                      tenant.active
-                        ? "hover:bg-rose-500/10 text-[var(--muted-foreground)] hover:text-rose-500"
-                        : "hover:bg-emerald-500/10 text-[var(--muted-foreground)] hover:text-emerald-500"
-                    }`}
-                    title={tenant.active ? "Desactivar" : "Reactivar"}
-                  >
-                    {tenant.active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                  </button>
-                  <button
-                    onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
-                    className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors"
-                    title="Eliminar Tenant Definitivamente"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-4 gap-3 mb-4">
-                <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                  <Users size={14} className="mx-auto text-amber-500 mb-1" />
-                  <div className="text-sm font-bold">{tenant.stats.users}</div>
-                  <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
-                </div>
-                <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                  <Package size={14} className="mx-auto text-emerald-500 mb-1" />
-                  <div className="text-sm font-bold">{tenant.stats.models}</div>
-                  <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
-                </div>
-                <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                  <UserCircle size={14} className="mx-auto text-amber-500 mb-1" />
-                  <div className="text-sm font-bold">{tenant.stats.clients}</div>
-                  <div className="text-[9px] text-[var(--muted-foreground)]">Clientes</div>
-                </div>
-                <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                  <ShoppingCart size={14} className="mx-auto text-amber-500 mb-1" />
-                  <div className="text-sm font-bold">{tenant.stats.orders}</div>
-                  <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
-                </div>
-              </div>
-
-              {/* Admins list */}
-              <div className="border-t border-[var(--border)] pt-3">
-                <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                  Administradores
-                </div>
-                {tenant.admins.length === 0 ? (
-                  <p className="text-xs text-[var(--muted-foreground)]">Sin administradores</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {tenant.admins.map((admin) => (
-                      <div key={admin.id} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold">
-                            {admin.nombre.slice(0, 1).toUpperCase()}
-                          </div>
-                          <div>
-                            <span className="font-medium">{admin.nombre}</span>
-                            <span className="text-[var(--muted-foreground)] ml-2">{admin.email}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingUser({
-                                id: admin.id,
-                                nombre: admin.nombre,
-                                email: admin.email,
-                                rol: "ROL_ADMIN",
-                                activo: admin.activo,
-                                password: "",
-                              });
-                              setShowEditUserModal(true);
-                            }}
-                            className="p-1 rounded hover:bg-[var(--muted)] text-amber-500 transition-colors"
-                            title="Editar Administrador"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteUser({ id: admin.id, nombre: admin.nombre, email: admin.email })}
-                            className="p-1 rounded hover:bg-rose-500/10 text-rose-500 transition-colors"
-                            title="Eliminar Administrador"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              admin.activo ? "bg-emerald-500" : "bg-rose-500"
-                            }`}
-                          />
-                        </div>
+                      {tenant.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-base">{tenant.name}</h3>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${planBadge}`}>
+                          {planName}
+                        </span>
                       </div>
-                    ))}
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            tenant.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                          }`}
+                        >
+                          {tenant.active ? "ACTIVO" : "INACTIVO"}
+                        </span>
+                        {tenant.estadoSuscripcion === "EN_PRUEBA" && (
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            PRUEBA GRATIS
+                          </span>
+                        )}
+                        {isOverdue ? (
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse">
+                            VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d gracia)
+                          </span>
+                        ) : isNearRenewal ? (
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            Vence en {tenant.diasRestantes}d
+                          </span>
+                        ) : tenant.diasRestantes !== undefined ? (
+                          <span className="text-[9px] font-semibold text-slate-400">
+                            {tenant.diasRestantes}d restantes
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
 
-              {/* Footer */}
-              <div className="mt-3 pt-3 border-t border-[var(--border)] text-[10px] text-[var(--muted-foreground)]">
-                Creado: {new Date(tenant.createdAt).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "numeric" })}
+                  {/* Acciones principales */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenSubscriptionModal(tenant)}
+                      className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
+                      title="Gestionar Suscripción y Facturación"
+                    >
+                      <CreditCard size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleViewDetail(tenant.id)}
+                      className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+                      title="Ver detalle y usuarios"
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleOpenEditTenant(tenant)}
+                      className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors"
+                      title="Editar Tenant y Negocio"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() =>
+                        setConfirmToggle({
+                          id: tenant.id,
+                          name: tenant.name,
+                          active: tenant.active,
+                        })
+                      }
+                      className={`p-2 rounded-lg transition-colors ${
+                        tenant.active
+                          ? "hover:bg-rose-500/10 text-[var(--muted-foreground)] hover:text-rose-500"
+                          : "hover:bg-emerald-500/10 text-[var(--muted-foreground)] hover:text-emerald-500"
+                      }`}
+                      title={tenant.active ? "Desactivar" : "Reactivar"}
+                    >
+                      {tenant.active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
+                      className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors"
+                      title="Eliminar Tenant Definitivamente"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                    <Users size={14} className="mx-auto text-amber-500 mb-1" />
+                    <div className="text-sm font-bold">{tenant.stats.users}</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
+                  </div>
+                  <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                    <Package size={14} className="mx-auto text-emerald-500 mb-1" />
+                    <div className="text-sm font-bold">{tenant.stats.models}</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
+                  </div>
+                  <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                    <UserCircle size={14} className="mx-auto text-amber-500 mb-1" />
+                    <div className="text-sm font-bold">{tenant.stats.clients}</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Clientes</div>
+                  </div>
+                  <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                    <ShoppingCart size={14} className="mx-auto text-amber-500 mb-1" />
+                    <div className="text-sm font-bold">{tenant.stats.orders}</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
+                  </div>
+                </div>
+
+                {/* Admins list */}
+                <div className="border-t border-[var(--border)] pt-3">
+                  <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                    Administradores
+                  </div>
+                  {tenant.admins.length === 0 ? (
+                    <p className="text-xs text-[var(--muted-foreground)]">Sin administradores</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {tenant.admins.map((admin) => (
+                        <div key={admin.id} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold">
+                              {admin.nombre.slice(0, 1).toUpperCase()}
+                            </div>
+                            <div>
+                              <span className="font-medium">{admin.nombre}</span>
+                              <span className="text-[var(--muted-foreground)] ml-2">{admin.email}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingUser({
+                                  id: admin.id,
+                                  nombre: admin.nombre,
+                                  email: admin.email,
+                                  rol: "ROL_ADMIN",
+                                  activo: admin.activo,
+                                  password: "",
+                                });
+                                setShowEditUserModal(true);
+                              }}
+                              className="p-1 rounded hover:bg-[var(--muted)] text-amber-500 transition-colors"
+                              title="Editar Administrador"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteUser({ id: admin.id, nombre: admin.nombre, email: admin.email })}
+                              className="p-1 rounded hover:bg-rose-500/10 text-rose-500 transition-colors"
+                              title="Eliminar Administrador"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                admin.activo ? "bg-emerald-500" : "bg-rose-500"
+                              }`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
+                  <span>
+                    Creado: {new Date(tenant.createdAt).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                  {tenant.fechaVencimientoPlan && (
+                    <span className="font-mono">
+                      Vence: {new Date(tenant.fechaVencimientoPlan).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* ═══ MODAL: CREAR TENANT ═══ */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
                   <Building2 size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Crear Nuevo Tenant</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Se creará una organización con su administrador inicial</p>
+                  <h3 className="font-extrabold text-base text-white">Crear Nuevo Negocio</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Asigna plan, período de prueba y administrador</p>
                 </div>
               </div>
               <button
@@ -612,10 +784,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateTenant} className="p-6 space-y-4">
+            <form onSubmit={handleCreateTenant} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Nombre del Negocio
+                  Nombre del Negocio *
                 </label>
                 <input
                   type="text"
@@ -626,9 +798,61 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
+
+              {/* Selector de Plan SaaS */}
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Nombre del Administrador
+                  Plan Comercial NEXORA *
+                </label>
+                <select
+                  value={newTenant.plan}
+                  onChange={(e) => {
+                    const plan = e.target.value;
+                    const precio = plan === "PLAN_BASICO" ? 30 : plan === "PLAN_MAYORISTA" ? 90 : 50;
+                    setNewTenant({ ...newTenant, plan, precioMensualPlan: precio });
+                  }}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors font-medium"
+                >
+                  <option value="PLAN_BASICO">Plan Básico ($30/mes) - 1 Sucursal, 2 Usuarios</option>
+                  <option value="PLAN_COMERCIAL">Plan Comercial ($50/mes) - 3 Sucursales, 6 Usuarios</option>
+                  <option value="PLAN_MAYORISTA">Plan Mayorista ($90/mes) - Multi-Bodega, ML Scoring</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  * Todos los planes cumplen el ciclo comercial 100% completo (Compras, Curvas, Stock, POS, Cobros, SRI).
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Días de Prueba Gratis
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="90"
+                    value={newTenant.diasPruebaGratis}
+                    onChange={(e) => setNewTenant({ ...newTenant, diasPruebaGratis: Number(e.target.value) })}
+                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Precio Mensual ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newTenant.precioMensualPlan}
+                    onChange={(e) => setNewTenant({ ...newTenant, precioMensualPlan: Number(e.target.value) })}
+                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Nombre del Administrador *
                 </label>
                 <input
                   type="text"
@@ -641,7 +865,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Email del Administrador
+                  Email del Administrador *
                 </label>
                 <input
                   type="email"
@@ -698,20 +922,20 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       )}
 
-      {/* ═══ MODAL: EDITAR EMPRESA / LOCAL ═══ */}
+      {/* ═══ MODAL: EDITAR EMPRESA / PLAN ═══ */}
       {showEditTenantModal && editingTenant && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
             <div className="p-6 border-b border-[var(--border)]">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Pencil size={20} className="text-amber-500" />
-                Editar Empresa / Local
+                Editar Empresa y Plan
               </h2>
               <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                Modifica el nombre y datos de facturación/configuración de la organización.
+                Modifica el nombre, plan contratado y datos comerciales.
               </p>
             </div>
-            <form onSubmit={handleUpdateTenant} className="p-6 space-y-4">
+            <form onSubmit={handleUpdateTenant} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Nombre de la Organización
@@ -724,6 +948,52 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Plan
+                  </label>
+                  <select
+                    value={editingTenant.plan}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, plan: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm"
+                  >
+                    <option value="PLAN_BASICO">Plan Básico</option>
+                    <option value="PLAN_COMERCIAL">Plan Comercial</option>
+                    <option value="PLAN_MAYORISTA">Plan Mayorista</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Estado Suscripción
+                  </label>
+                  <select
+                    value={editingTenant.estadoSuscripcion}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, estadoSuscripcion: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm"
+                  >
+                    <option value="EN_PRUEBA">En Prueba</option>
+                    <option value="ACTIVA">Activa</option>
+                    <option value="GRACIA">Gracia</option>
+                    <option value="SUSPENDIDA">Suspendida</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Precio Mensual ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editingTenant.precioMensualPlan}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, precioMensualPlan: Number(e.target.value) })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   RUC del Negocio
@@ -781,6 +1051,209 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: GESTIÓN DE SUSCRIPCIÓN Y COBROS / SRI ═══ */}
+      {showSubscriptionModal && subscribingTenant && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30">
+                  <CreditCard size={22} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base">Suscripción y Facturación Super Admin</h3>
+                  <p className="text-xs text-slate-300 mt-0.5">{subscribingTenant.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowSubscriptionModal(false);
+                  setSubscribingTenant(null);
+                }}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              {/* Resumen del Plan Actual */}
+              <div className="bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Plan Actual</span>
+                  <span className="text-base font-black text-white">{subscribingTenant.plan || "PLAN_COMERCIAL"}</span>
+                  <p className="text-xs text-emerald-400 font-semibold mt-0.5">
+                    Tarifa: ${subscribingTenant.precioMensualPlan || 50}.00 / mes
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Vigencia Actual</span>
+                  <span className="text-sm font-mono font-bold text-white">
+                    {subscribingTenant.fechaVencimientoPlan
+                      ? new Date(subscribingTenant.fechaVencimientoPlan).toLocaleDateString("es-EC")
+                      : "Sin fecha"}
+                  </span>
+                  <span className="text-xs block text-slate-400 mt-0.5">
+                    {subscribingTenant.diasRestantes !== undefined
+                      ? subscribingTenant.diasRestantes >= 0
+                        ? `${subscribingTenant.diasRestantes} días restantes`
+                        : `Vencido hace ${Math.abs(subscribingTenant.diasRestantes)} días`
+                      : ""}
+                  </span>
+                </div>
+              </div>
+
+              {/* Formulario de Registro de Cobro / Renovación */}
+              <form onSubmit={handleRegisterSubscriptionPayment} className="space-y-4 bg-black/20 p-4 rounded-2xl border border-[var(--border)]">
+                <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <DollarSign size={15} /> Registrar Cobro & Renovar Suscripción
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Período a Renovar
+                    </label>
+                    <select
+                      value={newPayment.periodoMeses}
+                      onChange={(e) => {
+                        const meses = Number(e.target.value);
+                        const mensual = subscribingTenant.precioMensualPlan || 50;
+                        setNewPayment({ ...newPayment, periodoMeses: meses, monto: mensual * meses });
+                      }}
+                      className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm"
+                    >
+                      <option value={1}>1 Mes</option>
+                      <option value={3}>3 Meses (Trimestre)</option>
+                      <option value={6}>6 Meses (Semestre)</option>
+                      <option value={12}>12 Meses (Anual)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Monto Total ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={newPayment.monto}
+                      onChange={(e) => setNewPayment({ ...newPayment, monto: Number(e.target.value) })}
+                      className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Método de Pago
+                    </label>
+                    <select
+                      value={newPayment.metodoPago}
+                      onChange={(e) => setNewPayment({ ...newPayment, metodoPago: e.target.value })}
+                      className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm"
+                    >
+                      <option value="TRANSFERENCIA">Transferencia</option>
+                      <option value="DEPOSITO">Depósito Bancario</option>
+                      <option value="TARJETA">Tarjeta de Crédito</option>
+                      <option value="EFECTIVO">Efectivo</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Factura SRI Emitida (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={newPayment.numeroFacturaSri}
+                      onChange={(e) => setNewPayment({ ...newPayment, numeroFacturaSri: e.target.value })}
+                      placeholder="001-001-000000123"
+                      className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Observación / Referencia
+                    </label>
+                    <input
+                      type="text"
+                      value={newPayment.notas}
+                      onChange={(e) => setNewPayment({ ...newPayment, notas: e.target.value })}
+                      placeholder="Ej: Comprobante Transf. #84920 Pichincha"
+                      className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={subLoading}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                >
+                  {subLoading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  <span>Registrar Cobro y Extender Vigencia</span>
+                </button>
+              </form>
+
+              {/* Historial de Pagos del Tenant */}
+              <div>
+                <h4 className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Receipt size={14} /> Historial de Pagos de Suscripción ({subPayments.length})
+                </h4>
+
+                {subPayments.length === 0 ? (
+                  <p className="text-xs text-[var(--muted-foreground)] py-4 text-center bg-[var(--muted)]/20 rounded-xl">
+                    No hay pagos registrados para este cliente aún.
+                  </p>
+                ) : (
+                  <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-[var(--muted)]/50 text-[var(--muted-foreground)]">
+                          <th className="text-left px-3 py-2 font-semibold">Fecha Pago</th>
+                          <th className="text-left px-3 py-2 font-semibold">Período</th>
+                          <th className="text-right px-3 py-2 font-semibold">Monto</th>
+                          <th className="text-left px-3 py-2 font-semibold">Método</th>
+                          <th className="text-left px-3 py-2 font-semibold">Factura SRI</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subPayments.map((pay) => (
+                          <tr key={pay.id} className="border-t border-[var(--border)] hover:bg-[var(--muted)]/20">
+                            <td className="px-3 py-2 font-mono">{new Date(pay.fechaPago).toLocaleDateString("es-EC")}</td>
+                            <td className="px-3 py-2">
+                              {pay.periodoMeses} mes(es) ({new Date(pay.fechaInicio).toLocaleDateString("es-EC")} - {new Date(pay.fechaFin).toLocaleDateString("es-EC")})
+                            </td>
+                            <td className="px-3 py-2 text-right font-black text-emerald-400">
+                              ${pay.monto.toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2 font-semibold">{pay.metodoPago}</td>
+                            <td className="px-3 py-2 font-mono text-[11px] text-slate-300">
+                              {pay.numeroFacturaSri ? (
+                                <span className="text-emerald-400 flex items-center gap-1">
+                                  <CheckCircle2 size={12} /> {pay.numeroFacturaSri}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

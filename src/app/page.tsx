@@ -45,6 +45,7 @@ import {
 import { GeolocationService } from '@/services/geolocation.service';
 import { ToastProvider } from '@/components/ui/toast';
 import { GyreOtpVerification } from '@/components/ui/GyreOtpVerification';
+import SubscriptionGraceBanner from '@/components/ui/SubscriptionGraceBanner';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
@@ -1071,7 +1072,10 @@ function MainApp() {
       </aside>
 
       {/* ─── CONTENIDO PRINCIPAL ─── */}
-      <main className="flex-1 flex flex-col h-full max-h-screen overflow-hidden min-w-0">
+      <main className="flex-1 flex flex-col h-full max-h-screen overflow-hidden min-w-0 relative">
+
+        {/* Banner de Suscripción / Período de Gracia & Modal de Bloqueo */}
+        <SubscriptionGraceBanner />
 
         {/* Navbar superior (Fijo arriba) */}
         <header
@@ -1191,7 +1195,11 @@ function MainApp() {
         </header>
 
         {/* ─── VISTA ACTIVA (Scroll vertical independiente con margen para móvil) ─── */}
-        <section key={`${vistaActual}-${activeSucursalId}`} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 pb-24 md:pb-8">
+        <section
+          id="nexora-main-content"
+          key={`${vistaActual}-${activeSucursalId}`}
+          className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 pb-24 md:pb-8 transition-opacity duration-300"
+        >
           {/* Alerta de datos offline pendientes */}
           {stats.pendingSyncCount > 0 && (
             <div className="p-4 border border-yellow-500/20 bg-yellow-500/5 text-yellow-600 rounded-xl flex items-center justify-between">
