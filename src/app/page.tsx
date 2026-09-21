@@ -907,10 +907,16 @@ function MainApp() {
                 />
               )}
               <div className="min-w-0 flex-1 flex flex-col justify-center pr-1">
-                <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words text-slate-950 dark:text-slate-50 font-sans">
+                <span 
+                  className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words font-sans"
+                  style={{ color: 'var(--foreground)' }}
+                >
                   {(businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA'}
                 </span>
-                <span className="text-[9.5px] font-extrabold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mt-0.5">
+                <span 
+                  className="text-[9.5px] font-extrabold uppercase tracking-wider block mt-0.5"
+                  style={{ color: 'var(--muted-foreground)' }}
+                >
                   {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
                 </span>
               </div>
