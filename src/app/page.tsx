@@ -374,7 +374,6 @@ function MainApp() {
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
         if (parsed?.tenantName) setBusinessNombre(parsed.tenantName);
-        if (parsed?.rol === 'ROL_SUPER_ADMIN') return;
       }
       const config = await ApiService.get('/configuracion/negocio');
       if (config) {
@@ -384,7 +383,9 @@ function MainApp() {
           applyBrandingColor(config.primaryColor);
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.warn('Error fetching business branding:', err);
+    }
   };
 
   useEffect(() => {
