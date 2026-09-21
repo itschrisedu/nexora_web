@@ -9,7 +9,7 @@ import {
   Truck, Star, Trash2, Plus, Phone, Globe,
   Image, ExternalLink, Eye, EyeOff, Share2,
   Copy, Check, MessageCircle, Upload, Sparkles,
-  Layers, Sliders, Settings2, HelpCircle, Crop
+  Layers, Sliders, Settings2, HelpCircle, Crop, Mail
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
@@ -94,6 +94,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [autoWhatsAppAbono, setAutoWhatsAppAbono] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     const stored = localStorage.getItem("nexora_auto_whatsapp_abono");
+    return stored === null ? true : stored === "true";
+  });
+  const [autoEmailComprobante, setAutoEmailComprobante] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("nexora_auto_email_comprobante");
     return stored === null ? true : stored === "true";
   });
 
@@ -981,6 +986,32 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       window.dispatchEvent(new CustomEvent("nexora:config-changed"));
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                  />
+                </label>
+              </div>
+
+              {/* ENVÍO AUTOMÁTICO POR CORREO ELECTRÓNICO */}
+              <div className="p-4 bg-slate-500/5 dark:bg-slate-800/20 border border-[var(--border)] rounded-xl">
+                <label className="flex items-center justify-between cursor-pointer select-none gap-4">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-2">
+                      <Mail size={15} className="text-blue-500" />
+                      <span>Enviar comprobantes y notificaciones automáticamente por Correo</span>
+                    </span>
+                    <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                      Despacha en segundo plano y de forma transparente el comprobante oficial (abonos, cobros, pedidos, entregas o devoluciones) al correo registrado del cliente o proveedor sin abrir pestañas ni interrumpir la operación.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoEmailComprobante}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setAutoEmailComprobante(checked);
+                      localStorage.setItem("nexora_auto_email_comprobante", String(checked));
+                      window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+                    }}
+                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
                   />
                 </label>
               </div>

@@ -2,7 +2,16 @@ const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const API_BASE_URL = rawUrl.endsWith('/api') ? rawUrl : `${rawUrl.replace(/\/+$/, '')}/api`;
 
 // Solo estas rutas son públicas (no necesitan Bearer token)
-const PUBLIC_PATHS = ['/auth/login', '/auth/refresh'];
+const PUBLIC_PATHS = [
+  '/auth/login',
+  '/auth/refresh',
+  '/auth/request-session-otp',
+  '/auth/verify-session-otp',
+  '/auth/request-unlock-otp',
+  '/auth/verify-unlock-otp',
+  '/auth/recuperar-contrasena',
+  '/auth/reset-contrasena',
+];
 
 /**
  * Traduce errores HTTP y de red a mensajes amigables para usuarios finales.

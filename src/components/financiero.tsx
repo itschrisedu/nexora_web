@@ -1100,6 +1100,23 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         showToast('Abono registrado. El cliente no tiene teléfono para enviar WhatsApp.', 'info');
       }
 
+      // Envío AUTOMÁTICO por Correo Electrónico en segundo plano (sin abrir pestañas ni recargar)
+      const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
+      const emailDestino = carteraSeleccionada?.clienteEmail || (carteraSeleccionada as any)?.email;
+      if (autoEmail && emailDestino) {
+        const msgTexto = armarMensajeWhatsAppAbono(dataAbono, false);
+        ApiService.post('/notificaciones/email-comprobante', {
+          destinatario: emailDestino,
+          asunto: `Comprobante de Abono — $${valor.toFixed(2)} — NEXORA`,
+          tipo: 'ABONO',
+          detalles: { mensaje: msgTexto },
+        }).then(() => {
+          showToast(`Comprobante enviado por correo a ${emailDestino}`, 'success');
+        }).catch((e) => {
+          console.warn('Error en despacho de correo en segundo plano:', e);
+        });
+      }
+
       setMontoAbono('');
       setNotasAbono('');
       await loadCobros();

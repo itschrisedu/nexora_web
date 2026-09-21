@@ -39,9 +39,12 @@ import {
   Menu,
   X,
   Receipt,
+  ShieldAlert,
+  KeyRound,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import { ToastProvider } from '@/components/ui/toast';
+import { GyreOtpVerification } from '@/components/ui/GyreOtpVerification';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
@@ -119,6 +122,18 @@ function MainApp() {
   const [alertaCount, setAlertaCount] = useState(0);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showGpsModal, setShowGpsModal] = useState(false);
+
+  // ── Estados para Sesión Única, Transferencia y Desbloqueo con OTP Gyre ──
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpMode, setOtpMode] = useState<'session-transfer' | 'account-unlock'>('session-transfer');
+  const [maskedEmail, setMaskedEmail] = useState('');
+  const [conflictData, setConflictData] = useState<{ email: string; password?: string } | null>(null);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [unlockEmail, setUnlockEmail] = useState('');
+  const [unlockNewPassword, setUnlockNewPassword] = useState('');
+  const [unlockLoading, setUnlockLoading] = useState(false);
+  const [unlockError, setUnlockError] = useState('');
 
   const verifyGpsPermission = () => {
     if (typeof window === 'undefined') return;
@@ -379,23 +394,45 @@ function MainApp() {
     else document.documentElement.classList.remove('dark');
   };
 
+  const finalizeLogin = (response: any) => {
+    localStorage.setItem('token', response.accessToken);
+    if (response.refreshToken) {
+      localStorage.setItem('refreshToken', response.refreshToken);
+    }
+    localStorage.setItem('user', JSON.stringify(response.user));
+    if (response.user?.tenantId) {
+      localStorage.setItem('tenantId', response.user.tenantId);
+    }
+    setUser(response.user);
+    checkLegalAndGpsConsent(response.user);
+    setIsLoggedIn(true);
+    setShowOtpModal(false);
+    setShowConflictModal(false);
+    setShowUnlockModal(false);
+    fetchStats();
+    fetchSucursales();
+    fetchBusinessBranding();
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     setLoading(true);
     try {
       if (online) {
-        const response = await ApiService.post('/auth/login', { email: username.trim(), password: password.trim() });
-        localStorage.setItem('token', response.accessToken);
-        if (response.refreshToken) {
-          localStorage.setItem('refreshToken', response.refreshToken);
+        const response = await ApiService.post('/auth/login', {
+          email: username.trim(),
+          password: password.trim(),
+        });
+
+        if (response.sessionConflict) {
+          setConflictData({ email: username.trim(), password: password.trim() });
+          setMaskedEmail(response.maskedEmail || username.trim());
+          setShowConflictModal(true);
+          return;
         }
-        localStorage.setItem('user', JSON.stringify(response.user));
-        if (response.user?.tenantId) {
-          localStorage.setItem('tenantId', response.user.tenantId);
-        }
-        setUser(response.user);
-        checkLegalAndGpsConsent(response.user);
+
+        finalizeLogin(response);
       } else {
         let mockUser;
         if (username.trim() === 'superadmin@nexora.com' && password.trim() === 'SuperAdmin2026!') {
@@ -409,15 +446,93 @@ function MainApp() {
         localStorage.setItem('user', JSON.stringify(mockUser));
         setUser(mockUser);
         checkLegalAndGpsConsent(mockUser);
+        setIsLoggedIn(true);
+        fetchStats();
+        fetchSucursales();
+        fetchBusinessBranding();
       }
-      setIsLoggedIn(true);
-      fetchStats();
-      fetchSucursales();
-      fetchBusinessBranding();
     } catch (err: any) {
       setLoginError(err.message || 'Error de conexión con el servidor');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmTransfer = async () => {
+    if (!conflictData) return;
+    setLoading(true);
+    setLoginError('');
+    try {
+      const res = await ApiService.post('/auth/request-session-otp', {
+        email: conflictData.email,
+        password: conflictData.password,
+      });
+      setMaskedEmail(res.maskedEmail || conflictData.email);
+      setOtpMode('session-transfer');
+      setShowConflictModal(false);
+      setShowOtpModal(true);
+    } catch (err: any) {
+      setLoginError(err.message || 'Error al solicitar código de verificación.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (code: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (otpMode === 'session-transfer') {
+        if (!conflictData) return { success: false, error: 'Datos de sesión no disponibles.' };
+        const response = await ApiService.post('/auth/verify-session-otp', {
+          email: conflictData.email,
+          otp: code,
+        });
+        finalizeLogin(response);
+        return { success: true };
+      } else {
+        const response = await ApiService.post('/auth/verify-unlock-otp', {
+          email: unlockEmail.trim(),
+          otp: code,
+          newPassword: unlockNewPassword.trim() || undefined,
+        });
+        finalizeLogin(response);
+        return { success: true };
+      }
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Código incorrecto.' };
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (otpMode === 'session-transfer') {
+      if (!conflictData) return;
+      await ApiService.post('/auth/request-session-otp', {
+        email: conflictData.email,
+        password: conflictData.password,
+      });
+    } else {
+      await ApiService.post('/auth/request-unlock-otp', {
+        email: unlockEmail.trim(),
+      });
+    }
+  };
+
+  const handleRequestUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unlockEmail.trim()) return;
+    setUnlockLoading(true);
+    setUnlockError('');
+    try {
+      const res = await ApiService.post('/auth/request-unlock-otp', {
+        email: unlockEmail.trim(),
+      });
+      setMaskedEmail(res.maskedEmail || unlockEmail.trim());
+      setOtpMode('account-unlock');
+      setShowUnlockModal(false);
+      setShowOtpModal(true);
+    } catch (err: any) {
+      setUnlockError(err.message || 'No se pudo enviar el código de desbloqueo.');
+    } finally {
+      setUnlockLoading(false);
     }
   };
 
@@ -556,14 +671,161 @@ function MainApp() {
               </div>
             )}
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white font-semibold text-sm rounded-lg shadow-lg hover:shadow-amber-500/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50 border border-amber-500/20">
+              className="w-full py-3 bg-linear-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white font-semibold text-sm rounded-lg shadow-lg hover:shadow-amber-500/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50 border border-amber-500/20 cursor-pointer">
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
           </form>
-          <div className="mt-6 text-center text-[10px] text-slate-500">
+
+          {/* Enlace de recuperación y desbloqueo universal */}
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setUnlockEmail(username.trim());
+                setUnlockError('');
+                setShowUnlockModal(true);
+              }}
+              className="text-xs text-amber-400/90 hover:text-amber-300 font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <KeyRound size={13} />
+              <span>¿Cuenta bloqueada o clave olvidada? Desbloquear por correo</span>
+            </button>
+          </div>
+
+          <div className="mt-5 text-center text-[10px] text-slate-500">
             {online ? 'Conectado al servidor' : 'Sin conexión: use admin@nexora.com / Admin123!'}
           </div>
         </div>
+
+        {/* ═══ MODAL 1: CONFLICTO DE SESIÓN ACTIVA ═══ */}
+        {showConflictModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+            <div className="w-full max-w-md bg-[#14161a] border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center mx-auto text-amber-400 shadow-lg shadow-amber-500/10">
+                <ShieldAlert size={28} />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white tracking-tight">
+                  Sesión Activa Detectada
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Ya existe una sesión abierta para <b className="text-amber-400">{username}</b> en otro dispositivo o navegador.
+                </p>
+                <div className="p-3.5 rounded-2xl bg-[#1c1f24] border border-white/5 text-xs text-slate-400 mt-3 text-left leading-relaxed">
+                  Por políticas de seguridad, <b>solo se permite una sesión activa a la vez</b>. Para transferir el control y cerrar la sesión anterior, te enviaremos una clave de 4 dígitos a tu correo registrado <span className="text-emerald-400 font-bold">{maskedEmail}</span>.
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConflictModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmTransfer}
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : 'Continuar y Transferir'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ MODAL 2: SOLICITUD DE DESBLOQUEO / RECUPERACIÓN UNIVERSAL ═══ */}
+        {showUnlockModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+            <div className="w-full max-w-md bg-[#14161a] border border-emerald-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 text-center relative">
+              <button
+                type="button"
+                onClick={() => setShowUnlockModal(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center mx-auto text-emerald-400 shadow-lg shadow-emerald-500/10">
+                <KeyRound size={28} />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white tracking-tight">
+                  Desbloquear Cuenta o Recuperar Clave
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Ingresa tu correo registrado para recibir un código de verificación de 4 dígitos y restablecer tu acceso de inmediato.
+                </p>
+              </div>
+
+              <form onSubmit={handleRequestUnlock} className="space-y-4 text-left">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Correo Registrado</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="usuario@dominio.com"
+                    value={unlockEmail}
+                    onChange={(e) => setUnlockEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-[#1c1f24] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Nueva Contraseña (Opcional)</label>
+                  <input
+                    type="password"
+                    placeholder="Dejar en blanco si solo desea desbloquear"
+                    value={unlockNewPassword}
+                    onChange={(e) => setUnlockNewPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-[#1c1f24] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+
+                {unlockError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+                    <AlertTriangle size={14} className="shrink-0" />
+                    <span>{unlockError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={unlockLoading || !unlockEmail.trim()}
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  {unlockLoading ? <Loader2 size={16} className="animate-spin" /> : 'Enviar Código de Desbloqueo'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ MODAL 3: VERIFICACIÓN CON COMPONENTE GYRE (4 DÍGITOS) ═══ */}
+        {showOtpModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-lg animate-in fade-in">
+            <GyreOtpVerification
+              title={otpMode === 'session-transfer' ? 'Autorizar Transferencia' : 'Desbloquear Cuenta'}
+              subtitle={
+                otpMode === 'session-transfer'
+                  ? 'Ingresa el código de 4 dígitos para cerrar la otra sesión y acceder aquí:'
+                  : 'Ingresa el código de 4 dígitos enviado para desbloquear tu cuenta:'
+              }
+              maskedContact={maskedEmail}
+              onVerify={handleVerifyOtp}
+              onResend={handleResendOtp}
+              onCancel={() => setShowOtpModal(false)}
+              onSuccessContinue={() => {
+                setShowOtpModal(false);
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   }
