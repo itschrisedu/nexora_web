@@ -480,6 +480,15 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         logoUrl: customLogo,
       });
       setSuccessMsg('Personalización guardada correctamente.');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('nexora:theme-changed', {
+          detail: {
+            primaryColor: customColor,
+            logoUrl: customLogo,
+            nombre: businessConfig.nombre,
+          }
+        }));
+      }
       loadBusinessConfig();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {

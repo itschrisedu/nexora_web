@@ -425,9 +425,8 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     return configChanged || nivelesChanged;
   }, [config, initialConfig, nivelesCredito, initialNiveles]);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hasChanges) return;
+  const handleSave = async (e?: React.FormEvent, specificTabLabel?: string) => {
+    if (e && e.preventDefault) e.preventDefault();
     setSaving(true);
     setSuccess("");
     setError("");
@@ -455,7 +454,14 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
       setInitialConfig({ ...finalConfig });
       setInitialNiveles([...nivelesCredito]);
 
-      setSuccess("Configuración global guardada correctamente.");
+      const label = specificTabLabel || (
+        activeTab === "general" ? "Identidad & Negocio" :
+        activeTab === "credito" ? "Scoring & Crédito" :
+        activeTab === "operaciones" ? "Operaciones & Logística" :
+        activeTab === "fiscal" ? "Parámetros Fiscales" : "Sitio Web & Catálogo"
+      );
+      setSuccess(`Cambios de "${label}" guardados correctamente.`);
+
       if (typeof document !== "undefined" && config.primaryColor) {
         document.documentElement.style.setProperty("--primary", config.primaryColor);
         document.documentElement.style.setProperty("--primary-foreground", getContrastColor(config.primaryColor));
@@ -467,6 +473,18 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           },
         }));
       }
+
+      // Sincronizar nombre en sesión local
+      const stored = localStorage.getItem('user');
+      if (stored && config.nombre) {
+        try {
+          const u = JSON.parse(stored);
+          u.tenantName = config.nombre;
+          localStorage.setItem('user', JSON.stringify(u));
+        } catch {}
+      }
+
+      setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al guardar la configuración.");
     } finally {
@@ -706,6 +724,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </div>
               </div>
             </div>
+
+            {/* ACCIÓN DE GUARDAR PESTAÑA IDENTIDAD & NEGOCIO */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+              <span className="text-xs text-[var(--muted-foreground)]">
+                Guarda el nombre comercial, RUC, datos de contacto, logotipo corporativo y color de marca.
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSave(undefined, "Identidad & Negocio")}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+              >
+                {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                <span>Guardar Identidad & Negocio</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -803,6 +837,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* ACCIÓN DE GUARDAR PESTAÑA SCORING & CRÉDITO */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+              <span className="text-xs text-[var(--muted-foreground)]">
+                Guarda las escalas progresivas de crédito, límites de compra por scoring y plazos máximos en días.
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSave(undefined, "Scoring & Crédito")}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+              >
+                {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                <span>Guardar Scoring & Crédito</span>
+              </button>
             </div>
           </div>
         )}
@@ -1127,6 +1177,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </div>
               )}
             </div>
+
+            {/* ACCIÓN DE GUARDAR PESTAÑA OPERACIONES & LOGÍSTICA */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+              <span className="text-xs text-[var(--muted-foreground)]">
+                Guarda los horarios de atención, tiempo de sesión y automatizaciones de comprobantes.
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSave(undefined, "Operaciones & Logística")}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+              >
+                {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                <span>Guardar Operaciones & Horarios</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -1201,6 +1267,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   </select>
                 </div>
               </div>
+            </div>
+
+            {/* ACCIÓN DE GUARDAR PESTAÑA PARÁMETROS FISCALES */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+              <span className="text-xs text-[var(--muted-foreground)]">
+                Guarda los puntos de emisión, ambiente y numeración interna de comprobantes y notas de venta.
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSave(undefined, "Parámetros Fiscales")}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+              >
+                {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                <span>Guardar Parámetros Fiscales</span>
+              </button>
             </div>
           </div>
         )}
@@ -1704,11 +1786,27 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </div>
               </div>
             </div>
+
+            {/* ACCIÓN DE GUARDAR PESTAÑA SITIO WEB & CATÁLOGO */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+              <span className="text-xs text-[var(--muted-foreground)]">
+                Guarda la portada principal, imágenes, redes sociales y textos de catálogo público.
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSave(undefined, "Sitio Web & Catálogo")}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 w-full sm:w-auto"
+              >
+                {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                <span>Guardar Sitio Web & Catálogo</span>
+              </button>
+            </div>
           </div>
         )}
 
         {/* BOTÓN GUARDAR FLOTANTE / INFERIOR */}
-        <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-[var(--border)]">
           <div className="text-xs">
             {hasChanges ? (
               <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
@@ -1718,22 +1816,18 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             ) : (
               <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
                 <CheckCircle size={13} className="text-emerald-500" />
-                Toda la configuración está al día
+                Configuración lista
               </span>
             )}
           </div>
           <button
             type="submit"
-            disabled={saving || !hasChanges}
-            title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
-            className={`flex items-center gap-2 px-5 py-2.5 font-bold text-xs rounded-xl transition-all shadow-md ${
-              hasChanges && !saving
-                ? "bg-slate-900 hover:bg-slate-800 text-white cursor-pointer active:scale-95 hover:shadow-lg dark:bg-amber-500 dark:hover:bg-amber-600 dark:text-slate-950"
-                : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60 shadow-none border border-slate-300 dark:border-slate-700"
-            }`}
+            disabled={saving}
+            title="Guardar todos los cambios realizados en el sistema"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 font-bold text-xs rounded-xl transition-all shadow-md bg-slate-900 hover:bg-slate-800 text-white cursor-pointer active:scale-95 hover:shadow-lg dark:bg-amber-500 dark:hover:bg-amber-600 dark:text-slate-950 disabled:opacity-60 w-full sm:w-auto"
           >
             {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-            <span>{hasChanges ? "Guardar Configuración" : "Configuración al Día"}</span>
+            <span>{saving ? "Guardando Configuración..." : "Guardar Toda la Configuración"}</span>
           </button>
         </div>
       </form>

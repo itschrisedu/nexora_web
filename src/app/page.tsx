@@ -908,10 +908,10 @@ function MainApp() {
                 />
               )}
               <div className="min-w-0 flex-1 flex flex-col justify-center pr-1">
-                <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words text-slate-900 dark:text-white">
-                  {businessNombre || user?.tenantName || 'NEXORA'}
+                <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words text-slate-950 dark:text-slate-50 font-sans">
+                  {(businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA'}
                 </span>
-                <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mt-0.5">
+                <span className="text-[9.5px] font-extrabold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mt-0.5">
                   {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
                 </span>
               </div>
