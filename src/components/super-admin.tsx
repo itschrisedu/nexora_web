@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { ApiService } from "@/services/api.service";
 import {
   Building2,
@@ -48,65 +48,49 @@ interface TenantAdmin {
   id: string;
   email: string;
   nombre: string;
-  activo: boolean;
-}
-
-interface TenantUser {
-  id: string;
-  email: string;
-  nombre: string;
   rol: string;
   activo: boolean;
-  createdAt: string;
-}
-
-interface SubscriptionPaymentItem {
-  id: string;
-  monto: number;
-  periodoMeses: number;
-  metodoPago: string;
-  plan: string;
-  fechaPago: string;
-  fechaInicio: string;
-  fechaFin: string;
-  numeroFacturaSri?: string;
-  facturaAutorizada: boolean;
-  notas?: string;
 }
 
 interface Tenant {
   id: string;
   name: string;
   active: boolean;
-  plan?: "PLAN_BASICO" | "PLAN_COMERCIAL" | "PLAN_MAYORISTA";
-  estadoSuscripcion?: "EN_PRUEBA" | "ACTIVA" | "GRACIA" | "SUSPENDIDA";
-  fechaVencimientoPlan?: string;
-  diasPruebaGratis?: number;
-  diasRestantes?: number;
-  maxSucursales?: number;
-  maxUsuarios?: number;
-  precioMensualPlan?: number;
   createdAt: string;
+  plan?: string;
+  estadoSuscripcion?: string;
+  fechaVencimientoPlan?: string;
+  diasRestantes?: number;
+  precioMensualPlan?: number;
   stats: TenantStats;
   admins: TenantAdmin[];
+}
+
+interface SubscriptionPaymentItem {
+  id: string;
+  monto: number;
+  fechaPago: string;
+  fechaInicio: string;
+  fechaFin: string;
+  periodoMeses: number;
+  metodoPago: string;
+  plan: string;
+  numeroFacturaSri?: string;
+  notas?: string;
 }
 
 interface TenantDetail {
   id: string;
   name: string;
   active: boolean;
-  plan?: "PLAN_BASICO" | "PLAN_COMERCIAL" | "PLAN_MAYORISTA";
-  estadoSuscripcion?: "EN_PRUEBA" | "ACTIVA" | "GRACIA" | "SUSPENDIDA";
-  fechaVencimientoPlan?: string;
-  diasPruebaGratis?: number;
-  diasRestantes?: number;
-  maxSucursales?: number;
-  maxUsuarios?: number;
-  precioMensualPlan?: number;
   createdAt: string;
+  plan?: string;
+  estadoSuscripcion?: string;
+  fechaVencimientoPlan?: string;
+  precioMensualPlan?: number;
   stats: TenantStats;
-  users: TenantUser[];
-  businessConfig: {
+  users: TenantAdmin[];
+  businessConfig?: {
     nombre: string;
     ruc: string;
     direccion: string;
@@ -137,7 +121,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [showPassCreateUser, setShowPassCreateUser] = useState(false);
   const [showPassEditUser, setShowPassEditUser] = useState(false);
 
-  // Modal Suscripción & Facturación
+  // Modal Suscripción & Pagos
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [subscribingTenant, setSubscribingTenant] = useState<Tenant | null>(null);
   const [subLoading, setSubLoading] = useState(false);
@@ -199,6 +183,195 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<{ id: string; nombre: string; email: string } | null>(null);
   const [deleteUserLoading, setDeleteUserLoading] = useState(false);
 
+  // Control de Cambios sin Guardar (Dirty Form) y Descarte Seguro
+  const initialTenantRef = useRef<string>("");
+  const initialUserRef = useRef<string>("");
+  const [discardConfirm, setDiscardConfirm] = useState<{ isOpen: boolean; onDiscard: () => void } | null>(null);
+
+  const isCreateTenantDirty = () => {
+    return (
+      newTenant.name.trim() !== "" ||
+      newTenant.adminEmail.trim() !== "" ||
+      newTenant.adminNombre.trim() !== "" ||
+      newTenant.adminPassword.trim() !== ""
+    );
+  };
+
+  const isEditTenantDirty = () => {
+    if (!editingTenant) return false;
+    return JSON.stringify(editingTenant) !== initialTenantRef.current;
+  };
+
+  const isCreateUserDirty = () => {
+    return (
+      newUser.nombre.trim() !== "" ||
+      newUser.email.trim() !== "" ||
+      newUser.password.trim() !== ""
+    );
+  };
+
+  const isEditUserDirty = () => {
+    if (!editingUser) return false;
+    return JSON.stringify(editingUser) !== initialUserRef.current;
+  };
+
+  const isSubscriptionDirty = () => {
+    return newPayment.notas.trim() !== "" || newPayment.numeroFacturaSri.trim() !== "";
+  };
+
+  const requestCloseEditTenant = () => {
+    if (isEditTenantDirty()) {
+      setDiscardConfirm({
+        isOpen: true,
+        onDiscard: () => {
+          setShowEditTenantModal(false);
+          setEditingTenant(null);
+          setDiscardConfirm(null);
+        },
+      });
+    } else {
+      setShowEditTenantModal(false);
+      setEditingTenant(null);
+    }
+  };
+
+  const requestCloseCreateTenant = () => {
+    if (isCreateTenantDirty()) {
+      setDiscardConfirm({
+        isOpen: true,
+        onDiscard: () => {
+          setShowCreateModal(false);
+          setNewTenant({
+            name: "",
+            adminEmail: "",
+            adminNombre: "",
+            adminPassword: "",
+            plan: "PLAN_COMERCIAL",
+            diasPruebaGratis: 15,
+            precioMensualPlan: 50,
+          });
+          setDiscardConfirm(null);
+        },
+      });
+    } else {
+      setShowCreateModal(false);
+    }
+  };
+
+  const requestCloseCreateUser = () => {
+    if (isCreateUserDirty()) {
+      setDiscardConfirm({
+        isOpen: true,
+        onDiscard: () => {
+          setShowCreateUserModal(false);
+          setNewUser({ email: "", nombre: "", password: "", rol: "ROL_ADMIN" });
+          setDiscardConfirm(null);
+        },
+      });
+    } else {
+      setShowCreateUserModal(false);
+    }
+  };
+
+  const requestCloseEditUser = () => {
+    if (isEditUserDirty()) {
+      setDiscardConfirm({
+        isOpen: true,
+        onDiscard: () => {
+          setShowEditUserModal(false);
+          setEditingUser(null);
+          setDiscardConfirm(null);
+        },
+      });
+    } else {
+      setShowEditUserModal(false);
+      setEditingUser(null);
+    }
+  };
+
+  const requestCloseSubscription = () => {
+    if (isSubscriptionDirty()) {
+      setDiscardConfirm({
+        isOpen: true,
+        onDiscard: () => {
+          setShowSubscriptionModal(false);
+          setSubscribingTenant(null);
+          setDiscardConfirm(null);
+        },
+      });
+    } else {
+      setShowSubscriptionModal(false);
+      setSubscribingTenant(null);
+    }
+  };
+
+  // Listener para cerrar con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (discardConfirm?.isOpen) {
+          setDiscardConfirm(null);
+          return;
+        }
+        if (confirmDeleteUser) {
+          setConfirmDeleteUser(null);
+          return;
+        }
+        if (confirmDeleteTenant) {
+          setConfirmDeleteTenant(null);
+          return;
+        }
+        if (confirmToggle) {
+          setConfirmToggle(null);
+          return;
+        }
+        if (showEditUserModal) {
+          requestCloseEditUser();
+          return;
+        }
+        if (showCreateUserModal) {
+          requestCloseCreateUser();
+          return;
+        }
+        if (showEditTenantModal) {
+          requestCloseEditTenant();
+          return;
+        }
+        if (showSubscriptionModal) {
+          requestCloseSubscription();
+          return;
+        }
+        if (showCreateModal) {
+          requestCloseCreateTenant();
+          return;
+        }
+        if (showDetailModal) {
+          setShowDetailModal(false);
+          setSelectedTenantDetail(null);
+          return;
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    discardConfirm,
+    confirmDeleteUser,
+    confirmDeleteTenant,
+    confirmToggle,
+    showEditUserModal,
+    showCreateUserModal,
+    showEditTenantModal,
+    showSubscriptionModal,
+    showCreateModal,
+    showDetailModal,
+    editingTenant,
+    newTenant,
+    newUser,
+    editingUser,
+    newPayment,
+  ]);
+
   const fetchTenants = useCallback(async () => {
     if (!online) return;
     setLoading(true);
@@ -257,7 +430,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   };
 
   const handleOpenEditTenant = (tenant: Tenant) => {
-    setEditingTenant({
+    const initialData = {
       id: tenant.id,
       name: tenant.name,
       plan: tenant.plan || "PLAN_COMERCIAL",
@@ -266,10 +439,12 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       ruc: "",
       direccion: "",
       telefono: "",
-    });
+    };
+    setEditingTenant(initialData);
+    initialTenantRef.current = JSON.stringify(initialData);
     setShowEditTenantModal(true);
     ApiService.get(`/tenants/${tenant.id}`).then((detail) => {
-      setEditingTenant({
+      const fullData = {
         id: tenant.id,
         name: detail.name,
         plan: detail.plan || "PLAN_COMERCIAL",
@@ -278,7 +453,9 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         ruc: detail.businessConfig?.ruc || "",
         direccion: detail.businessConfig?.direccion || "",
         telefono: detail.businessConfig?.telefono || "",
-      });
+      };
+      setEditingTenant(fullData);
+      initialTenantRef.current = JSON.stringify(fullData);
     }).catch(() => {});
   };
 
@@ -762,24 +939,27 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       )}
 
-      {/* ═══ MODAL: CREAR TENANT ═══ */}
+      {/* ═══ MODAL: CREAR TENANT / EMPRESA ═══ */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
-                  <Building2 size={20} />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-base text-white">Crear Nuevo Negocio</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Asigna plan, período de prueba y administrador</p>
-                </div>
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseCreateTenant(); }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Building2 size={20} className="text-[#0F172A]" />
+                  Crear Nueva Empresa
+                </h2>
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                  Registra una nueva organización con su administrador principal.
+                </p>
               </div>
               <button
-                onClick={() => setShowCreateModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                title="Cerrar ventana"
+                type="button"
+                onClick={requestCloseCreateTenant}
+                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -787,38 +967,37 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
             <form onSubmit={handleCreateTenant} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Nombre del Negocio *
+                  Nombre de la Empresa / Organización *
                 </label>
                 <input
                   type="text"
                   required
                   value={newTenant.name}
                   onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
-                  placeholder="Ej: Calzado Don Pepe"
+                  placeholder="Ej: Calzados Tungurahua"
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
 
-              {/* Selector de Plan SaaS */}
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Plan Comercial NEXORA *
+                  Plan Contratado
                 </label>
                 <select
                   value={newTenant.plan}
                   onChange={(e) => {
-                    const plan = e.target.value;
-                    const precio = plan === "PLAN_BASICO" ? 30 : plan === "PLAN_MAYORISTA" ? 90 : 50;
-                    setNewTenant({ ...newTenant, plan, precioMensualPlan: precio });
+                    const planVal = e.target.value;
+                    const precioDefecto = planVal === "PLAN_BASICO" ? 30 : planVal === "PLAN_MAYORISTA" ? 90 : 50;
+                    setNewTenant({ ...newTenant, plan: planVal, precioMensualPlan: precioDefecto });
                   }}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors font-medium"
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 >
-                  <option value="PLAN_BASICO">Plan Básico ($30/mes) - 1 Sucursal, 2 Usuarios</option>
-                  <option value="PLAN_COMERCIAL">Plan Comercial ($50/mes) - 3 Sucursales, 6 Usuarios</option>
-                  <option value="PLAN_MAYORISTA">Plan Mayorista ($90/mes) - Multi-Bodega, ML Scoring</option>
+                  <option value="PLAN_BASICO">Plan Básico ($30.00/mes - 1 Local, 3 Usuarios)</option>
+                  <option value="PLAN_COMERCIAL">Plan Comercial ($50.00/mes - 3 Locales, 10 Usuarios)</option>
+                  <option value="PLAN_MAYORISTA">Plan Mayorista ($90.00/mes - Locales y Usuarios Ilimitados)</option>
                 </select>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  * Todos los planes cumplen el ciclo comercial 100% completo (Compras, Curvas, Stock, POS, Cobros, SRI).
+                  * Todos los planes incluyen ciclo comercial completo (Compras, Curvas, Stock, POS, Cobranzas y Reportes).
                 </p>
               </div>
 
@@ -892,7 +1071,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <button
                     type="button"
                     onClick={() => setShowPassTenant(!showPassTenant)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 cursor-pointer"
                     tabIndex={-1}
                     title={showPassTenant ? "Ocultar contraseña" : "Mostrar contraseña"}
                   >
@@ -903,15 +1082,15 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                  onClick={requestCloseCreateTenant}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {createLoading && <Loader2 size={14} className="animate-spin" />}
                   {createLoading ? "Creando..." : "Crear Empresa"}
@@ -924,16 +1103,28 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
       {/* ═══ MODAL: EDITAR EMPRESA / PLAN ═══ */}
       {showEditTenantModal && editingTenant && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="p-6 border-b border-[var(--border)]">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Pencil size={20} className="text-amber-500" />
-                Editar Empresa y Plan
-              </h2>
-              <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                Modifica el nombre, plan contratado y datos comerciales.
-              </p>
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseEditTenant(); }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Pencil size={20} className="text-amber-500" />
+                  Editar Empresa y Plan
+                </h2>
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                  Modifica el nombre, plan contratado y datos comerciales.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={requestCloseEditTenant}
+                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
             </div>
             <form onSubmit={handleUpdateTenant} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div>
@@ -1033,18 +1224,15 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowEditTenantModal(false);
-                    setEditingTenant(null);
-                  }}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                  onClick={requestCloseEditTenant}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={editTenantLoading}
-                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
                 >
                   {editTenantLoading && <Loader2 size={14} className="animate-spin" />}
                   {editTenantLoading ? "Guardando..." : "Guardar Cambios"}
@@ -1055,9 +1243,12 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       )}
 
-      {/* ═══ MODAL: GESTIÓN DE SUSCRIPCIÓN Y COBROS / SRI ═══ */}
+      {/* ═══ MODAL: GESTIÓN DE SUSCRIPCIÓN Y PAGOS ═══ */}
       {showSubscriptionModal && subscribingTenant && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseSubscription(); }}
+        >
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="p-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
@@ -1066,16 +1257,13 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <CreditCard size={22} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base">Suscripción y Facturación Super Admin</h3>
+                  <h3 className="font-extrabold text-base">Suscripción y Licenciamiento Super Admin</h3>
                   <p className="text-xs text-slate-300 mt-0.5">{subscribingTenant.name}</p>
                 </div>
               </div>
               <button
-                onClick={() => {
-                  setShowSubscriptionModal(false);
-                  setSubscribingTenant(null);
-                }}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                onClick={requestCloseSubscription}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1169,7 +1357,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                      Factura SRI Emitida (Opcional)
+                      Comprobante / Referencia (Opcional)
                     </label>
                     <input
                       type="text"
@@ -1182,7 +1370,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
                   <div>
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                      Observación / Referencia
+                      Observación / Detalle de Pago
                     </label>
                     <input
                       type="text"
@@ -1197,10 +1385,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <button
                   type="submit"
                   disabled={subLoading}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {subLoading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                  <span>Registrar Cobro y Extender Vigencia</span>
+                  <span>Registrar Pago y Extender Vigencia</span>
                 </button>
               </form>
 
@@ -1223,7 +1411,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                           <th className="text-left px-3 py-2 font-semibold">Período</th>
                           <th className="text-right px-3 py-2 font-semibold">Monto</th>
                           <th className="text-left px-3 py-2 font-semibold">Método</th>
-                          <th className="text-left px-3 py-2 font-semibold">Factura SRI</th>
+                          <th className="text-left px-3 py-2 font-semibold">Comprobante</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1260,7 +1448,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
       {/* ═══ MODAL CONFIRMACIÓN: TOGGLE TENANT ═══ */}
       {confirmToggle && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmToggle(null); }}
+        >
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div
@@ -1284,14 +1475,14 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmToggle(null)}
-                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleToggleTenant}
                 disabled={toggleLoading}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer ${
                   confirmToggle.active
                     ? "bg-rose-500 hover:bg-rose-600"
                     : "bg-emerald-500 hover:bg-emerald-600"
@@ -1307,7 +1498,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
       {/* ═══ MODAL CONFIRMACIÓN: ELIMINAR TENANT ═══ */}
       {confirmDeleteTenant && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDeleteTenant(null); }}
+        >
           <div className="bg-[var(--card)] border border-rose-500/30 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center flex-shrink-0">
@@ -1331,14 +1525,14 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setConfirmDeleteTenant(null)}
-                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleDeleteTenant}
                 disabled={deleteTenantLoading}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg cursor-pointer"
               >
                 {deleteTenantLoading && <Loader2 size={14} className="animate-spin" />}
                 {deleteTenantLoading ? "Eliminando..." : "Eliminar Definitivamente"}
@@ -1350,7 +1544,15 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
       {/* ═══ MODAL DETALLE TENANT ═══ */}
       {showDetailModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { 
+            if (e.target === e.currentTarget) {
+              setShowDetailModal(false);
+              setSelectedTenantDetail(null);
+            }
+          }}
+        >
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
             {loadingDetail ? (
               <div className="flex items-center justify-center py-20">
@@ -1386,7 +1588,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleOpenEditTenant({ id: selectedTenantDetail.id, name: selectedTenantDetail.name } as any)}
-                      className="px-3 py-1.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-lg text-xs font-bold hover:bg-amber-500/20 transition-colors flex items-center gap-1.5"
+                      className="px-3 py-1.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-lg text-xs font-bold hover:bg-amber-500/20 transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <Pencil size={14} /> Editar Tenant
                     </button>
@@ -1395,7 +1597,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                         setShowDetailModal(false);
                         setSelectedTenantDetail(null);
                       }}
-                      className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+                      className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
                     >
                       <XCircle size={20} />
                     </button>
@@ -1459,7 +1661,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                       </h3>
                       <button
                         onClick={() => setShowCreateUserModal(true)}
-                        className="px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+                        className="px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
                       >
                         <UserPlus size={14} /> Nuevo Usuario
                       </button>
@@ -1498,17 +1700,19 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                                 <div className="flex items-center justify-end gap-1">
                                   <button
                                     onClick={() => {
-                                      setEditingUser({
+                                      const userData = {
                                         id: user.id,
                                         nombre: user.nombre,
                                         email: user.email,
                                         rol: user.rol,
                                         activo: user.activo,
                                         password: "",
-                                      });
+                                      };
+                                      setEditingUser(userData);
+                                      initialUserRef.current = JSON.stringify(userData);
                                       setShowEditUserModal(true);
                                     }}
-                                    className="p-1.5 rounded-lg hover:bg-amber-500/10 text-amber-500 transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-amber-500/10 text-amber-500 transition-colors cursor-pointer"
                                     title="Editar Usuario"
                                   >
                                     <Pencil size={15} />
@@ -1521,7 +1725,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                                         email: user.email,
                                       })
                                     }
-                                    className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors cursor-pointer"
                                     title="Eliminar Usuario"
                                   >
                                     <Trash2 size={15} />
@@ -1543,13 +1747,23 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
       {/* ═══ MODAL: CREAR USUARIO PARA TENANT ═══ */}
       {showCreateUserModal && selectedTenantDetail && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="p-6 border-b border-[var(--border)]">
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseCreateUser(); }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <UserPlus size={20} className="text-[#0F172A]" />
                 Agregar Usuario a {selectedTenantDetail.name}
               </h2>
+              <button
+                type="button"
+                onClick={requestCloseCreateUser}
+                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
             </div>
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
               <div>
@@ -1608,7 +1822,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <button
                     type="button"
                     onClick={() => setShowPassCreateUser(!showPassCreateUser)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 cursor-pointer"
                     tabIndex={-1}
                     title={showPassCreateUser ? "Ocultar contraseña" : "Mostrar contraseña"}
                   >
@@ -1619,15 +1833,15 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateUserModal(false)}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                  onClick={requestCloseCreateUser}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={createUserLoading}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {createUserLoading && <Loader2 size={14} className="animate-spin" />}
                   {createUserLoading ? "Creando..." : "Crear Usuario"}
@@ -1640,13 +1854,23 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
       {/* ═══ MODAL: EDITAR USUARIO ═══ */}
       {showEditUserModal && editingUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="p-6 border-b border-[var(--border)]">
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseEditUser(); }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Pencil size={20} className="text-amber-500" />
                 Editar Usuario
               </h2>
+              <button
+                type="button"
+                onClick={requestCloseEditUser}
+                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
             </div>
             <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
               <div>
@@ -1716,7 +1940,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <button
                     type="button"
                     onClick={() => setShowPassEditUser(!showPassEditUser)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 cursor-pointer"
                     tabIndex={-1}
                     title={showPassEditUser ? "Ocultar contraseña" : "Mostrar contraseña"}
                   >
@@ -1727,18 +1951,15 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowEditUserModal(false);
-                    setEditingUser(null);
-                  }}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                  onClick={requestCloseEditUser}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={editUserLoading}
-                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
                 >
                   {editUserLoading && <Loader2 size={14} className="animate-spin" />}
                   {editUserLoading ? "Guardando..." : "Guardar Cambios"}
@@ -1751,7 +1972,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
       {/* ═══ MODAL CONFIRMACIÓN: ELIMINAR USUARIO ═══ */}
       {confirmDeleteUser && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDeleteUser(null); }}
+        >
           <div className="bg-[var(--card)] border border-rose-500/30 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center flex-shrink-0">
@@ -1770,17 +1994,55 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDeleteUser(null)}
-                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors"
+                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleDeleteUser}
                 disabled={deleteUserLoading}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 {deleteUserLoading && <Loader2 size={14} className="animate-spin" />}
                 {deleteUserLoading ? "Eliminando..." : "Eliminar Usuario"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL CONFIRMACIÓN: DESCARTAR CAMBIOS SIN GUARDAR ═══ */}
+      {discardConfirm?.isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setDiscardConfirm(null); }}
+        >
+          <div className="bg-[var(--card)] border border-amber-500/30 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-[var(--foreground)]">¿Descartar cambios sin guardar?</h3>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                  Has realizado modificaciones en el formulario. Si cierras ahora, los cambios no guardados se perderán.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDiscardConfirm(null)}
+                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+              >
+                Continuar Editando
+              </button>
+              <button
+                type="button"
+                onClick={discardConfirm.onDiscard}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+              >
+                Descartar Cambios
               </button>
             </div>
           </div>

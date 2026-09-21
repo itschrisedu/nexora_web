@@ -399,6 +399,12 @@ function MainApp() {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
+        if (parsed?.rol === 'ROL_SUPER_ADMIN') {
+          setBusinessNombre('NEXORA GLOBAL');
+          setBusinessLogo('');
+          applyBrandingColor('#0F172A');
+          return;
+        }
         if (parsed?.tenantName) setBusinessNombre(parsed.tenantName);
       }
       const config = await ApiService.get('/configuracion/negocio');
@@ -968,7 +974,14 @@ function MainApp() {
           {/* Logo + Toggle tema + Botón Cerrar (en móvil) */}
           <div className="shrink-0 p-4 sm:p-5 border-b border-[var(--border)] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              {businessLogo ? (
+              {user?.rol === 'ROL_SUPER_ADMIN' ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/logo.png"
+                  alt="NEXORA"
+                  className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
+                />
+              ) : businessLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={businessLogo}
@@ -988,13 +1001,13 @@ function MainApp() {
                   className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words font-sans"
                   style={{ color: 'var(--foreground)' }}
                 >
-                  {(businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA'}
+                  {user?.rol === 'ROL_SUPER_ADMIN' ? 'NEXORA GLOBAL' : ((businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA')}
                 </span>
                 <span 
                   className="text-[9.5px] font-extrabold uppercase tracking-wider block mt-0.5"
                   style={{ color: 'var(--muted-foreground)' }}
                 >
-                  {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
+                  {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central de la Plataforma' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
                 </span>
               </div>
             </div>
@@ -1522,8 +1535,15 @@ function SuperAdminDashboard({ online, onNavigateToTenants }: { online: boolean;
   const totalTenants = tenants.length;
   const activeTenants = tenants.filter((t) => t.active).length;
   const totalUsers = tenants.reduce((sum, t) => sum + (t.stats?.users || 0), 0);
-  const totalModels = tenants.reduce((sum, t) => sum + (t.stats?.models || 0), 0);
-  const totalOrders = tenants.reduce((sum, t) => sum + (t.stats?.orders || 0), 0);
+  const activePercent = totalTenants > 0 ? Math.round((activeTenants / totalTenants) * 100) : 100;
+
+  const formatPlanLabel = (plan?: string) => {
+    if (!plan) return 'Plan Comercial';
+    if (plan === 'PLAN_BASICO') return 'Plan Básico';
+    if (plan === 'PLAN_MAYORISTA') return 'Plan Mayorista';
+    if (plan === 'PLAN_COMERCIAL') return 'Plan Comercial';
+    return plan.replace('_', ' ');
+  };
 
   return (
     <div className="space-y-8">
@@ -1540,23 +1560,23 @@ function SuperAdminDashboard({ online, onNavigateToTenants }: { online: boolean;
             </div>
             <h2 className="text-2xl font-black tracking-tight">Super Administrador Global</h2>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Supervisión de sucursales, administración centralizada de administradores y gobernanza general de la plataforma NEXORA.
+              Supervisión de empresas afiliadas, licenciamiento comercial, gestión centralizada de accesos y monitoreo global de la plataforma NEXORA.
             </p>
           </div>
           <button
             onClick={onNavigateToTenants}
-            className="flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg hover:shadow-amber-500/20 shrink-0"
+            className="flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg hover:shadow-amber-500/20 shrink-0 cursor-pointer"
           >
             <Building2 size={16} />
-            <span>Gestionar Sucursales / Tenants</span>
+            <span>Gestionar Empresas / Tenants</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards Globales */}
+      {/* KPI Cards Globales para Super Admin */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KpiCard
-          title="Sucursales / Tenants"
+          title="Empresas Afiliadas"
           value={loading ? '...' : String(totalTenants)}
           subtitle={loading ? 'Cargando...' : `${activeTenants} activas • ${totalTenants - activeTenants} inactivas`}
           subtitleColor="text-emerald-500"
@@ -1564,38 +1584,40 @@ function SuperAdminDashboard({ online, onNavigateToTenants }: { online: boolean;
           iconBg="bg-blue-500/10 text-blue-500"
         />
         <KpiCard
-          title="Personal Registrado"
+          title="Usuarios Globales"
           value={loading ? '...' : String(totalUsers)}
-          subtitle="En todas las sucursales"
+          subtitle="En toda la plataforma"
           icon={<Users size={16} />}
           iconBg="bg-amber-500/10 text-amber-500"
         />
         <KpiCard
-          title="Modelos de Calzado"
-          value={loading ? '...' : String(totalModels)}
-          subtitle="Catálogos combinados"
-          icon={<Package size={16} />}
+          title="Licenciamiento Activo"
+          value={loading ? '...' : `${activePercent}%`}
+          subtitle={`${activeTenants} de ${totalTenants} con servicio al día`}
+          subtitleColor="text-emerald-500"
+          icon={<ShieldCheck size={16} />}
           iconBg="bg-emerald-500/10 text-emerald-500"
         />
         <KpiCard
-          title="Pedidos Procesados"
-          value={loading ? '...' : String(totalOrders)}
-          subtitle="Volumen transaccional global"
-          icon={<CreditCard size={16} />}
+          title="Infraestructura Cloud"
+          value="100% Online"
+          subtitle="Aislamiento multitenant activo"
+          subtitleColor="text-emerald-500"
+          icon={<Database size={16} />}
           iconBg="bg-indigo-500/10 text-indigo-500"
         />
       </div>
 
-      {/* Resumen de Sucursales */}
+      {/* Resumen de Empresas / Tenants */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-base font-bold text-[var(--foreground)]">Sucursales del Ecosistema</h3>
-            <p className="text-xs text-[var(--muted-foreground)]">Resumen de comercios conectados a NEXORA</p>
+            <h3 className="text-base font-bold text-[var(--foreground)]">Empresas del Ecosistema</h3>
+            <p className="text-xs text-[var(--muted-foreground)]">Organizaciones conectadas a la red NEXORA</p>
           </div>
           <button
             onClick={onNavigateToTenants}
-            className="text-xs text-amber-500 hover:text-amber-400 font-bold hover:underline"
+            className="text-xs text-amber-500 hover:text-amber-400 font-bold hover:underline cursor-pointer"
           >
             Ver todas →
           </button>
@@ -1604,11 +1626,11 @@ function SuperAdminDashboard({ online, onNavigateToTenants }: { online: boolean;
         {loading ? (
           <div className="flex items-center justify-center py-12 text-[var(--muted-foreground)]">
             <Loader2 className="animate-spin text-amber-500 mr-2" size={20} />
-            <span className="text-xs">Cargando sucursales...</span>
+            <span className="text-xs">Cargando empresas...</span>
           </div>
         ) : tenants.length === 0 ? (
           <div className="text-center py-8 text-xs text-[var(--muted-foreground)]">
-            No hay sucursales registradas aún.
+            No hay empresas registradas aún.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1630,16 +1652,16 @@ function SuperAdminDashboard({ online, onNavigateToTenants }: { online: boolean;
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1 border-t border-[var(--border)]">
                   <div>
+                    <div className="font-bold text-[var(--foreground)] truncate text-[11px]">{formatPlanLabel(t.plan)}</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Plan Actual</div>
+                  </div>
+                  <div>
                     <div className="font-bold text-[var(--foreground)]">{t.stats?.users || 0}</div>
                     <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
                   </div>
                   <div>
-                    <div className="font-bold text-[var(--foreground)]">{t.stats?.models || 0}</div>
-                    <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-[var(--foreground)]">{t.stats?.orders || 0}</div>
-                    <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
+                    <div className="font-bold text-emerald-500">${t.precioMensualPlan || 50}/m</div>
+                    <div className="text-[9px] text-[var(--muted-foreground)]">Tarifa</div>
                   </div>
                 </div>
               </div>
