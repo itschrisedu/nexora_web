@@ -387,6 +387,29 @@ function MainApp() {
     } catch (err) {}
   };
 
+  useEffect(() => {
+    // Sincronización dinámica del favicon y título de la pestaña del navegador
+    const targetIcon = businessLogo || '/logo.png';
+    let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = targetIcon;
+
+    let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
+    if (appleLink) {
+      appleLink.href = targetIcon;
+    }
+
+    if (businessNombre) {
+      document.title = `${businessNombre} | NEXORA`;
+    } else {
+      document.title = 'NEXORA - Sistema de Gestión Comercial';
+    }
+  }, [businessLogo, businessNombre]);
+
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
@@ -636,7 +659,13 @@ function MainApp() {
         <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
 
         <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl z-10">
-          <div className="text-center mb-8">
+          <div className="text-center mb-8 flex flex-col items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="NEXORA"
+              className="w-16 h-16 object-contain mb-3 rounded-2xl p-1 bg-white shadow-xl ring-1 ring-white/10"
+            />
             <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-amber-300 bg-clip-text text-transparent">
               NEXORA
             </h1>
@@ -870,12 +899,12 @@ function MainApp() {
                   className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
                 />
               ) : (
-                <div
-                  className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center shadow-xs shrink-0"
-                  style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-                >
-                  {(businessNombre || user?.tenantName || 'N').charAt(0).toUpperCase()}
-                </div>
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/logo.png"
+                  alt="NEXORA"
+                  className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
+                />
               )}
               <div className="min-w-0 flex-1 flex flex-col justify-center pr-1">
                 <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words text-slate-900 dark:text-white">

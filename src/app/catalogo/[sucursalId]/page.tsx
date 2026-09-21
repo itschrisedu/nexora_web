@@ -94,6 +94,17 @@ export default function CatalogoSucursalPage() {
         if (!res.ok) throw new Error("No se pudo cargar el catálogo");
         const json = await res.json();
         setData(json);
+        if (json?.negocio) {
+          const iconUrl = json.negocio.logoUrl || '/logo.png';
+          let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = iconUrl;
+          document.title = `${json.negocio.nombreNegocio || 'Catálogo Digital'} | NEXORA`;
+        }
       } catch (err: any) {
         setError(err.message || "Error al cargar");
       } finally {
@@ -173,11 +184,9 @@ export default function CatalogoSucursalPage() {
             </a>
             <span className="text-white/10">|</span>
             {negocio.logoUrl ? (
-              <img src={negocio.logoUrl} alt="" className="h-7 w-7 rounded-lg object-cover ring-1 ring-amber-400/20" />
+              <img src={negocio.logoUrl} alt="" className="h-7 w-7 rounded-lg object-contain ring-1 ring-amber-400/20 bg-white p-0.5" />
             ) : (
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-900 font-black text-[10px]">
-                {negocio.nombreNegocio.charAt(0)}
-              </div>
+              <img src="/logo.png" alt="NEXORA" className="h-7 w-7 rounded-lg object-contain ring-1 ring-amber-400/20 bg-white p-0.5" />
             )}
             <div className="hidden md:block">
               <div className="text-xs font-bold">{sucursalActual.nombre}</div>

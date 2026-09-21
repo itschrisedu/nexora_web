@@ -191,6 +191,17 @@ function LandingContent() {
         if (!res.ok) throw new Error("No se pudo cargar la información del negocio");
         const json = await res.json();
         setData(json);
+        if (json?.negocio) {
+          const iconUrl = json.negocio.logoUrl || '/logo.png';
+          let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = iconUrl;
+          document.title = `${json.negocio.nombreNegocio || 'Calzado de Cuero'} | NEXORA`;
+        }
 
         // Inicializar la primera variante y serie de cada modelo
         if (json.modelos && Array.isArray(json.modelos)) {
@@ -503,12 +514,12 @@ function LandingContent() {
                 className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-contain bg-white border border-slate-200 p-1 shadow-xs group-hover:scale-105 transition-transform"
               />
             ) : (
-              <div
-                className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl flex items-center justify-center text-white font-black text-base shadow-sm group-hover:scale-105 transition-transform"
-                style={{ backgroundColor: brandColor }}
-              >
-                {negocio.nombreNegocio ? negocio.nombreNegocio.charAt(0) : "N"}
-              </div>
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src="/logo.png"
+                alt="NEXORA"
+                className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-contain bg-white border border-slate-200 p-1 shadow-xs group-hover:scale-105 transition-transform"
+              />
             )}
             <div>
               <span className="font-extrabold text-sm sm:text-base text-slate-900 tracking-tight block leading-tight">
@@ -1190,9 +1201,12 @@ function LandingContent() {
                     className="h-8 w-8 rounded-xl object-contain bg-white p-0.5"
                   />
                 ) : (
-                  <div className="h-8 w-8 rounded-xl bg-amber-500 flex items-center justify-center text-slate-900 font-black text-xs">
-                    {negocio.nombreNegocio?.charAt(0) || "N"}
-                  </div>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src="/logo.png"
+                    alt="NEXORA"
+                    className="h-8 w-8 rounded-xl object-contain bg-white p-0.5"
+                  />
                 )}
                 <div>
                   <h3 className="font-bold text-sm leading-tight">{negocio.nombreNegocio}</h3>
