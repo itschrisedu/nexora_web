@@ -273,6 +273,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
   const [newColorName, setNewColorName] = useState("");
   const [newColorFoto, setNewColorFoto] = useState<string | null>(null);
+  const [newColorSupplierId, setNewColorSupplierId] = useState("");
   const [newColorSerieIds, setNewColorSerieIds] = useState<string[]>([]);
   const [newColorSeriesPrices, setNewColorSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [newColorCustomTallas, setNewColorCustomTallas] = useState<Record<string, string[]>>({});
@@ -326,7 +327,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [qsRazonSocial, setQsRazonSocial] = useState("");
   const [qsContacto, setQsContacto] = useState("");
   const [qsSaving, setQsSaving] = useState(false);
-  const [qsContext, setQsContext] = useState<'create' | 'edit'>('create');
+  const [qsContext, setQsContext] = useState<'create' | 'edit' | 'addColor'>('create');
 
   const [marginPct, setMarginPct] = useState<number>(getStoredProfitMargin());
 
@@ -348,8 +349,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
   }, [showCreate, name, brand, baseCode, serieIds.length, colors]);
 
   const isDirtyAddColor = useCallback(() => {
-    return showAddColorModal && (newColorName.trim() !== "" || newColorFoto !== null);
-  }, [showAddColorModal, newColorName, newColorFoto]);
+    return showAddColorModal && (
+      newColorName.trim() !== "" ||
+      newColorFoto !== null ||
+      newColorSupplierId !== (selectedModelForColor?.supplierId || "")
+    );
+  }, [showAddColorModal, newColorName, newColorFoto, newColorSupplierId, selectedModelForColor]);
 
   const isDirtyPrice = useCallback(() => {
     return showPrice && (newCosto.trim() !== "" || newVenta.trim() !== "" || motivo.trim() !== "");
@@ -517,6 +522,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
         } else {
           setCreateAlternateIds(prev => [...prev, newId]);
         }
+      } else if (qsContext === 'addColor') {
+        setNewColorSupplierId(newId);
       } else {
         if (!editModelSupplierId) {
           setEditModelSupplierId(newId);
@@ -657,6 +664,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setSelectedModelForColor(m);
     setNewColorName("");
     setNewColorFoto(null);
+    setNewColorSupplierId(m.supplierId || (m.suppliers && m.suppliers.length > 0 ? m.suppliers[0].id : ""));
 
     const existingSerieIds = Array.from(
       new Set((m.products || []).map(p => p.serie?.id).filter(Boolean))
@@ -915,6 +923,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         stockInicial: parseInt(newColorStockInicial) || 0,
         seriesPrices: seriesPricesMap,
         customTallas: newColorCustomTallas,
+        supplierId: newColorSupplierId || undefined,
       });
 
       const addedColor = newColorName.trim();
@@ -2143,13 +2152,73 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 </div>
               </div>
 
-              {/* Sección 2: Series y Precios para este Color */}
+              {/* Sección 2: Proveedor / Taller Fabricante de esta Variante */}
+              <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+                  <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest flex items-center gap-1.5">
+                    <Truck size={14} className="text-emerald-600" />
+                    <span>2. Proveedor / Taller Fabricante</span>
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => { setQsContext('addColor'); setShowQuickSupplier(true); }}
+                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition-colors cursor-pointer"
+                  >
+                    <Plus size={12} />
+                    <span>+ Registrar Nuevo Proveedor</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-[var(--muted-foreground)] -mt-1">
+                  Selecciona el taller o proveedor que suministra esta variante. El precio de costo que ingreses abajo corresponderá al valor entregado por este proveedor.
+                </p>
+                <div className="space-y-2">
+                  <Lbl t="Proveedor Asignado a esta Variante" />
+                  <div className="flex gap-2">
+                    <select
+                      value={newColorSupplierId}
+                      onChange={e => setNewColorSupplierId(e.target.value)}
+                      className={`${INPUT} flex-1 font-medium`}
+                    >
+                      <option value="">-- Sin proveedor específico (Heredar del modelo) --</option>
+                      {listaProveedores.map(p => {
+                        const isPrimary = p.id === selectedModelForColor.supplierId;
+                        const isAlternate = (selectedModelForColor.alternateSupplierIds || []).includes(p.id);
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.razonSocial} {p.ruc ? `(${p.ruc})` : ''} {isPrimary ? '★ [Principal del Modelo]' : isAlternate ? '⚡ [Alterno del Modelo]' : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => { setQsContext('addColor'); setShowQuickSupplier(true); }}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors shadow-xs cursor-pointer"
+                      title="Registrar nuevo taller o proveedor al vuelo"
+                    >
+                      <Plus size={13} />
+                      <span>Nuevo</span>
+                    </button>
+                  </div>
+
+                  {newColorSupplierId && (
+                    <div className="flex items-center gap-2 pt-1 text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg">
+                      <CheckCircle size={13} className="shrink-0" />
+                      <span>
+                        Variante vinculada a: <strong>{listaProveedores.find(p => p.id === newColorSupplierId)?.razonSocial || 'Proveedor seleccionado'}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sección 3: Series y Precios para este Color */}
               <div className="space-y-4">
                 <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
-                  2. Series y Precios para este Color
+                  3. Series y Precios de Entrega (Costo) y Venta
                 </h5>
                 <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
-                  Activa las series que deseas generar para este nuevo color y asigna sus precios de compra y venta.
+                  Activa las series que deseas generar para este nuevo color y asigna el precio de entrega del proveedor y el precio de venta al público.
                 </p>
 
                 <div className="space-y-3">
@@ -2201,7 +2270,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                             <div className="px-4 pb-4 pt-3 space-y-3">
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <Lbl t="Precio de Compra ($)" req />
+                                  <Lbl t="Precio Entrega Proveedor ($)" req />
                                   <input type="number" min="0.01" step="0.01"
                                     value={prices.costPrice}
                                     onChange={e => setNewColorSeriesPrices(prev => ({
@@ -2211,7 +2280,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                     placeholder="0.00" className={INPUT} />
                                 </div>
                                 <div>
-                                  <Lbl t="Precio de Venta ($)" req />
+                                  <div className="flex items-center justify-between">
+                                    <Lbl t="Precio de Venta ($)" req />
+                                    {hasCost && suggestedSale && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setNewColorSeriesPrices(prev => ({
+                                          ...prev,
+                                          [s.id]: { ...prev[s.id], salePrice: suggestedSale }
+                                        }))}
+                                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+                                        title="Auto-asignar precio sugerido con margen de ganancia"
+                                      >
+                                        Auto: ${suggestedSale}
+                                      </button>
+                                    )}
+                                  </div>
                                   <input type="number" min="0.01" step="0.01"
                                     value={prices.salePrice}
                                     onChange={e => setNewColorSeriesPrices(prev => ({
