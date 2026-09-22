@@ -409,7 +409,11 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     setCreateLoading(true);
     setErrorMsg("");
     try {
-      await ApiService.post("/tenants", newTenant);
+      await ApiService.post("/tenants", {
+        ...newTenant,
+        diasPruebaGratis: Number(newTenant.diasPruebaGratis || 0),
+        precioMensualPlan: (newTenant.precioMensualPlan as any) !== "" && newTenant.precioMensualPlan !== undefined && newTenant.precioMensualPlan !== null ? Number(newTenant.precioMensualPlan) : 50,
+      });
       setSuccessMsg(`Tenant "${newTenant.name}" creado con ${newTenant.plan} y ${newTenant.diasPruebaGratis} días de prueba.`);
       setShowCreateModal(false);
       setNewTenant({
@@ -435,7 +439,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       name: tenant.name,
       plan: tenant.plan || "PLAN_COMERCIAL",
       estadoSuscripcion: tenant.estadoSuscripcion || "ACTIVA",
-      precioMensualPlan: tenant.precioMensualPlan || 50,
+      precioMensualPlan: (tenant.precioMensualPlan !== undefined && tenant.precioMensualPlan !== null) ? tenant.precioMensualPlan : 50,
       ruc: "",
       direccion: "",
       telefono: "",
@@ -449,7 +453,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         name: detail.name,
         plan: detail.plan || "PLAN_COMERCIAL",
         estadoSuscripcion: detail.estadoSuscripcion || "ACTIVA",
-        precioMensualPlan: detail.precioMensualPlan || 50,
+        precioMensualPlan: (detail.precioMensualPlan !== undefined && detail.precioMensualPlan !== null) ? detail.precioMensualPlan : 50,
         ruc: detail.businessConfig?.ruc || "",
         direccion: detail.businessConfig?.direccion || "",
         telefono: detail.businessConfig?.telefono || "",
@@ -468,7 +472,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         name: editingTenant.name,
         plan: editingTenant.plan,
         estadoSuscripcion: editingTenant.estadoSuscripcion,
-        precioMensualPlan: Number(editingTenant.precioMensualPlan),
+        precioMensualPlan: Number(editingTenant.precioMensualPlan || 0),
         businessConfig: {
           nombre: editingTenant.name,
           ruc: editingTenant.ruc,
@@ -492,7 +496,9 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
   const handleOpenSubscriptionModal = async (tenant: Tenant) => {
     setSubscribingTenant(tenant);
-    const defaultMonto = tenant.precioMensualPlan || (tenant.plan === "PLAN_BASICO" ? 30 : tenant.plan === "PLAN_MAYORISTA" ? 90 : 50);
+    const defaultMonto = (tenant.precioMensualPlan !== undefined && tenant.precioMensualPlan !== null)
+      ? tenant.precioMensualPlan
+      : (tenant.plan === "PLAN_BASICO" ? 30 : tenant.plan === "PLAN_MAYORISTA" ? 90 : 50);
     setNewPayment({
       monto: defaultMonto,
       periodoMeses: 1,
@@ -1010,8 +1016,9 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     type="number"
                     min="0"
                     max="90"
-                    value={newTenant.diasPruebaGratis}
-                    onChange={(e) => setNewTenant({ ...newTenant, diasPruebaGratis: Number(e.target.value) })}
+                    value={newTenant.diasPruebaGratis === ("" as any) ? "" : newTenant.diasPruebaGratis}
+                    onChange={(e) => setNewTenant({ ...newTenant, diasPruebaGratis: e.target.value === "" ? ("" as any) : Number(e.target.value) })}
+                    placeholder="15"
                     className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
@@ -1022,8 +1029,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <input
                     type="number"
                     step="0.01"
-                    value={newTenant.precioMensualPlan}
-                    onChange={(e) => setNewTenant({ ...newTenant, precioMensualPlan: Number(e.target.value) })}
+                    min="0"
+                    value={newTenant.precioMensualPlan === ("" as any) ? "" : newTenant.precioMensualPlan}
+                    onChange={(e) => setNewTenant({ ...newTenant, precioMensualPlan: e.target.value === "" ? ("" as any) : Number(e.target.value) })}
+                    placeholder="50.00"
                     className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
@@ -1179,8 +1188,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <input
                   type="number"
                   step="0.01"
-                  value={editingTenant.precioMensualPlan}
-                  onChange={(e) => setEditingTenant({ ...editingTenant, precioMensualPlan: Number(e.target.value) })}
+                  min="0"
+                  value={editingTenant.precioMensualPlan === ("" as any) ? "" : editingTenant.precioMensualPlan}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, precioMensualPlan: e.target.value === "" ? ("" as any) : Number(e.target.value) })}
+                  placeholder="0.00"
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
@@ -1276,7 +1287,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Plan Actual</span>
                   <span className="text-base font-black text-white">{subscribingTenant.plan || "PLAN_COMERCIAL"}</span>
                   <p className="text-xs text-emerald-400 font-semibold mt-0.5">
-                    Tarifa: ${subscribingTenant.precioMensualPlan || 50}.00 / mes
+                    Tarifa: ${(subscribingTenant.precioMensualPlan !== undefined && subscribingTenant.precioMensualPlan !== null ? Number(subscribingTenant.precioMensualPlan) : 50).toFixed(2)} / mes
                   </p>
                 </div>
                 <div className="text-right">
@@ -1311,7 +1322,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                       value={newPayment.periodoMeses}
                       onChange={(e) => {
                         const meses = Number(e.target.value);
-                        const mensual = subscribingTenant.precioMensualPlan || 50;
+                        const mensual = subscribingTenant.precioMensualPlan !== undefined && subscribingTenant.precioMensualPlan !== null ? Number(subscribingTenant.precioMensualPlan) : 50;
                         setNewPayment({ ...newPayment, periodoMeses: meses, monto: mensual * meses });
                       }}
                       className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm"

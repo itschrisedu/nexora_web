@@ -109,7 +109,7 @@ export default function SubscriptionGraceBanner({
 
   const planName = PLAN_NAMES[status.plan] || status.plan;
   const whatsappUrl = `https://wa.me/${status.superAdminWhatsapp}?text=${encodeURIComponent(
-    `Hola NEXORA, adjunto el comprobante de pago de la suscripción para el negocio "${status.tenantName}" (${planName}) por un valor de $${status.precioMensualPlan}.00.`
+    `Hola NEXORA, adjunto el comprobante de pago de la suscripción para el negocio "${status.tenantName}" (${planName}) por un valor de $${Number(status.precioMensualPlan ?? 0).toFixed(2)}.`
   )}`;
 
   return (
@@ -204,7 +204,7 @@ export default function SubscriptionGraceBanner({
                   </span>
                 </div>
                 <span className="text-xs font-black text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-700/50">
-                  Total: ${status.precioMensualPlan}.00 / mes
+                  Total: ${Number(status.precioMensualPlan ?? 0).toFixed(2)} / mes
                 </span>
               </div>
 
@@ -303,7 +303,7 @@ export default function SubscriptionGraceBanner({
               </div>
               <div className="text-right">
                 <span className="text-xs text-slate-400 block">Valor Mensual:</span>
-                <span className="text-base font-black text-emerald-400">${status.precioMensualPlan}.00</span>
+                <span className="text-base font-black text-emerald-400">${Number(status.precioMensualPlan ?? 0).toFixed(2)}</span>
               </div>
             </div>
 

@@ -2544,8 +2544,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* ── MODAL CREAR SERIE PERSONALIZADA ── */}
       {showCreateSeriesModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCreateSeriesModal(false), isDirtyCreateSeries()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCreateSeriesModal(false), isDirtyCreateSeries()); }}>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
@@ -2605,7 +2605,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* ── MODAL EDITAR SERIE EXISTENTE ── */}
       {showEditSeriesModal && editingSerie && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSeriesModal(false), isDirtyEditSeries()); }}>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSeriesModal(false), isDirtyEditSeries()); }}>
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center gap-3">
@@ -3241,7 +3241,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       {/* Modal de Proveedor Rápido */}
       {showQuickSupplier && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-150"
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150"
              onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="p-4 px-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">

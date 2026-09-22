@@ -299,8 +299,12 @@ function MainApp() {
 
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
+    const savedActiveView = localStorage.getItem('nexora_active_view') as Vista | null;
     if (token) { 
       setIsLoggedIn(true); 
+      if (savedActiveView) {
+        setVistaActual(savedActiveView);
+      }
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
         setUser(parsed);
@@ -461,6 +465,7 @@ function MainApp() {
       setShowUnsavedModal(true);
     } else {
       setVistaActual(target);
+      localStorage.setItem('nexora_active_view', target);
     }
   };
 
@@ -474,6 +479,7 @@ function MainApp() {
     setShowUnsavedModal(false);
     if (pendingVista) {
       setVistaActual(pendingVista);
+      localStorage.setItem('nexora_active_view', pendingVista);
       setPendingVista(null);
     }
   };
@@ -483,6 +489,7 @@ function MainApp() {
     setShowUnsavedModal(false);
     if (pendingVista) {
       setVistaActual(pendingVista);
+      localStorage.setItem('nexora_active_view', pendingVista);
       setPendingVista(null);
     }
   };
@@ -496,6 +503,8 @@ function MainApp() {
     if (response.user?.tenantId) {
       localStorage.setItem('tenantId', response.user.tenantId);
     }
+    localStorage.setItem('nexora_active_view', 'dashboard');
+    setVistaActual('dashboard');
     setUser(response.user);
     checkLegalAndGpsConsent(response.user);
     setIsLoggedIn(true);
@@ -648,6 +657,7 @@ function MainApp() {
     localStorage.removeItem('user');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('tenantId');
+    localStorage.removeItem('nexora_active_view');
     clearUnsavedChanges();
     setUser(null);
     setIsLoggedIn(false);
@@ -1766,7 +1776,7 @@ function SuperAdminDashboard({ online, onNavigateToTenants }: { online: boolean;
                     <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
                   </div>
                   <div>
-                    <div className="font-bold text-emerald-500">${t.precioMensualPlan || 50}/m</div>
+                    <div className="font-bold text-emerald-500">${t.precioMensualPlan !== undefined && t.precioMensualPlan !== null ? t.precioMensualPlan : 50}/m</div>
                     <div className="text-[9px] text-[var(--muted-foreground)]">Tarifa</div>
                   </div>
                 </div>
