@@ -55,6 +55,14 @@ import ConfirmModal from './ui/confirm-modal';
 import { useToast } from './ui/toast';
 import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, compartirOrdenCompraPdf, OrdenCompraPdfData } from '../services/pdf-factura.service';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
+import { validarRuc } from '../utils/ecuador-validators';
+import {
+  formatearNombres,
+  formatearEmail,
+  validarEmailEstricto,
+  formatearTelefono,
+  formatearDireccion,
+} from '../utils/text-formatters';
 
 interface ProveedoresProps {
   online: boolean;
@@ -423,6 +431,14 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [direccion, setDireccion] = useState('');
   const [email, setEmail] = useState('');
 
+  // Form: Editar Proveedor
+  const [showEditSupplierModal, setShowEditSupplierModal] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Proveedor | null>(null);
+  const [editRazonSocial, setEditRazonSocial] = useState('');
+  const [editContacto, setEditContacto] = useState('');
+  const [editDireccion, setEditDireccion] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+
   // Form: Nueva Orden
   const [orderSupplierId, setOrderSupplierId] = useState('');
   const [orderObservaciones, setOrderObservaciones] = useState('');
@@ -647,14 +663,27 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       return;
     }
 
+    if (!validarRuc(ruc)) {
+      showToast('El RUC ingresado no es válido (debe tener 13 dígitos numéricos).', 'error');
+      return;
+    }
+
+    if (email) {
+      const emailVal = validarEmailEstricto(email);
+      if (!emailVal.valido) {
+        showToast(emailVal.mensaje || 'El correo electrónico no es válido.', 'error');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       await ApiService.post('/proveedores', {
-        ruc,
-        razonSocial,
-        contacto: contacto || undefined,
-        direccion: direccion || undefined,
-        email: email || undefined,
+        ruc: ruc.trim(),
+        razonSocial: razonSocial.trim(),
+        contacto: contacto ? formatearNombres(contacto, 3) : undefined,
+        direccion: direccion ? formatearDireccion(direccion) : undefined,
+        email: email ? formatearEmail(email) : undefined,
       });
 
       showToast('Proveedor registrado correctamente.', 'success');
@@ -663,6 +692,51 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Error al registrar el proveedor.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOpenEditSupplier = (p: Proveedor) => {
+    setEditingSupplier(p);
+    setEditRazonSocial(p.razonSocial || p.nombre || '');
+    setEditContacto(p.contacto || '');
+    setEditDireccion(p.direccion || '');
+    setEditEmail(p.email || '');
+    setShowEditSupplierModal(true);
+  };
+
+  const handleUpdateProveedor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSupplier) return;
+    if (!editRazonSocial.trim()) {
+      showToast('La Razón Social es obligatoria.', 'error');
+      return;
+    }
+
+    if (editEmail) {
+      const emailVal = validarEmailEstricto(editEmail);
+      if (!emailVal.valido) {
+        showToast(emailVal.mensaje || 'El correo electrónico no es válido.', 'error');
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      await ApiService.put(`/proveedores/${editingSupplier.id}`, {
+        razonSocial: editRazonSocial.trim(),
+        contacto: editContacto ? formatearNombres(editContacto, 3) : undefined,
+        direccion: editDireccion ? formatearDireccion(editDireccion) : undefined,
+        email: editEmail ? formatearEmail(editEmail) : undefined,
+      });
+
+      showToast('Proveedor actualizado correctamente.', 'success');
+      setShowEditSupplierModal(false);
+      setEditingSupplier(null);
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Error al actualizar el proveedor.', 'error');
     } finally {
       setSaving(false);
     }
@@ -1780,8 +1854,16 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
                   <div className="pt-3 border-t border-[var(--border)] flex items-center gap-2">
                     <button
+                      onClick={() => handleOpenEditSupplier(p)}
+                      className="py-2 px-3 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="Editar datos del proveedor"
+                    >
+                      <Edit3 size={13} />
+                      <span>Editar</span>
+                    </button>
+                    <button
                       onClick={() => handleAbrirCuentaCorriente(p.id)}
-                      className="flex-1 py-2 px-3 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2 px-3 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <History size={13} />
                       <span>Estado de Cuenta</span>
@@ -1789,7 +1871,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     {tieneDeuda && (
                       <button
                         onClick={() => handleAbrirModalPago(p.id, undefined, deuda)}
-                        className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1 shadow-sm"
+                        className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
                         title="Registrar Abono o Pago"
                       >
                         <DollarSign size={13} />
@@ -4210,7 +4292,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   type="text"
                   placeholder="Ej. 0998765432"
                   value={contacto}
-                  onChange={(e) => setContacto(e.target.value)}
+                  onChange={(e) => setContacto(formatearTelefono(e.target.value))}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -4223,7 +4305,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   type="email"
                   placeholder="Ej. pedidos@proveedor.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(formatearEmail(e.target.value))}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -4236,7 +4318,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   type="text"
                   placeholder="Ej. Parque Industrial / Av. Principal"
                   value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
+                  onChange={(e) => setDireccion(formatearDireccion(e.target.value))}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -4261,6 +4343,127 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     </div>
                   ) : (
                     <span>Guardar Proveedor</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          MODAL: EDITAR PROVEEDOR
+         ══════════════════════════════════════════ */}
+      {showEditSupplierModal && editingSupplier && (
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowEditSupplierModal(false); setEditingSupplier(null); } }}>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                  <Edit3 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Editar Proveedor</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Actualizar datos de {editingSupplier.razonSocial || editingSupplier.nombre}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => { setShowEditSupplierModal(false); setEditingSupplier(null); }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateProveedor} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  RUC del Proveedor
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editingSupplier.ruc || ''}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl text-xs font-mono font-bold text-[var(--muted-foreground)] cursor-not-allowed opacity-60"
+                />
+                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">El RUC no puede modificarse una vez registrado.</p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Razón Social / Nombre Comercial *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Curtiduría & Cueros del Ecuador S.A."
+                  value={editRazonSocial}
+                  onChange={(e) => setEditRazonSocial(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Teléfono / WhatsApp de Contacto
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. 0998765432"
+                  value={editContacto}
+                  onChange={(e) => setEditContacto(formatearTelefono(e.target.value))}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  placeholder="Ej. pedidos@proveedor.com"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(formatearEmail(e.target.value))}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Dirección de Taller / Fábrica
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. Parque Industrial / Av. Principal"
+                  value={editDireccion}
+                  onChange={(e) => setEditDireccion(formatearDireccion(e.target.value))}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditSupplierModal(false); setEditingSupplier(null); }}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700"
+                >
+                  {saving ? (
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Actualizando...</span>
+                    </div>
+                  ) : (
+                    <span>Actualizar Proveedor</span>
                   )}
                 </button>
               </div>

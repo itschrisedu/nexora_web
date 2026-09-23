@@ -19,6 +19,14 @@ import {
   validarDocumentoEcuador,
   normalizarTelefonoCelular,
 } from "../utils/ecuador-validators";
+import {
+  formatearNombres,
+  formatearApellidos,
+  formatearEmail,
+  validarEmailEstricto,
+  formatearTelefono,
+  formatearDireccion,
+} from "../utils/text-formatters";
 
 interface ClientesProps {
   online: boolean;
@@ -384,6 +392,15 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     if (!validarTelefonoCelular(telefono)) {
       setTelErr("El número celular debe tener exactamente 10 dígitos y empezar con 09 (ej. 0991234567).");
       valid = false;
+    }
+
+    // Validación estricta de Email (si se ingresó)
+    if (email) {
+      const emailRes = validarEmailEstricto(email);
+      if (!emailRes.valido) {
+        setError(emailRes.mensaje || "El correo electrónico ingresado no es válido.");
+        valid = false;
+      }
     }
 
     // Validación de Documento de Identificación (Cédula 10 dígitos módulo 10 / RUC 13 dígitos terminado en 001)
@@ -1799,8 +1816,28 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
             </div>
             <form onSubmit={showCreate ? handleCreate : handleEdit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
-                <div><Lbl t="Nombre" req /><input type="text" required value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej. Juan" className={INPUT} /></div>
-                <div><Lbl t="Apellido" req /><input type="text" required value={apellido} onChange={e => setApellido(e.target.value)} placeholder="Ej. Pérez" className={INPUT} /></div>
+                <div>
+                  <Lbl t="Nombres (Hasta 3)" req />
+                  <input
+                    type="text"
+                    required
+                    value={nombre}
+                    onChange={(e) => setNombre(formatearNombres(e.target.value, 3))}
+                    placeholder="Ej. Juan Carlos Eduardo"
+                    className={INPUT}
+                  />
+                </div>
+                <div>
+                  <Lbl t="Apellidos (Hasta 2)" req />
+                  <input
+                    type="text"
+                    required
+                    value={apellido}
+                    onChange={(e) => setApellido(formatearApellidos(e.target.value))}
+                    placeholder="Ej. Pérez Gómez"
+                    className={INPUT}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1811,7 +1848,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                     maxLength={10}
                     value={telefono}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      const val = formatearTelefono(e.target.value);
                       setTelefono(val);
                       if (telErr) setTelErr("");
                     }}
@@ -1820,7 +1857,16 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                   />
                   {telErr && <p className="text-[10px] text-red-400 mt-1 font-medium">{telErr}</p>}
                 </div>
-                <div><Lbl t="Email" /><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Ej. juan@correo.com" className={INPUT} /></div>
+                <div>
+                  <Lbl t="Email (Minúsculas)" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(formatearEmail(e.target.value))}
+                    placeholder="ej. juan@correo.com"
+                    className={INPUT}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Lbl t="Tipo de Documento de Identificación" />
@@ -1865,8 +1911,26 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                   {docErr && <p className="text-[10px] text-red-400 mt-1 font-medium">{docErr}</p>}
                 </div>
               </div>
-              <div><Lbl t="Dirección" /><input type="text" value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Ej. Av. Principal 123, Guayaquil" className={INPUT} /></div>
-              <div><Lbl t="Notas" /><textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2} placeholder="Observaciones del cliente..." className={`${INPUT} resize-none`} /></div>
+              <div>
+                <Lbl t="Dirección" />
+                <input
+                  type="text"
+                  value={direccion}
+                  onChange={(e) => setDireccion(formatearDireccion(e.target.value))}
+                  placeholder="Ej. Av. Principal 123 y Rocafuerte"
+                  className={INPUT}
+                />
+              </div>
+              <div>
+                <Lbl t="Notas" />
+                <textarea
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  rows={2}
+                  placeholder="Observaciones del cliente..."
+                  className={`${INPUT} resize-none`}
+                />
+              </div>
 
               {/* Sección Opcional: Saldo Anterior / Deuda Previa al crear cliente */}
               {showCreate && (
