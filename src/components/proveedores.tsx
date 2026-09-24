@@ -4290,7 +4290,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     required
                     placeholder="Ej. Juan Carlos"
                     value={provNombres}
-                    onChange={(e) => setProvNombres(formatearNombres(e.target.value, 3))}
+                    onChange={(e) => setProvNombres(formatearNombres(e.target.value))}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
                   />
                 </div>

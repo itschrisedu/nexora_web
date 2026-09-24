@@ -15,35 +15,34 @@ export function capitalizarPalabra(palabra: string): string {
 }
 
 /**
- * Formatea una cadena de nombres permitiendo hasta `maxPalabras` (por defecto 3).
+ * Formatea una cadena de nombres.
  * - Elimina números y caracteres especiales (solo letras y espacios).
- * - Convierte cada nombre a formato Capital Case (Primera letra mayúscula, resto minúsculas).
- * - Permite 1, 2 o hasta `maxPalabras` nombres sin obligar a ingresar todos.
+ * - Convierte cada palabra a formato Capital Case (Primera letra mayúscula, resto minúsculas).
+ * - Preserva espacios finales para una experiencia fluida al escribir.
  */
-export function formatearNombres(valor: string, maxPalabras: number = 3): string {
+export function formatearNombres(valor: string, maxPalabras?: number): string {
   if (!valor) return '';
   // Filtrar caracteres no permitidos (solo letras en español y espacios)
   const soloLetras = valor.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
   // Dividir por espacios y descartar vacíos
   const palabras = soloLetras.split(/\s+/).filter(Boolean);
-  // Limitar al número máximo de palabras permitidas
-  const palabrasPermitidas = palabras.slice(0, maxPalabras);
+  // Limitar al número máximo de palabras permitidas si se especifica
+  const palabrasPermitidas = maxPalabras ? palabras.slice(0, maxPalabras) : palabras;
   // Capitalizar cada palabra
   const formateadas = palabrasPermitidas.map(capitalizarPalabra);
   
   // Si el usuario termina escribiendo un espacio al final, preservarlo para no trabar la escritura
-  const terminaEnEspacio = valor.endsWith(' ') && palabras.length < maxPalabras;
+  const terminaEnEspacio = valor.endsWith(' ') && (!maxPalabras || palabras.length < maxPalabras);
   return formateadas.join(' ') + (terminaEnEspacio ? ' ' : '');
 }
 
 /**
- * Formatea una cadena de apellidos permitiendo hasta 2 apellidos.
+ * Formatea una cadena de apellidos.
  * - Elimina números y caracteres especiales.
  * - Formatea cada apellido a Capital Case.
- * - Permite 1 o 2 apellidos.
  */
 export function formatearApellidos(valor: string): string {
-  return formatearNombres(valor, 2);
+  return formatearNombres(valor);
 }
 
 /**

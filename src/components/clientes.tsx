@@ -1822,8 +1822,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                     type="text"
                     required
                     value={nombre}
-                    onChange={(e) => setNombre(formatearNombres(e.target.value, 3))}
-                    placeholder="Ej. Juan Carlos Eduardo"
+                    onChange={(e) => setNombre(formatearNombres(e.target.value))}
+                    placeholder="Ej. Juan Carlos"
                     className={INPUT}
                   />
                 </div>

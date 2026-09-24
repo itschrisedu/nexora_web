@@ -1042,9 +1042,9 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={newTenant.precioMensualPlan === ("" as any) ? "" : newTenant.precioMensualPlan}
-                    onChange={(e) => setNewTenant({ ...newTenant, precioMensualPlan: e.target.value === "" ? ("" as any) : Number(e.target.value) })}
-                    placeholder="50.00"
+                    value={newTenant.precioMensualPlan === ("" as any) || newTenant.precioMensualPlan === 0 || (newTenant.precioMensualPlan as any) === "0" ? "" : newTenant.precioMensualPlan}
+                    onChange={(e) => setNewTenant({ ...newTenant, precioMensualPlan: e.target.value as any })}
+                    placeholder="0.00"
                     className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
@@ -1201,8 +1201,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={editingTenant.precioMensualPlan === ("" as any) ? "" : editingTenant.precioMensualPlan}
-                  onChange={(e) => setEditingTenant({ ...editingTenant, precioMensualPlan: e.target.value === "" ? ("" as any) : Number(e.target.value) })}
+                  value={editingTenant.precioMensualPlan === ("" as any) || editingTenant.precioMensualPlan === 0 || (editingTenant.precioMensualPlan as any) === "0" ? "" : editingTenant.precioMensualPlan}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, precioMensualPlan: e.target.value as any })}
                   placeholder="0.00"
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 />
@@ -1354,8 +1354,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                       type="number"
                       step="0.01"
                       min="0"
-                      value={newPayment.monto === "" ? "" : newPayment.monto}
-                      onChange={(e) => setNewPayment({ ...newPayment, monto: e.target.value === "" ? "" : Number(e.target.value) })}
+                      value={newPayment.monto === "" || newPayment.monto === 0 || newPayment.monto === "0" ? "" : newPayment.monto}
+                      onChange={(e) => setNewPayment({ ...newPayment, monto: e.target.value })}
                       placeholder="0.00"
                       className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm font-bold focus:outline-none focus:border-[#0F172A]"
                     />

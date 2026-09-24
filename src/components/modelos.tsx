@@ -3501,7 +3501,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Lbl t="Nombres del Proveedor" req />
-                  <input type="text" required placeholder="Ej. Juan Carlos" value={qsNombres} onChange={e => setQsNombres(formatearNombres(e.target.value, 3))} className={INPUT} />
+                  <input type="text" required placeholder="Ej. Juan Carlos" value={qsNombres} onChange={e => setQsNombres(formatearNombres(e.target.value))} className={INPUT} />
                 </div>
                 <div>
                   <Lbl t="Apellidos del Proveedor" req />
