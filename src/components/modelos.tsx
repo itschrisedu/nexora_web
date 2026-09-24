@@ -10,6 +10,7 @@ import {
   Layers, Boxes, Truck
 } from "lucide-react";
 import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
+import { generarSiglaProveedor } from "../utils/text-formatters";
 
 interface ModelosProps {
   online: boolean;
@@ -36,6 +37,17 @@ interface Producto {
   precioCosto: number;
   precioVenta: number;
   serie: { id: string; nombre: string } | null;
+  supplierId?: string | null;
+  supplier?: { id: string; razonSocial: string; ruc?: string; contacto?: string } | null;
+  supplierSigla?: string;
+  priceHistory?: {
+    precioCostoAnterior: number;
+    precioVentaAnterior: number;
+    precioCostoNuevo: number;
+    precioVentaNuevo: number;
+    motivo?: string;
+    createdAt: string;
+  }[];
   tallas: TallaStock[];
   activo: boolean;
 }
@@ -269,7 +281,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [showAddColorModal, setShowAddColorModal] = useState(false);
   const [selectedModelForColor, setSelectedModelForColor] = useState<ModeloAgrupado | null>(null);
   const [supplierId, setSupplierId] = useState("");
-  const [listaProveedores, setListaProveedores] = useState<{ id: string; razonSocial: string; ruc?: string }[]>([]);
+  const [listaProveedores, setListaProveedores] = useState<{ id: string; razonSocial: string; ruc?: string; contacto?: string }[]>([]);
 
   const [newColorName, setNewColorName] = useState("");
   const [newColorFoto, setNewColorFoto] = useState<string | null>(null);
@@ -292,6 +304,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [editProductImageChanged, setEditProductImageChanged] = useState(false);
   const [editProductCosto, setEditProductCosto] = useState("");
   const [editProductVenta, setEditProductVenta] = useState("");
+  const [editProductSupplierId, setEditProductSupplierId] = useState("");
+  const [editProductMotivo, setEditProductMotivo] = useState("");
+  const [knownSeriesCosts, setKnownSeriesCosts] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [editProductTallas, setEditProductTallas] = useState<{ tallaId: string; numero: number; cantidad: number }[]>([]);
   const [newTallaNumeroInput, setNewTallaNumeroInput] = useState("");
 
@@ -1076,6 +1091,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setEditProductImageChanged(false);
     setEditProductCosto(String(p.precioCosto));
     setEditProductVenta(String(p.precioVenta));
+    setEditProductSupplierId(p.supplierId || (p.supplier as any)?.id || "");
+    setEditProductMotivo("");
     setEditProductSerieId((p.serie as any)?.id || (p as any).serieId || "");
     const tallasData = (p.tallas || (p as any).stockPorTalla || []).map((t: any) => ({
       tallaId: t.tallaId || t.id,
@@ -1108,6 +1125,16 @@ export default function ModelosComponent({ online }: ModelosProps) {
         cantidad: hasExisting ? (existingMap[t.numero] ?? 0) : (hasCurva ? (curva[t.numero] ?? 2) : 2),
       }));
       setEditProductTallas(newTallasList);
+
+      // Auto-propagar precio conocido de la serie si existe
+      const cacheKey = `${newSerieId}_${editProductSupplierId || 'default'}`;
+      if (knownSeriesCosts[cacheKey]) {
+        setEditProductCosto(knownSeriesCosts[cacheKey].costPrice);
+        setEditProductVenta(knownSeriesCosts[cacheKey].salePrice);
+      } else if (knownSeriesCosts[newSerieId]) {
+        setEditProductCosto(knownSeriesCosts[newSerieId].costPrice);
+        setEditProductVenta(knownSeriesCosts[newSerieId].salePrice);
+      }
     }
   };
 
@@ -1191,12 +1218,24 @@ export default function ModelosComponent({ online }: ModelosProps) {
         serieId: editProductSerieId || undefined,
         costPrice: costo,
         salePrice: venta,
+        supplierId: editProductSupplierId || null,
+        motivoCambioPrecio: editProductMotivo.trim() || undefined,
         tallas: editProductTallas.map(t => ({
           tallaId: t.tallaId || undefined,
           numero: t.numero,
           cantidad: t.cantidad,
         })),
       });
+
+      // Guardar en la memoria de costos de series
+      if (editProductSerieId) {
+        const key = `${editProductSerieId}_${editProductSupplierId || 'default'}`;
+        setKnownSeriesCosts(prev => ({
+          ...prev,
+          [key]: { costPrice: editProductCosto, salePrice: editProductVenta },
+          [editProductSerieId]: { costPrice: editProductCosto, salePrice: editProductVenta },
+        }));
+      }
 
       setSuccess("Variante actualizada exitosamente.");
       setShowEditProduct(false);
@@ -1689,6 +1728,27 @@ export default function ModelosComponent({ online }: ModelosProps) {
                               <div className="text-right">
                                 <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precio</span>
                                 <span className="text-xs font-extrabold text-[#0F172A]">${Number(p.precioVenta).toFixed(2)}</span>
+                              </div>
+                            </div>
+
+                            {/* Insignia Discreta de Taller y Costo */}
+                            <div className="flex items-center justify-between text-[11px] px-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-[var(--muted-foreground)]">Taller:</span>
+                                {p.supplier ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
+                                    <Truck size={10} />
+                                    <span>{p.supplier.razonSocial}</span>
+                                    {p.supplierSigla && (
+                                      <span className="bg-blue-600 text-white px-1 py-0.2 rounded text-[8px] font-mono font-black">{p.supplierSigla}</span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-[var(--muted-foreground)] italic">Por defecto</span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-[var(--muted-foreground)]">
+                                Costo: <strong className="text-slate-800 dark:text-slate-200 font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
                               </div>
                             </div>
 
@@ -2842,24 +2902,156 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 </div>
               </div>
 
-              {/* Precios Unificados */}
-              <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-3">
-                <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
-                  Ajuste de Precios
-                </span>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Lbl t="Precio Costo ($)" req />
-                    <input type="number" step="0.01" min="0.01" value={editProductCosto}
-                      onChange={e => setEditProductCosto(e.target.value)} className={INPUT} required />
-                  </div>
-                  <div>
-                    <Lbl t="Precio Venta ($)" req />
-                    <input type="number" step="0.01" min="0.01" value={editProductVenta}
-                      onChange={e => setEditProductVenta(e.target.value)} className={INPUT} required />
-                  </div>
+              {/* Taller / Proveedor Fabricante de la Variante */}
+              <div className="space-y-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-3.5">
+                <div className="flex items-center justify-between">
+                  <Lbl t="Taller / Proveedor Fabricante" />
+                  <span className="text-[10px] text-[var(--muted-foreground)]">Asignación por variante</span>
                 </div>
+                <select
+                  value={editProductSupplierId}
+                  onChange={(e) => {
+                    const newSupId = e.target.value;
+                    setEditProductSupplierId(newSupId);
+                    // Auto-propagar precio conocido para este taller y serie si existe
+                    const cacheKey = `${editProductSerieId}_${newSupId || 'default'}`;
+                    if (knownSeriesCosts[cacheKey]) {
+                      setEditProductCosto(knownSeriesCosts[cacheKey].costPrice);
+                      setEditProductVenta(knownSeriesCosts[cacheKey].salePrice);
+                    }
+                  }}
+                  className={INPUT}
+                >
+                  <option value="">-- Proveedor por defecto del modelo --</option>
+                  {listaProveedores.map((prov) => {
+                    const sigla = generarSiglaProveedor(prov.razonSocial);
+                    return (
+                      <option key={prov.id} value={prov.id}>
+                        {prov.razonSocial} {sigla ? `[${sigla}]` : ''} {prov.contacto ? `· Contacto: ${prov.contacto}` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+                {editProductSupplierId && (() => {
+                  const selSup = listaProveedores.find(p => p.id === editProductSupplierId);
+                  const sigla = selSup ? generarSiglaProveedor(selSup.razonSocial) : '';
+                  return (
+                    <div className="flex items-center gap-1.5 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
+                      <Truck size={12} className="shrink-0" />
+                      <span>Taller: <strong>{selSup?.razonSocial}</strong></span>
+                      {sigla && <span className="bg-blue-600 text-white px-1.5 py-0.2 rounded text-[9px] font-mono font-black">{sigla}</span>}
+                    </div>
+                  );
+                })()}
               </div>
+
+              {/* Precios, Detección de Variación & Margen */}
+              {(() => {
+                const costNum = parseFloat(editProductCosto) || 0;
+                const saleNum = parseFloat(editProductVenta) || 0;
+                const prevCost = Number(editProduct.precioCosto) || 0;
+                const diffCost = costNum - prevCost;
+                const suggested = costNum > 0 ? calculateSuggestedPrice(costNum, marginPct) : 0;
+                const realMargin = costNum > 0 && saleNum > 0 ? calculateRealMarginPercent(costNum, saleNum) : 0;
+                const ganancia = costNum > 0 && saleNum > 0 ? calculateProfitAmount(costNum, saleNum) : 0;
+
+                return (
+                  <div className="space-y-3">
+                    {/* Indicador de variación en tiempo real (Alza / Rebaja) */}
+                    {Math.abs(diffCost) > 0.001 && costNum > 0 && (
+                      <div className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between animate-in fade-in duration-200 ${
+                        diffCost > 0
+                          ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                          : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                      }`}>
+                        <span className="flex items-center gap-1.5">
+                          {diffCost > 0 ? '🔺 Alza en Costo de Entrega:' : '🟢 Rebaja en Costo de Entrega:'}
+                          ${prevCost.toFixed(2)} ➔ ${costNum.toFixed(2)}
+                        </span>
+                        <span className="font-mono font-black">
+                          {diffCost > 0 ? `+ $${diffCost.toFixed(2)}` : `- $${Math.abs(diffCost).toFixed(2)}`}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
+                          Ajuste de Precios & Rentabilidad
+                        </span>
+                        {suggested > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setEditProductVenta(suggested.toFixed(2))}
+                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-lg hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                          >
+                            Aplicar Sugerido (${suggested.toFixed(2)})
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Lbl t="Precio Costo / Entrega ($)" req />
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={editProductCosto}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setEditProductCosto(val);
+                              const num = parseFloat(val);
+                              if (!isNaN(num) && num > 0) {
+                                const sug = calculateSuggestedPrice(num, marginPct);
+                                if (!editProductVenta || editProductVenta === "0") {
+                                  setEditProductVenta(sug.toFixed(2));
+                                }
+                              }
+                            }}
+                            className={INPUT}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Lbl t="Precio Venta al Público ($)" req />
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={editProductVenta}
+                            onChange={e => setEditProductVenta(e.target.value)}
+                            className={INPUT}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Resumen de Margen */}
+                      {costNum > 0 && saleNum > 0 && (
+                        <div className="flex items-center justify-between pt-1.5 text-[11px] text-[var(--muted-foreground)] border-t border-emerald-500/15">
+                          <span>Margen Real: <strong className="text-emerald-600">{realMargin.toFixed(1)}%</strong></span>
+                          <span>Ganancia: <strong className="text-emerald-600 font-mono">${ganancia.toFixed(2)} / par</strong></span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Motivo de cambio de precio (opcional para trazabilidad) */}
+                    {Math.abs(diffCost) > 0.001 && (
+                      <div>
+                        <Lbl t="Motivo del Ajuste de Precio (Opcional)" />
+                        <input
+                          type="text"
+                          placeholder="Ej: Cambio en tarifa de mano de obra del taller"
+                          value={editProductMotivo}
+                          onChange={e => setEditProductMotivo(e.target.value)}
+                          className={INPUT}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
