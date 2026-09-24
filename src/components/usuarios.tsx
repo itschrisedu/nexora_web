@@ -20,6 +20,7 @@ interface SucursalItem {
   active: boolean;
   isMatriz: boolean;
   isCurrent: boolean;
+  ruc?: string;
   direccion: string;
   telefono: string;
   email: string;
@@ -69,6 +70,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [creatingSucursal, setCreatingSucursal] = useState(false);
   const [newSucursal, setNewSucursal] = useState({
     name: '',
+    ruc: '',
     direccion: '',
     telefono: '',
     email: '',
@@ -85,7 +87,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   // ─── EDITAR SUCURSAL ───
   const [showEditSucursalModal, setShowEditSucursalModal] = useState(false);
   const [editingSucursal, setEditingSucursal] = useState<SucursalItem | null>(null);
-  const [editSucursalForm, setEditSucursalForm] = useState({ name: '', direccion: '', telefono: '', email: '', active: true });
+  const [editSucursalForm, setEditSucursalForm] = useState({ name: '', ruc: '', direccion: '', telefono: '', email: '', active: true });
   const [savingSucursal, setSavingSucursal] = useState(false);
 
   // ─── TRANSFERIR PERSONAL ───
@@ -244,6 +246,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setShowAddSucursalModal(false);
       setNewSucursal({
         name: '',
+        ruc: '',
         direccion: '',
         telefono: '',
         email: '',
@@ -432,6 +435,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     setEditingSucursal(suc);
     setEditSucursalForm({
       name: suc.name,
+      ruc: suc.ruc || '',
       direccion: suc.direccion,
       telefono: suc.telefono,
       email: suc.email,
@@ -700,7 +704,13 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     </button>
                   </div>
 
-                  <div className="space-y-1 text-xs text-[var(--muted-foreground)]">
+                  <div className="space-y-1.5 text-xs text-[var(--muted-foreground)]">
+                    {sucursal.ruc && (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--muted)]/60 text-[var(--foreground)] font-mono text-[10.5px] font-bold border border-[var(--border)]">
+                        <span>RUC:</span>
+                        <span>{sucursal.ruc}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5"><MapPin size={13} />{sucursal.direccion}</div>
                     {sucursal.telefono && <div>Tel: {sucursal.telefono}</div>}
                     {sucursal.email && <div>Email: {sucursal.email}</div>}
@@ -946,6 +956,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                         <Building2 size={12} className="text-amber-500" />
                         {sucursales.find(s => s.id === user.tenantId)?.name || 'Matriz Principal'}
                       </span>
+                      {user.rol === 'ROL_ADMIN' && (
+                        <span className="block text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
+                          {sucursales.find(s => s.id === user.tenantId)?.isMatriz !== false ? '• Administrador General' : '• Admin de Sucursal'}
+                        </span>
+                      )}
                     </td>
                     <td className="p-3.5">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
@@ -1123,7 +1138,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
             </div>
             <form onSubmit={handleCreateSucursal} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre de la Sucursal</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre de la Sucursal *</label>
                 <input
                   type="text"
                   required
@@ -1132,6 +1147,21 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   placeholder="Ej: Sucursal Centro / Sucursal Norte"
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">RUC del Establecimiento (Opcional)</label>
+                <input
+                  type="text"
+                  maxLength={13}
+                  value={newSucursal.ruc}
+                  onChange={(e) => setNewSucursal({ ...newSucursal, ruc: e.target.value.replace(/\D/g, '').slice(0, 13) })}
+                  placeholder="Ej: 1891234567001 (13 dígitos)"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0F172A]"
+                />
+                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                  Si se omite, la sucursal operará bajo el RUC matriz general del negocio.
+                </p>
               </div>
 
               <div>
@@ -1552,6 +1582,21 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   onChange={(e) => setEditSucursalForm({ ...editSucursalForm, name: e.target.value })}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">RUC del Establecimiento (Opcional)</label>
+                <input
+                  type="text"
+                  maxLength={13}
+                  value={editSucursalForm.ruc}
+                  onChange={(e) => setEditSucursalForm({ ...editSucursalForm, ruc: e.target.value.replace(/\D/g, '').slice(0, 13) })}
+                  placeholder="Ej: 1891234567001 (13 dígitos)"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0F172A]"
+                />
+                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                  RUC propio del local o establecimiento. Si se vacía, hereda el RUC matriz.
+                </p>
               </div>
 
               <div>

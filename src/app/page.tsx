@@ -379,11 +379,23 @@ function MainApp() {
     }
   };
 
+  const isMatrizAdmin = user?.rol === 'ROL_SUPER_ADMIN' || (user?.rol === 'ROL_ADMIN' && (!user?.tenantId || sucursales.find(s => s.id === user?.tenantId)?.isMatriz !== false));
+  const isBranchRestricted = !!(user?.rol && user?.rol !== 'ROL_SUPER_ADMIN' && !isMatrizAdmin);
+
   const fetchSucursales = async () => {
     try {
       const data = await ApiService.get('/configuracion/sucursales').catch(() => null);
       if (Array.isArray(data) && data.length > 0) {
         setSucursales(data);
+        const storedUser = localStorage.getItem('user');
+        const parsed = storedUser ? JSON.parse(storedUser) : null;
+        if (parsed?.tenantId) {
+          const userSuc = data.find(s => s.id === parsed.tenantId);
+          if (userSuc && !userSuc.isMatriz) {
+            setActiveSucursalId(parsed.tenantId);
+            localStorage.setItem('activeSucursalId', parsed.tenantId);
+          }
+        }
       } else {
         const storedUser = localStorage.getItem('user');
         const parsed = storedUser ? JSON.parse(storedUser) : null;
@@ -1060,7 +1072,7 @@ function MainApp() {
               <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 <MapPin size={12} /> Sucursal Activa
               </div>
-              {user?.rol === 'ROL_ADMIN' ? (
+              {!isBranchRestricted && user?.rol === 'ROL_ADMIN' ? (
                 <select
                   value={activeSucursalId}
                   onChange={(e) => {
@@ -1080,8 +1092,10 @@ function MainApp() {
                   ))}
                 </select>
               ) : (
-                <div className="text-xs font-bold text-[var(--foreground)] py-1">
-                  📍 {sucursales.find((s) => s.id === activeSucursalId)?.name || 'Sucursal Asignada'}
+                <div className="text-xs font-bold text-[var(--foreground)] py-1 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  <span>{sucursales.find((s) => s.id === (user?.tenantId || activeSucursalId))?.name || 'Sucursal Asignada'}</span>
+                  {user?.rol === 'ROL_ADMIN' && <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">(Admin Local)</span>}
                 </div>
               )}
             </div>
@@ -1267,7 +1281,7 @@ function MainApp() {
                 }}
               >
                 <MapPin size={14} className="shrink-0" style={{ color: 'var(--primary-foreground)' }} />
-                {user?.rol === 'ROL_ADMIN' ? (
+                {!isBranchRestricted && user?.rol === 'ROL_ADMIN' ? (
                   <select
                     value={activeSucursalId}
                     onChange={(e) => {
@@ -1288,8 +1302,11 @@ function MainApp() {
                     ))}
                   </select>
                 ) : (
-                  <span className="font-bold text-xs truncate max-w-[150px]" style={{ color: 'var(--primary-foreground)' }}>
-                    📍 {sucursales.find((s) => s.id === activeSucursalId)?.name || 'Sucursal Asignada'}
+                  <span className="font-bold text-xs truncate max-w-[200px] flex items-center gap-1.5" style={{ color: 'var(--primary-foreground)' }}>
+                    <span>📍 {sucursales.find((s) => s.id === (user?.tenantId || activeSucursalId))?.name || 'Sucursal Asignada'}</span>
+                    {user?.rol === 'ROL_ADMIN' && (
+                      <span className="text-[10px] opacity-80 font-normal">(Admin Local)</span>
+                    )}
                   </span>
                 )}
               </div>
