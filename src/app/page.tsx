@@ -47,6 +47,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { GyreOtpVerification } from '@/components/ui/GyreOtpVerification';
 import SubscriptionGraceBanner from '@/components/ui/SubscriptionGraceBanner';
 import UnsavedChangesModal from '@/components/ui/unsaved-changes-modal';
+import CambiarPasswordModal from '@/components/ui/CambiarPasswordModal';
 import { getUnsavedChanges, clearUnsavedChanges, UnsavedChangesDetail } from '@/utils/unsaved-changes';
 
 // Importaciones dinámicas para evitar SSR con Dexie
@@ -126,6 +127,7 @@ function MainApp() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showGpsModal, setShowGpsModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showGlobalPasswordModal, setShowGlobalPasswordModal] = useState(false);
 
   // ── Estados para Sesión Única, Transferencia y Desbloqueo con OTP Gyre ──
   const [showConflictModal, setShowConflictModal] = useState(false);
@@ -1209,6 +1211,13 @@ function MainApp() {
               </button>
             )}
             <button
+              onClick={() => setShowGlobalPasswordModal(true)}
+              className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+              title="Cambiar Contraseña 🔐"
+            >
+              <KeyRound size={16} />
+            </button>
+            <button
               onClick={() => setShowLogoutModal(true)}
               className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
               title="Cerrar sesión"
@@ -1654,6 +1663,12 @@ function MainApp() {
           </div>
         </div>
       )}
+
+      {/* Modal Global de Cambio de Contraseña (Vault Password Meter) */}
+      <CambiarPasswordModal
+        isOpen={showGlobalPasswordModal}
+        onClose={() => setShowGlobalPasswordModal(false)}
+      />
     </div>
   );
 }

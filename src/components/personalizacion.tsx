@@ -10,11 +10,12 @@ import {
   Truck, Star, Trash2, Plus, Phone, Globe,
   Image, ExternalLink, Eye, EyeOff, Share2,
   Copy, Check, MessageCircle, Upload, Sparkles,
-  Layers, Sliders, Settings2, HelpCircle, Crop, Mail
+  Layers, Sliders, Settings2, HelpCircle, Crop, Mail, ShieldCheck
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
 import ImageCropperModal from "./ui/image-cropper-modal";
+import CambiarPasswordModal from "./ui/CambiarPasswordModal";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 
 interface CreditLevelConfigItem {
@@ -124,6 +125,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
   const [initialConfig, setInitialConfig] = useState<BusinessConfig | null>(null);
   const [initialNiveles, setInitialNiveles] = useState<CreditLevelConfigItem[] | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Control de descartes y cierre seguro de modales
   const [showDiscardModal, setShowDiscardModal] = useState(false);
@@ -395,8 +397,15 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
               localStorage.setItem("tenantId", data.tenantId);
             }
           }
+          let userTenantName = "";
+          if (typeof window !== "undefined") {
+            try {
+              const u = JSON.parse(localStorage.getItem("user") || "{}");
+              userTenantName = u.tenantName || "";
+            } catch {}
+          }
           const loadedConfig: BusinessConfig = {
-            nombre: data.nombre || "",
+            nombre: data.nombre || userTenantName || "",
             ruc: data.ruc || "",
             direccion: data.direccion || "",
             telefono: data.telefono || "",
@@ -777,6 +786,47 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* SEGURIDAD & CREDENCIALES DE ACCESO */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0">
+                    <ShieldCheck size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">Seguridad & Credenciales de Acceso</h3>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">
+                      Administración de contraseñas con validación por bóveda de seguridad.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(true)}
+                  className="px-4 py-2 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Lock size={14} />
+                  <span>Cambiar Mi Contraseña</span>
+                </button>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[var(--muted)]/30 border border-[var(--border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="space-y-1">
+                  <div className="font-bold text-[var(--foreground)]">Protección de Cuenta y Bóveda Activa</div>
+                  <div className="text-[11px] text-[var(--muted-foreground)]">
+                    Puedes actualizar tu contraseña en cualquier momento. El sistema evaluará en tiempo real la fortaleza de tu clave.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(true)}
+                  className="px-3.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] font-semibold text-[11px] text-[var(--foreground)] transition-colors cursor-pointer shrink-0"
+                >
+                  Modificar Clave
+                </button>
               </div>
             </div>
 
@@ -2069,6 +2119,13 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             pendingCloseRef.current = null;
           }
         }}
+      />
+
+      {/* Modal de Cambio de Contraseña con Vault Password Meter */}
+      <CambiarPasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={() => setSuccess("Contraseña actualizada con éxito.")}
       />
     </div>
   );
