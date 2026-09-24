@@ -15,7 +15,6 @@ import {
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
 import ImageCropperModal from "./ui/image-cropper-modal";
-import CambiarPasswordModal from "./ui/CambiarPasswordModal";
 import VaultPasswordMeter, { analyzePassword } from "./ui/VaultPasswordMeter";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 
@@ -85,7 +84,25 @@ interface BusinessConfig {
 type TabType = "general" | "credito" | "operaciones" | "fiscal" | "catalogo" | "seguridad";
 
 export default function PersonalizacionComponent({ online }: PersonalizacionProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("general");
+  const user = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const isPersonal = user?.rol === "ROL_VENDEDOR" || user?.rol === "ROL_BODEGUERO";
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "{}");
+        if (u?.rol === "ROL_VENDEDOR" || u?.rol === "ROL_BODEGUERO") return "seguridad";
+      } catch {}
+    }
+    return "general";
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
@@ -126,7 +143,6 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
   const [initialConfig, setInitialConfig] = useState<BusinessConfig | null>(null);
   const [initialNiveles, setInitialNiveles] = useState<CreditLevelConfigItem[] | null>(null);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Estados para pestaña de Cambio de Contraseña integrada
   const [tabPassActual, setTabPassActual] = useState("");
@@ -619,7 +635,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     );
   }
 
-  const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
+  const allTabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: "general", label: "Identidad & Negocio", icon: <Building2 size={16} /> },
     { id: "credito", label: "Scoring & Crédito", icon: <DollarSign size={16} /> },
     { id: "operaciones", label: "Operaciones & Logística", icon: <Truck size={16} /> },
@@ -627,6 +643,10 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     { id: "catalogo", label: "Sitio Web & Catálogo", icon: <Globe size={16} /> },
     { id: "seguridad", label: "Seguridad & Contraseña", icon: <KeyRound size={16} /> },
   ];
+
+  const tabs = isPersonal
+    ? allTabs.filter((t) => t.id === "seguridad" || t.id === "catalogo")
+    : allTabs;
 
   return (
     <div className="space-y-4 max-w-full pb-6">
@@ -861,7 +881,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowPasswordModal(true)}
+                  onClick={() => setActiveTab("seguridad")}
                   className="px-4 py-2 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Lock size={14} />
@@ -878,7 +898,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowPasswordModal(true)}
+                  onClick={() => setActiveTab("seguridad")}
                   className="px-3.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] font-semibold text-[11px] text-[var(--foreground)] transition-colors cursor-pointer shrink-0"
                 >
                   Modificar Clave
@@ -2342,13 +2362,6 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             pendingCloseRef.current = null;
           }
         }}
-      />
-
-      {/* Modal de Cambio de Contraseña con Vault Password Meter */}
-      <CambiarPasswordModal
-        isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
-        onSuccess={() => setSuccess("Contraseña actualizada con éxito.")}
       />
     </div>
   );

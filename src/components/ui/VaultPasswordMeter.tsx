@@ -101,8 +101,8 @@ export function analyzePassword(password: string): PasswordAnalysis {
   switch (score) {
     case 1:
       level = "paperclip";
-      label = "A paperclip";
-      crackTime = "Cracked instantly.";
+      label = "Seguridad Débil";
+      crackTime = "Fácil de adivinar en pocos segundos.";
       color = "text-[#F87171]";
       borderColor = "border-red-500/40";
       glowColor = "rgba(239, 68, 68, 0.15)";
@@ -111,8 +111,8 @@ export function analyzePassword(password: string): PasswordAnalysis {
       break;
     case 2:
       level = "padlock";
-      label = "A padlock";
-      crackTime = "Cracked in 2 hours.";
+      label = "Seguridad Aceptable";
+      crackTime = "Protección básica contra intentos comunes.";
       color = "text-[#FB923C]";
       borderColor = "border-orange-500/40";
       glowColor = "rgba(249, 115, 22, 0.15)";
@@ -121,8 +121,8 @@ export function analyzePassword(password: string): PasswordAnalysis {
       break;
     case 3:
       level = "deadbolt";
-      label = "A deadbolt";
-      crackTime = "Cracked in 5 years.";
+      label = "Seguridad Alta";
+      crackTime = "Buena protección, difícil de descifrar.";
       color = "text-[#FACC15]";
       borderColor = "border-amber-400/40";
       glowColor = "rgba(234, 179, 8, 0.15)";
@@ -131,8 +131,8 @@ export function analyzePassword(password: string): PasswordAnalysis {
       break;
     case 4:
       level = "vault";
-      label = "A bank vault";
-      crackTime = entropyBits > 80 ? "Cracked in 100 thousand years." : "Cracked in 3 thousand years.";
+      label = "Máxima Seguridad (Bóveda)";
+      crackTime = "Totalmente protegida e imposible de vulnerar.";
       color = "text-[#4ADE80]";
       borderColor = "border-emerald-500/50";
       glowColor = "rgba(16, 185, 129, 0.2)";
@@ -141,8 +141,8 @@ export function analyzePassword(password: string): PasswordAnalysis {
       break;
     default:
       level = "bare";
-      label = "Too weak";
-      crackTime = "Cracked instantly.";
+      label = "Muy Débil";
+      crackTime = "Se vulnera al instante. Ingresa una clave más segura.";
       color = "text-slate-400";
       borderColor = "border-slate-800";
       glowColor = "rgba(100, 116, 139, 0.1)";
@@ -405,14 +405,9 @@ export default function VaultPasswordMeter({
             </button>
           </div>
 
-          {/* Subtitle: "Cracked in 3 thousand years." */}
+          {/* Subtitle: Estado en lenguaje claro */}
           <p className="text-xs sm:text-sm text-slate-200 font-medium leading-tight">
             {analysis.crackTime}
-          </p>
-
-          {/* Entropy: "71 bits of entropy" */}
-          <p className="text-[11px] sm:text-xs text-slate-400 font-mono font-medium">
-            {analysis.entropyBits} bits of entropy
           </p>
         </div>
       </div>
