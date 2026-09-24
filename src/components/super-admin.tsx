@@ -126,7 +126,15 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [subscribingTenant, setSubscribingTenant] = useState<Tenant | null>(null);
   const [subLoading, setSubLoading] = useState(false);
   const [subPayments, setSubPayments] = useState<SubscriptionPaymentItem[]>([]);
-  const [newPayment, setNewPayment] = useState({
+  const [newPayment, setNewPayment] = useState<{
+    monto: number | string;
+    periodoMeses: number;
+    metodoPago: string;
+    plan: string;
+    numeroFacturaSri: string;
+    facturaAutorizada: boolean;
+    notas: string;
+  }>({
     monto: 50,
     periodoMeses: 1,
     metodoPago: "TRANSFERENCIA",
@@ -525,8 +533,12 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     if (!subscribingTenant) return;
     setSubLoading(true);
     try {
-      await ApiService.post(`/tenants/${subscribingTenant.id}/subscription-payment`, newPayment);
-      setSuccessMsg(`Pago de $${newPayment.monto} registrado para ${subscribingTenant.name}. Vigencia renovada.`);
+      const payload = {
+        ...newPayment,
+        monto: Number(newPayment.monto || 0),
+      };
+      await ApiService.post(`/tenants/${subscribingTenant.id}/subscription-payment`, payload);
+      setSuccessMsg(`Pago de $${Number(newPayment.monto || 0).toFixed(2)} registrado para ${subscribingTenant.name}. Vigencia renovada.`);
       const updatedPayments = await ApiService.get(`/tenants/${subscribingTenant.id}/subscription-payments`);
       setSubPayments(updatedPayments || []);
       await fetchTenants();
@@ -1341,10 +1353,11 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     <input
                       type="number"
                       step="0.01"
-                      required
-                      value={newPayment.monto}
-                      onChange={(e) => setNewPayment({ ...newPayment, monto: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm font-bold"
+                      min="0"
+                      value={newPayment.monto === "" ? "" : newPayment.monto}
+                      onChange={(e) => setNewPayment({ ...newPayment, monto: e.target.value === "" ? "" : Number(e.target.value) })}
+                      placeholder="0.00"
+                      className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm font-bold focus:outline-none focus:border-[#0F172A]"
                     />
                   </div>
 

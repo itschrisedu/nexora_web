@@ -10,7 +10,16 @@ import {
   Layers, Boxes, Truck
 } from "lucide-react";
 import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
-import { generarSiglaProveedor } from "../utils/text-formatters";
+import {
+  generarSiglaProveedor,
+  formatearNombres,
+  formatearApellidos,
+  formatearEmail,
+  validarEmailEstricto,
+  formatearTelefono,
+  formatearDireccion,
+} from "../utils/text-formatters";
+import { validarRuc } from "../utils/ecuador-validators";
 
 interface ModelosProps {
   online: boolean;
@@ -339,8 +348,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
   // ── Estado para mini-formulario de agregar proveedor rápido ──
   const [showQuickSupplier, setShowQuickSupplier] = useState(false);
   const [qsRuc, setQsRuc] = useState("");
-  const [qsRazonSocial, setQsRazonSocial] = useState("");
+  const [qsNombres, setQsNombres] = useState("");
+  const [qsApellidos, setQsApellidos] = useState("");
+  const [qsNombreComercial, setQsNombreComercial] = useState("");
   const [qsContacto, setQsContacto] = useState("");
+  const [qsEmail, setQsEmail] = useState("");
+  const [qsDireccion, setQsDireccion] = useState("");
   const [qsSaving, setQsSaving] = useState(false);
   const [qsContext, setQsContext] = useState<'create' | 'edit' | 'addColor'>('create');
 
@@ -392,8 +405,16 @@ export default function ModelosComponent({ online }: ModelosProps) {
   }, [showEditModel, editModel, editModelName, editModelBrand]);
 
   const isDirtyQuickSupplier = useCallback(() => {
-    return showQuickSupplier && (qsRuc.trim() !== "" || qsRazonSocial.trim() !== "" || qsContacto.trim() !== "");
-  }, [showQuickSupplier, qsRuc, qsRazonSocial, qsContacto]);
+    return showQuickSupplier && (
+      qsRuc.trim() !== "" ||
+      qsNombres.trim() !== "" ||
+      qsApellidos.trim() !== "" ||
+      qsNombreComercial.trim() !== "" ||
+      qsContacto.trim() !== "" ||
+      qsEmail.trim() !== "" ||
+      qsDireccion.trim() !== ""
+    );
+  }, [showQuickSupplier, qsRuc, qsNombres, qsApellidos, qsNombreComercial, qsContacto, qsEmail, qsDireccion]);
 
   // Manejador global de la tecla Escape
   useEffect(() => {
@@ -515,16 +536,37 @@ export default function ModelosComponent({ online }: ModelosProps) {
   // ── Crear proveedor rápido desde modal catálogo ──
   const handleQuickCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!qsRuc.trim() || !qsRazonSocial.trim()) {
-      setError("RUC y Razón Social del proveedor son obligatorios.");
+    if (!qsRuc.trim() || !qsNombres.trim() || !qsApellidos.trim()) {
+      setError("RUC, Nombres y Apellidos del proveedor son obligatorios.");
       return;
     }
+
+    if (!validarRuc(qsRuc.trim())) {
+      setError("El RUC o Cédula ingresado no es válido (debe tener 10 o 13 dígitos numéricos).");
+      return;
+    }
+
+    if (qsEmail) {
+      const emailVal = validarEmailEstricto(qsEmail);
+      if (!emailVal.valido) {
+        setError(emailVal.mensaje || "El correo electrónico no es válido.");
+        return;
+      }
+    }
+
+    const razonSocialFinal = qsNombreComercial.trim() || `${qsNombres.trim()} ${qsApellidos.trim()}`;
+
     setQsSaving(true);
     try {
       const res = await ApiService.post("/proveedores", {
         ruc: qsRuc.trim(),
-        razonSocial: qsRazonSocial.trim(),
-        contacto: qsContacto.trim() || undefined,
+        razonSocial: razonSocialFinal,
+        nombreComercial: qsNombreComercial.trim() || undefined,
+        nombres: qsNombres.trim(),
+        apellidos: qsApellidos.trim(),
+        contacto: qsContacto ? formatearTelefono(qsContacto) : `${qsNombres.trim()} ${qsApellidos.trim()}`,
+        direccion: qsDireccion ? formatearDireccion(qsDireccion) : undefined,
+        email: qsEmail ? formatearEmail(qsEmail) : undefined,
       });
       const newId = res.id;
       // Recargar lista de proveedores
@@ -546,9 +588,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
           setEditModelAlternateIds(prev => [...prev, newId]);
         }
       }
-      setSuccess(`Proveedor "${qsRazonSocial.trim()}" creado y asignado.`);
+      setSuccess(`Proveedor "${razonSocialFinal}" creado y asignado.`);
       setShowQuickSupplier(false);
-      setQsRuc(""); setQsRazonSocial(""); setQsContacto("");
+      setQsRuc(""); setQsNombres(""); setQsApellidos(""); setQsNombreComercial(""); setQsContacto(""); setQsEmail(""); setQsDireccion("");
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al crear el proveedor.");
@@ -1744,7 +1786,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                                     )}
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] text-[var(--muted-foreground)] italic">Por defecto</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin taller asignado</span>
                                 )}
                               </div>
                               <div className="text-[10px] text-[var(--muted-foreground)]">
@@ -3435,35 +3477,73 @@ export default function ModelosComponent({ online }: ModelosProps) {
       {showQuickSupplier && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150"
              onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-4 px-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Truck size={18} className="text-emerald-400" />
-                <h3 className="font-extrabold text-sm text-white">Nuevo Proveedor Rápido</h3>
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-5 px-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Truck size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-white">Nuevo Proveedor / Taller</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Crea y asigna inmediatamente el taller o proveedor</p>
+                </div>
               </div>
-              <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="text-slate-400 hover:text-white p-1">
+              <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer">
                 <X size={16} />
               </button>
             </div>
-            <form onSubmit={handleQuickCreateSupplier} className="p-5 space-y-3">
+            <form onSubmit={handleQuickCreateSupplier} className="p-6 space-y-4 text-xs">
               <div>
-                <Lbl t="RUC / Cédula *" />
+                <Lbl t="RUC del Proveedor / Cédula" req />
                 <input type="text" required placeholder="Ej. 1792348574001" value={qsRuc} onChange={e => setQsRuc(e.target.value)} className={INPUT} />
               </div>
-              <div>
-                <Lbl t="Razón Social / Taller *" />
-                <input type="text" required placeholder="Ej. Taller Calzado Cevallos" value={qsRazonSocial} onChange={e => setQsRazonSocial(e.target.value)} className={INPUT} />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Lbl t="Nombres del Proveedor" req />
+                  <input type="text" required placeholder="Ej. Juan Carlos" value={qsNombres} onChange={e => setQsNombres(formatearNombres(e.target.value, 3))} className={INPUT} />
+                </div>
+                <div>
+                  <Lbl t="Apellidos del Proveedor" req />
+                  <input type="text" required placeholder="Ej. Pérez Gómez" value={qsApellidos} onChange={e => setQsApellidos(formatearApellidos(e.target.value))} className={INPUT} />
+                </div>
               </div>
+
               <div>
-                <Lbl t="Contacto / Teléfono" />
-                <input type="text" placeholder="Ej. 0998765432" value={qsContacto} onChange={e => setQsContacto(e.target.value)} className={INPUT} />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    Nombre Comercial / Taller
+                  </label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">(Opcional)</span>
+                </div>
+                <input type="text" placeholder="Ej. Calzados Artesanales Cevallos (Dejar vacío si es persona natural)" value={qsNombreComercial} onChange={e => setQsNombreComercial(e.target.value)} className={INPUT} />
+                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                  Si no se ingresa, se usarán los nombres y apellidos como razón social.
+                </p>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="px-3 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Lbl t="Teléfono / WhatsApp" />
+                  <input type="text" placeholder="Ej. 0998765432" value={qsContacto} onChange={e => setQsContacto(formatearTelefono(e.target.value))} className={INPUT} />
+                </div>
+                <div>
+                  <Lbl t="Correo Electrónico (Opcional)" />
+                  <input type="email" placeholder="Ej. pedidos@proveedor.com" value={qsEmail} onChange={e => setQsEmail(formatearEmail(e.target.value))} className={INPUT} />
+                </div>
+              </div>
+
+              <div>
+                <Lbl t="Dirección de Taller / Fábrica (Opcional)" />
+                <input type="text" placeholder="Ej. Parque Industrial / Av. Principal" value={qsDireccion} onChange={e => setQsDireccion(formatearDireccion(e.target.value))} className={INPUT} />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors">
                   Cancelar
                 </button>
-                <button type="submit" disabled={qsSaving} className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm">
-                  {qsSaving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                <button type="submit" disabled={qsSaving} className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer">
+                  {qsSaving ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={14} />}
                   <span>Guardar y Asignar</span>
                 </button>
               </div>

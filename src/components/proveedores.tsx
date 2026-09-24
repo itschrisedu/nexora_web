@@ -58,6 +58,7 @@ import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { validarRuc } from '../utils/ecuador-validators';
 import {
   formatearNombres,
+  formatearApellidos,
   formatearEmail,
   validarEmailEstricto,
   formatearTelefono,
@@ -426,7 +427,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
   // Form: Nuevo Proveedor
   const [ruc, setRuc] = useState('');
-  const [razonSocial, setRazonSocial] = useState('');
+  const [provNombres, setProvNombres] = useState('');
+  const [provApellidos, setProvApellidos] = useState('');
+  const [nombreComercial, setNombreComercial] = useState('');
   const [contacto, setContacto] = useState('');
   const [direccion, setDireccion] = useState('');
   const [email, setEmail] = useState('');
@@ -500,8 +503,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   }, []);
 
   const isDirtySupplier = useCallback(() => {
-    return showSupplierModal && (ruc.trim() !== '' || razonSocial.trim() !== '' || contacto.trim() !== '' || direccion.trim() !== '' || email.trim() !== '');
-  }, [showSupplierModal, ruc, razonSocial, contacto, direccion, email]);
+    return showSupplierModal && (ruc.trim() !== '' || provNombres.trim() !== '' || provApellidos.trim() !== '' || nombreComercial.trim() !== '' || contacto.trim() !== '' || direccion.trim() !== '' || email.trim() !== '');
+  }, [showSupplierModal, ruc, provNombres, provApellidos, nombreComercial, contacto, direccion, email]);
 
   const isDirtyOrder = useCallback(() => {
     return showOrderModal && (orderLines.length > 0 || orderSupplierId !== '' || orderObservaciones.trim() !== '');
@@ -658,13 +661,13 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
   const handleCreateProveedor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ruc || !razonSocial) {
-      showToast('El RUC y la Razón Social son obligatorios.', 'error');
+    if (!ruc || !provNombres.trim() || !provApellidos.trim()) {
+      showToast('El RUC, Nombres y Apellidos del proveedor son obligatorios.', 'error');
       return;
     }
 
     if (!validarRuc(ruc)) {
-      showToast('El RUC ingresado no es válido (debe tener 13 dígitos numéricos).', 'error');
+      showToast('El RUC o Cédula ingresado no es válido (debe tener 10 o 13 dígitos numéricos).', 'error');
       return;
     }
 
@@ -676,12 +679,17 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       }
     }
 
+    const razonSocialFinal = nombreComercial.trim() || `${provNombres.trim()} ${provApellidos.trim()}`;
+
     setSaving(true);
     try {
       await ApiService.post('/proveedores', {
         ruc: ruc.trim(),
-        razonSocial: razonSocial.trim(),
-        contacto: contacto ? formatearNombres(contacto, 3) : undefined,
+        razonSocial: razonSocialFinal,
+        nombreComercial: nombreComercial.trim() || undefined,
+        nombres: provNombres.trim(),
+        apellidos: provApellidos.trim(),
+        contacto: contacto ? formatearTelefono(contacto) : `${provNombres.trim()} ${provApellidos.trim()}`,
         direccion: direccion ? formatearDireccion(direccion) : undefined,
         email: email ? formatearEmail(email) : undefined,
       });
@@ -710,7 +718,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     e.preventDefault();
     if (!editingSupplier) return;
     if (!editRazonSocial.trim()) {
-      showToast('La Razón Social es obligatoria.', 'error');
+      showToast('La Razón Social o Nombre es obligatoria.', 'error');
       return;
     }
 
@@ -726,7 +734,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     try {
       await ApiService.put(`/proveedores/${editingSupplier.id}`, {
         razonSocial: editRazonSocial.trim(),
-        contacto: editContacto ? formatearNombres(editContacto, 3) : undefined,
+        contacto: editContacto ? formatearTelefono(editContacto) : undefined,
         direccion: editDireccion ? formatearDireccion(editDireccion) : undefined,
         email: editEmail ? formatearEmail(editEmail) : undefined,
       });
@@ -744,7 +752,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
   const resetSupplierForm = () => {
     setRuc('');
-    setRazonSocial('');
+    setProvNombres('');
+    setProvApellidos('');
+    setNombreComercial('');
     setContacto('');
     setDireccion('');
     setEmail('');
@@ -4270,18 +4280,52 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Nombres del Proveedor *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Juan Carlos"
+                    value={provNombres}
+                    onChange={(e) => setProvNombres(formatearNombres(e.target.value, 3))}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Apellidos del Proveedor *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Pérez Gómez"
+                    value={provApellidos}
+                    onChange={(e) => setProvApellidos(formatearApellidos(e.target.value))}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Razón Social / Nombre Comercial *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    Nombre Comercial / Taller
+                  </label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">(Opcional)</span>
+                </div>
                 <input
                   type="text"
-                  required
-                  placeholder="Ej. Curtiduría & Cueros del Ecuador S.A."
-                  value={razonSocial}
-                  onChange={(e) => setRazonSocial(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
+                  placeholder="Ej. Calzados Artesanales Cevallos (Dejar vacío si es persona natural)"
+                  value={nombreComercial}
+                  onChange={(e) => setNombreComercial(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
+                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                  Si no se ingresa, se usarán los nombres y apellidos como razón social.
+                </p>
               </div>
 
               <div>
@@ -4299,7 +4343,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Correo Electrónico
+                  Correo Electrónico (Opcional)
                 </label>
                 <input
                   type="email"
@@ -4312,7 +4356,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Dirección de Taller / Fábrica
+                  Dirección de Taller / Fábrica (Opcional)
                 </label>
                 <input
                   type="text"

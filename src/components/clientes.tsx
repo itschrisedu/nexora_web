@@ -1817,7 +1817,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
             <form onSubmit={showCreate ? handleCreate : handleEdit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Lbl t="Nombres (Hasta 3)" req />
+                  <Lbl t="Nombres" req />
                   <input
                     type="text"
                     required
@@ -1828,7 +1828,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                   />
                 </div>
                 <div>
-                  <Lbl t="Apellidos (Hasta 2)" req />
+                  <Lbl t="Apellidos" req />
                   <input
                     type="text"
                     required
