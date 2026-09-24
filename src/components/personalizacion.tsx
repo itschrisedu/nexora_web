@@ -10,12 +10,13 @@ import {
   Truck, Star, Trash2, Plus, Phone, Globe,
   Image, ExternalLink, Eye, EyeOff, Share2,
   Copy, Check, MessageCircle, Upload, Sparkles,
-  Layers, Sliders, Settings2, HelpCircle, Crop, Mail, ShieldCheck
+  Layers, Sliders, Settings2, HelpCircle, Crop, Mail, ShieldCheck, KeyRound
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
 import ImageCropperModal from "./ui/image-cropper-modal";
 import CambiarPasswordModal from "./ui/CambiarPasswordModal";
+import VaultPasswordMeter, { analyzePassword } from "./ui/VaultPasswordMeter";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 
 interface CreditLevelConfigItem {
@@ -81,7 +82,7 @@ interface BusinessConfig {
   mostrarStockPublico?: boolean;
 }
 
-type TabType = "general" | "credito" | "operaciones" | "fiscal" | "catalogo";
+type TabType = "general" | "credito" | "operaciones" | "fiscal" | "catalogo" | "seguridad";
 
 export default function PersonalizacionComponent({ online }: PersonalizacionProps) {
   const [activeTab, setActiveTab] = useState<TabType>("general");
@@ -126,6 +127,60 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   const [initialConfig, setInitialConfig] = useState<BusinessConfig | null>(null);
   const [initialNiveles, setInitialNiveles] = useState<CreditLevelConfigItem[] | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  // Estados para pestaña de Cambio de Contraseña integrada
+  const [tabPassActual, setTabPassActual] = useState("");
+  const [tabPassNuevo, setTabPassNuevo] = useState("");
+  const [tabPassConfirm, setTabPassConfirm] = useState("");
+  const [showTabActual, setShowTabActual] = useState(false);
+  const [showTabNuevo, setShowTabNuevo] = useState(false);
+  const [showTabConfirm, setShowTabConfirm] = useState(false);
+  const [tabPassLoading, setTabPassLoading] = useState(false);
+  const [tabPassError, setTabPassError] = useState("");
+  const [tabPassSuccess, setTabPassSuccess] = useState("");
+
+  const tabAnalysis = useMemo(() => analyzePassword(tabPassNuevo), [tabPassNuevo]);
+  const tabPasswordsMatch = tabPassNuevo && tabPassNuevo === tabPassConfirm;
+
+  const handleTabPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTabPassError("");
+    setTabPassSuccess("");
+
+    if (!tabPassActual) {
+      setTabPassError("Debe ingresar su contraseña actual.");
+      return;
+    }
+    if (!tabPassNuevo || tabPassNuevo.length < 8) {
+      setTabPassError("La nueva contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (tabPassNuevo !== tabPassConfirm) {
+      setTabPassError("Las contraseñas no coinciden. Verifíquelas nuevamente.");
+      return;
+    }
+    if (tabAnalysis.score < 2) {
+      setTabPassError("La contraseña es muy vulnerable. Debe cumplir con al menos mayúsculas, minúsculas o números.");
+      return;
+    }
+
+    setTabPassLoading(true);
+    try {
+      await ApiService.post("/auth/change-password", {
+        passwordActual: tabPassActual,
+        passwordNuevo: tabPassNuevo,
+      });
+      setTabPassSuccess("¡Contraseña de acceso actualizada correctamente!");
+      setTabPassActual("");
+      setTabPassNuevo("");
+      setTabPassConfirm("");
+      setTimeout(() => setTabPassSuccess(""), 4000);
+    } catch (err: any) {
+      setTabPassError(err.message || "No se pudo actualizar la contraseña. Verifique su clave actual.");
+    } finally {
+      setTabPassLoading(false);
+    }
+  };
 
   // Control de descartes y cierre seguro de modales
   const [showDiscardModal, setShowDiscardModal] = useState(false);
@@ -570,6 +625,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     { id: "operaciones", label: "Operaciones & Logística", icon: <Truck size={16} /> },
     { id: "fiscal", label: "Parámetros Fiscales", icon: <Shield size={16} /> },
     { id: "catalogo", label: "Sitio Web & Catálogo", icon: <Globe size={16} /> },
+    { id: "seguridad", label: "Seguridad & Contraseña", icon: <KeyRound size={16} /> },
   ];
 
   return (
@@ -1981,6 +2037,173 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
                 <span>{saving ? "Guardando..." : "Guardar Sitio Web & Catálogo"}</span>
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ PESTAÑA 6: SEGURIDAD & CAMBIO DE CONTRASEÑA ══════════════ */}
+        {activeTab === "seguridad" && (
+          <div className="space-y-6">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0">
+                    <KeyRound size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-[var(--foreground)]">
+                      Seguridad de la Cuenta & Cambio de Contraseña
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                      Actualiza tu clave de acceso con blindaje criptográfico para todos los roles (Super Admin, Admin y Colaboradores)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-full text-xs font-bold">
+                    <ShieldCheck size={14} />
+                    <span>Protección Activa</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Mensajes de Alerta */}
+              {tabPassError && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-500 rounded-2xl text-xs font-semibold flex items-center gap-2.5">
+                  <AlertCircle size={18} className="shrink-0" />
+                  <span>{tabPassError}</span>
+                </div>
+              )}
+
+              {tabPassSuccess && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 rounded-2xl text-xs font-semibold flex items-center gap-2.5">
+                  <CheckCircle size={18} className="shrink-0" />
+                  <span>{tabPassSuccess}</span>
+                </div>
+              )}
+
+              {/* Formulario Responsive de Cambio de Contraseña */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Columna Izquierda: Inputs */}
+                <div className="lg:col-span-6 space-y-4">
+                  {/* Contraseña Actual */}
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                      Contraseña Actual *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showTabActual ? "text" : "password"}
+                        required
+                        value={tabPassActual}
+                        onChange={(e) => setTabPassActual(e.target.value)}
+                        placeholder="Ingresa tu contraseña actual"
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTabActual(!showTabActual)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      >
+                        {showTabActual ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Nueva Contraseña */}
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                      Nueva Contraseña *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showTabNuevo ? "text" : "password"}
+                        required
+                        value={tabPassNuevo}
+                        onChange={(e) => setTabPassNuevo(e.target.value)}
+                        placeholder="Ingresa tu nueva contraseña segura"
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTabNuevo(!showTabNuevo)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      >
+                        {showTabNuevo ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirmar Nueva Contraseña */}
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                      Confirmar Nueva Contraseña *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showTabConfirm ? "text" : "password"}
+                        required
+                        value={tabPassConfirm}
+                        onChange={(e) => setTabPassConfirm(e.target.value)}
+                        placeholder="Repite tu nueva contraseña"
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTabConfirm(!showTabConfirm)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      >
+                        {showTabConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {tabPassConfirm && (
+                      <p
+                        className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                          tabPasswordsMatch ? "text-emerald-500" : "text-rose-500"
+                        }`}
+                      >
+                        {tabPasswordsMatch ? "✓ Las contraseñas coinciden" : "✗ Las contraseñas no coinciden"}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Botón de Actualización */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleTabPasswordSubmit}
+                      disabled={tabPassLoading || !tabPassActual || !tabPassNuevo || !tabPasswordsMatch || tabAnalysis.score < 2}
+                      className="w-full sm:w-auto px-6 py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {tabPassLoading ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          <span>Actualizando Contraseña...</span>
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound size={15} className="text-emerald-400" />
+                          <span>Actualizar Contraseña de Acceso</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Columna Derecha: Componente Bank Vault Password Meter */}
+                <div className="lg:col-span-6">
+                  <div className="space-y-3">
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                      Evaluador de Fortaleza Acorazada (Bóveda / Vault)
+                    </label>
+                    <VaultPasswordMeter
+                      password={tabPassNuevo}
+                      showRequirements={true}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

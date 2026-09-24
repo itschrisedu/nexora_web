@@ -1193,23 +1193,21 @@ function MainApp() {
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {(user?.rol === 'ROL_ADMIN' || user?.rol === 'ROL_SUPER_ADMIN') && (
-              <button
-                onClick={() => {
-                  navigateToView('personalizacion');
-                  if (isMobile) setMobileMenuOpen(false);
-                }}
-                className="p-1.5 rounded-lg transition-colors cursor-pointer"
-                style={
-                  vistaActual === 'personalizacion'
-                    ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }
-                    : {}
-                }
-                title="Configuración Global ⚙️"
-              >
-                <Settings size={16} />
-              </button>
-            )}
+            <button
+              onClick={() => {
+                navigateToView('personalizacion');
+                if (isMobile) setMobileMenuOpen(false);
+              }}
+              className="p-1.5 rounded-lg transition-colors cursor-pointer"
+              style={
+                vistaActual === 'personalizacion'
+                  ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }
+                  : {}
+              }
+              title="Configuración Global ⚙️"
+            >
+              <Settings size={16} />
+            </button>
             <button
               onClick={() => setShowGlobalPasswordModal(true)}
               className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors cursor-pointer"
