@@ -4,6 +4,14 @@ export class GeolocationService {
   static async captureAndReportLocation(): Promise<boolean> {
     if (typeof window === "undefined" || !navigator.geolocation) return false;
 
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (parsed?.rol === "ROL_SUPER_ADMIN") return true;
+      } catch {}
+    }
+
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {

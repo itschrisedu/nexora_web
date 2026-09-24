@@ -146,6 +146,12 @@ function MainApp() {
 
   const verifyGpsPermission = () => {
     if (typeof window === 'undefined') return;
+    const storedUser = localStorage.getItem('user');
+    const parsed = storedUser ? JSON.parse(storedUser) : user;
+    if (parsed?.rol === 'ROL_SUPER_ADMIN') {
+      setShowGpsModal(false);
+      return;
+    }
     if (!navigator.geolocation) {
       setShowGpsModal(true);
       return;
@@ -195,6 +201,11 @@ function MainApp() {
 
   const checkLegalAndGpsConsent = (userData: any) => {
     if (!userData) return;
+    if (userData.rol === 'ROL_SUPER_ADMIN') {
+      setShowTermsModal(false);
+      setShowGpsModal(false);
+      return;
+    }
     if (!userData.termsAcceptedAt) {
       setShowTermsModal(true);
       setShowGpsModal(false);
