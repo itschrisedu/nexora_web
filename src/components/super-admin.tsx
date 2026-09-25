@@ -774,10 +774,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
             const planName =
               tenant.plan === "PLAN_BASICO"
-                ? "Básico ($30/m)"
+                ? "Plan Básico"
                 : tenant.plan === "PLAN_MAYORISTA"
-                ? "Mayorista ($90/m)"
-                : "Comercial ($50/m)";
+                ? "Plan Mayorista"
+                : "Plan Comercial";
 
             const isOverdue = tenant.diasRestantes !== undefined && tenant.diasRestantes < 0;
             const isNearRenewal = tenant.diasRestantes !== undefined && tenant.diasRestantes >= 0 && tenant.diasRestantes <= 3;
@@ -1039,9 +1039,9 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   }}
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 >
-                  <option value="PLAN_BASICO">Plan Básico ($30.00/mes - 1 Local, 3 Usuarios)</option>
-                  <option value="PLAN_COMERCIAL">Plan Comercial ($50.00/mes - 3 Locales, 10 Usuarios)</option>
-                  <option value="PLAN_MAYORISTA">Plan Mayorista ($90.00/mes - Locales y Usuarios Ilimitados)</option>
+                  <option value="PLAN_BASICO">Plan Básico</option>
+                  <option value="PLAN_COMERCIAL">Plan Comercial</option>
+                  <option value="PLAN_MAYORISTA">Plan Mayorista</option>
                 </select>
                 <p className="text-[11px] text-slate-400 mt-1">
                   * Todos los planes incluyen ciclo comercial completo (Compras, Curvas, Stock, POS, Cobranzas y Reportes).

@@ -44,9 +44,9 @@ export interface SubscriptionStatus {
 }
 
 const PLAN_NAMES: Record<string, string> = {
-  PLAN_BASICO: "Plan Básico (1 Sucursal / 2 Usuarios)",
-  PLAN_COMERCIAL: "Plan Comercial (3 Sucursales / 6 Usuarios)",
-  PLAN_MAYORISTA: "Plan Mayorista (Ilimitado / Multi-Bodega / ML Scoring)",
+  PLAN_BASICO: "Plan Básico",
+  PLAN_COMERCIAL: "Plan Comercial",
+  PLAN_MAYORISTA: "Plan Mayorista",
 };
 
 export default function SubscriptionGraceBanner({
