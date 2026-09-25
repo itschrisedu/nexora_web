@@ -521,13 +521,15 @@ function LandingContent() {
                 className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-contain bg-white border border-slate-200 p-1 shadow-xs group-hover:scale-105 transition-transform"
               />
             )}
-            <div>
+            <div className="flex flex-col justify-center">
               <span className="font-extrabold text-sm sm:text-base text-slate-900 tracking-tight block leading-tight">
                 {negocio.nombreNegocio || "Calzado en Cuero"}
               </span>
-              <span className="text-[10px] font-semibold text-amber-700 bg-amber-500/10 px-1.5 py-0.2 rounded-md border border-amber-500/20">
-                100% Cuero Cevallos
-              </span>
+              {negocio.heroFraseCorta && negocio.heroFraseCorta.trim() ? (
+                <span className="text-[10px] font-semibold text-amber-700 bg-amber-500/10 px-1.5 py-0.2 rounded-md border border-amber-500/20 w-fit mt-0.5">
+                  {negocio.heroFraseCorta.trim()}
+                </span>
+              ) : null}
             </div>
           </a>
 
@@ -1208,9 +1210,11 @@ function LandingContent() {
                     className="h-8 w-8 rounded-xl object-contain bg-white p-0.5"
                   />
                 )}
-                <div>
+                <div className="flex flex-col justify-center">
                   <h3 className="font-bold text-sm leading-tight">{negocio.nombreNegocio}</h3>
-                  <p className="text-[11px] text-slate-400">Calzado 100% Cuero de Cevallos</p>
+                  {negocio.heroFraseCorta && negocio.heroFraseCorta.trim() ? (
+                    <p className="text-[11px] text-slate-400 mt-0.5">{negocio.heroFraseCorta.trim()}</p>
+                  ) : null}
                 </div>
               </div>
               <p className="text-xs text-slate-400 max-w-md leading-relaxed">

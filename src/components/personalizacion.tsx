@@ -494,15 +494,15 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             creditPlazoMaximoDias: data.creditPlazoMaximoDias ?? 30,
             creditScoreMinimo: data.creditScoreMinimo ?? 60,
             creditTasaMoraPct: data.creditTasaMoraPct ?? 2.5,
-            heroTitulo: data.heroTitulo || "Calzado 100% Cuero Ecuatoriano",
-            heroSubtitulo: data.heroSubtitulo || "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
-            heroFraseCorta: data.heroFraseCorta || "Producción Directa desde Fábrica • Cantón Cevallos",
+            heroTitulo: data.heroTitulo !== undefined ? data.heroTitulo : "Calzado 100% Cuero Ecuatoriano",
+            heroSubtitulo: data.heroSubtitulo !== undefined ? data.heroSubtitulo : "Venta al por mayor y menor directamente desde fábrica con los mejores estándares de calidad y durabilidad.",
+            heroFraseCorta: data.heroFraseCorta !== undefined ? data.heroFraseCorta : "100% Cuero Cevallos",
             heroBannerUrl: data.heroBannerUrl || "",
             heroBackgroundUrl: data.heroBackgroundUrl || "",
-            cardTitulo: data.cardTitulo || "Calidad Artesanal Garantizada",
-            cardSubtitulo: data.cardSubtitulo || "Cada par refleja la tradición del calzado con tecnología de confort y cuero vacuno genuino.",
-            cardEtiqueta: data.cardEtiqueta || "Artesanía & Confort",
-            cardGarantia: data.cardGarantia || "Cuero Vacuno Seleccionado",
+            cardTitulo: data.cardTitulo !== undefined ? data.cardTitulo : "Calidad Artesanal Garantizada",
+            cardSubtitulo: data.cardSubtitulo !== undefined ? data.cardSubtitulo : "Cada par refleja la tradición del calzado con tecnología de confort y cuero vacuno genuino.",
+            cardEtiqueta: data.cardEtiqueta !== undefined ? data.cardEtiqueta : "Artesanía & Confort",
+            cardGarantia: data.cardGarantia !== undefined ? data.cardGarantia : "Cuero Vacuno Seleccionado",
             sobreNosotros: data.sobreNosotros || "Somos productores y comercializadores de calzado de cuero. Garantizamos calidad, acabados finos y precios directos de fabricante.",
             garantiaTaller: data.garantiaTaller || "Garantizamos la máxima calidad en cada par de calzado elaborado con 100% cuero vacuno ecuatoriano. Ofrecemos respaldo directo de fábrica y servicio de mantenimiento en todos nuestros puntos de venta autorizados.",
             caracteristicasCalidad: data.caracteristicasCalidad || "Cueros vacunos genuinos tratados para resistir el uso continuo.\nSuelas antideslizantes de alta adherencia y costuras reforzadas.\nAtención personalizada a comerciantes mayoristas y clientes particulares.\nServicio y respaldo técnico en todos nuestros locales.",
@@ -1629,17 +1629,17 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                      🏷️ Frase Corta / Distintivo Superior del Hero
+                      🏷️ Distintivo de Marca / Etiqueta del Encabezado
                     </label>
                     <input
                       type="text"
-                      value={config.heroFraseCorta !== undefined ? config.heroFraseCorta : "Producción Directa desde Fábrica • Cantón Cevallos"}
+                      value={config.heroFraseCorta !== undefined ? config.heroFraseCorta : "100% Cuero Cevallos"}
                       onChange={(e) => setConfig({ ...config, heroFraseCorta: e.target.value })}
-                      placeholder="Producción Directa desde Fábrica • Cantón Cevallos"
+                      placeholder="100% Cuero Cevallos (Dejar vacío para ocultar)"
                       className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
                     />
                     <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
-                      Texto que aparece en el distintivo superior de la portada principal (ej: Producción Directa desde Fábrica • Cantón Cevallos).
+                      Etiqueta que acompaña al nombre de tu negocio en la barra superior y pie de página. Si se deja vacía, se oculta automáticamente adaptando el espacio.
                     </span>
                   </div>
 
