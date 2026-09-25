@@ -34,7 +34,19 @@ import {
   Sparkles,
   Clock,
   Send,
+  Download,
+  BarChart3,
+  TrendingUp,
+  Filter,
+  Search,
+  FileSpreadsheet,
+  RefreshCw,
 } from "lucide-react";
+import {
+  descargarReporteSuscripcionesPdf,
+  descargarReporteSuscripcionesCsv,
+  SuperAdminReportData,
+} from "@/services/pdf-super-admin-reporte.service";
 
 interface TenantStats {
   users: number;
@@ -105,6 +117,16 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Pestaña Principal Super Admin
+  const [activeMainTab, setActiveMainTab] = useState<'EMPRESAS' | 'REPORTES_SUSCRIPCIONES'>('EMPRESAS');
+
+  // Estado para Reporte de Suscripciones y Recaudación
+  const [reportData, setReportData] = useState<SuperAdminReportData | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportSearch, setReportSearch] = useState("");
+  const [reportFilterPlan, setReportFilterPlan] = useState("TODOS");
+  const [reportFilterEstado, setReportFilterEstado] = useState("TODOS");
 
   // Modales Tenant
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -555,16 +577,39 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         monto: Number(newPayment.monto || 0),
       };
       await ApiService.post(`/tenants/${subscribingTenant.id}/subscription-payment`, payload);
-      setSuccessMsg(`Pago de $${Number(newPayment.monto || 0).toFixed(2)} registrado para ${subscribingTenant.name}. Vigencia renovada.`);
-      const updatedPayments = await ApiService.get(`/tenants/${subscribingTenant.id}/subscription-payments`);
-      setSubPayments(updatedPayments || []);
+      // Recargar los pagos del tenant tras registrar exitosamente
+      const detail = await ApiService.get(`/tenants/${subscribingTenant.id}`);
+      setSubPayments(detail.subscriptionPayments || []);
+      setSuccessMsg("Pago registrado correctamente");
       await fetchTenants();
+      if (activeMainTab === 'REPORTES_SUSCRIPCIONES') {
+        fetchSubscriptionReport();
+      }
     } catch (err: any) {
       setErrorMsg(err.message || "Error al registrar el pago");
     } finally {
       setSubLoading(false);
     }
   };
+
+  const fetchSubscriptionReport = useCallback(async () => {
+    if (!online) return;
+    setReportLoading(true);
+    try {
+      const data = await ApiService.get('/tenants/reportes/ingresos-suscripciones');
+      setReportData(data);
+    } catch (err: any) {
+      console.error('Error cargando reporte de suscripciones:', err);
+    } finally {
+      setReportLoading(false);
+    }
+  }, [online]);
+
+  useEffect(() => {
+    if (activeMainTab === 'REPORTES_SUSCRIPCIONES') {
+      fetchSubscriptionReport();
+    }
+  }, [activeMainTab, fetchSubscriptionReport]);
 
   const handleToggleTenant = async () => {
     if (!confirmToggle) return;
@@ -721,22 +766,45 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-[var(--muted-foreground)] font-medium flex items-center gap-2">
-            <Building2 size={18} className="text-[#0F172A]" />
-            Crear, editar, activar/desactivar y administrar organizaciones o usuarios del sistema.
-          </p>
+      {/* Header y Selector de Pestañas Super Admin */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 bg-[var(--muted)]/50 p-1.5 rounded-2xl border border-[var(--border)]">
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('EMPRESAS')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeMainTab === 'EMPRESAS'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <Building2 size={15} />
+            <span>Empresas y Locales ({tenants.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('REPORTES_SUSCRIPCIONES')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeMainTab === 'REPORTES_SUSCRIPCIONES'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <BarChart3 size={15} />
+            <span>Reportes y Recaudación SaaS</span>
+          </button>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          disabled={!online}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50"
-        >
-          <Plus size={16} />
-          Nueva Empresa / Local
-        </button>
+
+        {activeMainTab === 'EMPRESAS' && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            disabled={!online}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
+          >
+            <Plus size={16} />
+            Nueva Empresa / Local
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -751,18 +819,20 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         </div>
       )}
 
-      {/* Tenants Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="animate-spin text-[#0F172A]" />
-        </div>
-      ) : tenants.length === 0 ? (
-        <div className="text-center py-20 text-[var(--muted-foreground)]">
-          <Building2 size={48} className="mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-semibold">No hay empresas o locales registrados</p>
-          <p className="text-sm">Crea la primera empresa o local para comenzar.</p>
-        </div>
-      ) : (
+      {/* VISTA 1: GESTIÓN DE EMPRESAS Y LOCALES */}
+      {activeMainTab === 'EMPRESAS' && (
+        <>
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 size={32} className="animate-spin text-[#0F172A]" />
+            </div>
+          ) : tenants.length === 0 ? (
+            <div className="text-center py-20 text-[var(--muted-foreground)]">
+              <Building2 size={48} className="mx-auto mb-4 opacity-30" />
+              <p className="text-lg font-semibold">No hay empresas o locales registrados</p>
+              <p className="text-sm">Crea la primera empresa o local para comenzar.</p>
+            </div>
+          ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {tenants.map((tenant) => {
             const planBadge =
@@ -983,6 +1053,399 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               </div>
             );
           })}
+        </div>
+      )}
+      </>
+      )}
+
+      {/* VISTA 2: REPORTES DE SUSCRIPCIONES, PAGOS Y RECAUDACIÓN */}
+      {activeMainTab === 'REPORTES_SUSCRIPCIONES' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {reportLoading && !reportData ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 size={32} className="animate-spin text-[#0F172A]" />
+              <p className="text-xs text-[var(--muted-foreground)] font-semibold">Generando consolidado financiero de suscripciones...</p>
+            </div>
+          ) : !reportData ? (
+            <div className="p-8 text-center bg-[var(--card)] border border-[var(--border)] rounded-2xl">
+              <AlertTriangle size={32} className="mx-auto text-amber-500 mb-2" />
+              <p className="text-sm font-bold text-[var(--foreground)]">No se pudo cargar el reporte</p>
+              <button
+                type="button"
+                onClick={fetchSubscriptionReport}
+                className="mt-3 px-4 py-2 bg-[#0F172A] text-white text-xs font-bold rounded-xl"
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : (() => {
+            const kpis = reportData.kpis || {
+              totalRecaudado: 0,
+              ingresosMesActual: 0,
+              mrrProyectado: 0,
+              totalLocales: 0,
+              localesAlDia: 0,
+              localesPorVencer: 0,
+              localesVencidos: 0,
+              localesEnPrueba: 0,
+            };
+
+            const formatPlanName = (p?: string) => {
+              if (p === 'PLAN_BASICO') return 'Plan Básico';
+              if (p === 'PLAN_MAYORISTA') return 'Plan Mayorista';
+              return 'Plan Comercial';
+            };
+
+            // Filtrado interactivo de pagos
+            const pagosFiltrados = (reportData.pagos || []).filter((p) => {
+              const matchesSearch = !reportSearch.trim() ||
+                p.tenantName.toLowerCase().includes(reportSearch.toLowerCase()) ||
+                (p.metodoPago && p.metodoPago.toLowerCase().includes(reportSearch.toLowerCase())) ||
+                (p.numeroFacturaSri && p.numeroFacturaSri.toLowerCase().includes(reportSearch.toLowerCase()));
+
+              const matchesPlan = reportFilterPlan === 'TODOS' || p.tenantPlan === reportFilterPlan;
+              return matchesSearch && matchesPlan;
+            });
+
+            // Filtrado interactivo de locales
+            const localesFiltrados = (reportData.locales || []).filter((loc) => {
+              const matchesSearch = !reportSearch.trim() || loc.name.toLowerCase().includes(reportSearch.toLowerCase());
+              const matchesPlan = reportFilterPlan === 'TODOS' || loc.plan === reportFilterPlan;
+              const matchesEstado = reportFilterEstado === 'TODOS' || loc.estadoCalculado === reportFilterEstado;
+              return matchesSearch && matchesPlan && matchesEstado;
+            });
+
+            return (
+              <div className="space-y-6">
+                {/* Tarjetas de Métricas Principales (KPIs) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Recaudación Total</span>
+                      <TrendingUp size={16} className="text-emerald-500" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                      ${Number(kpis.totalRecaudado || 0).toFixed(2)}
+                    </div>
+                    <span className="text-[11px] text-[var(--muted-foreground)] mt-1 block">
+                      {reportData.pagos?.length || 0} pagos registrados en total
+                    </span>
+                  </div>
+
+                  <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Ingresos Este Mes</span>
+                      <DollarSign size={16} className="text-blue-500" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-[var(--foreground)] font-mono">
+                      ${Number(kpis.ingresosMesActual || 0).toFixed(2)}
+                    </div>
+                    <span className="text-[11px] text-[var(--muted-foreground)] mt-1 block">
+                      Mes en curso
+                    </span>
+                  </div>
+
+                  <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">MRR Proyectado</span>
+                      <Sparkles size={16} className="text-purple-500" />
+                    </div>
+                    <div className="mt-2 text-2xl font-black text-purple-600 dark:text-purple-400 font-mono">
+                      ${Number(kpis.mrrProyectado || 0).toFixed(2)} <span className="text-xs font-semibold text-[var(--muted-foreground)]">/ mes</span>
+                    </div>
+                    <span className="text-[11px] text-[var(--muted-foreground)] mt-1 block">
+                      Ingreso recurrente de {kpis.totalLocales} locales
+                    </span>
+                  </div>
+
+                  <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Estado de Locales</span>
+                      <Building2 size={16} className="text-[#0F172A]" />
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-md text-xs font-bold">
+                        {kpis.localesAlDia} Al Día
+                      </span>
+                      {kpis.localesPorVencer > 0 && (
+                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-md text-xs font-bold">
+                          {kpis.localesPorVencer} Por Vencer
+                        </span>
+                      )}
+                      {kpis.localesVencidos > 0 && (
+                        <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-md text-xs font-bold">
+                          {kpis.localesVencidos} Vencidos
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-[var(--muted-foreground)] mt-2 block">
+                      {kpis.localesEnPrueba} en período de prueba gratis
+                    </span>
+                  </div>
+                </div>
+
+                {/* Barra de Filtros y Acciones de Descarga */}
+                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex flex-wrap items-center gap-2 flex-1">
+                    <div className="relative flex-1 min-w-[200px] max-w-sm">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por local, método o factura..."
+                        value={reportSearch}
+                        onChange={(e) => setReportSearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <Filter size={13} className="text-[var(--muted-foreground)]" />
+                      <select
+                        value={reportFilterPlan}
+                        onChange={(e) => setReportFilterPlan(e.target.value)}
+                        className="px-2.5 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none"
+                      >
+                        <option value="TODOS">Todos los Planes</option>
+                        <option value="PLAN_BASICO">Plan Básico</option>
+                        <option value="PLAN_COMERCIAL">Plan Comercial</option>
+                        <option value="PLAN_MAYORISTA">Plan Mayorista</option>
+                      </select>
+
+                      <select
+                        value={reportFilterEstado}
+                        onChange={(e) => setReportFilterEstado(e.target.value)}
+                        className="px-2.5 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none"
+                      >
+                        <option value="TODOS">Todos los Estados</option>
+                        <option value="AL_DIA">Al Día</option>
+                        <option value="POR_VENCER">Por Vencer (&le; 7 días)</option>
+                        <option value="VENCIDO">Vencidos</option>
+                        <option value="EN_PRUEBA">En Prueba Gratis</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Botones de Descarga */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => descargarReporteSuscripcionesPdf(reportData)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      title="Descargar Reporte Formal en PDF"
+                    >
+                      <Download size={14} />
+                      <span>Descargar PDF</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => descargarReporteSuscripcionesCsv(reportData)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      title="Exportar Reporte a Excel / CSV"
+                    >
+                      <FileSpreadsheet size={14} />
+                      <span>Exportar CSV / Excel</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={fetchSubscriptionReport}
+                      disabled={reportLoading}
+                      className="p-2 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] rounded-xl transition-all cursor-pointer"
+                      title="Actualizar datos"
+                    >
+                      <RefreshCw size={14} className={reportLoading ? "animate-spin" : ""} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* TABLA 1: HISTORIAL CONSOLIDADO DE PAGOS DE SUSCRIPCIÓN */}
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs overflow-hidden space-y-0">
+                  <div className="p-4 sm:p-5 border-b border-[var(--border)] flex items-center justify-between">
+                    <div>
+                      <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                        <Receipt size={16} className="text-emerald-600" />
+                        Historial Consolidado de Pagos de Suscripción ({pagosFiltrados.length})
+                      </h3>
+                      <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                        Registro oficial de transferencias, depósitos y renovaciones de todos los clientes SaaS.
+                      </p>
+                    </div>
+                  </div>
+
+                  {pagosFiltrados.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                      No hay registros de pagos que coincidan con los filtros aplicados.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-[var(--border)] bg-[var(--muted)]/40 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                            <th className="p-3.5">Empresa / Local</th>
+                            <th className="p-3.5">Plan</th>
+                            <th className="p-3.5">Monto ($)</th>
+                            <th className="p-3.5">Período</th>
+                            <th className="p-3.5">Método</th>
+                            <th className="p-3.5">Fecha de Pago</th>
+                            <th className="p-3.5">Vigencia Fin</th>
+                            <th className="p-3.5">Factura SRI</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {pagosFiltrados.map((p) => (
+                            <tr key={p.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                              <td className="p-3.5 font-bold text-[var(--foreground)]">
+                                {p.tenantName}
+                              </td>
+                              <td className="p-3.5">
+                                <span className="px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-md font-semibold text-[11px]">
+                                  {formatPlanName(p.tenantPlan)}
+                                </span>
+                              </td>
+                              <td className="p-3.5 font-extrabold text-emerald-600 font-mono text-sm">
+                                ${Number(p.monto).toFixed(2)}
+                              </td>
+                              <td className="p-3.5 text-[var(--muted-foreground)]">
+                                {p.periodoMeses} mes(es)
+                              </td>
+                              <td className="p-3.5 font-medium text-[var(--foreground)]">
+                                {p.metodoPago || 'TRANSFERENCIA'}
+                              </td>
+                              <td className="p-3.5 font-mono text-[var(--muted-foreground)]">
+                                {p.fechaPago ? new Date(p.fechaPago).toLocaleDateString('es-EC') : '—'}
+                              </td>
+                              <td className="p-3.5 font-mono font-semibold text-[var(--foreground)]">
+                                {p.fechaFin ? new Date(p.fechaFin).toLocaleDateString('es-EC') : '—'}
+                              </td>
+                              <td className="p-3.5">
+                                {p.numeroFacturaSri ? (
+                                  <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300 font-bold bg-slate-500/10 px-1.5 py-0.5 rounded">
+                                    {p.numeroFacturaSri}
+                                  </span>
+                                ) : (
+                                  <span className="text-[var(--muted-foreground)] italic">Sin factura</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* TABLA 2: ESTADO Y VIGENCIA DE TODOS LOS LOCALES */}
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs overflow-hidden space-y-0">
+                  <div className="p-4 sm:p-5 border-b border-[var(--border)] flex items-center justify-between">
+                    <div>
+                      <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                        <Building2 size={16} className="text-[#0F172A]" />
+                        Estado de Suscripción y Vencimientos por Local ({localesFiltrados.length})
+                      </h3>
+                      <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                        Monitoreo de locales al día, próximos vencimientos y acceso a renovación directa.
+                      </p>
+                    </div>
+                  </div>
+
+                  {localesFiltrados.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                      No hay locales que coincidan con los filtros aplicados.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-[var(--border)] bg-[var(--muted)]/40 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                            <th className="p-3.5">Local / Organización</th>
+                            <th className="p-3.5">Plan Asignado</th>
+                            <th className="p-3.5">Tarifa Mensual</th>
+                            <th className="p-3.5">Estado de Pago</th>
+                            <th className="p-3.5">Días Restantes</th>
+                            <th className="p-3.5">Vencimiento</th>
+                            <th className="p-3.5 text-right">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {localesFiltrados.map((loc) => {
+                            const tenantObj = tenants.find((t) => t.id === loc.id);
+
+                            return (
+                              <tr key={loc.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                                <td className="p-3.5 font-bold text-[var(--foreground)]">
+                                  {loc.name}
+                                  {tenantObj && !tenantObj.active && (
+                                    <span className="ml-2 px-1.5 py-0.5 bg-rose-500/10 text-rose-500 rounded text-[9px] font-bold">
+                                      Desactivado
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-3.5">
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                    {formatPlanName(loc.plan)}
+                                  </span>
+                                </td>
+                                <td className="p-3.5 font-mono font-bold text-slate-800 dark:text-slate-200">
+                                  ${Number(loc.precioMensualPlan || 0).toFixed(2)} / mes
+                                </td>
+                                <td className="p-3.5">
+                                  {loc.estadoCalculado === 'AL_DIA' && (
+                                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-md font-bold text-[11px] inline-flex items-center gap-1">
+                                      <CheckCircle2 size={12} /> Al Día
+                                    </span>
+                                  )}
+                                  {loc.estadoCalculado === 'POR_VENCER' && (
+                                    <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded-md font-bold text-[11px] inline-flex items-center gap-1">
+                                      <Clock size={12} /> Por Vencer
+                                    </span>
+                                  )}
+                                  {loc.estadoCalculado === 'VENCIDO' && (
+                                    <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-md font-bold text-[11px] inline-flex items-center gap-1">
+                                      <AlertTriangle size={12} /> Vencido
+                                    </span>
+                                  )}
+                                  {loc.estadoCalculado === 'EN_PRUEBA' && (
+                                    <span className="px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-md font-bold text-[11px] inline-flex items-center gap-1">
+                                      <Sparkles size={12} /> En Prueba
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-3.5 font-mono font-semibold">
+                                  {loc.estadoCalculado === 'EN_PRUEBA'
+                                    ? 'Prueba Gratis'
+                                    : loc.diasRestantes < 0
+                                    ? `${Math.abs(loc.diasRestantes)} días vencido`
+                                    : `${loc.diasRestantes} días`}
+                                </td>
+                                <td className="p-3.5 font-mono text-[var(--muted-foreground)]">
+                                  {loc.fechaVencimientoPlan
+                                    ? new Date(loc.fechaVencimientoPlan).toLocaleDateString('es-EC')
+                                    : '—'}
+                                </td>
+                                <td className="p-3.5 text-right">
+                                  {tenantObj && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenSubscriptionModal(tenantObj)}
+                                      className="px-2.5 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                                    >
+                                      <CreditCard size={12} />
+                                      <span>Registrar Pago</span>
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
