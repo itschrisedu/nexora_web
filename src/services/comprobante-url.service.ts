@@ -214,6 +214,9 @@ export interface PedidoClienteComprobanteData {
   totales: {
     totalPares: number;
     totalPagar: number;
+    adelanto?: number;
+    saldoPendiente?: number;
+    metodoAdelanto?: string;
   };
 }
 
@@ -233,6 +236,9 @@ export function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteDat
     c_dir: data.cliente.direccion || '',
     pares: data.totales.totalPares,
     tot: data.totales.totalPagar,
+    ad: data.totales.adelanto || 0,
+    sal: data.totales.saldoPendiente !== undefined ? data.totales.saldoPendiente : Math.max(0, data.totales.totalPagar - (data.totales.adelanto || 0)),
+    m_ad: data.totales.metodoAdelanto || '',
     e_nom: data.emisor.nombre,
     e_ruc: data.emisor.ruc,
     e_dir: data.emisor.direccion,

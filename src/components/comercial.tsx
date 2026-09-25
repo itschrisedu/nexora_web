@@ -59,6 +59,9 @@ interface Pedido {
   montoTotal: number;
   estado: EstadoPedido;
   tipoPago: string;
+  adelanto?: number;
+  metodoAdelanto?: string;
+  referenciaAdelanto?: string;
   tipoEntrega?: 'PRESENCIAL' | 'ENVIO';
   asumeFlete?: 'NO_APLICA' | 'CLIENTE' | 'EMPRESA';
   costoEnvio?: number;
@@ -242,6 +245,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [notasPedido, setNotasPedido] = useState('');
   const [mostrarObservacionGeneral, setMostrarObservacionGeneral] = useState(false);
 
+  // ── Anticipos / Adelantos de Dinero ──
+  const [registraAdelanto, setRegistraAdelanto] = useState(false);
+  const [adelantoInput, setAdelantoInput] = useState('');
+  const [metodoAdelanto, setMetodoAdelanto] = useState<'EFECTIVO' | 'TRANSFERENCIA' | 'DEPOSITO' | 'CHEQUE'>('EFECTIVO');
+  const [referenciaAdelanto, setReferenciaAdelanto] = useState('');
+
   // ── Logística de Entrega (Fase E1) ──
   const [tipoEntrega, setTipoEntrega] = useState<'PRESENCIAL' | 'ENVIO'>('PRESENCIAL');
   const [asumeFlete, setAsumeFlete] = useState<'CLIENTE' | 'EMPRESA'>('CLIENTE');
@@ -302,11 +311,15 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setEditingOrderId(null);
     setEditingOrderNumero('');
     setReferenciaComprobante('');
+    setRegistraAdelanto(false);
+    setAdelantoInput('');
+    setMetodoAdelanto('EFECTIVO');
+    setReferenciaAdelanto('');
   };
 
   const isDirtyOrder = useCallback(() => {
-    return showModal && (lineasPedido.length > 0 || clientId !== '' || notasPedido.trim() !== '');
-  }, [showModal, lineasPedido.length, clientId, notasPedido]);
+    return showModal && (lineasPedido.length > 0 || clientId !== '' || notasPedido.trim() !== '' || adelantoInput.trim() !== '');
+  }, [showModal, lineasPedido.length, clientId, notasPedido, adelantoInput]);
 
   const isDirtySupplierOrder = useCallback(() => {
     return showSupplierOrderModal && (selectedSupplierId !== '' || supplierOrderObservaciones.trim() !== '' || Object.keys(supplierOrderTallasMap).length > 0);
@@ -854,6 +867,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       totales: {
         totalPares: (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0),
         totalPagar: Number(p.montoTotal || 0),
+        adelanto: Number((p as any).adelanto || 0),
+        saldoPendiente: Math.max(0, Number(p.montoTotal || 0) - Number((p as any).adelanto || 0)),
+        metodoAdelanto: (p as any).metodoAdelanto || undefined,
       },
     });
 
@@ -938,6 +954,10 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       });
     }
 
+    const montoAdelanto = Number((p as any).adelanto || 0);
+    const totalPagar = Number(p.montoTotal || 0);
+    const saldoPendiente = Math.max(0, totalPagar - montoAdelanto);
+
     // Generar enlace digital oficial del comprobante
     const urlComprobante = generarUrlPublicaPedidoCliente({
       pedido: {
@@ -963,7 +983,10 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       lineas: lineasComprobante,
       totales: {
         totalPares: (p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0),
-        totalPagar: Number(p.montoTotal || 0),
+        totalPagar,
+        adelanto: montoAdelanto,
+        saldoPendiente,
+        metodoAdelanto: (p as any).metodoAdelanto || undefined,
       },
     });
 
@@ -980,7 +1003,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       return stockDisp < (l.cantidad || 1);
     }) || p.estado === 'EN_ESPERA_STOCK' || (p as any).bajoPedido === true;
 
-    const tieneAbono = Number((p as any).totalAbonado || (p as any).abono || 0) > 0 || (p as any).adelantoRegistrado === true || p.tipoPago === 'ANTICIPO' || p.tipoPago === 'ADELANTO';
+    const tieneAbono = montoAdelanto > 0 || (p as any).adelantoRegistrado === true || p.tipoPago === 'ANTICIPO' || p.tipoPago === 'ADELANTO';
 
     let tiempoEntregaTexto = '';
     if (haySinStock) {
@@ -993,7 +1016,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       }
     }
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares\n💰 *VALOR TOTAL:* $${Number(p.montoTotal).toFixed(2)}\n\n🔗 *Ver Comprobante Digital Oficial y Descargar PDF:*\n${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+    let desgloseFinancieroTexto = `\n💰 *VALOR TOTAL:* $${totalPagar.toFixed(2)}`;
+    if (montoAdelanto > 0) {
+      desgloseFinancieroTexto = `\n💰 *VALOR TOTAL:* $${totalPagar.toFixed(2)}\n💵 *ANTICIPO RECIBIDO (${(p as any).metodoAdelanto || 'EFECTIVO'}):* -$${montoAdelanto.toFixed(2)}\n⏳ *SALDO PENDIENTE A LA ENTREGA:* *$${saldoPendiente.toFixed(2)}*`;
+    }
+
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares${desgloseFinancieroTexto}\n\n🔗 *Ver Comprobante Digital Oficial y Descargar PDF:*\n${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
 
     let numLimpio = telefono.replace(/\D/g, '');
     if (numLimpio.startsWith('09') && numLimpio.length === 10) {
@@ -1343,6 +1371,20 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setTipoPago(p.tipoPago || 'CONTADO');
     setNotasPedido((p as any).notas || '');
 
+    // Anticipo / Adelanto
+    const montoAd = Number(p.adelanto || 0);
+    if (montoAd > 0) {
+      setRegistraAdelanto(true);
+      setAdelantoInput(String(montoAd));
+      setMetodoAdelanto((p.metodoAdelanto as any) || 'EFECTIVO');
+      setReferenciaAdelanto(p.referenciaAdelanto || '');
+    } else {
+      setRegistraAdelanto(false);
+      setAdelantoInput('');
+      setMetodoAdelanto('EFECTIVO');
+      setReferenciaAdelanto('');
+    }
+
     // Logística
     setTipoEntrega(p.tipoEntrega || 'PRESENCIAL');
     setAsumeFlete(p.asumeFlete === 'EMPRESA' ? 'EMPRESA' : 'CLIENTE');
@@ -1423,6 +1465,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       return;
     }
 
+    const valorAdelanto = registraAdelanto && Number(adelantoInput) > 0 ? Number(adelantoInput) : 0;
+
     setCreatingOrder(true);
     setErrorMsg('');
     try {
@@ -1449,6 +1493,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           observacion: l.observacionModelo || undefined,
         })),
         notas: notasFinales || undefined,
+        adelanto: valorAdelanto,
+        metodoAdelanto: valorAdelanto > 0 ? metodoAdelanto : undefined,
+        referenciaAdelanto: valorAdelanto > 0 && referenciaAdelanto.trim() ? referenciaAdelanto.trim() : undefined,
         tipoEntrega,
         asumeFlete: tipoEntrega === 'ENVIO' ? asumeFlete : 'NO_APLICA',
         costoEnvio: tipoEntrega === 'ENVIO' ? Number(costoEnvio || 0) : 0,
@@ -1490,6 +1537,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
             montoTotal: totalFinal,
             estado: 'PENDIENTE',
             tipoPago,
+            adelanto: valorAdelanto,
+            metodoAdelanto: valorAdelanto > 0 ? metodoAdelanto : undefined,
+            referenciaAdelanto: valorAdelanto > 0 ? referenciaAdelanto : undefined,
             tipoEntrega,
             asumeFlete,
             costoEnvio: Number(costoEnvio || 0),
@@ -1862,7 +1912,19 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                         <td className="px-6 py-4">
                           <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px] font-semibold">{p.tipoPago}</span>
                         </td>
-                        <td className="px-6 py-4 text-right font-extrabold text-emerald-600">${Number(p.montoTotal).toFixed(2)}</td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="font-extrabold text-emerald-600">${Number(p.montoTotal).toFixed(2)}</div>
+                          {Number(p.adelanto || 0) > 0 && (
+                            <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
+                              Anticipo: ${Number(p.adelanto).toFixed(2)}
+                            </div>
+                          )}
+                          {Number(p.adelanto || 0) > 0 && (
+                            <div className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">
+                              Saldo: ${Math.max(0, Number(p.montoTotal) - Number(p.adelanto)).toFixed(2)}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-right text-[10px] text-[var(--muted-foreground)]">
                           {new Date(p.createdAt).toLocaleDateString('es-EC')}
                         </td>
@@ -1994,6 +2056,29 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   <span>Modificar Envío / Guía</span>
                                 </button>
                               </div>
+
+                              {/* Tarjeta de Anticipo Registrado si aplica */}
+                              {Number(p.adelanto || 0) > 0 && (
+                                <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <CreditCard size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                                    <div>
+                                      <span className="font-extrabold text-blue-900 dark:text-blue-200">
+                                        Anticipo / Adelanto Recibido: ${Number(p.adelanto).toFixed(2)}
+                                      </span>
+                                      <span className="text-[11px] text-blue-700 dark:text-blue-300 ml-1.5">
+                                        ({p.metodoAdelanto || 'EFECTIVO'}{p.referenciaAdelanto ? ` · Ref: ${p.referenciaAdelanto}` : ''})
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-[var(--muted-foreground)] block">Saldo restante al entregar:</span>
+                                    <span className="font-black text-amber-600 dark:text-amber-400 text-sm">
+                                      ${Math.max(0, Number(p.montoTotal) - Number(p.adelanto)).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
 
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-3 flex-wrap">
@@ -2393,6 +2478,111 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       </div>
                     </div>
                   )}
+
+                  {/* 1.1 SECCIÓN DE ANTICIPO / ADELANTO DE DINERO */}
+                  <div className="sm:col-span-2 p-3.5 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <DollarSign size={16} className="text-amber-600" />
+                        <span className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                          ¿El cliente deja un Adelanto / Anticipo de Dinero?
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextState = !registraAdelanto;
+                          setRegistraAdelanto(nextState);
+                          if (!nextState) {
+                            setAdelantoInput('');
+                            setReferenciaAdelanto('');
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer ${
+                          registraAdelanto
+                            ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-2xs'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-amber-500'
+                        }`}
+                      >
+                        {registraAdelanto ? '✓ Sí, con anticipo' : '+ Registrar Anticipo'}
+                      </button>
+                    </div>
+
+                    {registraAdelanto && (
+                      <div className="pt-2 border-t border-amber-500/20 space-y-3 animate-in fade-in duration-150">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-bold text-amber-900 dark:text-amber-300 mb-1">
+                              Monto del Adelanto ($) *
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              placeholder="Ej: 200.00"
+                              value={adelantoInput}
+                              onChange={(e) => setAdelantoInput(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--card)] border border-amber-500/40 rounded-xl text-xs font-black text-amber-900 dark:text-amber-200 focus:outline-none focus:border-amber-600 font-mono"
+                              required={registraAdelanto}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                              Método de Anticipo *
+                            </label>
+                            <select
+                              value={metodoAdelanto}
+                              onChange={(e) => setMetodoAdelanto(e.target.value as any)}
+                              className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-600"
+                            >
+                              <option value="EFECTIVO">💵 Efectivo</option>
+                              <option value="TRANSFERENCIA">🏦 Transferencia</option>
+                              <option value="DEPOSITO">📥 Depósito</option>
+                              <option value="CHEQUE">📝 Cheque</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                              N° Comprobante / Ref. (Opcional)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej: Transf #99321"
+                              value={referenciaAdelanto}
+                              onChange={(e) => setReferenciaAdelanto(e.target.value)}
+                              className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-600"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Resumen de cálculo en tiempo real */}
+                        {(() => {
+                          const subtotalActual = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
+                          const montoAd = Number(adelantoInput || 0);
+                          const saldoRestanteCalc = Math.max(0, subtotalActual - montoAd);
+
+                          return (
+                            <div className="p-2.5 bg-[var(--card)] border border-amber-500/20 rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs">
+                              <div className="flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                                <span>Total Pedido:</span>
+                                <span className="font-bold text-[var(--foreground)]">${subtotalActual.toFixed(2)}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-emerald-600 font-bold">
+                                <span>Anticipo:</span>
+                                <span>-${montoAd.toFixed(2)}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-black">
+                                <span>Saldo a Cobrar al Entregar:</span>
+                                <span className="text-sm font-mono">${saldoRestanteCalc.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Observación General del Pedido (Compacta y Opcional) */}
                   <div className="sm:col-span-2 pt-1">
@@ -3537,20 +3727,37 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 const subtotalBase = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
                 const descCupon = cuponAplicado ? Number(cuponAplicado.descuentoCalculado || 0) : 0;
                 const totalConDescuento = Math.max(0, subtotalBase - descCupon);
+                const montoAdelanto = registraAdelanto ? Number(adelantoInput || 0) : 0;
+                const saldoRestanteFinal = Math.max(0, totalConDescuento - montoAdelanto);
 
                 return (
-                  <div className="text-xs space-y-0.5">
+                  <div className="text-xs space-y-1">
                     {descCupon > 0 && (
                       <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)]">
                         <span>Subtotal: ${subtotalBase.toFixed(2)}</span>
                         <span className="text-purple-600 font-bold">Cupón ({cuponAplicado.promocion?.codigo}): -${descCupon.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[var(--muted-foreground)]">Total a Pagar: </span>
-                      <span className="font-black text-base text-emerald-600">
-                        ${totalConDescuento.toFixed(2)}
-                      </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[var(--muted-foreground)]">Total Pedido: </span>
+                        <span className="font-bold text-sm text-[var(--foreground)]">
+                          ${totalConDescuento.toFixed(2)}
+                        </span>
+                      </div>
+                      {montoAdelanto > 0 && (
+                        <>
+                          <span className="text-slate-300">·</span>
+                          <span className="text-emerald-600 font-bold">
+                            Anticipo: -${montoAdelanto.toFixed(2)}
+                          </span>
+                          <span className="text-slate-300">·</span>
+                          <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20 text-amber-900 dark:text-amber-200">
+                            <span className="font-bold">Saldo al Entregar:</span>
+                            <span className="font-black text-sm font-mono">${saldoRestanteFinal.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 );

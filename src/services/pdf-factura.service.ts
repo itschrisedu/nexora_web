@@ -631,6 +631,9 @@ export interface PedidoClientePdfData {
     descuento?: number;
     costoEnvio?: number;
     totalPagar: number;
+    adelanto?: number;
+    saldoPendiente?: number;
+    metodoAdelanto?: string;
   };
 }
 
@@ -796,31 +799,55 @@ export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
 
   y += 5;
 
-  // ── 5. Totales ──
-  const startTotalsX = pageWidth - 85;
+  // ── 5. Totales & Desglose de Anticipos ──
+  const startTotalsX = pageWidth - 90;
+  const montoAdelanto = Number(data.totales.adelanto || 0);
+  const saldoPendiente = data.totales.saldoPendiente !== undefined
+    ? Number(data.totales.saldoPendiente)
+    : Math.max(0, data.totales.totalPagar - montoAdelanto);
+
+  const boxHeight = montoAdelanto > 0 ? 32 : 20;
+
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(startTotalsX, y, 73, 20, 1.5, 1.5, "FD");
+  doc.roundedRect(startTotalsX, y, 78, boxHeight, 1.5, 1.5, "FD");
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
-  doc.text("TOTAL PARES:", startTotalsX + 4, y + 6);
+  doc.text("TOTAL PARES:", startTotalsX + 4, y + 5);
   doc.setFont("helvetica", "bold");
-  doc.text(`${data.totales.totalPares} pares`, startTotalsX + 69, y + 6, { align: "right" });
+  doc.text(`${data.totales.totalPares} pares`, startTotalsX + 74, y + 5, { align: "right" });
 
   doc.setDrawColor(203, 213, 225);
-  doc.line(startTotalsX + 4, y + 9, startTotalsX + 69, y + 9);
+  doc.line(startTotalsX + 4, y + 8, startTotalsX + 74, y + 8);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
+  doc.setFontSize(8.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("VALOR TOTAL:", startTotalsX + 4, y + 15);
-  doc.setTextColor(5, 150, 105); // Emerald 600
-  doc.text(`$${data.totales.totalPagar.toFixed(2)}`, startTotalsX + 69, y + 15, { align: "right" });
+  doc.text("VALOR TOTAL:", startTotalsX + 4, y + 13);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`$${data.totales.totalPagar.toFixed(2)}`, startTotalsX + 74, y + 13, { align: "right" });
+
+  if (montoAdelanto > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(5, 150, 105); // Emerald 600
+    doc.text(`ANTICIPO RECIBIDO (${data.totales.metodoAdelanto || "EFECTIVO"}):`, startTotalsX + 4, y + 19);
+    doc.setFont("helvetica", "bold");
+    doc.text(`-$${montoAdelanto.toFixed(2)}`, startTotalsX + 74, y + 19, { align: "right" });
+
+    doc.line(startTotalsX + 4, y + 22, startTotalsX + 74, y + 22);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(180, 83, 9); // Amber 700
+    doc.text("SALDO PENDIENTE:", startTotalsX + 4, y + 28);
+    doc.text(`$${saldoPendiente.toFixed(2)}`, startTotalsX + 74, y + 28, { align: "right" });
+  }
 
   // Footer
-  y += 26;
+  y += boxHeight + 8;
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);

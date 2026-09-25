@@ -572,6 +572,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     ridePdfUrl?: string;
   } | null>(null);
 
+  // Modal Cambiar Tipo de Venta (Contado <-> Crédito)
+  const [showCambiarTipoModal, setShowCambiarTipoModal] = useState(false);
+  const [cobroParaCambiarTipo, setCobroParaCambiarTipo] = useState<Cobro | null>(null);
+  const [nuevoTipoVenta, setNuevoTipoVenta] = useState<'CREDITO' | 'CONTADO'>('CREDITO');
+  const [cambioTipoDiasPlazo, setCambioTipoDiasPlazo] = useState<number>(30);
+  const [cambioTipoFechaVencimiento, setCambioTipoFechaVencimiento] = useState<string>('');
+  const [cambioTipoMontoAbonado, setCambioTipoMontoAbonado] = useState<string>('');
+  const [cambioTipoMetodoAbono, setCambioTipoMetodoAbono] = useState<string>('EFECTIVO');
+  const [cambioTipoNotas, setCambioTipoNotas] = useState<string>('');
+  const [savingCambiarTipo, setSavingCambiarTipo] = useState(false);
+
   // Configuración del Emisor (Dueño del Negocio / RUC)
   const [businessConfig, setBusinessConfig] = useState<{
     nombre: string;
@@ -1762,6 +1773,47 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     }
   };
 
+  const handleAbrirCambiarTipo = (cobro: Cobro) => {
+    const esCredito = (cobro.tipo || '').toUpperCase() === 'CREDITO';
+    const tipoDestino: 'CREDITO' | 'CONTADO' = esCredito ? 'CONTADO' : 'CREDITO';
+    setCobroParaCambiarTipo(cobro);
+    setNuevoTipoVenta(tipoDestino);
+    setCambioTipoDiasPlazo(30);
+    
+    const fechaDefecto = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    setCambioTipoFechaVencimiento(fechaDefecto);
+    
+    const totalAbonado = (cobro.abonos || []).reduce((sum, a) => sum + Number(a.monto), 0);
+    setCambioTipoMontoAbonado(totalAbonado > 0 ? String(totalAbonado) : '');
+    setCambioTipoMetodoAbono('EFECTIVO');
+    setCambioTipoNotas('');
+    setShowCambiarTipoModal(true);
+  };
+
+  const handleEjecutarCambioTipo = async () => {
+    if (!cobroParaCambiarTipo) return;
+    setSavingCambiarTipo(true);
+    try {
+      const res = await ApiService.post(`/financiero/cobros/${cobroParaCambiarTipo.id}/cambiar-tipo`, {
+        nuevoTipo: nuevoTipoVenta,
+        diasPlazo: cambioTipoDiasPlazo,
+        fechaVencimiento: nuevoTipoVenta === 'CREDITO' ? cambioTipoFechaVencimiento : undefined,
+        montoAbonadoInicial: nuevoTipoVenta === 'CREDITO' ? (parseFloat(cambioTipoMontoAbonado) || 0) : undefined,
+        metodoAbonoInicial: cambioTipoMetodoAbono,
+        notas: cambioTipoNotas,
+      });
+
+      showToast(res.message || 'Tipo de venta modificado exitosamente.', 'success');
+      setShowCambiarTipoModal(false);
+      setCobroParaCambiarTipo(null);
+      await loadCobros();
+    } catch (err: any) {
+      showToast(err.message || 'Error al cambiar tipo de venta.', 'error');
+    } finally {
+      setSavingCambiarTipo(false);
+    }
+  };
+
   const saldoTotalGeneral = cobros.reduce((acc, c) => acc + Number(c.saldoPendiente), 0);
 
   // Filtrado de Cartera Consolidada
@@ -2125,6 +2177,19 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                                   type="button"
                                                   onClick={(e) => {
                                                     e.stopPropagation();
+                                                    handleAbrirCambiarTipo(cobroItem);
+                                                  }}
+                                                  className="px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-700 dark:text-blue-300 text-xs font-bold rounded-xl transition-all border border-blue-500/20 flex items-center gap-1 cursor-pointer shadow-2xs"
+                                                  title={cobroItem.tipo === 'CONTADO' ? 'Convertir a Crédito' : 'Convertir a Contado'}
+                                                >
+                                                  {cobroItem.tipo === 'CONTADO' ? <CreditCard size={13} /> : <DollarSign size={13} />}
+                                                  <span>{cobroItem.tipo === 'CONTADO' ? 'A Crédito' : 'A Contado'}</span>
+                                                </button>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
                                                     handleAbrirFacturacion(cliente, cobroItem);
                                                   }}
                                                   className="px-2.5 py-1.5 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] text-xs font-bold rounded-xl transition-all border border-[#0F172A]/20 flex items-center gap-1"
@@ -2465,6 +2530,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                           ${Number(cobroSeleccionado.saldoPendiente).toFixed(2)}
                         </span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAbrirCambiarTipo(cobroSeleccionado)}
+                        className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-700 dark:text-blue-300 font-bold rounded-lg transition-colors border border-blue-500/20 flex items-center gap-1 text-[10px] cursor-pointer"
+                        title={cobroSeleccionado.tipo === 'CONTADO' ? 'Convertir esta nota de contado a crédito' : 'Convertir esta nota a crédito a contado'}
+                      >
+                        {cobroSeleccionado.tipo === 'CONTADO' ? <CreditCard size={11} /> : <DollarSign size={11} />}
+                        <span>{cobroSeleccionado.tipo === 'CONTADO' ? 'Pasar a Crédito' : 'Pasar a Contado'}</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => {
@@ -4780,6 +4855,278 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         </div>
         );
       })()}
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* MODAL: CAMBIAR MODALIDAD DE VENTA (CONTADO <-> CRÉDITO)       */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {showCambiarTipoModal && cobroParaCambiarTipo && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+            {/* Header del Modal */}
+            <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 text-emerald-400">
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Cambiar Condición de Venta</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    {cobroParaCambiarTipo.saleNote?.numero
+                      ? `Nota #${String(cobroParaCambiarTipo.saleNote.numero).padStart(4, '0')}`
+                      : cobroParaCambiarTipo.numeroCobro || 'Nota Comercial'} · {cobroParaCambiarTipo.clienteNombre || 'Cliente'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCambiarTipoModal(false);
+                  setCobroParaCambiarTipo(null);
+                }}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+              {/* Selector de Tipo Destino */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  Nueva Condición de Pago *
+                </label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-[var(--muted)]/40 rounded-2xl border border-[var(--border)]">
+                  <button
+                    type="button"
+                    onClick={() => setNuevoTipoVenta('CONTADO')}
+                    className={`py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      nuevoTipoVenta === 'CONTADO'
+                        ? 'bg-[#0F172A] text-white shadow-md'
+                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                    }`}
+                  >
+                    <DollarSign size={14} />
+                    <span>Venta de Contado</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNuevoTipoVenta('CREDITO')}
+                    className={`py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      nuevoTipoVenta === 'CREDITO'
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                    }`}
+                  >
+                    <CreditCard size={14} />
+                    <span>Venta a Crédito</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Información del monto original */}
+              <div className="p-3 bg-slate-500/5 rounded-2xl border border-[var(--border)] flex items-center justify-between">
+                <span className="text-[11px] text-[var(--muted-foreground)] font-medium">Monto Total de la Venta:</span>
+                <span className="font-mono font-black text-sm text-[var(--foreground)]">
+                  ${Number(cobroParaCambiarTipo.montoOriginal ?? cobroParaCambiarTipo.montoTotal ?? 0).toFixed(2)}
+                </span>
+              </div>
+
+              {nuevoTipoVenta === 'CREDITO' ? (
+                <div className="space-y-4 pt-1">
+                  {/* Plazo en días */}
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                      Plazo de Crédito *
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[15, 30, 45, 60].map((dias) => (
+                        <button
+                          key={dias}
+                          type="button"
+                          onClick={() => {
+                            setCambioTipoDiasPlazo(dias);
+                            const nuevaFecha = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                            setCambioTipoFechaVencimiento(nuevaFecha);
+                          }}
+                          className={`py-2 px-2 rounded-xl font-extrabold text-xs border text-center transition-all cursor-pointer ${
+                            cambioTipoDiasPlazo === dias
+                              ? 'bg-emerald-600/15 border-emerald-600 text-emerald-700 dark:text-emerald-300 font-black shadow-xs'
+                              : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-slate-400'
+                          }`}
+                        >
+                          {dias} días
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-2">
+                      <label className="block text-[10px] text-[var(--muted-foreground)] mb-1 font-semibold">
+                        Fecha Límite de Vencimiento:
+                      </label>
+                      <input
+                        type="date"
+                        value={cambioTipoFechaVencimiento}
+                        onChange={(e) => setCambioTipoFechaVencimiento(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Anticipo / Abono Inicial */}
+                  <div className="p-3.5 bg-blue-500/5 rounded-2xl border border-blue-500/20 space-y-3">
+                    <span className="font-extrabold text-xs text-blue-900 dark:text-blue-200 block flex items-center gap-1.5">
+                      <DollarSign size={14} className="text-blue-600" />
+                      Anticipo / Abono Inicial Recibido (Opcional)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[10px] text-[var(--muted-foreground)] mb-1 font-semibold">
+                          Monto Recibido ($):
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max={Number(cobroParaCambiarTipo.montoOriginal ?? cobroParaCambiarTipo.montoTotal ?? 0)}
+                          placeholder="0.00"
+                          value={cambioTipoMontoAbonado}
+                          onChange={(e) => setCambioTipoMontoAbonado(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-emerald-600 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-[var(--muted-foreground)] mb-1 font-semibold">
+                          Método de Pago:
+                        </label>
+                        <select
+                          value={cambioTipoMetodoAbono}
+                          onChange={(e) => setCambioTipoMetodoAbono(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        >
+                          <option value="EFECTIVO">💵 Efectivo</option>
+                          <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
+                          <option value="DEPOSITO">💳 Depósito Bancario</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notas */}
+                  <div>
+                    <label className="block text-[10px] text-[var(--muted-foreground)] mb-1 font-semibold">
+                      Observación / Motivo del Crédito:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Acuerdo comercial con cliente, se otorga 30 días con anticipo..."
+                      value={cambioTipoNotas}
+                      onChange={(e) => setCambioTipoNotas(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                    />
+                  </div>
+
+                  {/* Resumen del Saldo que quedará en Cartera */}
+                  {(() => {
+                    const total = Number(cobroParaCambiarTipo.montoOriginal ?? cobroParaCambiarTipo.montoTotal ?? 0);
+                    const abono = Math.min(total, parseFloat(cambioTipoMontoAbonado) || 0);
+                    const saldoFinal = Math.max(0, total - abono);
+
+                    return (
+                      <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-amber-800 dark:text-amber-300 font-bold block uppercase">
+                            Saldo Pendiente que se cargará a Cartera:
+                          </span>
+                          <span className="text-[11px] text-[var(--muted-foreground)]">
+                            Vence el: <strong>{cambioTipoFechaVencimiento ? new Date(cambioTipoFechaVencimiento).toLocaleDateString('es-EC') : '30 días'}</strong>
+                          </span>
+                        </div>
+                        <span className="font-mono font-black text-base text-red-500">
+                          ${saldoFinal.toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div className="space-y-4 pt-1">
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl space-y-2">
+                    <span className="font-extrabold text-xs text-emerald-800 dark:text-emerald-300 block flex items-center gap-1.5">
+                      <CheckCircle size={15} className="text-emerald-600" />
+                      Liquidación Inmediata de Contado
+                    </span>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">
+                      Al cambiar a <strong>Contado</strong>, la venta quedará completamente <strong>Saldada ($0.00 pendiente)</strong>, liberando automáticamente el cupo de crédito del cliente.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-[var(--muted-foreground)] mb-1 font-semibold">
+                      Método de Cobro de Contado:
+                    </label>
+                    <select
+                      value={cambioTipoMetodoAbono}
+                      onChange={(e) => setCambioTipoMetodoAbono(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    >
+                      <option value="EFECTIVO">💵 Efectivo</option>
+                      <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
+                      <option value="DEPOSITO">💳 Depósito Bancario</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-[var(--muted-foreground)] mb-1 font-semibold">
+                      Observación / Notas:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Pago total en efectivo recibido en mostrador..."
+                      value={cambioTipoNotas}
+                      onChange={(e) => setCambioTipoNotas(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCambiarTipoModal(false);
+                  setCobroParaCambiarTipo(null);
+                }}
+                className="px-4 py-2 text-xs font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleEjecutarCambioTipo}
+                disabled={savingCambiarTipo}
+                className="px-5 py-2.5 bg-gradient-to-r from-slate-900 to-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer border border-slate-700"
+              >
+                {savingCambiarTipo ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Guardando cambios...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} className="text-emerald-400" />
+                    <span>Confirmar Cambio a {nuevoTipoVenta === 'CREDITO' ? 'Crédito' : 'Contado'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Confirmación UI (Reemplaza confirm nativo) */}
       <ConfirmModal
