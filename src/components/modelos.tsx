@@ -724,7 +724,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setSelectedModelForColor(m);
     setNewColorName("");
     setNewColorFoto(null);
-    setNewColorSupplierId(m.supplierId || (m.suppliers && m.suppliers.length > 0 ? m.suppliers[0].id : ""));
+    const defaultSupId = m.supplierId || (m.suppliers && m.suppliers.length > 0 ? m.suppliers[0].id : "");
+    setNewColorSupplierId(defaultSupId);
 
     const existingSerieIds = Array.from(
       new Set((m.products || []).map(p => p.serie?.id).filter(Boolean))
@@ -736,7 +737,10 @@ export default function ModelosComponent({ online }: ModelosProps) {
     const initialCustomTallas: Record<string, string[]> = {};
 
     existingSerieIds.forEach(sid => {
-      const prod = m.products.find(p => p.serie?.id === sid);
+      // Buscar si este proveedor ya tiene precio registrado para esta serie
+      const prod = m.products.find(p => (p.supplierId === defaultSupId || p.supplier?.id === defaultSupId) && p.serie?.id === sid)
+        || (defaultSupId === m.supplierId ? m.products.find(p => p.serie?.id === sid) : undefined);
+
       initialPrices[sid] = {
         costPrice: prod ? String(prod.precioCosto) : "",
         salePrice: prod ? String(prod.precioVenta) : "",
@@ -759,6 +763,68 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setNewColorStockInicial("1");
     setError("");
     setShowAddColorModal(true);
+  };
+
+  const handleSupplierChangeInAddColor = (newSupId: string) => {
+    setNewColorSupplierId(newSupId);
+    if (!selectedModelForColor) return;
+
+    // Actualizar los precios para cada serie activa según el historial de este proveedor en el modelo
+    setNewColorSeriesPrices(prev => {
+      const updated = { ...prev };
+      newColorSerieIds.forEach(sid => {
+        const matchingProd = selectedModelForColor.products?.find(
+          p => (p.supplierId === newSupId || p.supplier?.id === newSupId) && p.serie?.id === sid
+        );
+        if (matchingProd && matchingProd.precioCosto > 0) {
+          updated[sid] = {
+            costPrice: String(matchingProd.precioCosto),
+            salePrice: String(matchingProd.precioVenta),
+          };
+        } else {
+          updated[sid] = {
+            costPrice: "",
+            salePrice: "",
+          };
+        }
+      });
+      return updated;
+    });
+  };
+
+  const handleCostPriceChangeInNewColor = (serieId: string, newCost: string) => {
+    const costVal = parseFloat(newCost);
+    const autoSuggestedSale = !isNaN(costVal) && costVal > 0 ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+
+    setNewColorSeriesPrices(prev => {
+      const currentSerie = prev[serieId] || { costPrice: "", salePrice: "" };
+      const shouldUpdateSale = !currentSerie.salePrice || currentSerie.salePrice === "0" || currentSerie.salePrice === "0.00";
+      return {
+        ...prev,
+        [serieId]: {
+          costPrice: newCost,
+          salePrice: shouldUpdateSale && autoSuggestedSale ? autoSuggestedSale : currentSerie.salePrice,
+        },
+      };
+    });
+  };
+
+  const replicarCostoEnNuevoColor = (sourceSerieId: string) => {
+    const source = newColorSeriesPrices[sourceSerieId];
+    if (!source || !source.costPrice) return;
+    const costVal = parseFloat(source.costPrice);
+    const suggestedSale = !isNaN(costVal) && costVal > 0 ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+
+    setNewColorSeriesPrices(prev => {
+      const updated = { ...prev };
+      newColorSerieIds.forEach(sid => {
+        updated[sid] = {
+          costPrice: source.costPrice,
+          salePrice: source.salePrice || suggestedSale,
+        };
+      });
+      return updated;
+    });
   };
 
   const toggleNewColorSerie = (id: string) => {
@@ -823,6 +889,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
         return { ...prev, [serieId]: [...current, tallaId] };
       }
     });
+  };
   };
 
   const addTallaRepeatInNewColorSerie = (serieId: string, tallaId: string) => {
