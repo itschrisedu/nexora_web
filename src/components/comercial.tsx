@@ -278,6 +278,14 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [envioModalCiudadEnvio, setEnvioModalCiudadEnvio] = useState('');
   const [savingEnvioModal, setSavingEnvioModal] = useState(false);
 
+  // ── Modal independiente de Gestión Rápida de Adelanto / Anticipo ──
+  const [showModalAdelanto, setShowModalAdelanto] = useState(false);
+  const [pedidoAdelantoSeleccionado, setPedidoAdelantoSeleccionado] = useState<Pedido | null>(null);
+  const [modalAdelantoMonto, setModalAdelantoMonto] = useState('');
+  const [modalAdelantoMetodo, setModalAdelantoMetodo] = useState<'EFECTIVO' | 'TRANSFERENCIA' | 'DEPOSITO' | 'CHEQUE'>('EFECTIVO');
+  const [modalAdelantoRef, setModalAdelantoRef] = useState('');
+  const [savingAdelantoModal, setSavingAdelantoModal] = useState(false);
+
   const [creatingOrder, setCreatingOrder] = useState(false);
 
   // ── Modal de Entrega Parcial / Total de Pedido ──
@@ -333,6 +341,10 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     return showModalEnvio && (envioModalGuiaEnvio.trim() !== '' || envioModalDireccionEnvio.trim() !== '' || envioModalCiudadEnvio.trim() !== '');
   }, [showModalEnvio, envioModalGuiaEnvio, envioModalDireccionEnvio, envioModalCiudadEnvio]);
 
+  const isDirtyAdelanto = useCallback(() => {
+    return showModalAdelanto && (modalAdelantoMonto.trim() !== '' || modalAdelantoRef.trim() !== '');
+  }, [showModalAdelanto, modalAdelantoMonto, modalAdelantoRef]);
+
   const isDirtyEntrega = useCallback(() => {
     return showEntregaModal && Object.keys(entregaItemsMap).length > 0;
   }, [showEntregaModal, entregaItemsMap]);
@@ -350,6 +362,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       if (showModalEnvio) {
         e.preventDefault();
         safeDismiss(() => { setShowModalEnvio(false); setPedidoEnvioSeleccionado(null); }, isDirtyEnvio());
+        return;
+      }
+      if (showModalAdelanto) {
+        e.preventDefault();
+        safeDismiss(() => { setShowModalAdelanto(false); setPedidoAdelantoSeleccionado(null); }, isDirtyAdelanto());
         return;
       }
       if (showEntregaModal) {
@@ -371,9 +388,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [
-    showDiscardModal, showNuevoTransporteModal, showModalEnvio, showEntregaModal,
+    showDiscardModal, showNuevoTransporteModal, showModalEnvio, showModalAdelanto, showEntregaModal,
     showSupplierOrderModal, showModal, safeDismiss, isDirtyNuevoTransporte,
-    isDirtyEnvio, isDirtyEntrega, isDirtySupplierOrder, isDirtyOrder
+    isDirtyEnvio, isDirtyAdelanto, isDirtyEntrega, isDirtySupplierOrder, isDirtyOrder
   ]);
   const [validandoCupon, setValidandoCupon] = useState(false);
   const [cuponErrorMsg, setCuponErrorMsg] = useState('');
@@ -1455,6 +1472,47 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
+  const handleAbrirModalAdelanto = (p: Pedido) => {
+    setPedidoAdelantoSeleccionado(p);
+    setModalAdelantoMonto(p.adelanto && Number(p.adelanto) > 0 ? String(p.adelanto) : '');
+    setModalAdelantoMetodo((p.metodoAdelanto as any) || 'EFECTIVO');
+    setModalAdelantoRef(p.referenciaAdelanto || '');
+    setShowModalAdelanto(true);
+  };
+
+  const handleGuardarAdelanto = async () => {
+    if (!pedidoAdelantoSeleccionado) return;
+    const monto = Number(modalAdelantoMonto || 0);
+    if (isNaN(monto) || monto < 0) {
+      showToast('El monto del anticipo no puede ser negativo', 'error');
+      return;
+    }
+    const total = Number(pedidoAdelantoSeleccionado.montoTotal || 0);
+    if (monto > total) {
+      showToast(`El anticipo ($${monto.toFixed(2)}) no puede exceder el valor total del pedido ($${total.toFixed(2)})`, 'error');
+      return;
+    }
+
+    setSavingAdelantoModal(true);
+    try {
+      await ApiService.put(`/pedidos/${pedidoAdelantoSeleccionado.id}/adelanto`, {
+        adelanto: monto,
+        metodoAdelanto: monto > 0 ? modalAdelantoMetodo : undefined,
+        referenciaAdelanto: monto > 0 ? modalAdelantoRef.trim() || undefined : undefined,
+      });
+
+      showToast(monto > 0 ? `¡Anticipo de $${monto.toFixed(2)} registrado correctamente!` : 'Anticipo retirado exitosamente', 'success');
+      setShowModalAdelanto(false);
+      setPedidoAdelantoSeleccionado(null);
+      await loadPedidos();
+    } catch (err: any) {
+      console.error('Error al actualizar anticipo:', err);
+      showToast(err.message || 'Error al actualizar anticipo del pedido', 'error');
+    } finally {
+      setSavingAdelantoModal(false);
+    }
+  };
+
   const handleCrearPedidoOnline = async () => {
     if (!clientId) {
       setErrorMsg('Debes seleccionar un cliente.');
@@ -1934,11 +1992,28 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                             <button
                               type="button"
                               onClick={() => handleAbrirModalEnvio(p)}
-                              className="px-2 py-1 bg-blue-500/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-500/20 flex items-center gap-1"
+                              className="px-2 py-1 bg-blue-500/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-500/20 flex items-center gap-1 cursor-pointer"
                               title="Gestionar Courier, Guía y Flete de este pedido"
                             >
                               <Truck size={12} /> Logística
                             </button>
+
+                            {/* Botón directo para registrar o modificar Anticipo / Adelanto */}
+                            {(p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK' || p.estado === 'EN_PREPARACION' || p.estado === 'ENTREGADO_PARCIAL') && (
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirModalAdelanto(p)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1 cursor-pointer ${
+                                  Number(p.adelanto || 0) > 0
+                                    ? 'bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/40 hover:bg-amber-500 hover:text-slate-950'
+                                    : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-600 hover:text-white'
+                                }`}
+                                title={Number(p.adelanto || 0) > 0 ? `Modificar anticipo registrado ($${Number(p.adelanto).toFixed(2)})` : 'Registrar anticipo o abono de dinero'}
+                              >
+                                <DollarSign size={12} />
+                                <span>{Number(p.adelanto || 0) > 0 ? `Anticipo: $${Number(p.adelanto).toFixed(2)}` : '+ Adelanto'}</span>
+                              </button>
+                            )}
 
                             {isUpdating ? (
                               <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
@@ -2057,28 +2132,65 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                 </button>
                               </div>
 
-                              {/* Tarjeta de Anticipo Registrado si aplica */}
-                              {Number(p.adelanto || 0) > 0 && (
-                                <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                                  <div className="flex items-center gap-2">
-                                    <CreditCard size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                                    <div>
-                                      <span className="font-extrabold text-blue-900 dark:text-blue-200">
-                                        Anticipo / Adelanto Recibido: ${Number(p.adelanto).toFixed(2)}
-                                      </span>
-                                      <span className="text-[11px] text-blue-700 dark:text-blue-300 ml-1.5">
-                                        ({p.metodoAdelanto || 'EFECTIVO'}{p.referenciaAdelanto ? ` · Ref: ${p.referenciaAdelanto}` : ''})
-                                      </span>
-                                    </div>
+                              {/* Tarjeta de Anticipo Registrado / Botón para Gestionar Anticipo */}
+                              <div className={`p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border ${
+                                Number(p.adelanto || 0) > 0
+                                  ? 'bg-amber-500/10 border-amber-500/30'
+                                  : 'bg-[var(--card)] border-[var(--border)]'
+                              }`}>
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`p-2 rounded-xl font-black ${
+                                    Number(p.adelanto || 0) > 0
+                                      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                      : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                                  }`}>
+                                    <DollarSign size={16} />
                                   </div>
-                                  <div className="text-right">
-                                    <span className="text-[10px] text-[var(--muted-foreground)] block">Saldo restante al entregar:</span>
-                                    <span className="font-black text-amber-600 dark:text-amber-400 text-sm">
-                                      ${Math.max(0, Number(p.montoTotal) - Number(p.adelanto)).toFixed(2)}
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className={`font-black ${
+                                        Number(p.adelanto || 0) > 0
+                                          ? 'text-amber-900 dark:text-amber-200'
+                                          : 'text-[var(--foreground)]'
+                                      }`}>
+                                        {Number(p.adelanto || 0) > 0
+                                          ? `Anticipo / Adelanto Recibido: $${Number(p.adelanto).toFixed(2)}`
+                                          : 'Sin anticipo registrado'}
+                                      </span>
+                                      {Number(p.adelanto || 0) > 0 && (
+                                        <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 font-extrabold text-[10px]">
+                                          {p.metodoAdelanto || 'EFECTIVO'}{p.referenciaAdelanto ? ` · Ref: ${p.referenciaAdelanto}` : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[11px] text-[var(--muted-foreground)] block mt-0.5">
+                                      {Number(p.adelanto || 0) > 0
+                                        ? `Saldo restante a cobrar al entregar: $${Math.max(0, Number(p.montoTotal) - Number(p.adelanto)).toFixed(2)}`
+                                        : 'Puedes registrar un abono o anticipo entregado por el cliente antes de realizar la entrega'}
                                     </span>
                                   </div>
                                 </div>
-                              )}
+
+                                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                  {(p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK' || p.estado === 'EN_PREPARACION' || p.estado === 'ENTREGADO_PARCIAL') && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleAbrirModalAdelanto(p);
+                                      }}
+                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs ${
+                                        Number(p.adelanto || 0) > 0
+                                          ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black'
+                                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                      }`}
+                                    >
+                                      <DollarSign size={13} />
+                                      <span>{Number(p.adelanto || 0) > 0 ? 'Modificar Anticipo' : '+ Registrar Anticipo'}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
 
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-3 flex-wrap">
@@ -4320,6 +4432,200 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 >
                   {savingEnvioModal ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
                   <span>Guardar Logística de Entrega</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL GESTIONAR ANTICIPO / ADELANTO DE DINERO ── */}
+      {showModalAdelanto && pedidoAdelantoSeleccionado && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              safeDismiss(() => {
+                setShowModalAdelanto(false);
+                setPedidoAdelantoSeleccionado(null);
+              }, isDirtyAdelanto());
+            }
+          }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/20 backdrop-blur-sm rounded-2xl border border-amber-400/30 text-amber-400 font-bold">
+                  <DollarSign size={22} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">
+                    Anticipo / Adelanto — Pedido #{getNumeroPedido(pedidoAdelantoSeleccionado)}
+                  </h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Cliente: {pedidoAdelantoSeleccionado.clienteNombre || 'Consumidor Final'} · Total Pedido: ${Number(pedidoAdelantoSeleccionado.montoTotal).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowModalAdelanto(false);
+                  setPedidoAdelantoSeleccionado(null);
+                }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleGuardarAdelanto();
+              }}
+              className="p-5 space-y-4 overflow-y-auto flex-1"
+            >
+              {/* Resumen Financiero Dinámico */}
+              {(() => {
+                const totalPedido = Number(pedidoAdelantoSeleccionado.montoTotal || 0);
+                const montoAnticipo = Number(modalAdelantoMonto || 0);
+                const saldoPendiente = Math.max(0, totalPedido - montoAnticipo);
+
+                return (
+                  <div className="p-4 bg-amber-500/5 border border-amber-500/25 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[var(--muted-foreground)]">Valor Total del Pedido:</span>
+                      <span className="font-black text-sm text-[var(--foreground)] font-mono">${totalPedido.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">Anticipo Ingresado:</span>
+                      <span className="font-black text-sm text-emerald-600 font-mono">-${montoAnticipo.toFixed(2)}</span>
+                    </div>
+                    <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-black text-amber-900 dark:text-amber-300 block">Saldo a Cancelar al Entregar:</span>
+                        <span className="text-[10px] text-[var(--muted-foreground)]">Se cobrará al momento de despachar</span>
+                      </div>
+                      <span className="text-base font-black text-amber-600 dark:text-amber-400 font-mono">${saldoPendiente.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Botones de Atajo Rápido */}
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">
+                  Atajos de Anticipo
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const total = Number(pedidoAdelantoSeleccionado.montoTotal || 0);
+                      setModalAdelantoMonto((total * 0.5).toFixed(2));
+                    }}
+                    className="py-1.5 px-2 rounded-xl text-xs font-bold border border-[var(--border)] hover:border-amber-500 bg-[var(--card)] text-[var(--foreground)] transition-all text-center cursor-pointer"
+                  >
+                    50% (${(Number(pedidoAdelantoSeleccionado.montoTotal || 0) * 0.5).toFixed(2)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const total = Number(pedidoAdelantoSeleccionado.montoTotal || 0);
+                      setModalAdelantoMonto(total.toFixed(2));
+                    }}
+                    className="py-1.5 px-2 rounded-xl text-xs font-bold border border-[var(--border)] hover:border-amber-500 bg-[var(--card)] text-[var(--foreground)] transition-all text-center cursor-pointer"
+                  >
+                    100% (${Number(pedidoAdelantoSeleccionado.montoTotal || 0).toFixed(2)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalAdelantoMonto('0.00');
+                    }}
+                    className="py-1.5 px-2 rounded-xl text-xs font-bold border border-rose-500/30 text-rose-600 hover:bg-rose-500/10 bg-[var(--card)] transition-all text-center cursor-pointer"
+                  >
+                    Quitar Anticipo
+                  </button>
+                </div>
+              </div>
+
+              {/* Inputs de Anticipo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                    Monto del Anticipo ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={Number(pedidoAdelantoSeleccionado.montoTotal || 0)}
+                    placeholder="0.00"
+                    value={modalAdelantoMonto}
+                    onChange={(e) => setModalAdelantoMonto(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-amber-500/40 rounded-xl text-sm font-black text-amber-900 dark:text-amber-200 focus:outline-none focus:border-amber-600 font-mono"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                    Método de Anticipo *
+                  </label>
+                  <select
+                    value={modalAdelantoMetodo}
+                    onChange={(e) => setModalAdelantoMetodo(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-600"
+                  >
+                    <option value="EFECTIVO">💵 Efectivo (Caja)</option>
+                    <option value="TRANSFERENCIA">🏦 Transferencia Bancaria</option>
+                    <option value="DEPOSITO">📥 Depósito Bancario</option>
+                    <option value="CHEQUE">📝 Cheque</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                    N° Comprobante / Referencia / Banco (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Transf #84931 Banco Pichincha"
+                    value={modalAdelantoRef}
+                    onChange={(e) => setModalAdelantoRef(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-600"
+                  />
+                </div>
+              </div>
+
+              {/* Mensaje de Sincronización Automática */}
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                <CheckCircle size={14} className="shrink-0 text-blue-600 dark:text-blue-400" />
+                <span>
+                  Este anticipo se sincronizará automáticamente como pago inicial en el módulo de Cobranzas / Financiero al entregar el pedido.
+                </span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModalAdelanto(false);
+                    setPedidoAdelantoSeleccionado(null);
+                  }}
+                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingAdelantoModal}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {savingAdelantoModal ? <Loader2 size={14} className="animate-spin" /> : <DollarSign size={14} />}
+                  <span>Guardar Anticipo</span>
                 </button>
               </div>
             </form>
