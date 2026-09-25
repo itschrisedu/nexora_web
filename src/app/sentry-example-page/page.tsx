@@ -5,14 +5,26 @@ import * as Sentry from "@sentry/nextjs";
 
 export default function SentryExamplePage() {
   const [errorSent, setErrorSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const triggerClientError = () => {
+  const triggerDirectError = async () => {
+    setLoading(true);
     try {
-      throw new Error("Sentry Test Error from NEXORA Frontend!");
+      throw new Error("⚡ [NEXORA] Error de prueba provocado manualmente en Producción");
     } catch (error) {
       Sentry.captureException(error);
+      // Forzar el envío inmediato de los eventos en cola
+      await Sentry.flush(2000);
       setErrorSent(true);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const triggerUnhandledError = () => {
+    // Provoca un error global no controlado en el navegador
+    // @ts-ignore
+    window.funcionInexistenteEnNexoraParaPruebaSentry();
   };
 
   return (
@@ -23,19 +35,29 @@ export default function SentryExamplePage() {
         </div>
         <h1 className="text-2xl font-bold mb-2">Prueba de Sentry.io</h1>
         <p className="text-slate-400 text-sm mb-6">
-          Haz clic en el botón inferior para enviar un error de prueba a tu panel de control de Sentry y verificar la conexión.
+          Haz clic en cualquiera de los botones para enviar un error en tiempo real a tu panel de control de Sentry.
         </p>
 
-        <button
-          onClick={triggerClientError}
-          className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-red-600/20 active:scale-95 cursor-pointer"
-        >
-          Provocar Error de Prueba
-        </button>
+        <div className="space-y-3">
+          <button
+            onClick={triggerDirectError}
+            disabled={loading}
+            className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-all shadow-lg shadow-red-600/20 active:scale-95 cursor-pointer text-sm"
+          >
+            {loading ? "Enviando a Sentry..." : "1. Enviar Error Controlado con Flush Directo"}
+          </button>
+
+          <button
+            onClick={triggerUnhandledError}
+            className="w-full py-3 px-4 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-amber-600/20 active:scale-95 cursor-pointer text-sm"
+          >
+            2. Provocar Error Global (Crash de Función)
+          </button>
+        </div>
 
         {errorSent && (
           <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-lg animate-fade-in">
-            ✅ ¡Error capturado y enviado a Sentry! Revisa tu panel en sentry.io
+            ✅ ¡Error enviado y sincronizado con Sentry! Recarga la página de Sentry en 5 segundos.
           </div>
         )}
 
