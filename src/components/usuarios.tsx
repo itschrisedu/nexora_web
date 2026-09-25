@@ -491,14 +491,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     setEditingSucursal(suc);
     const hasCustomRuc = Boolean(suc.isRucPropio && suc.ruc);
     setShowCustomRucEdit(hasCustomRuc);
-    setEditSucursalForm({
+    const initialForm = {
       name: suc.name,
       ruc: hasCustomRuc ? (suc.ruc || '') : '',
-      direccion: suc.direccion,
-      telefono: suc.telefono,
-      email: suc.email,
+      direccion: suc.direccion || '',
+      telefono: suc.telefono || '',
+      email: suc.email || '',
       active: suc.active,
-    });
+    };
+    setEditSucursalForm(initialForm);
+    editSucursalSnapshotRef.current = JSON.stringify(initialForm);
     setShowEditSucursalModal(true);
   };
 
@@ -1314,7 +1316,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </div>
               </div>
               <button
-                onClick={() => setShowAddSucursalModal(false)}
+                onClick={() => safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal())}
                 className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
@@ -1435,7 +1437,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddSucursalModal(false)}
+                  onClick={() => safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal())}
                   className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                 >
                   Cancelar
@@ -1820,7 +1822,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </div>
               </div>
               <button
-                onClick={() => setShowEditSucursalModal(false)}
+                onClick={() => safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal())}
                 className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
@@ -1963,7 +1965,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 )}
                 <button
                   type="button"
-                  onClick={() => setShowEditSucursalModal(false)}
+                  onClick={() => safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal())}
                   className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                 >
                   Cancelar
