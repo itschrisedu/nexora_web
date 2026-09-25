@@ -1232,14 +1232,15 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       const precioCatalogo = Number(pObj.salePrice) || Number(pObj.costPrice) || 0;
       setPrecioItem(precioCatalogo);
       setPrecioItemInput(precioCatalogo > 0 ? String(precioCatalogo) : '');
-      // Resetear último precio del cliente para que el useEffect lo consulte y auto-aplique
       setUltimoPrecioCliente(null);
       setFechaUltimaVenta(null);
       
       const initialMap: Record<string, number> = {};
       if (pObj.tallas) {
         pObj.tallas.forEach((t: any) => {
-          initialMap[t.tallaId] = 0;
+          const ratio = t.ratio || t.cantidadSerie || 1;
+          const key = t.tallaId || `t-${t.numero ?? t.nombre}`;
+          initialMap[key] = tipoVentaItem === 'SERIE_COMPLETA' ? ratio : 0;
         });
       }
       setTallaCantidadesMap(initialMap);
@@ -1263,116 +1264,54 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
 
     const prodObj = productoSeleccionadoObj;
+    const tallasList = tipoVentaItem === 'SERIE_ESPECIAL'
+      ? (listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.tallas || [
+          { id: 't-esp-38', numero: 38 },
+          { id: 't-esp-39', numero: 39 },
+          { id: 't-esp-40', numero: 40 },
+          { id: 't-esp-41', numero: 41 },
+          { id: 't-esp-42', numero: 42 },
+          { id: 't-esp-43', numero: 43 },
+        ])
+      : (prodObj.tallas || []);
 
-    if (tipoVentaItem === 'SERIE_COMPLETA') {
-      if (!prodObj.tallas || prodObj.tallas.length === 0) {
-        showToast('Este modelo no tiene tallas asociadas en la serie.', 'warning');
-        return;
-      }
+    const lineasAgregadas: any[] = [];
+    tallasList.forEach((t: any) => {
+      const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+      const qty = tallaCantidadesMap[key] || 0;
+      if (qty > 0) {
+        const num = Number(t.numero ?? t.nombre);
+        const matchedTalla = (prodObj.tallas || []).find((pt: any) => Number(pt.numero ?? pt.nombre) === num);
+        const resolvedTallaId = matchedTalla?.tallaId || matchedTalla?.id || t.id || key;
 
-      const getCurvaRatio = (talla: any, _tallas: any[]) => {
-        if (talla.ratio && talla.ratio > 0) return talla.ratio;
-        if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
-        return 1;
-      };
-
-      const sortedTallas = [...prodObj.tallas].sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0));
-      const lineasSerie = sortedTallas.map((t: any) => {
-        const ratio = getCurvaRatio(t, prodObj.tallas);
-        const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
-        return {
+        lineasAgregadas.push({
           productId: prodObj.id,
           modelName: prodObj.modelName,
           color: prodObj.color,
-          serieNombre: prodObj.serieNombre,
-          imageUrl: prodObj.imageUrl,
-          tallaId: t.tallaId,
-          numeroTalla: t.numero,
-          cantidad: factor,
-          precioUnitario: Number(precioItem),
-          tipoVenta: 'SERIE_COMPLETA' as const,
-          subtipoSerie,
-          cantidadSeries,
-          observacionModelo: observacionModeloActual.trim() || undefined,
-        };
-      });
-
-      setLineasPedido([...lineasPedido, ...lineasSerie]);
-    } else if (tipoVentaItem === 'SERIE_ESPECIAL') {
-      const serieSeleccionada = listaSeriesDisponibles.find((s) => s.id === serieEspecialId);
-      const tallasSerie = serieSeleccionada?.tallas && serieSeleccionada.tallas.length > 0
-        ? serieSeleccionada.tallas
-        : [
-            { id: 't-esp-38', numero: 38 },
-            { id: 't-esp-39', numero: 39 },
-            { id: 't-esp-40', numero: 40 },
-            { id: 't-esp-41', numero: 41 },
-            { id: 't-esp-42', numero: 42 },
-            { id: 't-esp-43', numero: 43 },
-          ];
-
-      const nombreSerieClean = serieSeleccionada?.nombre
-        ? serieSeleccionada.nombre.replace(/_/g, ' ')
-        : 'Serie Especial';
-
-      const sortedTallasSerie = [...tallasSerie].sort((a: any, b: any) => (Number(a.numero) || 0) - (Number(b.numero) || 0));
-      const lineasSerieEspecial = sortedTallasSerie.map((t: any) => {
-        const factor = (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
-        const num = Number(t.numero);
-        const matchedTalla = (prodObj.tallas || []).find((pt: any) => Number(pt.numero) === num);
-        const resolvedTallaId = matchedTalla?.tallaId || matchedTalla?.id || t.id || t.tallaId || `t-${num}`;
-
-        return {
-          productId: prodObj.id,
-          modelName: prodObj.modelName,
-          color: prodObj.color,
-          serieNombre: `${nombreSerieClean} (${tallasSerie[0]?.numero}-${tallasSerie[tallasSerie.length - 1]?.numero}) [Bajo Pedido]`,
+          serieNombre: tipoVentaItem === 'SERIE_ESPECIAL'
+            ? `${listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.nombre?.replace(/_/g, ' ') || 'Serie Especial'} [Bajo Pedido]`
+            : (prodObj.serieNombre || 'ADULTO'),
           imageUrl: prodObj.imageUrl,
           tallaId: resolvedTallaId,
           numeroTalla: num,
-          cantidad: factor,
+          cantidad: qty,
           precioUnitario: Number(precioItem),
-          tipoVenta: 'SERIE_ESPECIAL' as const,
-          esPedidoEspecial: true,
-          subtipoSerie,
-          cantidadSeries,
+          tipoVenta: tipoVentaItem,
+          esPedidoEspecial: tipoVentaItem === 'SERIE_ESPECIAL',
+          subtipoSerie: qty === 12 ? 'DOCENA' : 'MEDIA_DOCENA',
+          cantidadSeries: Math.max(1, Math.floor(qty / 6)),
           observacionModelo: observacionModeloActual.trim() || undefined,
-        };
-      });
-
-      setLineasPedido([...lineasPedido, ...lineasSerieEspecial]);
-    } else {
-      // Venta por talla específica (Numeración)
-      const lineasNumeracion: any[] = [];
-      Object.entries(tallaCantidadesMap).forEach(([tallaId, qty]) => {
-        if (qty > 0) {
-          const tallaObj = prodObj.tallas.find((t: any) => t.tallaId === tallaId);
-          if (tallaObj) {
-            lineasNumeracion.push({
-              productId: prodObj.id,
-              modelName: prodObj.modelName,
-              color: prodObj.color,
-              serieNombre: prodObj.serieNombre,
-              imageUrl: prodObj.imageUrl,
-              tallaId: tallaObj.tallaId,
-              numeroTalla: tallaObj.numero,
-              cantidad: Number(qty),
-              precioUnitario: Number(precioItem),
-              tipoVenta: 'TALLA_ESPECIFICA' as const,
-              observacionModelo: observacionModeloActual.trim() || undefined,
-            });
-          }
-        }
-      });
-
-      lineasNumeracion.sort((a, b) => (Number(a.numeroTalla) || 0) - (Number(b.numeroTalla) || 0));
-      if (lineasNumeracion.length === 0) {
-        showToast('Por favor asigna al menos una talla con cantidad mayor a 0.', 'warning');
-        return;
+        });
       }
+    });
 
-      setLineasPedido([...lineasPedido, ...lineasNumeracion]);
+    if (lineasAgregadas.length === 0) {
+      showToast('Por favor asigna al menos una talla con cantidad mayor a 0.', 'warning');
+      return;
     }
+
+    setLineasPedido([...lineasPedido, ...lineasAgregadas]);
+    showToast(`¡${prodObj.modelName} agregado al pedido!`, 'success');
 
     // Limpiar selección de producto y observación del modelo
     setSelectedProductId('');
@@ -1380,11 +1319,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setBusquedaModelo('');
     setPrecioItem(0);
     setPrecioItemInput('');
-    setTallaCantidadesMap({});
-    setCantidadSeries(1);
-    setUltimoPrecioCliente(null);
     setObservacionModeloActual('');
     setMostrarObsModeloActual(false);
+    setTallaCantidadesMap({});
   };
 
   const handleEliminarLinea = (index: number) => {
@@ -2856,521 +2793,444 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Modalidad de Venta *</label>
-                    <select
-                      value={tipoVentaItem}
-                      onChange={(e) => setTipoVentaItem(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                    >
-                      <option value="SERIE_COMPLETA">📦 Venta por Serie Completa (Media Docena / Docena)</option>
-                      <option value="TALLA_ESPECIFICA">👟 Venta por Talla Específica (Numeración)</option>
-                      <option value="SERIE_ESPECIAL">⭐ Pedido Especial / Otra Serie (Bajo Pedido para Proveedor)</option>
-                    </select>
+                  {/* Selector de Modalidad de Venta con BOTONES */}
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                      Modalidad de Venta *
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTipoVentaItem('SERIE_COMPLETA');
+                          if (productoSeleccionadoObj?.tallas) {
+                            const map: Record<string, number> = {};
+                            productoSeleccionadoObj.tallas.forEach((t: any) => {
+                              const ratio = t.ratio || t.cantidadSerie || 1;
+                              const key = t.tallaId || `t-${t.numero ?? t.nombre}`;
+                              map[key] = ratio;
+                            });
+                            setTallaCantidadesMap(map);
+                          }
+                        }}
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          tipoVentaItem === 'SERIE_COMPLETA'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                        }`}
+                      >
+                        <span>📦</span>
+                        <span>Serie Completa (Docena / ½ Doc.)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTipoVentaItem('TALLA_ESPECIFICA')}
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          tipoVentaItem === 'TALLA_ESPECIFICA'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                        }`}
+                      >
+                        <span>👟</span>
+                        <span>Por Talla (Numeración)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTipoVentaItem('SERIE_ESPECIAL');
+                          const sObj = listaSeriesDisponibles.find((s) => s.id === serieEspecialId) || listaSeriesDisponibles[0];
+                          if (sObj?.tallas) {
+                            const map: Record<string, number> = {};
+                            sObj.tallas.forEach((t: any) => {
+                              map[t.id || `t-${t.numero}`] = 1;
+                            });
+                            setTallaCantidadesMap(map);
+                          }
+                        }}
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          tipoVentaItem === 'SERIE_ESPECIAL'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
+                        }`}
+                      >
+                        <span>⭐</span>
+                        <span>Pedido Especial / Otra Serie</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {tipoVentaItem === 'SERIE_COMPLETA' ? (
-                    <div className="sm:col-span-2 space-y-3 p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
-                      {(() => {
-                        const getCurvaRatio = (talla: any, _tallas: any[]) => {
-                          if (talla.ratio && talla.ratio > 0) return talla.ratio;
-                          if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
-                          return 1;
-                        };
-
-                        const baseParesPorSerie = (productoSeleccionadoObj?.tallas || []).reduce(
-                          (sum: number, t: any) => sum + getCurvaRatio(t, productoSeleccionadoObj?.tallas || []),
-                          0
-                        ) || (productoSeleccionadoObj?.tallas?.length || 6);
-
-                        const paresMediaDocena = baseParesPorSerie;
-                        const paresDocenaCompleta = baseParesPorSerie * 2;
-
-                        const totalParesStock = (productoSeleccionadoObj?.tallas || []).reduce(
-                          (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
-                          0
-                        );
-                        const mediasDocenasStock = Math.floor(totalParesStock / (paresMediaDocena || 1));
-                        const docenasStock = Math.floor(totalParesStock / (paresDocenaCompleta || 1));
-                        const stockActualSerie = subtipoSerie === 'MEDIA_DOCENA' ? mediasDocenasStock : docenasStock;
-                        const hayFaltante = cantidadSeries > stockActualSerie;
-                        const paresSeleccionadosTotales = (subtipoSerie === 'MEDIA_DOCENA' ? paresMediaDocena : paresDocenaCompleta) * (cantidadSeries || 1);
-
-                        return (
-                          <>
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
-                                <span>Seleccionar Curva de Serie:</span>
-                              </span>
-                              <div className="flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setSubtipoSerie('MEDIA_DOCENA')}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                                    subtipoSerie === 'MEDIA_DOCENA'
-                                      ? 'bg-emerald-600 text-white border-transparent shadow-xs'
-                                      : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
-                                  }`}
-                                >
-                                  <span>
-                                    {paresMediaDocena === 6 ? '½ Media Docena (6 pares)' : `Curva Serie (${paresMediaDocena} pares)`}
-                                  </span>
-                                  <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                                    subtipoSerie === 'MEDIA_DOCENA' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-700'
-                                  }`}>
-                                    Stock: {mediasDocenasStock}
-                                  </span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setSubtipoSerie('DOCENA')}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                                    subtipoSerie === 'DOCENA'
-                                      ? 'bg-emerald-600 text-white border-transparent shadow-xs'
-                                      : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
-                                  }`}
-                                >
-                                  <span>
-                                    {paresDocenaCompleta === 12 ? '1 Docena (12 pares)' : `Doble Serie (${paresDocenaCompleta} pares)`}
-                                  </span>
-                                  <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                                    subtipoSerie === 'DOCENA' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-700'
-                                  }`}>
-                                    Stock: {docenasStock}
-                                  </span>
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                              <div className="flex items-center gap-2">
-                                <label className="text-xs font-semibold text-[var(--muted-foreground)] shrink-0">
-                                  ¿Cuántas {subtipoSerie === 'MEDIA_DOCENA' ? (paresMediaDocena === 6 ? 'medias docenas' : 'series') : (paresDocenaCompleta === 12 ? 'docenas' : 'doble series')}?:
-                                </label>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => setCantidadSeries(Math.max(1, (cantidadSeries || 1) - 1))}
-                                    className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-sm"
-                                  >
-                                    -
-                                  </button>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={cantidadSeries}
-                                    onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
-                                    className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setCantidadSeries((cantidadSeries || 1) + 1)}
-                                    className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors shadow-sm"
-                                  >
-                                    +
-                                  </button>
+                  {/* Alerta de Stock Inter-Sucursal si existe */}
+                  {productoSeleccionadoObj && stockInterSucursalResult.length > 0 && (
+                    <div className="sm:col-span-2">
+                      <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                            <span>⚡ Disponibilidad Inter-Sucursal (Otras Sucursales)</span>
+                          </span>
+                          <span className="text-[10px] bg-amber-500/20 text-amber-900 dark:text-amber-200 px-2.5 py-0.5 rounded-full font-bold">
+                            {stockInterSucursalResult.length} sucursal(es) con stock
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                          {stockInterSucursalResult.map((res: any) => (
+                            <div key={res.sucursalId} className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl gap-2 text-xs">
+                              <div>
+                                <span className="font-extrabold text-[var(--foreground)] block">{res.sucursalNombre}</span>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10px] text-[var(--muted-foreground)]">
+                                  <span>Color: <strong className="text-[var(--foreground)]">{res.color}</strong></span>
+                                  <span>• Total: <strong className="text-emerald-700 dark:text-emerald-300">{res.stockTotal} pares</strong></span>
+                                  <span>({res.tallasDisponibles.map((t: any) => `#${t.talla}: ${t.cantidad}p`).join(', ')})</span>
                                 </div>
-                                <span className="text-xs font-black text-emerald-700 ml-1">
-                                  = {paresSeleccionadosTotales} pares
-                                </span>
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => handleAgregarInterSucursal(res)}
+                                className="px-3 py-1.5 bg-[#0F172A] hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shrink-0 shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <span>📦 Despachar de {res.sucursalNombre}</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                              {/* Alerta de Stock Disponible para la Serie */}
-                              <div className="text-left sm:text-right">
-                                {hayFaltante ? (
-                                  <span className="text-[11px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg inline-block">
-                                    ⚠️ Stock: {stockActualSerie} disp. (+{cantidadSeries - stockActualSerie} bajo pedido)
+                  {/* Componente Estándar ModelTallaCurvaCard para Configurar y Agregar Modelo al Pedido */}
+                  <div className="sm:col-span-2">
+                    {productoSeleccionadoObj ? (() => {
+                      const prodObj = productoSeleccionadoObj;
+                      const tallasList = tipoVentaItem === 'SERIE_ESPECIAL'
+                        ? (listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.tallas || [
+                            { id: 't-esp-38', numero: 38 },
+                            { id: 't-esp-39', numero: 39 },
+                            { id: 't-esp-40', numero: 40 },
+                            { id: 't-esp-41', numero: 41 },
+                            { id: 't-esp-42', numero: 42 },
+                            { id: 't-esp-43', numero: 43 },
+                          ])
+                        : (prodObj.tallas || []).slice().sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0));
+
+                      const totalParesConfig = tallasList.reduce((sum: number, t: any) => {
+                        const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                        return sum + (tallaCantidadesMap[key] || 0);
+                      }, 0);
+
+                      const subtotalConfig = totalParesConfig * (precioItem || 0);
+                      const mediasDocenasCount = totalParesConfig / 6;
+                      const docenasCount = totalParesConfig / 12;
+                      const docenasLabel = totalParesConfig === 6
+                        ? '½ Docena'
+                        : totalParesConfig === 12
+                        ? '1 Docena'
+                        : totalParesConfig > 0 && totalParesConfig % 12 === 0
+                        ? `${docenasCount} Docenas`
+                        : totalParesConfig > 0 && totalParesConfig % 6 === 0
+                        ? `${mediasDocenasCount} Medias Docenas`
+                        : `${totalParesConfig} pares`;
+
+                      const serieNombreDisplay = tipoVentaItem === 'SERIE_ESPECIAL'
+                        ? (listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.nombre?.replace(/_/g, ' ') || 'Serie Especial')
+                        : (prodObj.serieNombre || 'ADULTO');
+
+                      return (
+                        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3">
+                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            {/* Lado Izquierdo: Miniatura, Datos del Modelo y Curva de Tallas */}
+                            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                              {prodObj.imageUrl ? (
+                                <img src={prodObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] shrink-0" />
+                              ) : (
+                                <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
+                                  👟
+                                </div>
+                              )}
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-black text-sm text-[var(--foreground)] uppercase tracking-wide">
+                                    {prodObj.modelName}
                                   </span>
-                                ) : (
-                                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-500/15 border border-emerald-500/25 px-2.5 py-1 rounded-lg inline-block">
-                                    🟢 Stock suficiente ({stockActualSerie} disponibles)
+                                  <span className="text-xs text-[var(--muted-foreground)] font-medium">
+                                    {prodObj.color}
                                   </span>
+                                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                                    Serie: {serieNombreDisplay}
+                                  </span>
+                                </div>
+
+                                {/* Selector de serie alternativa para Pedido Especial */}
+                                {tipoVentaItem === 'SERIE_ESPECIAL' && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <label className="text-[11px] font-bold text-purple-700 dark:text-purple-300">
+                                      Serie a Solicitar:
+                                    </label>
+                                    <select
+                                      value={serieEspecialId}
+                                      onChange={(e) => {
+                                        const newSerieId = e.target.value;
+                                        setSerieEspecialId(newSerieId);
+                                        const sObj = listaSeriesDisponibles.find((s) => s.id === newSerieId);
+                                        if (sObj?.tallas) {
+                                          const map: Record<string, number> = {};
+                                          sObj.tallas.forEach((t: any) => {
+                                            map[t.id || `t-${t.numero}`] = 1;
+                                          });
+                                          setTallaCantidadesMap(map);
+                                        }
+                                      }}
+                                      className="px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold focus:outline-none focus:border-purple-600"
+                                    >
+                                      {listaSeriesDisponibles.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                          {s.nombre.replace(/_/g, ' ')}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 )}
-                              </div>
-                            </div>
-                          </>
-                        );
-                      })()}
 
-                      {/* Vista previa de chips de tallas de la serie con formato de curva */}
-                      {productoSeleccionadoObj && productoSeleccionadoObj.tallas && (
-                        <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
-                          {(() => {
-                            const getCurvaRatio = (talla: any, _tallas: any[]) => {
-                              if (talla.ratio && talla.ratio > 0) return talla.ratio;
-                              if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
-                              return 1;
-                            };
+                                {/* Curva de Tallas con Pills Estandarizadas */}
+                                <div className="mt-2.5 space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {tallasList.map((t: any) => {
+                                      const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                      const qty = tallaCantidadesMap[key] || 0;
+                                      const stockBodega = t.cantidad ?? t.stock ?? 0;
 
-                            return (
-                              <>
-                                <div className="flex flex-wrap items-center justify-between gap-1">
-                                  <span className="text-[10px] font-bold uppercase text-[var(--muted-foreground)] block">
-                                    Distribución de Curva ({subtipoSerie === 'MEDIA_DOCENA' ? 'Media Docena' : 'Docena Completa'}):
-                                  </span>
-                                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/20 font-mono">
-                                    Serie: {[...productoSeleccionadoObj.tallas]
-                                      .sort((a, b) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0))
-                                      .map((t: any) => {
-                                        const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
-                                        const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
-                                        return `${factor}/${t.numero ?? t.nombre}`;
-                                      }).join(', ')}
-                                  </span>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2">
-                                  {[...productoSeleccionadoObj.tallas]
-                                    .sort((a, b) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0))
-                                    .map((t: any) => {
-                                      const ratio = getCurvaRatio(t, productoSeleccionadoObj.tallas);
-                                      const factor = ratio * (subtipoSerie === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadSeries || 1);
-                                      const stockTalla = t.cantidad ?? t.stock ?? 0;
                                       return (
-                                        <div key={t.tallaId} className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs shadow-2xs">
-                                          <span className="font-extrabold text-xs font-mono text-[var(--foreground)]">T{t.numero ?? t.nombre}</span>
-                                          <span className="font-bold text-xs text-emerald-600 font-mono">({factor} pares)</span>
-                                          <span className="text-[10px] text-[var(--muted-foreground)] font-medium">disp: {stockTalla}</span>
+                                        <div
+                                          key={key}
+                                          className={`flex items-center gap-1 rounded-xl border px-2 py-1 shadow-2xs transition-all ${
+                                            qty > 0
+                                              ? 'bg-[var(--card)] border-emerald-500/50 shadow-xs ring-1 ring-emerald-500/20'
+                                              : 'bg-[var(--card)] border-[var(--border)] opacity-70'
+                                          }`}
+                                        >
+                                          <span className="text-[var(--foreground)] font-extrabold text-xs font-mono">
+                                            T{t.numero ?? t.nombre}
+                                          </span>
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setTallaCantidadesMap({
+                                                  ...tallaCantidadesMap,
+                                                  [key]: Math.max(0, qty - 1),
+                                                });
+                                              }}
+                                              className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                              title={`Restar 1 par T${t.numero ?? t.nombre}`}
+                                            >
+                                              −
+                                            </button>
+                                            <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
+                                              {qty}
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setTallaCantidadesMap({
+                                                  ...tallaCantidadesMap,
+                                                  [key]: qty + 1,
+                                                });
+                                              }}
+                                              className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                              title={`Sumar 1 par T${t.numero ?? t.nombre}`}
+                                            >
+                                              +
+                                            </button>
+                                          </div>
+                                          {tipoVentaItem !== 'SERIE_ESPECIAL' && (
+                                            <span className="text-[9px] text-[var(--muted-foreground)] ml-0.5 font-medium">
+                                              ({stockBodega}p)
+                                            </span>
+                                          )}
                                         </div>
                                       );
                                     })}
-                                </div>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  ) : tipoVentaItem === 'SERIE_ESPECIAL' ? (
-                    /* Pedido Especial de Serie No Existente en Stock / Fabricación Proveedor */
-                    <div className="sm:col-span-2 space-y-3 p-3.5 bg-purple-500/5 border border-purple-500/25 rounded-xl">
-                      <div className="flex items-center justify-between gap-2 border-b border-purple-500/20 pb-2">
-                        <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-                          <span>⭐ Solicitar Otra Serie (Bajo Pedido a Proveedor)</span>
-                        </span>
-                        <span className="text-[10px] font-bold text-purple-700 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
-                          Para Fabricación / Compra
-                        </span>
-                      </div>
+                                  </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                            Seleccionar Serie a Pedir *
-                          </label>
-                          <select
-                            value={serieEspecialId}
-                            onChange={(e) => setSerieEspecialId(e.target.value)}
-                            className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
-                          >
-                            {listaSeriesDisponibles.map((s) => {
-                              const tallasInfo = s.tallas && s.tallas.length > 0
-                                ? `(${s.tallas[0].numero}-${s.tallas[s.tallas.length - 1].numero})`
-                                : '';
-                              return (
-                                <option key={s.id} value={s.id}>
-                                  {s.nombre.replace(/_/g, ' ')} {tallasInfo}
-                                </option>
-                              );
-                            })}
-                          </select>
-                        </div>
+                                  {/* Acciones Rápidas */}
+                                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const newMap: Record<string, number> = { ...tallaCantidadesMap };
+                                        tallasList.forEach((t: any) => {
+                                          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                          newMap[key] = (newMap[key] || 0) + 1;
+                                        });
+                                        setTallaCantidadesMap(newMap);
+                                      }}
+                                      className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                    >
+                                      +1 par c/talla
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const newMap: Record<string, number> = { ...tallaCantidadesMap };
+                                        tallasList.forEach((t: any) => {
+                                          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                          newMap[key] = Math.max(0, (newMap[key] || 0) - 1);
+                                        });
+                                        setTallaCantidadesMap(newMap);
+                                      }}
+                                      className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                    >
+                                      −1 par c/talla
+                                    </button>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                            Curva de Serie
-                          </label>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setSubtipoSerie('MEDIA_DOCENA')}
-                              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border text-center ${
-                                subtipoSerie === 'MEDIA_DOCENA'
-                                  ? 'bg-purple-600 text-white border-transparent shadow-xs'
-                                  : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
-                              }`}
-                            >
-                              ½ Media Docena (6)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setSubtipoSerie('DOCENA')}
-                              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border text-center ${
-                                subtipoSerie === 'DOCENA'
-                                  ? 'bg-purple-600 text-white border-transparent shadow-xs'
-                                  : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
-                              }`}
-                            >
-                              1 Docena (12)
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                                    {tipoVentaItem === 'SERIE_COMPLETA' && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const newMap: Record<string, number> = {};
+                                            tallasList.forEach((t: any) => {
+                                              const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                              const ratio = t.ratio || t.cantidadSerie || 1;
+                                              newMap[key] = ratio;
+                                            });
+                                            setTallaCantidadesMap(newMap);
+                                          }}
+                                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                        >
+                                          ½ Docena (6 pares)
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const newMap: Record<string, number> = {};
+                                            tallasList.forEach((t: any) => {
+                                              const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                              const ratio = t.ratio || t.cantidadSerie || 1;
+                                              newMap[key] = ratio * 2;
+                                            });
+                                            setTallaCantidadesMap(newMap);
+                                          }}
+                                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                        >
+                                          1 Docena (12 pares)
+                                        </button>
+                                      </>
+                                    )}
 
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold text-[var(--muted-foreground)]">
-                            Cantidad de {subtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}:
-                          </label>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setCantidadSeries(Math.max(1, (cantidadSeries || 1) - 1))}
-                              className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              min="1"
-                              value={cantidadSeries}
-                              onChange={(e) => setCantidadSeries(Math.max(1, parseInt(e.target.value) || 1))}
-                              className="w-14 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setCantidadSeries((cantidadSeries || 1) + 1)}
-                              className="w-7 h-7 rounded-lg border border-[var(--border)] bg-[var(--card)] flex items-center justify-center font-bold text-xs"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                        <span className="text-xs font-black text-purple-800">
-                          Total: {(subtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * (cantidadSeries || 1)} pares especiales
-                        </span>
-                      </div>
-
-                      <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-lg text-[11px] text-purple-900 flex items-center gap-2">
-                        <span>ℹ️</span>
-                        <span>
-                          Este artículo se registrará con la etiqueta <strong>[Bajo Pedido]</strong> y podrá enviarse directamente a un proveedor para su fabricación.
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Venta por Talla Específica (Numeración con Chips Interactivos y Stock de Pares) */
-                    <div className="sm:col-span-2 space-y-3 p-3.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[var(--foreground)] block">
-                          👟 Asigna la cantidad de pares por cada talla:
-                        </span>
-                        <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
-                          Se indica el stock de pares disponibles por número
-                        </span>
-                      </div>
-
-                      {productoSeleccionadoObj && productoSeleccionadoObj.tallas ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                          {[...productoSeleccionadoObj.tallas]
-                            .sort((a, b) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0))
-                            .map((t: any) => {
-                            const cantActual = tallaCantidadesMap[t.tallaId] || 0;
-                            const stockBodega = t.cantidad ?? t.stock ?? 0;
-                            const excedeStock = cantActual > stockBodega;
-                            return (
-                              <div
-                                key={t.tallaId}
-                                className={`p-2.5 rounded-xl border flex flex-col justify-between gap-1.5 transition-all ${
-                                  cantActual > 0
-                                    ? 'bg-[#0F172A]/5 border-[#0F172A]/40 shadow-sm'
-                                    : 'bg-[var(--card)] border-[var(--border)]'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-black text-xs">Talla #{t.numero ?? t.nombre}</span>
-                                  {stockBodega > 0 ? (
-                                    <span className="px-1.5 py-0.2 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded text-[9px] font-bold">
-                                      {stockBodega} {stockBodega === 1 ? 'par' : 'pares'}
+                                    <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
+                                      = {totalParesConfig} pares total
                                     </span>
-                                  ) : (
-                                    <span className="px-1.5 py-0.2 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded text-[9px] font-bold">
-                                      0 pares
-                                    </span>
-                                  )}
-                                </div>
+                                  </div>
 
-                                <div className="flex items-center gap-1 justify-center py-0.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: Math.max(0, cantActual - 1) })}
-                                    className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors"
-                                  >
-                                    -
-                                  </button>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={cantActual}
-                                    onChange={(e) => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: Math.max(0, parseInt(e.target.value) || 0) })}
-                                    className="w-12 h-7 text-center font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-none focus:border-[#0F172A]"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setTallaCantidadesMap({ ...tallaCantidadesMap, [t.tallaId]: cantActual + 1 })}
-                                    className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center font-bold text-xs hover:bg-[var(--muted)] transition-colors"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-
-                                {excedeStock && cantActual > 0 && (
-                                  <span className="text-[9px] text-amber-600 font-semibold text-center leading-tight">
-                                    ⚠️ {stockBodega} Bodega + {cantActual - stockBodega} Pedido
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-[var(--muted-foreground)]">Selecciona un modelo arriba para cargar sus tallas.</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Alerta de Stock Inter-Sucursal */}
-                  {productoSeleccionadoObj && (
-                    <div className="sm:col-span-2">
-                      {loadingInterSucursal ? (
-                        <div className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl text-xs text-[var(--muted-foreground)] flex items-center gap-2">
-                          <span className="animate-spin">⌛</span> Consultando disponibilidad en otras sucursales...
-                        </div>
-                      ) : stockInterSucursalResult.length > 0 ? (
-                        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                              <span>⚡ Disponibilidad Inter-Sucursal (Otras Sucursales)</span>
-                            </span>
-                            <span className="text-[10px] bg-amber-500/20 text-amber-900 px-2.5 py-0.5 rounded-full font-bold">
-                              {stockInterSucursalResult.length} sucursal(es) con stock
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-amber-900">
-                            Si no dispones de stock en esta sucursal, puedes realizar un <strong>Despacho Inter-Sucursal Urgente</strong>. El cliente no percibirá la diferencia y el sistema mantendrá los cuadres de caja independientes.
-                          </p>
-                          <div className="grid grid-cols-1 gap-2">
-                            {stockInterSucursalResult.map((res: any) => (
-                              <div key={res.sucursalId} className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl gap-2 text-xs">
-                                <div>
-                                  <span className="font-extrabold text-[var(--foreground)] block">{res.sucursalNombre}</span>
-                                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10px] text-[var(--muted-foreground)]">
-                                    <span>Color: <strong className="text-[var(--foreground)]">{res.color}</strong></span>
-                                    <span>• Total: <strong className="text-emerald-700">{res.stockTotal} pares</strong></span>
-                                    <span>({res.tallasDisponibles.map((t: any) => `#${t.talla}: ${t.cantidad}p`).join(', ')})</span>
+                                  {/* Línea de Observación para este Modelo */}
+                                  <div className="pt-1">
+                                    {!mostrarObsModeloActual && !observacionModeloActual ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setMostrarObsModeloActual(true)}
+                                        className="text-[11px] font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Plus size={11} />
+                                        <span>Agregar observación a este modelo</span>
+                                      </button>
+                                    ) : (
+                                      <div className="flex items-center gap-2 p-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
+                                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase shrink-0">
+                                          📝 Obs:
+                                        </span>
+                                        <input
+                                          type="text"
+                                          placeholder="Ej: Suela especial, hebilla dorada, cuero café mate..."
+                                          value={observacionModeloActual}
+                                          onChange={(e) => setObservacionModeloActual(e.target.value)}
+                                          className="flex-1 px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs text-[var(--foreground)] focus:outline-none focus:border-emerald-600"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setObservacionModeloActual('');
+                                            setMostrarObsModeloActual(false);
+                                          }}
+                                          className="text-[10px] font-bold text-rose-500 hover:underline shrink-0 cursor-pointer"
+                                        >
+                                          ✕ Quitar
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAgregarInterSucursal(res)}
-                                  className="px-3 py-1.5 bg-[#0F172A] hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shrink-0 shadow-xs flex items-center justify-center gap-1"
-                                >
-                                  <span>📦 Despachar de {res.sucursalNombre}</span>
-                                </button>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
+                            </div>
 
-                  {/* Precio Unitario */}
-                  <div className="sm:col-span-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
-                        Precio Unitario de Venta ($)
-                      </label>
-                      {!puedeCambiarPrecio && (
-                        <span className="text-[10px] text-amber-600 font-bold flex items-center gap-1">
-                          <Lock size={10} /> Fijado por catálogo (Solo Admin puede modificar)
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      placeholder="0.00"
-                      disabled={!puedeCambiarPrecio}
-                      value={precioItemInput}
-                      onChange={(e) => {
-                        const valStr = e.target.value;
-                        setPrecioItemInput(valStr);
-                        const parsed = parseFloat(valStr);
-                        setPrecioItem(isNaN(parsed) ? 0 : parsed);
-                      }}
-                      className={`w-full px-3 py-2 border rounded-xl text-xs font-bold focus:outline-none ${
-                        !puedeCambiarPrecio
-                          ? 'bg-[var(--muted)]/40 border-[var(--border)] text-[var(--muted-foreground)] cursor-not-allowed'
-                          : 'bg-[var(--card)] border-[var(--border)] focus:border-[#0F172A] text-[var(--foreground)]'
-                      }`}
-                    />
+                            {/* Lado Derecho: Resumen, Precio, Subtotal y Botón de Agregar */}
+                            <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between gap-3 pt-3 lg:pt-0 border-t lg:border-t-0 border-[var(--border)] shrink-0 min-w-[200px]">
+                              <div className="text-left lg:text-right">
+                                <div className="text-xs font-black text-[var(--foreground)]">
+                                  {totalParesConfig} pares <span className="text-[11px] font-medium text-[var(--muted-foreground)] font-mono">({docenasLabel})</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1 justify-start lg:justify-end">
+                                  <span className="text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    placeholder="0.00"
+                                    disabled={!puedeCambiarPrecio}
+                                    value={precioItemInput}
+                                    onChange={(e) => {
+                                      const valStr = e.target.value;
+                                      setPrecioItemInput(valStr);
+                                      const parsed = parseFloat(valStr);
+                                      setPrecioItem(isNaN(parsed) ? 0 : parsed);
+                                    }}
+                                    className={`w-20 px-2 py-1 border rounded-lg text-xs font-bold text-center focus:outline-none ${
+                                      !puedeCambiarPrecio
+                                        ? 'bg-[var(--muted)]/40 border-[var(--border)] text-[var(--muted-foreground)] cursor-not-allowed'
+                                        : 'bg-[var(--card)] border-[var(--border)] focus:border-emerald-600 text-[var(--foreground)]'
+                                    }`}
+                                  />
+                                  <span className="text-[11px] text-[var(--muted-foreground)] font-medium">/ par</span>
+                                </div>
+                                <div className="text-base font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                  ${subtotalConfig.toFixed(2)}
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={handleAgregarLinea}
+                                disabled={totalParesConfig === 0}
+                                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <Plus size={14} />
+                                <span>+ Agregar al Pedido</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Info de último precio al cliente si aplica */}
+                          {ultimoPrecioCliente !== null && selectedProductId && clientId && (
+                            <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-xs">
+                              <span className="text-emerald-600 text-sm">✅</span>
+                              <div>
+                                <span className="font-bold text-emerald-700 dark:text-emerald-300">Precio del historial del cliente: </span>
+                                <span className="font-black text-emerald-800 dark:text-emerald-200">${ultimoPrecioCliente.toFixed(2)}</span>
+                                {fechaUltimaVenta && <span className="text-emerald-600 ml-1">({fechaUltimaVenta})</span>}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })() : (
+                      <div className="p-6 text-center border-2 border-dashed border-[var(--border)] rounded-2xl bg-[var(--card)]/50">
+                        <span className="text-2xl block mb-1">👟</span>
+                        <p className="text-xs font-semibold text-[var(--muted-foreground)]">
+                          Busca y selecciona un modelo de calzado arriba para configurar su curva de tallas y agregarlo al pedido.
+                        </p>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Observación Opcional por Modelo */}
-                  {productoSeleccionadoObj && (
-                    <div className="sm:col-span-2 pt-1">
-                      {!mostrarObsModeloActual && !observacionModeloActual ? (
-                        <button
-                          type="button"
-                          onClick={() => setMostrarObsModeloActual(true)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-[var(--border)] text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:border-emerald-600 transition-all cursor-pointer"
-                        >
-                          <FileText size={12} />
-                          <span>+ Agregar Observación a este Modelo (Opcional)</span>
-                        </button>
-                      ) : (
-                        <div className="p-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-1.5 animate-in fade-in duration-150">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
-                              <FileText size={11} />
-                              <span>Observación Específica para {productoSeleccionadoObj.modelName} (Opcional)</span>
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setObservacionModeloActual('');
-                                setMostrarObsModeloActual(false);
-                              }}
-                              className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer"
-                            >
-                              ✕ Quitar
-                            </button>
-                          </div>
-                          <input
-                            type="text"
-                            placeholder="Ej: Suela especial, hebilla dorada, cuero café mate..."
-                            value={observacionModeloActual}
-                            onChange={(e) => setObservacionModeloActual(e.target.value)}
-                            className="w-full px-3 py-1.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-lg text-xs text-[var(--foreground)] focus:outline-none focus:border-emerald-600"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
-
-                {/* Información de último precio al cliente */}
-                {ultimoPrecioCliente !== null && selectedProductId && clientId && (
-                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2">
-                    <span className="text-emerald-600 text-lg">✅</span>
-                    <div className="text-[11px]">
-                      <span className="font-bold text-emerald-700">Precio auto-aplicado del historial del cliente: </span>
-                      <span className="font-black text-emerald-800">${ultimoPrecioCliente.toFixed(2)}</span>
-                      {fechaUltimaVenta && <span className="text-emerald-600 ml-1">(ultima compra: {fechaUltimaVenta})</span>}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleAgregarLinea}
-                  disabled={!selectedProductId}
-                  className="w-full py-2.5 bg-[#0F172A]/10 text-[#0F172A] border border-[#0F172A]/20 hover:bg-[#0F172A] hover:text-white transition-all font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Plus size={14} /> {tipoVentaItem === 'SERIE_COMPLETA' ? 'Agregar Serie Completa al Pedido' : 'Agregar Numeración Seleccionada al Pedido'}
-                </button>
               </div>
 
               {/* 3. TABLA DE PRODUCTOS EN EL PEDIDO (Agrupado compacto por modelo en Serie Completa) */}
