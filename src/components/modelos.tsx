@@ -19,7 +19,7 @@ import {
   formatearTelefono,
   formatearDireccion,
 } from "../utils/text-formatters";
-import { validarRuc } from "../utils/ecuador-validators";
+import { validarRuc, validarCedula } from "../utils/ecuador-validators";
 
 interface ModelosProps {
   online: boolean;
@@ -355,6 +355,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [qsEmail, setQsEmail] = useState("");
   const [qsDireccion, setQsDireccion] = useState("");
   const [qsSaving, setQsSaving] = useState(false);
+  const [qsError, setQsError] = useState("");
   const [qsContext, setQsContext] = useState<'create' | 'edit' | 'addColor'>('create');
 
   const [marginPct, setMarginPct] = useState<number>(getStoredProfitMargin());
@@ -536,20 +537,22 @@ export default function ModelosComponent({ online }: ModelosProps) {
   // ── Crear proveedor rápido desde modal catálogo ──
   const handleQuickCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!qsRuc.trim() || !qsNombres.trim() || !qsApellidos.trim()) {
-      setError("RUC, Nombres y Apellidos del proveedor son obligatorios.");
+    setQsError("");
+    const rucClean = qsRuc.trim().replace(/\D/g, "");
+    if (!rucClean || !qsNombres.trim() || !qsApellidos.trim()) {
+      setQsError("Cédula/RUC, Nombres y Apellidos del proveedor son obligatorios.");
       return;
     }
 
-    if (!validarRuc(qsRuc.trim())) {
-      setError("El RUC o Cédula ingresado no es válido (debe tener 10 o 13 dígitos numéricos).");
+    if (!validarRuc(rucClean) && !validarCedula(rucClean)) {
+      setQsError("El documento ingresado no es válido (debe tener 10 dígitos de cédula o 13 dígitos de RUC válidos en Ecuador).");
       return;
     }
 
     if (qsEmail) {
       const emailVal = validarEmailEstricto(qsEmail);
       if (!emailVal.valido) {
-        setError(emailVal.mensaje || "El correo electrónico no es válido.");
+        setQsError(emailVal.mensaje || "El correo electrónico no es válido.");
         return;
       }
     }
@@ -559,7 +562,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setQsSaving(true);
     try {
       const res = await ApiService.post("/proveedores", {
-        ruc: qsRuc.trim(),
+        ruc: rucClean,
         razonSocial: razonSocialFinal,
         nombreComercial: qsNombreComercial.trim() || undefined,
         nombres: qsNombres.trim(),
@@ -590,10 +593,10 @@ export default function ModelosComponent({ online }: ModelosProps) {
       }
       setSuccess(`Proveedor "${razonSocialFinal}" creado y asignado.`);
       setShowQuickSupplier(false);
-      setQsRuc(""); setQsNombres(""); setQsApellidos(""); setQsNombreComercial(""); setQsContacto(""); setQsEmail(""); setQsDireccion("");
+      setQsRuc(""); setQsNombres(""); setQsApellidos(""); setQsNombreComercial(""); setQsContacto(""); setQsEmail(""); setQsDireccion(""); setQsError("");
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
-      setError(err.message || "Error al crear el proveedor.");
+      setQsError(err.message || "Error al crear el proveedor.");
     } finally {
       setQsSaving(false);
     }
@@ -3493,19 +3496,39 @@ export default function ModelosComponent({ online }: ModelosProps) {
               </button>
             </div>
             <form onSubmit={handleQuickCreateSupplier} className="p-6 space-y-4 text-xs">
+              {qsError && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                  <AlertCircle size={14} className="shrink-0" />
+                  <span>{qsError}</span>
+                </div>
+              )}
+
               <div>
-                <Lbl t="RUC del Proveedor / Cédula" req />
-                <input type="text" required placeholder="Ej. 1792348574001" value={qsRuc} onChange={e => setQsRuc(e.target.value)} className={INPUT} />
+                <Lbl t="Cédula / RUC del Proveedor" req />
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. 1804567890 o 1792348574001"
+                  value={qsRuc}
+                  onChange={e => {
+                    setQsRuc(e.target.value.replace(/\D/g, '').slice(0, 13));
+                    if (qsError) setQsError('');
+                  }}
+                  className={INPUT}
+                />
+                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                  10 dígitos para cédula de persona natural o 13 dígitos para RUC.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Lbl t="Nombres del Proveedor" req />
-                  <input type="text" required placeholder="Ej. Juan Carlos" value={qsNombres} onChange={e => setQsNombres(formatearNombres(e.target.value))} className={INPUT} />
+                  <input type="text" required placeholder="Ej. Juan Carlos" value={qsNombres} onChange={e => { setQsNombres(formatearNombres(e.target.value)); if (qsError) setQsError(''); }} className={INPUT} />
                 </div>
                 <div>
                   <Lbl t="Apellidos del Proveedor" req />
-                  <input type="text" required placeholder="Ej. Pérez Gómez" value={qsApellidos} onChange={e => setQsApellidos(formatearApellidos(e.target.value))} className={INPUT} />
+                  <input type="text" required placeholder="Ej. Pérez Gómez" value={qsApellidos} onChange={e => { setQsApellidos(formatearApellidos(e.target.value)); if (qsError) setQsError(''); }} className={INPUT} />
                 </div>
               </div>
 
