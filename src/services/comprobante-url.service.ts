@@ -20,11 +20,42 @@ export function obtenerUrlBase(): string {
 }
 
 /**
+ * Elimina claves vacías o nulas recursivamente para mantener la URL lo más corta y limpia posible
+ */
+export function limpiarObjetoPayload(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(limpiarObjetoPayload).filter((v) => v !== undefined && v !== null);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value === undefined || value === null || value === '') continue;
+      if (typeof value === 'string' && value.startsWith('data:image')) continue;
+      const cleanVal = limpiarObjetoPayload(value);
+      if (cleanVal !== undefined && cleanVal !== null && cleanVal !== '') {
+        cleaned[key] = cleanVal;
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
+/**
+ * Genera el formato estándar y profesional de hipervínculo / enlace para WhatsApp
+ */
+export function formatearEnlaceWhatsAppComprobante(url: string, titulo: string = 'Descarga aquí tu comprobante oficial'): string {
+  if (!url) return '';
+  return `📥 *${titulo}:*\n👉 ${url}`;
+}
+
+/**
  * Codifica un objeto a Base64 seguro para URL con soporte completo UTF-8
  */
 export function codificarPayload(data: any): string {
   try {
-    const jsonStr = JSON.stringify(data);
+    const dataLimpia = limpiarObjetoPayload(data);
+    const jsonStr = JSON.stringify(dataLimpia);
     if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
       const bytes = new TextEncoder().encode(jsonStr);
       let binary = '';

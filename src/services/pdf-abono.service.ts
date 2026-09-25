@@ -361,7 +361,7 @@ export function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, incluir
   try {
     const urlRecibo = generarUrlPublicaAbono(data);
     if (urlRecibo) {
-      msg += `🔗 *Ver o descargar comprobante digital oficial:*\n${urlRecibo}\n\n`;
+      msg += `📥 *Descarga aquí tu comprobante oficial:*\n👉 ${urlRecibo}\n\n`;
     }
   } catch (e) {
     // Si falla, el mensaje continúa con el detalle completo

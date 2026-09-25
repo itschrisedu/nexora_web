@@ -240,7 +240,7 @@ export async function compartirFacturaPdf(
   const ivaFactura = Number(data.totales?.iva15 || 0);
   const totalFactura = Number(data.totales?.total || 0);
 
-  const mensajeTexto = `Estimado/a *${data.comprador.nombre}*,\n\nLe saludamos de *${emisorNombre}*. Adjuntamos el detalle de su Factura Electrónica Oficial:\n\n🧾 *FACTURA No:* ${data.comprobante.numero}\n📅 *Fecha:* ${data.comprobante.fecha}\n👤 *RUC/Cédula:* ${data.comprador.cedula}${itemsTexto ? `\n\n📦 *DETALLE DE COMPRA:*${itemsTexto}` : ""}\n\n━━━━━━━━━━━━━━━━━━━━━\n💵 *Subtotal:* $${subtotalFactura.toFixed(2)}\n📊 *IVA (15%):* $${ivaFactura.toFixed(2)}\n💰 *TOTAL FACTURA:* $${totalFactura.toFixed(2)}\n━━━━━━━━━━━━━━━━━━━━━\n${urlDigital ? `\n🔗 *Ver o descargar factura digital oficial:*\n${urlDigital}\n` : ""}\n¡Muchas gracias por su preferencia!\n*${emisorNombre}*`;
+  const mensajeTexto = `Estimado/a *${data.comprador.nombre}*,\n\nLe saludamos de *${emisorNombre}*. Adjuntamos el detalle de su Factura Electrónica Oficial:\n\n🧾 *FACTURA No:* ${data.comprobante.numero}\n📅 *Fecha:* ${data.comprobante.fecha}\n👤 *RUC/Cédula:* ${data.comprador.cedula}${itemsTexto ? `\n\n📦 *DETALLE DE COMPRA:*${itemsTexto}` : ""}\n\n━━━━━━━━━━━━━━━━━━━━━\n💵 *Subtotal:* $${subtotalFactura.toFixed(2)}\n📊 *IVA (15%):* $${ivaFactura.toFixed(2)}\n💰 *TOTAL FACTURA:* $${totalFactura.toFixed(2)}\n━━━━━━━━━━━━━━━━━━━━━\n${urlDigital ? `\n📥 *Descarga aquí tu factura digital oficial:*\n👉 ${urlDigital}\n` : ""}\n¡Muchas gracias por su preferencia!\n*${emisorNombre}*`;
 
   // Apertura directa a WhatsApp sin popups de Windows ni descargas en disco
   const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
@@ -556,7 +556,7 @@ export async function compartirOrdenCompraPdf(
     urlDigital = generarUrlPublicaOrden(data);
   } catch (e) {}
 
-  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe compartimos la *Orden de Compra No. ${data.orden.numero}* (${data.totales.totalPares} pares):\n\n🔗 *Ver detalle y descargar PDF:*\n${urlDigital}\n\nPor favor confirmar recepción del pedido. ¡Muchas gracias!\n*${data.emisor.nombre || "Gerencia de Compras"}*`;
+  const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe compartimos la *Orden de Compra No. ${data.orden.numero}* (${data.totales.totalPares} pares):\n\n📥 *Descarga aquí la orden de compra oficial en PDF:*\n👉 ${urlDigital}\n\nPor favor confirmar recepción del pedido. ¡Muchas gracias!\n*${data.emisor.nombre || "Gerencia de Compras"}*`;
 
   // Apertura directa garantizada de WhatsApp Web / móvil
   const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
