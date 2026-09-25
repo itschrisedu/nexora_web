@@ -7,7 +7,8 @@ import {
   Plus, Search, Loader2, Users, Edit2, CheckCircle,
   AlertCircle, X, RefreshCw, Phone, Mail, MapPin, User, UserPlus, CreditCard,
   DollarSign, ShieldAlert, FileText, Clock, Tag, MessageCircle, Copy, Check,
-  Flame, Sparkles, Send, Gift, Calendar, UserX, AlertTriangle, ArrowUpRight, Building
+  Flame, Sparkles, Send, Gift, Calendar, UserX, AlertTriangle, ArrowUpRight, Building,
+  Wallet
 } from "lucide-react";
 import { getClienteReputacion } from "../utils/cliente-reputacion";
 import ConfirmModal from "./ui/confirm-modal";
@@ -44,6 +45,7 @@ interface Cliente {
   ruc?: string;
   direccion?: string;
   notas?: string;
+  saldoAFavor?: number;
   limiteCredito?: number;
   creditoUtilizado?: number;
   creditoDisponible?: number;
@@ -295,6 +297,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               cedula: c.cedula || c.ruc || "S/N",
               email: c.email,
               telefono: c.telefono,
+              saldoAFavor: c.saldoAFavor ? Number(c.saldoAFavor) : 0,
               limiteCredito: c.limiteCredito || 0,
               cupoDisponible: c.cupoDisponible || 0,
               score: c.score || 100,
@@ -857,7 +860,15 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                                 {(c.nombre || "?").charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <div className="font-semibold text-sm">{c.nombre} {c.apellido || ""}</div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-semibold text-sm">{c.nombre} {c.apellido || ""}</span>
+                                  {Number(c.saldoAFavor || 0) > 0 && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                                      <Wallet size={10} />
+                                      ${Number(c.saldoAFavor).toFixed(2)} a favor
+                                    </span>
+                                  )}
+                                </div>
                                 {c.direccion && <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[160px]">{c.direccion}</div>}
                               </div>
                             </div>
@@ -968,6 +979,25 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                         <div className="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase tracking-wider">Score Crediticio</div>
                         <div className={`text-2xl font-black mt-1 ${scoreColor(scoreVal)}`}>{scoreVal}<span className="text-xs text-[var(--muted-foreground)] ml-1">/ 100</span></div>
                       </div>
+
+                      {Number(selected.saldoAFavor ?? 0) > 0 && (
+                        <div className="p-3.5 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 dark:border-emerald-800/60 rounded-xl space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                              <Wallet size={13} className="text-emerald-600 dark:text-emerald-400" /> Saldo a Favor
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                              Disponible
+                            </span>
+                          </div>
+                          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                            ${Number(selected.saldoAFavor).toFixed(2)}
+                          </div>
+                          <div className="text-[10px] text-emerald-700/90 dark:text-emerald-300/90 leading-tight">
+                            Crédito a favor para aplicar a nuevas compras o compensación.
+                          </div>
+                        </div>
+                      )}
 
                       <div className="space-y-2">
                         <div className="flex justify-between items-center text-xs">

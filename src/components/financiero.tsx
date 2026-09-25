@@ -1981,9 +1981,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                               </td>
 
                               <td className="px-5 py-4 text-center">
-                                <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold inline-block ${cfg.color}`}>
-                                  {cfg.label}
-                                </span>
+                                {cliente.saldoTotalPendiente === 0 && cliente.saldoAFavorCliente > 0 ? (
+                                  <span className="px-2.5 py-1 rounded-lg border text-[10px] font-bold inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+                                    ✨ Con saldo a favor
+                                  </span>
+                                ) : (
+                                  <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold inline-block ${cfg.color}`}>
+                                    {cfg.label}
+                                  </span>
+                                )}
                               </td>
 
                               <td className="px-5 py-4 text-right text-xs font-semibold text-[var(--muted-foreground)]">
@@ -1991,16 +1997,20 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                               </td>
 
                               <td className="px-5 py-4 text-right">
-                                <span
-                                  className={`text-sm font-black ${
-                                    cliente.saldoTotalPendiente > 0 ? 'text-red-500' : 'text-emerald-600'
-                                  }`}
-                                >
-                                  ${cliente.saldoTotalPendiente.toFixed(2)}
-                                </span>
-                                {cliente.saldoAFavorCliente > 0 && (
-                                  <div className="text-[10px] font-bold text-emerald-600 mt-0.5">💰 A favor: ${cliente.saldoAFavorCliente.toFixed(2)}</div>
-                                )}
+                                <div className="flex flex-col items-end gap-1">
+                                  <span
+                                    className={`text-sm font-black ${
+                                      cliente.saldoTotalPendiente > 0 ? 'text-red-500' : 'text-emerald-600'
+                                    }`}
+                                  >
+                                    ${cliente.saldoTotalPendiente.toFixed(2)}
+                                  </span>
+                                  {cliente.saldoAFavorCliente > 0 && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                                      💰 ${cliente.saldoAFavorCliente.toFixed(2)} a favor
+                                    </span>
+                                  )}
+                                </div>
                               </td>
 
                               <td className="px-5 py-4 text-right text-[11px] text-[var(--muted-foreground)]">
