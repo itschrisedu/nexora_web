@@ -237,12 +237,41 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   const handleCreateSucursal = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreatingSucursal(true);
     setErrorMsg('');
     setSuccessMsg('');
+
+    const cleanName = newSucursal.name.trim();
+    if (!cleanName) {
+      setErrorMsg('El nombre de la sucursal es obligatorio.');
+      return;
+    }
+
+    const cleanTel = newSucursal.telefono.replace(/\D/g, '').trim();
+    if (cleanTel) {
+      if (cleanTel.length !== 10) {
+        setErrorMsg('El teléfono debe tener exactamente 10 dígitos numéricos (ej. 0991234567).');
+        return;
+      }
+    }
+
+    const cleanEmail = newSucursal.email.trim();
+    if (cleanEmail) {
+      const atCount = (cleanEmail.match(/@/g) || []).length;
+      if (atCount !== 1 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        setErrorMsg('El correo electrónico no es válido. Debe contener un solo "@" y un dominio válido (ej. sucursal@ejemplo.com).');
+        return;
+      }
+    }
+
+    setCreatingSucursal(true);
     try {
-      await ApiService.post('/configuracion/sucursales', newSucursal);
-      setSuccessMsg(`Sucursal "${newSucursal.name}" creada exitosamente.`);
+      await ApiService.post('/configuracion/sucursales', {
+        name: cleanName,
+        direccion: newSucursal.direccion.trim(),
+        telefono: cleanTel,
+        email: cleanEmail,
+      });
+      setSuccessMsg(`Sucursal "${cleanName}" creada exitosamente.`);
       setShowAddSucursalModal(false);
       setNewSucursal({
         name: '',
@@ -447,15 +476,46 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const handleSaveEditSucursal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSucursal) return;
-    setSavingSucursal(true);
     setErrorMsg('');
+    setSuccessMsg('');
+
+    const cleanName = (editSucursalForm.name || '').trim();
+    if (!cleanName) {
+      setErrorMsg('El nombre de la sucursal es obligatorio.');
+      return;
+    }
+
+    const cleanTel = (editSucursalForm.telefono || '').replace(/\D/g, '').trim();
+    if (cleanTel) {
+      if (cleanTel.length !== 10) {
+        setErrorMsg('El teléfono debe tener exactamente 10 dígitos numéricos (ej. 0991234567).');
+        return;
+      }
+    }
+
+    const cleanEmail = (editSucursalForm.email || '').trim();
+    if (cleanEmail) {
+      const atCount = (cleanEmail.match(/@/g) || []).length;
+      if (atCount !== 1 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        setErrorMsg('El correo electrónico no es válido. Debe contener un solo "@" y un dominio válido (ej. sucursal@ejemplo.com).');
+        return;
+      }
+    }
+
+    setSavingSucursal(true);
     try {
-      const data = await ApiService.put(`/configuracion/sucursales/${editingSucursal.id}`, editSucursalForm);
+      const data = await ApiService.put(`/configuracion/sucursales/${editingSucursal.id}`, {
+        name: cleanName,
+        direccion: (editSucursalForm.direccion || '').trim(),
+        telefono: cleanTel,
+        email: cleanEmail,
+        active: editSucursalForm.active,
+      });
       if (Array.isArray(data)) setSucursales(data);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('nexora:sucursales-changed'));
       }
-      setSuccessMsg(`Sucursal "${editSucursalForm.name}" actualizada.`);
+      setSuccessMsg(`Sucursal "${cleanName}" actualizada.`);
       setShowEditSucursalModal(false);
       setEditingSucursal(null);
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -705,9 +765,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   </div>
 
                   <div className="space-y-1.5 text-xs text-[var(--muted-foreground)]">
-                    {sucursal.ruc && (
+                    {sucursal.ruc && sucursal.ruc !== '0000000000001' && (
                       <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--muted)]/60 text-[var(--foreground)] font-mono text-[10.5px] font-bold border border-[var(--border)]">
-                        <span>RUC:</span>
+                        <span>RUC Matriz:</span>
                         <span>{sucursal.ruc}</span>
                       </div>
                     )}
@@ -1149,19 +1209,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">RUC del Establecimiento (Opcional)</label>
-                <input
-                  type="text"
-                  maxLength={13}
-                  value={newSucursal.ruc}
-                  onChange={(e) => setNewSucursal({ ...newSucursal, ruc: e.target.value.replace(/\D/g, '').slice(0, 13) })}
-                  placeholder="Ej: 1891234567001 (13 dígitos)"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0F172A]"
-                />
-                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  Si se omite, la sucursal operará bajo el RUC matriz general del negocio.
-                </p>
+              <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl flex items-center gap-2.5 text-xs">
+                <Store size={16} className="text-blue-500 shrink-0" />
+                <span className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                  Esta sucursal operará bajo el RUC matriz de la empresa (no requiere segundo RUC).
+                </span>
               </div>
 
               <div>
@@ -1177,22 +1229,31 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Teléfono</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Teléfono (10 dígitos)</label>
                   <input
-                    type="text"
+                    type="tel"
+                    maxLength={10}
                     value={newSucursal.telefono}
-                    onChange={(e) => setNewSucursal({ ...newSucursal, telefono: e.target.value })}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setNewSucursal({ ...newSucursal, telefono: digits });
+                    }}
                     placeholder="0991234567"
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico (Opcional)</label>
                   <input
                     type="email"
                     value={newSucursal.email}
-                    onChange={(e) => setNewSucursal({ ...newSucursal, email: e.target.value })}
-                    placeholder="sucursal@calzados.com"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const atMatches = val.match(/@/g);
+                      if (atMatches && atMatches.length > 1) return;
+                      setNewSucursal({ ...newSucursal, email: val });
+                    }}
+                    placeholder="sucursal@ejemplo.com"
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
@@ -1585,21 +1646,6 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">RUC del Establecimiento (Opcional)</label>
-                <input
-                  type="text"
-                  maxLength={13}
-                  value={editSucursalForm.ruc}
-                  onChange={(e) => setEditSucursalForm({ ...editSucursalForm, ruc: e.target.value.replace(/\D/g, '').slice(0, 13) })}
-                  placeholder="Ej: 1891234567001 (13 dígitos)"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0F172A]"
-                />
-                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  RUC propio del local o establecimiento. Si se vacía, hereda el RUC matriz.
-                </p>
-              </div>
-
-              <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Direccion</label>
                 <input
                   type="text"
@@ -1611,20 +1657,31 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Telefono</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Telefono (10 dígitos)</label>
                   <input
-                    type="text"
+                    type="tel"
+                    maxLength={10}
                     value={editSucursalForm.telefono}
-                    onChange={(e) => setEditSucursalForm({ ...editSucursalForm, telefono: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setEditSucursalForm({ ...editSucursalForm, telefono: digits });
+                    }}
+                    placeholder="0991234567"
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electronico</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electronico (Opcional)</label>
                   <input
                     type="email"
                     value={editSucursalForm.email}
-                    onChange={(e) => setEditSucursalForm({ ...editSucursalForm, email: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const atMatches = val.match(/@/g);
+                      if (atMatches && atMatches.length > 1) return;
+                      setEditSucursalForm({ ...editSucursalForm, email: val });
+                    }}
+                    placeholder="sucursal@ejemplo.com"
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
