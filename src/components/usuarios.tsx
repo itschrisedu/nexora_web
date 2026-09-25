@@ -21,6 +21,8 @@ interface SucursalItem {
   isMatriz: boolean;
   isCurrent: boolean;
   ruc?: string;
+  isRucPropio?: boolean;
+  rucMatriz?: string;
   direccion: string;
   telefono: string;
   email: string;
@@ -68,6 +70,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   // ─── SUCURSALES ───
   const [sucursales, setSucursales] = useState<SucursalItem[]>([]);
   const [showAddSucursalModal, setShowAddSucursalModal] = useState(false);
+  const [showCustomRucNew, setShowCustomRucNew] = useState(false);
   const [creatingSucursal, setCreatingSucursal] = useState(false);
   const [newSucursal, setNewSucursal] = useState({
     name: '',
@@ -87,6 +90,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   // ─── EDITAR SUCURSAL ───
   const [showEditSucursalModal, setShowEditSucursalModal] = useState(false);
+  const [showCustomRucEdit, setShowCustomRucEdit] = useState(false);
   const [editingSucursal, setEditingSucursal] = useState<SucursalItem | null>(null);
   const [editSucursalForm, setEditSucursalForm] = useState({ name: '', ruc: '', direccion: '', telefono: '', email: '', active: true });
   const [savingSucursal, setSavingSucursal] = useState(false);
@@ -247,6 +251,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       return;
     }
 
+    let cleanRucToSend = '';
+    if (showCustomRucNew && newSucursal.ruc.trim()) {
+      const cleanDigits = newSucursal.ruc.replace(/\D/g, '').trim();
+      if (cleanDigits.length !== 13) {
+        setErrorMsg('El RUC propio de la sucursal debe contener exactamente 13 dígitos numéricos (ej. 1801234567001).');
+        return;
+      }
+      cleanRucToSend = cleanDigits;
+    }
+
     const cleanTel = newSucursal.telefono.replace(/\D/g, '').trim();
     if (cleanTel) {
       if (cleanTel.length !== 10) {
@@ -268,12 +282,14 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     try {
       await ApiService.post('/configuracion/sucursales', {
         name: cleanName,
+        ruc: cleanRucToSend || undefined,
         direccion: newSucursal.direccion.trim(),
         telefono: cleanTel,
         email: cleanEmail,
       });
       setSuccessMsg(`Sucursal "${cleanName}" creada exitosamente.`);
       setShowAddSucursalModal(false);
+      setShowCustomRucNew(false);
       setNewSucursal({
         name: '',
         ruc: '',
@@ -468,9 +484,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   const handleEditSucursal = (suc: SucursalItem) => {
     setEditingSucursal(suc);
+    const hasCustomRuc = Boolean(suc.isRucPropio && suc.ruc);
+    setShowCustomRucEdit(hasCustomRuc);
     setEditSucursalForm({
       name: suc.name,
-      ruc: suc.ruc || '',
+      ruc: hasCustomRuc ? (suc.ruc || '') : '',
       direccion: suc.direccion,
       telefono: suc.telefono,
       email: suc.email,
@@ -489,6 +507,22 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     if (!cleanName) {
       setErrorMsg('El nombre de la sucursal es obligatorio.');
       return;
+    }
+
+    let cleanRucToSend: string | undefined = undefined;
+    if (showCustomRucEdit) {
+      const cleanDigits = (editSucursalForm.ruc || '').replace(/\D/g, '').trim();
+      if (cleanDigits) {
+        if (cleanDigits.length !== 13) {
+          setErrorMsg('El RUC propio debe contener exactamente 13 dígitos numéricos (ej. 1801234567001).');
+          return;
+        }
+        cleanRucToSend = cleanDigits;
+      } else {
+        cleanRucToSend = ''; // Limpiar RUC propio para heredar matriz
+      }
+    } else {
+      cleanRucToSend = ''; // Heredar RUC matriz
     }
 
     const cleanTel = (editSucursalForm.telefono || '').replace(/\D/g, '').trim();
@@ -512,6 +546,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     try {
       const data = await ApiService.put(`/configuracion/sucursales/${editingSucursal.id}`, {
         name: cleanName,
+        ruc: cleanRucToSend,
         direccion: (editSucursalForm.direccion || '').trim(),
         telefono: cleanTel,
         email: cleanEmail,
@@ -771,12 +806,29 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   </div>
 
                   <div className="space-y-1.5 text-xs text-[var(--muted-foreground)]">
-                    {sucursal.ruc && sucursal.ruc !== '0000000000001' && (
-                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--muted)]/60 text-[var(--foreground)] font-mono text-[10.5px] font-bold border border-[var(--border)]">
-                        <span>RUC Matriz:</span>
+                    {sucursal.isMatriz ? (
+                      sucursal.ruc ? (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 font-mono text-[10.5px] font-bold border border-amber-500/20">
+                          <span>🏛️ RUC Matriz:</span>
+                          <span>{sucursal.ruc}</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--muted)]/60 text-[var(--muted-foreground)] font-mono text-[10.5px] border border-[var(--border)]">
+                          <span>🏛️ RUC Matriz:</span>
+                          <span>Sin registrar</span>
+                        </div>
+                      )
+                    ) : sucursal.isRucPropio && sucursal.ruc ? (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 text-blue-700 dark:text-blue-400 font-mono text-[10.5px] font-bold border border-blue-500/20" title="Esta sucursal opera con su propio RUC independiente">
+                        <span>🏢 RUC Propio:</span>
                         <span>{sucursal.ruc}</span>
                       </div>
-                    )}
+                    ) : sucursal.ruc ? (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--muted)]/60 text-[var(--foreground)] font-mono text-[10.5px] font-medium border border-[var(--border)]" title="Hereda el RUC comercial de la Matriz Principal">
+                        <span>🏛️ RUC (Heredado de Matriz):</span>
+                        <span>{sucursal.ruc}</span>
+                      </div>
+                    ) : null}
                     <div className="flex items-center gap-1.5"><MapPin size={13} />{sucursal.direccion}</div>
                     {sucursal.telefono && <div>Tel: {sucursal.telefono}</div>}
                     {sucursal.email && <div>Email: {sucursal.email}</div>}
@@ -1215,11 +1267,59 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 />
               </div>
 
-              <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl flex items-center gap-2.5 text-xs">
-                <Store size={16} className="text-blue-500 shrink-0" />
-                <span className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
-                  Esta sucursal operará bajo el RUC matriz de la empresa (no requiere segundo RUC).
-                </span>
+              {/* Bloque Identificación Tributaria / RUC */}
+              <div className="space-y-2 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2.5">
+                    <Store size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-[11px] text-[var(--foreground)]">Identificación Tributaria (RUC)</div>
+                      <div className="text-[10.5px] text-[var(--muted-foreground)] leading-tight mt-0.5">
+                        {!showCustomRucNew
+                          ? 'Por defecto, la sucursal operará con el RUC de la Matriz Principal.'
+                          : 'Esta sucursal emitirá notas y transacciones con su propio RUC independiente.'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextState = !showCustomRucNew;
+                      setShowCustomRucNew(nextState);
+                      if (!nextState) setNewSucursal({ ...newSucursal, ruc: '' });
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold transition-all shrink-0 cursor-pointer ${
+                      showCustomRucNew
+                        ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20 hover:bg-rose-500/20'
+                        : 'bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20'
+                    }`}
+                  >
+                    {showCustomRucNew ? '− Usar RUC Matriz' : '+ Agregar RUC Propio'}
+                  </button>
+                </div>
+
+                {showCustomRucNew && (
+                  <div className="pt-2 border-t border-[var(--border)]/60 animate-in fade-in duration-150">
+                    <label className="block text-[10px] font-bold text-[var(--foreground)] uppercase tracking-wider mb-1">
+                      RUC Propio de la Sucursal (13 dígitos) *
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={13}
+                      required={showCustomRucNew}
+                      value={newSucursal.ruc}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 13);
+                        setNewSucursal({ ...newSucursal, ruc: digits });
+                      }}
+                      placeholder="Ej: 1801234567001"
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-blue-500/40 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                      Debe contener 13 dígitos numéricos terminados en 001.
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1671,7 +1771,61 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                 />
               </div>
+              {/* Bloque Identificación Tributaria / RUC en Editar */}
+              <div className="space-y-2 p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2.5">
+                    <Store size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-[11px] text-[var(--foreground)]">Identificación Tributaria (RUC)</div>
+                      <div className="text-[10.5px] text-[var(--muted-foreground)] leading-tight mt-0.5">
+                        {showCustomRucEdit && editSucursalForm.ruc
+                          ? 'Esta sucursal tiene configurado un RUC propio independiente.'
+                          : 'Esta sucursal opera bajo el RUC de la Matriz Principal.'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextState = !showCustomRucEdit;
+                      setShowCustomRucEdit(nextState);
+                      if (!nextState) {
+                        setEditSucursalForm({ ...editSucursalForm, ruc: '' });
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold transition-all shrink-0 cursor-pointer ${
+                      showCustomRucEdit
+                        ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20 hover:bg-rose-500/20'
+                        : 'bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20'
+                    }`}
+                  >
+                    {showCustomRucEdit ? '− Volver a RUC Matriz' : '+ Configurar RUC Propio'}
+                  </button>
+                </div>
 
+                {showCustomRucEdit && (
+                  <div className="pt-2 border-t border-[var(--border)]/60 animate-in fade-in duration-150">
+                    <label className="block text-[10px] font-bold text-[var(--foreground)] uppercase tracking-wider mb-1">
+                      RUC Propio de la Sucursal (13 dígitos)
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={13}
+                      value={editSucursalForm.ruc}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 13);
+                        setEditSucursalForm({ ...editSucursalForm, ruc: digits });
+                      }}
+                      placeholder="Ej: 1801234567001"
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-blue-500/40 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                      Dejar vacío o presionar "Volver a RUC Matriz" para heredar el RUC de la Matriz.
+                    </span>
+                  </div>
+                )}
+              </div>
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Direccion</label>
                 <input
@@ -1736,8 +1890,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={savingSucursal}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+                  disabled={savingSucursal || !isDirtyEditSucursal()}
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {savingSucursal ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
