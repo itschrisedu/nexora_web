@@ -9,6 +9,7 @@ import {
   Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2, Eye, EyeOff, Lock, Unlock
 } from 'lucide-react';
 import UnsavedChangesModal from './ui/unsaved-changes-modal';
+import { formatearEmail, validarEmailEstricto, handleEmailKeyDown } from '@/utils/text-formatters';
 
 interface UsuariosProps {
   online: boolean;
@@ -143,6 +144,17 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // ═══ VALIDACIÓN DE EMAIL ═══
+  const validateEmail = (emailVal: string): string => {
+    const res = validarEmailEstricto(emailVal);
+    return res.valido ? '' : (res.mensaje || 'Formato de correo no válido');
+  };
+
+  const [addUserEmailError, setAddUserEmailError] = useState('');
+  const [editUserEmailError, setEditUserEmailError] = useState('');
+  const [newSucursalEmailError, setNewSucursalEmailError] = useState('');
+  const [editSucursalEmailError, setEditSucursalEmailError] = useState('');
 
   useEffect(() => {
     if (online) {
@@ -327,6 +339,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       return;
     }
 
+    const emailErr = validateEmail(email);
+    if (emailErr) {
+      setAddUserEmailError(emailErr);
+      return;
+    }
+
     setSaving(true);
     try {
       const isGlobal = rolOption === 'ADMIN_GENERAL';
@@ -344,6 +362,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       setSuccessMsg('Colaborador registrado con éxito.');
       setShowAddModal(false);
+      setAddUserEmailError('');
       setNombre('');
       setEmail('');
       setPassword('');
@@ -364,6 +383,13 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+
+    const emailErr = validateEmail(editingUser.email);
+    if (emailErr) {
+      setEditUserEmailError(emailErr);
+      return;
+    }
+
     setSaving(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -381,6 +407,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
       setSuccessMsg(`Colaborador "${editingUser.nombre}" actualizado.`);
       setShowEditModal(false);
+      setEditUserEmailError('');
       setEditingUser(null);
       loadUsers();
       if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
@@ -1422,15 +1449,27 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   <input
                     type="email"
                     value={newSucursal.email}
+                    onKeyDown={handleEmailKeyDown}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      const atMatches = val.match(/@/g);
-                      if (atMatches && atMatches.length > 1) return;
+                      const val = formatearEmail(e.target.value);
                       setNewSucursal({ ...newSucursal, email: val });
+                      setNewSucursalEmailError(val.trim() ? validateEmail(val) : '');
+                    }}
+                    onBlur={() => {
+                      if (newSucursal.email.trim()) setNewSucursalEmailError(validateEmail(newSucursal.email));
                     }}
                     placeholder="sucursal@ejemplo.com"
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                    className={`w-full px-3 py-2 bg-[var(--muted)]/40 border rounded-xl text-xs focus:outline-none transition-colors ${
+                      newSucursalEmailError 
+                        ? 'border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20 text-red-600 dark:text-red-400' 
+                        : 'border-[var(--border)] focus:border-[#0F172A]'
+                    }`}
                   />
+                  {newSucursalEmailError && (
+                    <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5 animate-fadeIn">
+                      <AlertCircle size={13} className="shrink-0 text-red-500" /> {newSucursalEmailError}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1496,10 +1535,27 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   type="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={handleEmailKeyDown}
+                  onChange={(e) => {
+                    const val = formatearEmail(e.target.value);
+                    setEmail(val);
+                    setAddUserEmailError(val.trim() ? validateEmail(val) : '');
+                  }}
+                  onBlur={() => {
+                    if (email.trim()) setAddUserEmailError(validateEmail(email));
+                  }}
                   placeholder="carlos@calzados.com"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  className={`w-full px-3 py-2 bg-[var(--muted)]/40 border rounded-xl text-xs focus:outline-none transition-colors ${
+                    addUserEmailError 
+                      ? 'border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20 text-red-600 dark:text-red-400' 
+                      : 'border-[var(--border)] focus:border-[#0F172A]'
+                  }`}
                 />
+                {addUserEmailError && (
+                  <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5 animate-fadeIn">
+                    <AlertCircle size={13} className="shrink-0 text-red-500" /> {addUserEmailError}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1637,9 +1693,26 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   type="email"
                   required
                   value={editingUser.email}
-                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  onKeyDown={handleEmailKeyDown}
+                  onChange={(e) => {
+                    const val = formatearEmail(e.target.value);
+                    setEditingUser({ ...editingUser, email: val });
+                    setEditUserEmailError(val.trim() ? validateEmail(val) : '');
+                  }}
+                  onBlur={() => {
+                    if (editingUser.email.trim()) setEditUserEmailError(validateEmail(editingUser.email));
+                  }}
+                  className={`w-full px-3 py-2 bg-[var(--muted)]/40 border rounded-xl text-xs focus:outline-none transition-colors ${
+                    editUserEmailError 
+                      ? 'border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20 text-red-600 dark:text-red-400' 
+                      : 'border-[var(--border)] focus:border-[#0F172A]'
+                  }`}
                 />
+                {editUserEmailError && (
+                  <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5 animate-fadeIn">
+                    <AlertCircle size={13} className="shrink-0 text-red-500" /> {editUserEmailError}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1921,19 +1994,31 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electronico (Opcional)</label>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico (Opcional)</label>
                   <input
                     type="email"
                     value={editSucursalForm.email}
+                    onKeyDown={handleEmailKeyDown}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      const atMatches = val.match(/@/g);
-                      if (atMatches && atMatches.length > 1) return;
+                      const val = formatearEmail(e.target.value);
                       setEditSucursalForm({ ...editSucursalForm, email: val });
+                      setEditSucursalEmailError(val.trim() ? validateEmail(val) : '');
+                    }}
+                    onBlur={() => {
+                      if (editSucursalForm.email.trim()) setEditSucursalEmailError(validateEmail(editSucursalForm.email));
                     }}
                     placeholder="sucursal@ejemplo.com"
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                    className={`w-full px-3 py-2 bg-[var(--muted)]/40 border rounded-xl text-xs focus:outline-none transition-colors ${
+                      editSucursalEmailError 
+                        ? 'border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20 text-red-600 dark:text-red-400' 
+                        : 'border-[var(--border)] focus:border-[#0F172A]'
+                    }`}
                   />
+                  {editSucursalEmailError && (
+                    <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5 animate-fadeIn">
+                      <AlertCircle size={13} className="shrink-0 text-red-500" /> {editSucursalEmailError}
+                    </p>
+                  )}
                 </div>
               </div>
 

@@ -92,47 +92,81 @@ export function dividirApellidos(apellidosStr: string): {
 /**
  * Normaliza y formatea un correo electrónico:
  * - Fuerza todo a minúsculas.
- * - Elimina espacios y caracteres de control.
+ * - Elimina espacios en blanco.
+ * - Impide estrictamente más de un solo símbolo '@' (bloquea doble arroba).
  */
 export function formatearEmail(email: string): string {
   if (!email) return '';
-  return email.toLowerCase().replace(/\s+/g, '').trim();
+  const clean = email.toLowerCase().replace(/\s+/g, '');
+  let atCount = 0;
+  return clean.replace(/@/g, (match) => {
+    atCount++;
+    return atCount === 1 ? match : '';
+  });
 }
 
 /**
- * Valida un correo electrónico con reglas estrictas:
- * - Debe tener exactamente un solo símbolo '@'.
- * - Debe tener un dominio válido con punto posterior.
+ * Previene la inserción de un segundo '@' por teclado.
  */
-export function validarEmailEstricto(email: string): { valido: boolean; mensaje?: string } {
+export function handleEmailKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+  if (e.key === '@') {
+    const input = e.currentTarget;
+    const val = input.value;
+    if (val.includes('@')) {
+      const selStart = input.selectionStart || 0;
+      const selEnd = input.selectionEnd || 0;
+      const selectedText = val.substring(selStart, selEnd);
+      // Si la selección actual no incluye el '@' existente, bloquea la tecla
+      if (!selectedText.includes('@')) {
+        e.preventDefault();
+      }
+    }
+  }
+}
+
+/**
+ * Valida un correo electrónico con reglas detalladas y mensajes claros:
+ * - Obligatoriedad opcional.
+ * - Debe tener exactamente un solo símbolo '@'.
+ * - Nombre de usuario antes del '@'.
+ * - Dominio válido con extensión posterior (ej: .com, .ec).
+ */
+export function validarEmailEstricto(email: string, obligatorio: boolean = false): { valido: boolean; mensaje?: string } {
   const limpio = formatearEmail(email);
   if (!limpio) {
-    return { valido: true }; // Opcional si está vacío
+    if (obligatorio) {
+      return { valido: false, mensaje: 'El correo electrónico es requerido.' };
+    }
+    return { valido: true };
   }
   
   const arrobas = (limpio.match(/@/g) || []).length;
   if (arrobas === 0) {
-    return { valido: false, mensaje: 'El correo electrónico debe incluir el símbolo "@".' };
+    return { valido: false, mensaje: 'El correo debe incluir un arroba (@), ej: usuario@correo.com' };
   }
   if (arrobas > 1) {
-    return { valido: false, mensaje: 'El correo electrónico solo puede contener un único símbolo "@".' };
+    return { valido: false, mensaje: 'El correo no puede tener más de un arroba (@).' };
   }
 
   const partes = limpio.split('@');
   const usuario = partes[0];
   const dominio = partes[1];
 
-  if (!usuario || !dominio) {
-    return { valido: false, mensaje: 'El formato del correo es incompleto (ej: usuario@empresa.com).' };
+  if (!usuario) {
+    return { valido: false, mensaje: 'Falta el nombre de usuario antes del arroba (@).' };
+  }
+
+  if (!dominio) {
+    return { valido: false, mensaje: 'Falta el dominio después del arroba (@), ej: negocio.com' };
   }
 
   if (!dominio.includes('.') || dominio.startsWith('.') || dominio.endsWith('.')) {
-    return { valido: false, mensaje: 'El dominio del correo electrónico debe incluir una extensión válida (ej: .com, .ec).' };
+    return { valido: false, mensaje: 'El dominio debe incluir una extensión válida (ej: .com, .ec).' };
   }
 
   const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
   if (!emailRegex.test(limpio)) {
-    return { valido: false, mensaje: 'El correo electrónico contiene caracteres no válidos.' };
+    return { valido: false, mensaje: 'Formato de correo no válido. Ej: usuario@negocio.com' };
   }
 
   return { valido: true };

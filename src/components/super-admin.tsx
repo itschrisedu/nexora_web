@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { ApiService } from "@/services/api.service";
+import { formatearEmail, validarEmailEstricto, handleEmailKeyDown } from "@/utils/text-formatters";
 import {
   Building2,
   Plus,
@@ -190,6 +191,16 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<{ id: string; nombre: string; email: string } | null>(null);
   const [deleteUserLoading, setDeleteUserLoading] = useState(false);
+
+  // ═══ VALIDACIÓN DE EMAIL ═══
+  const validateEmail = (email: string): string => {
+    const res = validarEmailEstricto(email);
+    return res.valido ? "" : (res.mensaje || "Formato de correo no válido");
+  };
+
+  const [adminEmailError, setAdminEmailError] = useState("");
+  const [newUserEmailError, setNewUserEmailError] = useState("");
+  const [editUserEmailError, setEditUserEmailError] = useState("");
 
   // Control de Cambios sin Guardar (Dirty Form) y Descarte Seguro
   const initialTenantRef = useRef<string>("");
@@ -414,6 +425,11 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   // ═══ HANDLERS TENANT ═══
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
+    const emailErr = validateEmail(newTenant.adminEmail);
+    if (emailErr) {
+      setAdminEmailError(emailErr);
+      return;
+    }
     setCreateLoading(true);
     setErrorMsg("");
     try {
@@ -424,6 +440,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       });
       setSuccessMsg(`Tenant "${newTenant.name}" creado con ${newTenant.plan} y ${newTenant.diasPruebaGratis} días de prueba.`);
       setShowCreateModal(false);
+      setAdminEmailError("");
       setNewTenant({
         name: "",
         adminEmail: "",
@@ -608,11 +625,17 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTenantDetail) return;
+    const emailErr = validateEmail(newUser.email);
+    if (emailErr) {
+      setNewUserEmailError(emailErr);
+      return;
+    }
     setCreateUserLoading(true);
     try {
       await ApiService.post(`/tenants/${selectedTenantDetail.id}/users`, newUser);
       setSuccessMsg(`Usuario "${newUser.nombre}" creado exitosamente.`);
       setShowCreateUserModal(false);
+      setNewUserEmailError("");
       setNewUser({ email: "", nombre: "", password: "", rol: "ROL_ADMIN" });
       await handleViewDetail(selectedTenantDetail.id);
       await fetchTenants();
@@ -626,6 +649,11 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+    const emailErr = validateEmail(editingUser.email);
+    if (emailErr) {
+      setEditUserEmailError(emailErr);
+      return;
+    }
     setEditUserLoading(true);
     try {
       const payload: any = {
@@ -640,6 +668,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       await ApiService.patch(`/tenants/users/${editingUser.id}`, payload);
       setSuccessMsg(`Usuario "${editingUser.nombre}" actualizado.`);
       setShowEditUserModal(false);
+      setEditUserEmailError("");
       setEditingUser(null);
       if (selectedTenantDetail) {
         await handleViewDetail(selectedTenantDetail.id);
@@ -1071,10 +1100,27 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   type="email"
                   required
                   value={newTenant.adminEmail}
-                  onChange={(e) => setNewTenant({ ...newTenant, adminEmail: e.target.value })}
+                  onKeyDown={handleEmailKeyDown}
+                  onChange={(e) => {
+                    const val = formatearEmail(e.target.value);
+                    setNewTenant({ ...newTenant, adminEmail: val });
+                    setAdminEmailError(val.trim() ? validateEmail(val) : "");
+                  }}
+                  onBlur={() => {
+                    if (newTenant.adminEmail.trim()) setAdminEmailError(validateEmail(newTenant.adminEmail));
+                  }}
                   placeholder="admin@negocio.com"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
+                  className={`w-full px-3 py-2.5 bg-[var(--muted)] border rounded-lg text-sm focus:outline-none transition-colors ${
+                    adminEmailError 
+                      ? "border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20 text-red-600 dark:text-red-400" 
+                      : "border-[var(--border)] focus:border-[#0F172A]"
+                  }`}
                 />
+                {adminEmailError && (
+                  <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5 animate-fadeIn">
+                    <AlertTriangle size={13} className="shrink-0 text-red-500" /> {adminEmailError}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
@@ -1811,10 +1857,27 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   type="email"
                   required
                   value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  onKeyDown={handleEmailKeyDown}
+                  onChange={(e) => {
+                    const val = formatearEmail(e.target.value);
+                    setNewUser({ ...newUser, email: val });
+                    setNewUserEmailError(val.trim() ? validateEmail(val) : "");
+                  }}
+                  onBlur={() => {
+                    if (newUser.email.trim()) setNewUserEmailError(validateEmail(newUser.email));
+                  }}
                   placeholder="usuario@negocio.com"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                  className={`w-full px-3 py-2.5 bg-[var(--muted)] border rounded-lg text-sm focus:outline-none transition-colors ${
+                    newUserEmailError 
+                      ? "border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20 text-red-600 dark:text-red-400" 
+                      : "border-[var(--border)] focus:border-[#0F172A]"
+                  }`}
                 />
+                {newUserEmailError && (
+                  <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5 animate-fadeIn">
+                    <AlertTriangle size={13} className="shrink-0 text-red-500" /> {newUserEmailError}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
@@ -1917,9 +1980,26 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   type="email"
                   required
                   value={editingUser.email}
-                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                  onKeyDown={handleEmailKeyDown}
+                  onChange={(e) => {
+                    const val = formatearEmail(e.target.value);
+                    setEditingUser({ ...editingUser, email: val });
+                    setEditUserEmailError(val.trim() ? validateEmail(val) : "");
+                  }}
+                  onBlur={() => {
+                    if (editingUser.email.trim()) setEditUserEmailError(validateEmail(editingUser.email));
+                  }}
+                  className={`w-full px-3 py-2.5 bg-[var(--muted)] border rounded-lg text-sm focus:outline-none transition-colors ${
+                    editUserEmailError 
+                      ? "border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20 text-red-600 dark:text-red-400" 
+                      : "border-[var(--border)] focus:border-[#0F172A]"
+                  }`}
                 />
+                {editUserEmailError && (
+                  <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5 animate-fadeIn">
+                    <AlertTriangle size={13} className="shrink-0 text-red-500" /> {editUserEmailError}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
