@@ -390,8 +390,8 @@ function MainApp() {
     }
   };
 
-  const isMatrizAdmin = user?.rol === 'ROL_SUPER_ADMIN' || (user?.rol === 'ROL_ADMIN' && (!user?.tenantId || sucursales.find(s => s.id === user?.tenantId)?.isMatriz !== false));
-  const isBranchRestricted = !!(user?.rol && user?.rol !== 'ROL_SUPER_ADMIN' && !isMatrizAdmin);
+  const isGlobalAdmin = user?.rol === 'ROL_SUPER_ADMIN' || (user?.rol === 'ROL_ADMIN' && (user?.esAdminGeneral === true || (!user?.parentId && user?.esAdminGeneral !== false)));
+  const isBranchRestricted = !!(user?.rol && !isGlobalAdmin);
 
   const fetchSucursales = async () => {
     try {
@@ -401,8 +401,8 @@ function MainApp() {
         const storedUser = localStorage.getItem('user');
         const parsed = storedUser ? JSON.parse(storedUser) : null;
         if (parsed?.tenantId) {
-          const userSuc = data.find(s => s.id === parsed.tenantId);
-          if (userSuc && !userSuc.isMatriz) {
+          const isUserGlobal = parsed?.rol === 'ROL_SUPER_ADMIN' || (parsed?.rol === 'ROL_ADMIN' && (parsed?.esAdminGeneral === true || (!parsed?.parentId && parsed?.esAdminGeneral !== false)));
+          if (!isUserGlobal) {
             setActiveSucursalId(parsed.tenantId);
             localStorage.setItem('activeSucursalId', parsed.tenantId);
           }
@@ -1186,7 +1186,7 @@ function MainApp() {
             <div className="min-w-0">
               <div className="text-xs font-semibold truncate max-w-[110px]">{user?.nombre || 'Usuario'}</div>
               <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[110px]">
-                {user?.rol === 'ROL_SUPER_ADMIN' ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? 'Administrador' : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
+                {user?.rol === 'ROL_SUPER_ADMIN' ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? (isGlobalAdmin ? 'Admin General' : 'Admin de Sucursal') : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
               </div>
             </div>
           </div>

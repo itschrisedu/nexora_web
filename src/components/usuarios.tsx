@@ -37,6 +37,7 @@ interface UserListItem {
   email: string;
   nombre: string;
   rol: 'ROL_ADMIN' | 'ROL_VENDEDOR' | 'ROL_BODEGUERO';
+  esAdminGeneral?: boolean;
   activo: boolean;
   permiteCambiarPrecio?: boolean;
   intentosFallidos?: number;
@@ -109,7 +110,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPasswordAddUser, setShowPasswordAddUser] = useState(false);
-  const [rol, setRol] = useState<'ROL_VENDEDOR' | 'ROL_BODEGUERO' | 'ROL_ADMIN'>('ROL_VENDEDOR');
+  const [rolOption, setRolOption] = useState<'ADMIN_GENERAL' | 'ADMIN_SUCURSAL' | 'ROL_VENDEDOR' | 'ROL_BODEGUERO'>('ROL_VENDEDOR');
   const [permiteCambiarPrecio, setPermiteCambiarPrecio] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -152,7 +153,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   // === Snapshots al abrir modales ===
   useEffect(() => { if (showAddSucursalModal) sucursalFormSnapshotRef.current = JSON.stringify(newSucursal); }, [showAddSucursalModal]);
-  useEffect(() => { if (showAddModal) userFormSnapshotRef.current = JSON.stringify({ nombre, email, password, rol, permiteCambiarPrecio }); }, [showAddModal]);
+  useEffect(() => { if (showAddModal) userFormSnapshotRef.current = JSON.stringify({ nombre, email, password, rolOption, permiteCambiarPrecio }); }, [showAddModal]);
   useEffect(() => { if (showEditModal && editingUser) editUserSnapshotRef.current = JSON.stringify({ nombre: editingUser.nombre, email: editingUser.email, rol: editingUser.rol, activo: editingUser.activo, permiteCambiarPrecio: editingUser.permiteCambiarPrecio }); }, [showEditModal, editingUser]);
   useEffect(() => { if (showEditSucursalModal) editSucursalSnapshotRef.current = JSON.stringify(editSucursalForm); }, [showEditSucursalModal]);
   useEffect(() => { if (showResetPasswordModal) resetPwSnapshotRef.current = JSON.stringify({ newPassword }); }, [showResetPasswordModal]);
@@ -160,7 +161,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   // === Dirty check helpers ===
   const isDirtySucursal = useCallback(() => showAddSucursalModal && JSON.stringify(newSucursal) !== sucursalFormSnapshotRef.current, [showAddSucursalModal, newSucursal]);
-  const isDirtyAddUser = useCallback(() => showAddModal && JSON.stringify({ nombre, email, password, rol, permiteCambiarPrecio }) !== userFormSnapshotRef.current, [showAddModal, nombre, email, password, rol, permiteCambiarPrecio]);
+  const isDirtyAddUser = useCallback(() => showAddModal && JSON.stringify({ nombre, email, password, rolOption, permiteCambiarPrecio }) !== userFormSnapshotRef.current, [showAddModal, nombre, email, password, rolOption, permiteCambiarPrecio]);
   const isDirtyEditUser = useCallback(() => showEditModal && editingUser ? JSON.stringify({ nombre: editingUser.nombre, email: editingUser.email, rol: editingUser.rol, activo: editingUser.activo, permiteCambiarPrecio: editingUser.permiteCambiarPrecio }) !== editUserSnapshotRef.current : false, [showEditModal, editingUser]);
   const isDirtyEditSucursal = useCallback(() => showEditSucursalModal && JSON.stringify(editSucursalForm) !== editSucursalSnapshotRef.current, [showEditSucursalModal, editSucursalForm]);
   const isDirtyResetPw = useCallback(() => showResetPasswordModal && JSON.stringify({ newPassword }) !== resetPwSnapshotRef.current, [showResetPasswordModal, newPassword]);
@@ -300,18 +301,22 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!nombre || !email || !password || !rol) {
+    if (!nombre || !email || !password || !rolOption) {
       setErrorMsg('Todos los campos son obligatorios.');
       return;
     }
 
     setSaving(true);
     try {
+      const isGlobal = rolOption === 'ADMIN_GENERAL';
+      const actualRol = (rolOption === 'ADMIN_GENERAL' || rolOption === 'ADMIN_SUCURSAL') ? 'ROL_ADMIN' : rolOption;
+
       await ApiService.post('/auth/usuarios', {
         nombre,
         email,
         password,
-        rol,
+        rol: actualRol,
+        esAdminGeneral: isGlobal,
         permiteCambiarPrecio,
         tenantId: selectedTenantForNewUser || undefined,
       });
@@ -321,7 +326,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setNombre('');
       setEmail('');
       setPassword('');
-      setRol('ROL_VENDEDOR');
+      setRolOption('ROL_VENDEDOR');
       setPermiteCambiarPrecio(false);
       setSelectedTenantForNewUser('');
       loadUsers();
@@ -347,6 +352,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         nombre: editingUser.nombre,
         email: editingUser.email,
         rol: editingUser.rol,
+        esAdminGeneral: editingUser.esAdminGeneral,
         activo: editingUser.activo,
         permiteCambiarPrecio: editingUser.permiteCambiarPrecio,
         tenantId: editingUser.tenantId,
@@ -859,11 +865,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                           </td>
                           <td className="p-3">
                             <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                              user.rol === 'ROL_ADMIN' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                              user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20') :
                               user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                               'bg-amber-500/10 text-amber-600 border-amber-500/20'
                             }`}>
-                              {user.rol === 'ROL_ADMIN' ? 'Admin' : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
+                              {user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'Admin General' : 'Admin Sucursal') : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
                             </span>
                           </td>
                           <td className="p-3 text-center">
@@ -1018,17 +1024,17 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                       </span>
                       {user.rol === 'ROL_ADMIN' && (
                         <span className="block text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
-                          {sucursales.find(s => s.id === user.tenantId)?.isMatriz !== false ? '• Administrador General' : '• Admin de Sucursal'}
+                          {user.esAdminGeneral ? '👑 Administrador General' : '🏢 Admin de Sucursal'}
                         </span>
                       )}
                     </td>
                     <td className="p-3.5">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                        user.rol === 'ROL_ADMIN' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                        user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20') :
                         user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                         'bg-amber-500/10 text-amber-600 border-amber-500/20'
                       }`}>
-                        {user.rol === 'ROL_ADMIN' ? 'Administrador' : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
+                        {user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'Admin General' : 'Admin Sucursal') : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
                       </span>
                     </td>
                     <td className="p-3.5 text-center">
@@ -1355,16 +1361,23 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol en el Negocio</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol en el Negocio *</label>
                 <select
-                  value={rol}
-                  onChange={(e) => setRol(e.target.value as any)}
+                  value={rolOption}
+                  onChange={(e) => setRolOption(e.target.value as any)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                 >
-                  <option value="ROL_VENDEDOR">Vendedor</option>
-                  <option value="ROL_BODEGUERO">Bodeguero</option>
-                  <option value="ROL_ADMIN">Administrador</option>
+                  <option value="ROL_VENDEDOR">💼 Vendedor</option>
+                  <option value="ROL_BODEGUERO">📦 Bodeguero</option>
+                  <option value="ADMIN_SUCURSAL">🏢 Administrador de Sucursal (Solo este local)</option>
+                  <option value="ADMIN_GENERAL">👑 Administrador General (Dueño / Todas las sucursales)</option>
                 </select>
+                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                  {rolOption === 'ADMIN_GENERAL' && '👑 Podrá ver y alternar entre todas las sucursales del negocio.'}
+                  {rolOption === 'ADMIN_SUCURSAL' && '🏢 Su gestión administrativa estará limitada exclusivamente a este local.'}
+                  {rolOption === 'ROL_VENDEDOR' && '💼 Ventas, pedidos, cobros y consulta de existencias inter-sucursales.'}
+                  {rolOption === 'ROL_BODEGUERO' && '📦 Recepción de mercancía, kardex y gestión de stock de este local.'}
+                </p>
               </div>
 
               <div>
@@ -1464,13 +1477,27 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol</label>
                   <select
-                    value={editingUser.rol}
-                    onChange={(e) => setEditingUser({ ...editingUser, rol: e.target.value as any })}
+                    value={
+                      editingUser.rol === 'ROL_ADMIN'
+                        ? (editingUser.esAdminGeneral ? 'ADMIN_GENERAL' : 'ADMIN_SUCURSAL')
+                        : editingUser.rol
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'ADMIN_GENERAL') {
+                        setEditingUser({ ...editingUser, rol: 'ROL_ADMIN', esAdminGeneral: true });
+                      } else if (val === 'ADMIN_SUCURSAL') {
+                        setEditingUser({ ...editingUser, rol: 'ROL_ADMIN', esAdminGeneral: false });
+                      } else {
+                        setEditingUser({ ...editingUser, rol: val as any, esAdminGeneral: false });
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   >
-                    <option value="ROL_VENDEDOR">Vendedor</option>
-                    <option value="ROL_BODEGUERO">Bodeguero</option>
-                    <option value="ROL_ADMIN">Administrador</option>
+                    <option value="ROL_VENDEDOR">💼 Vendedor</option>
+                    <option value="ROL_BODEGUERO">📦 Bodeguero</option>
+                    <option value="ADMIN_SUCURSAL">🏢 Administrador de Sucursal (Solo este local)</option>
+                    <option value="ADMIN_GENERAL">👑 Administrador General (Todas las sucursales)</option>
                   </select>
                 </div>
 
