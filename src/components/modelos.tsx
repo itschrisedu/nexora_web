@@ -890,7 +890,6 @@ export default function ModelosComponent({ online }: ModelosProps) {
       }
     });
   };
-  };
 
   const addTallaRepeatInNewColorSerie = (serieId: string, tallaId: string) => {
     setNewColorCustomTallas(prev => {

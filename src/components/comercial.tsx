@@ -36,6 +36,7 @@ import { useToast } from './ui/toast';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
 import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
+import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock } from '../utils/curvas';
 
 interface ComercialProps {
   online: boolean;
@@ -1235,15 +1236,18 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       setUltimoPrecioCliente(null);
       setFechaUltimaVenta(null);
       
-      const initialMap: Record<string, number> = {};
-      if (pObj.tallas) {
-        pObj.tallas.forEach((t: any) => {
-          const ratio = t.ratio || t.cantidadSerie || 1;
-          const key = t.tallaId || `t-${t.numero ?? t.nombre}`;
-          initialMap[key] = tipoVentaItem === 'SERIE_COMPLETA' ? ratio : 0;
+      if (tipoVentaItem === 'SERIE_COMPLETA' && pObjSorted.tallas) {
+        const mejorCurva = detectarMejorCurvaSegunStock(pObjSorted.serieNombre, pObjSorted.tallas);
+        const mapCalculado = calcularCurvaParaTallas(pObjSorted.serieNombre, pObjSorted.tallas, mejorCurva);
+        setTallaCantidadesMap(mapCalculado);
+      } else if (pObjSorted.tallas) {
+        const initialMap: Record<string, number> = {};
+        pObjSorted.tallas.forEach((t: any) => {
+          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+          initialMap[key] = 0;
         });
+        setTallaCantidadesMap(initialMap);
       }
-      setTallaCantidadesMap(initialMap);
     } else {
       setSelectedProductId('');
       setProductoSeleccionadoObj(null);
@@ -2804,12 +2808,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                         onClick={() => {
                           setTipoVentaItem('SERIE_COMPLETA');
                           if (productoSeleccionadoObj?.tallas) {
-                            const map: Record<string, number> = {};
-                            productoSeleccionadoObj.tallas.forEach((t: any) => {
-                              const ratio = t.ratio || t.cantidadSerie || 1;
-                              const key = t.tallaId || `t-${t.numero ?? t.nombre}`;
-                              map[key] = ratio;
-                            });
+                            const mejorCurva = detectarMejorCurvaSegunStock(productoSeleccionadoObj.serieNombre, productoSeleccionadoObj.tallas);
+                            const map = calcularCurvaParaTallas(productoSeleccionadoObj.serieNombre, productoSeleccionadoObj.tallas, mejorCurva);
                             setTallaCantidadesMap(map);
                           }
                         }}
@@ -2824,7 +2824,17 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTipoVentaItem('TALLA_ESPECIFICA')}
+                        onClick={() => {
+                          setTipoVentaItem('TALLA_ESPECIFICA');
+                          if (productoSeleccionadoObj?.tallas) {
+                            const map: Record<string, number> = {};
+                            productoSeleccionadoObj.tallas.forEach((t: any) => {
+                              const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                              map[key] = 0;
+                            });
+                            setTallaCantidadesMap(map);
+                          }
+                        }}
                         className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
                           tipoVentaItem === 'TALLA_ESPECIFICA'
                             ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
@@ -2840,10 +2850,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                           setTipoVentaItem('SERIE_ESPECIAL');
                           const sObj = listaSeriesDisponibles.find((s) => s.id === serieEspecialId) || listaSeriesDisponibles[0];
                           if (sObj?.tallas) {
-                            const map: Record<string, number> = {};
-                            sObj.tallas.forEach((t: any) => {
-                              map[t.id || `t-${t.numero}`] = 1;
-                            });
+                            const mejorCurva = detectarMejorCurvaSegunStock(sObj.nombre, sObj.tallas);
+                            const map = calcularCurvaParaTallas(sObj.nombre, sObj.tallas, mejorCurva);
                             setTallaCantidadesMap(map);
                           }
                         }}
@@ -3082,35 +3090,35 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                       −1 par c/talla
                                     </button>
 
-                                    {tipoVentaItem === 'SERIE_COMPLETA' && (
+                                    {(tipoVentaItem === 'SERIE_COMPLETA' || tipoVentaItem === 'SERIE_ESPECIAL') && (
                                       <>
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            const newMap: Record<string, number> = {};
-                                            tallasList.forEach((t: any) => {
-                                              const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
-                                              const ratio = t.ratio || t.cantidadSerie || 1;
-                                              newMap[key] = ratio;
-                                            });
+                                            const newMap = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_A');
                                             setTallaCantidadesMap(newMap);
                                           }}
                                           className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                         >
-                                          ½ Docena (6 pares)
+                                          ½ Docena A (6 pares)
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            const newMap: Record<string, number> = {};
-                                            tallasList.forEach((t: any) => {
-                                              const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
-                                              const ratio = t.ratio || t.cantidadSerie || 1;
-                                              newMap[key] = ratio * 2;
-                                            });
+                                            const newMap = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_B');
                                             setTallaCantidadesMap(newMap);
                                           }}
-                                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                          className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                        >
+                                          ½ Docena B (6 pares)
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const newMap = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'DOCENA');
+                                            setTallaCantidadesMap(newMap);
+                                          }}
+                                          className="px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                         >
                                           1 Docena (12 pares)
                                         </button>
