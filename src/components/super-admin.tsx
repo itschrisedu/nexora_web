@@ -119,7 +119,24 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [errorMsg, setErrorMsg] = useState("");
 
   // Pestaña Principal Super Admin
-  const [activeMainTab, setActiveMainTab] = useState<'EMPRESAS' | 'REPORTES_SUSCRIPCIONES'>('EMPRESAS');
+  const [activeMainTab, setActiveMainTab] = useState<'EMPRESAS' | 'REPORTES_SUSCRIPCIONES' | 'SUPER_ADMINS'>('EMPRESAS');
+
+  // Estado para Equipo Super Admin
+  const [superAdmins, setSuperAdmins] = useState<any[]>([]);
+  const [loadingSuperAdmins, setLoadingSuperAdmins] = useState(false);
+  const [showCreateSuperAdminModal, setShowCreateSuperAdminModal] = useState(false);
+  const [showEditSuperAdminModal, setShowEditSuperAdminModal] = useState(false);
+  const [editingSuperAdmin, setEditingSuperAdmin] = useState<any | null>(null);
+  const [confirmDeleteSuperAdmin, setConfirmDeleteSuperAdmin] = useState<any | null>(null);
+  const [superAdminForm, setSuperAdminForm] = useState({
+    nombre: '',
+    email: '',
+    password: '',
+    activo: true,
+  });
+  const [showPassSuperAdmin, setShowPassSuperAdmin] = useState(false);
+  const [savingSuperAdmin, setSavingSuperAdmin] = useState(false);
+  const [deletingSuperAdmin, setDeletingSuperAdmin] = useState(false);
 
   // Estado para Reporte de Suscripciones y Recaudación
   const [reportData, setReportData] = useState<SuperAdminReportData | null>(null);
@@ -425,6 +442,90 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       setLoading(false);
     }
   }, [online]);
+
+  const fetchSuperAdmins = useCallback(async () => {
+    if (!online) return;
+    setLoadingSuperAdmins(true);
+    try {
+      const data = await ApiService.get('/tenants/super-admins');
+      setSuperAdmins(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error('Error cargando super administradores:', err);
+      setErrorMsg(err.message || 'Error al cargar lista de Super Administradores');
+    } finally {
+      setLoadingSuperAdmins(false);
+    }
+  }, [online]);
+
+  const handleCrearSuperAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!superAdminForm.nombre.trim() || !superAdminForm.email.trim() || !superAdminForm.password.trim()) {
+      setErrorMsg('Todos los campos son obligatorios.');
+      return;
+    }
+    setSavingSuperAdmin(true);
+    setErrorMsg('');
+    try {
+      await ApiService.post('/tenants/super-admins', {
+        nombre: superAdminForm.nombre.trim(),
+        email: superAdminForm.email.trim(),
+        password: superAdminForm.password.trim(),
+      });
+      setSuccessMsg('¡Super Administrador creado exitosamente!');
+      setShowCreateSuperAdminModal(false);
+      setSuperAdminForm({ nombre: '', email: '', password: '', activo: true });
+      await fetchSuperAdmins();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al crear Super Administrador');
+    } finally {
+      setSavingSuperAdmin(false);
+    }
+  };
+
+  const handleActualizarSuperAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSuperAdmin) return;
+    setSavingSuperAdmin(true);
+    setErrorMsg('');
+    try {
+      await ApiService.patch(`/tenants/super-admins/${editingSuperAdmin.id}`, {
+        nombre: superAdminForm.nombre.trim(),
+        email: superAdminForm.email.trim(),
+        password: superAdminForm.password.trim() || undefined,
+        activo: superAdminForm.activo,
+      });
+      setSuccessMsg('¡Super Administrador actualizado exitosamente!');
+      setShowEditSuperAdminModal(false);
+      setEditingSuperAdmin(null);
+      await fetchSuperAdmins();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al actualizar Super Administrador');
+    } finally {
+      setSavingSuperAdmin(false);
+    }
+  };
+
+  const handleEliminarSuperAdmin = async () => {
+    if (!confirmDeleteSuperAdmin) return;
+    setDeletingSuperAdmin(true);
+    setErrorMsg('');
+    try {
+      await ApiService.delete(`/tenants/super-admins/${confirmDeleteSuperAdmin.id}`);
+      setSuccessMsg(`Super Administrador "${confirmDeleteSuperAdmin.nombre}" eliminado correctamente.`);
+      setConfirmDeleteSuperAdmin(null);
+      await fetchSuperAdmins();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al eliminar Super Administrador');
+    } finally {
+      setDeletingSuperAdmin(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeMainTab === 'SUPER_ADMINS') {
+      fetchSuperAdmins();
+    }
+  }, [activeMainTab, fetchSuperAdmins]);
 
   useEffect(() => {
     fetchTenants();
@@ -768,7 +869,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     <div className="space-y-6">
       {/* Header y Selector de Pestañas Super Admin */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 bg-[var(--muted)]/50 p-1.5 rounded-2xl border border-[var(--border)]">
+        <div className="flex items-center gap-2 bg-[var(--muted)]/50 p-1.5 rounded-2xl border border-[var(--border)] flex-wrap">
           <button
             type="button"
             onClick={() => setActiveMainTab('EMPRESAS')}
@@ -780,6 +881,21 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
           >
             <Building2 size={15} />
             <span>Empresas y Locales ({tenants.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMainTab('SUPER_ADMINS');
+              fetchSuperAdmins();
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeMainTab === 'SUPER_ADMINS'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <ShieldAlert size={15} className={activeMainTab === 'SUPER_ADMINS' ? 'text-amber-400' : ''} />
+            <span>Equipo Super Admin ({superAdmins.length})</span>
           </button>
           <button
             type="button"
@@ -803,6 +919,20 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
           >
             <Plus size={16} />
             Nueva Empresa / Local
+          </button>
+        )}
+
+        {activeMainTab === 'SUPER_ADMINS' && (
+          <button
+            onClick={() => {
+              setSuperAdminForm({ nombre: '', email: '', password: '', activo: true });
+              setShowCreateSuperAdminModal(true);
+            }}
+            disabled={!online}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
+          >
+            <UserPlus size={16} />
+            Nuevo Super Admin
           </button>
         )}
       </div>
@@ -1446,6 +1576,164 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      {/* VISTA 3: GESTIÓN DE EQUIPO SUPER ADMIN                          */}
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      {activeMainTab === 'SUPER_ADMINS' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Banner Informativo */}
+          <div className="p-4 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700/50 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                <ShieldAlert size={22} />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  Equipo de Super Administradores NEXORA
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
+                    {superAdmins.length} {superAdmins.length === 1 ? 'cuenta' : 'cuentas'}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Los miembros de este equipo tienen control total sobre la plataforma, creación de empresas y reportes SaaS.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSuperAdminForm({ nombre: '', email: '', password: '', activo: true });
+                setShowCreateSuperAdminModal(true);
+              }}
+              disabled={!online}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <UserPlus size={15} />
+              <span>+ Nuevo Super Admin</span>
+            </button>
+          </div>
+
+          {loadingSuperAdmins ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 size={32} className="animate-spin text-[#0F172A]" />
+              <p className="text-xs text-[var(--muted-foreground)] font-semibold">Cargando equipo de Super Administradores...</p>
+            </div>
+          ) : superAdmins.length === 0 ? (
+            <div className="p-12 text-center bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3">
+              <ShieldAlert size={36} className="mx-auto text-amber-500 opacity-60" />
+              <h4 className="font-bold text-sm text-[var(--foreground)]">No se encontraron Super Administradores</h4>
+              <p className="text-xs text-[var(--muted-foreground)]">Puedes registrar un nuevo Super Administrador con el botón superior.</p>
+            </div>
+          ) : (
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[var(--muted-foreground)] uppercase text-[10px] tracking-wider font-bold">
+                      <th className="p-4">Super Administrador</th>
+                      <th className="p-4">Rol en Plataforma</th>
+                      <th className="p-4">Estado</th>
+                      <th className="p-4">Fecha de Registro</th>
+                      <th className="p-4">Seguridad</th>
+                      <th className="p-4 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {superAdmins.map((sa) => {
+                      const isBloqueado = sa.bloqueadoHasta && new Date(sa.bloqueadoHasta) > new Date();
+
+                      return (
+                        <tr key={sa.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 font-black flex items-center justify-center text-sm shadow-xs shrink-0">
+                                {sa.nombre.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <span className="font-bold text-[var(--foreground)] block text-xs">
+                                  {sa.nombre}
+                                </span>
+                                <span className="text-[11px] text-[var(--muted-foreground)] font-mono">
+                                  {sa.email}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="px-2.5 py-1 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-lg text-[10px] font-extrabold inline-flex items-center gap-1">
+                              <ShieldAlert size={12} className="text-blue-500" />
+                              Super Admin Global
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            {sa.activo ? (
+                              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-md font-bold text-[10px] inline-flex items-center gap-1">
+                                <CheckCircle2 size={11} /> Activo
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-md font-bold text-[10px] inline-flex items-center gap-1">
+                                <XCircle size={11} /> Inactivo
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 text-[var(--muted-foreground)] font-mono">
+                            {sa.createdAt ? new Date(sa.createdAt).toLocaleDateString('es-EC', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                          </td>
+                          <td className="p-4">
+                            {isBloqueado ? (
+                              <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-md font-bold text-[10px] inline-flex items-center gap-1">
+                                <Lock size={11} /> Bloqueado por intentos
+                              </span>
+                            ) : sa.intentosFallidos > 0 ? (
+                              <span className="text-amber-600 text-[11px] font-medium">
+                                {sa.intentosFallidos} intento(s) fallido(s)
+                              </span>
+                            ) : (
+                              <span className="text-emerald-600 text-[11px] font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={12} /> Seguro
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingSuperAdmin(sa);
+                                  setSuperAdminForm({
+                                    nombre: sa.nombre,
+                                    email: sa.email,
+                                    password: '',
+                                    activo: sa.activo,
+                                  });
+                                  setShowEditSuperAdminModal(true);
+                                }}
+                                className="p-2 text-[var(--muted-foreground)] hover:text-blue-600 hover:bg-blue-500/10 rounded-xl transition-colors cursor-pointer"
+                                title="Editar Super Administrador"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteSuperAdmin(sa)}
+                                className="p-2 text-[var(--muted-foreground)] hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+                                title="Eliminar Super Administrador"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2572,6 +2860,256 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               >
                 {deleteUserLoading && <Loader2 size={14} className="animate-spin" />}
                 {deleteUserLoading ? "Eliminando..." : "Eliminar Usuario"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: CREAR SUPER ADMINISTRADOR ═══ */}
+      {showCreateSuperAdminModal && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCreateSuperAdminModal(false); }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <ShieldAlert size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Nuevo Super Administrador</h2>
+                  <p className="text-[11px] text-slate-300 mt-0.5">Acceso irrestricto y control global de la plataforma</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateSuperAdminModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCrearSuperAdmin} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Nombre Completo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Administrador Maestro"
+                  value={superAdminForm.nombre}
+                  onChange={(e) => setSuperAdminForm({ ...superAdminForm, nombre: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Correo Electrónico *
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="admin@nexora.com"
+                  value={superAdminForm.email}
+                  onKeyDown={handleEmailKeyDown}
+                  onChange={(e) => setSuperAdminForm({ ...superAdminForm, email: formatearEmail(e.target.value) })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Contraseña de Acceso (mín. 6 caracteres) *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassSuperAdmin ? "text" : "password"}
+                    required
+                    minLength={6}
+                    placeholder="••••••••"
+                    value={superAdminForm.password}
+                    onChange={(e) => setSuperAdminForm({ ...superAdminForm, password: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassSuperAdmin(!showPassSuperAdmin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  >
+                    {showPassSuperAdmin ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateSuperAdminModal(false)}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSuperAdmin}
+                  className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {savingSuperAdmin && <Loader2 size={14} className="animate-spin" />}
+                  {savingSuperAdmin ? "Guardando..." : "Crear Super Admin"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: EDITAR SUPER ADMINISTRADOR ═══ */}
+      {showEditSuperAdminModal && editingSuperAdmin && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowEditSuperAdminModal(false); setEditingSuperAdmin(null); } }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-500/20 text-blue-400 rounded-xl">
+                  <Pencil size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Editar Super Administrador</h2>
+                  <p className="text-[11px] text-slate-300 mt-0.5">{editingSuperAdmin.email}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowEditSuperAdminModal(false); setEditingSuperAdmin(null); }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleActualizarSuperAdmin} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Nombre Completo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={superAdminForm.nombre}
+                  onChange={(e) => setSuperAdminForm({ ...superAdminForm, nombre: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Correo Electrónico *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={superAdminForm.email}
+                  onKeyDown={handleEmailKeyDown}
+                  onChange={(e) => setSuperAdminForm({ ...superAdminForm, email: formatearEmail(e.target.value) })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Nueva Contraseña (Opcional)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassSuperAdmin ? "text" : "password"}
+                    placeholder="Dejar en blanco para conservar la actual"
+                    value={superAdminForm.password}
+                    onChange={(e) => setSuperAdminForm({ ...superAdminForm, password: e.target.value })}
+                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassSuperAdmin(!showPassSuperAdmin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  >
+                    {showPassSuperAdmin ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Estado de la Cuenta
+                </label>
+                <select
+                  value={superAdminForm.activo ? "true" : "false"}
+                  onChange={(e) => setSuperAdminForm({ ...superAdminForm, activo: e.target.value === "true" })}
+                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A]"
+                >
+                  <option value="true">Activo (Habilitado)</option>
+                  <option value="false">Inactivo (Deshabilitado)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditSuperAdminModal(false); setEditingSuperAdmin(null); }}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSuperAdmin}
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {savingSuperAdmin && <Loader2 size={14} className="animate-spin" />}
+                  {savingSuperAdmin ? "Actualizando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL CONFIRMACIÓN: ELIMINAR SUPER ADMIN ═══ */}
+      {confirmDeleteSuperAdmin && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDeleteSuperAdmin(null); }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
+              <ShieldAlert size={24} />
+            </div>
+            <h3 className="text-base font-bold text-[var(--foreground)]">
+              ¿Eliminar Super Administrador?
+            </h3>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              ¿Estás seguro de que deseas eliminar la cuenta de <strong className="text-[var(--foreground)]">{confirmDeleteSuperAdmin.nombre}</strong> ({confirmDeleteSuperAdmin.email})? Esta acción revocará todos los permisos de acceso global de forma permanente.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteSuperAdmin(null)}
+                className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleEliminarSuperAdmin}
+                disabled={deletingSuperAdmin}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {deletingSuperAdmin && <Loader2 size={14} className="animate-spin" />}
+                {deletingSuperAdmin ? "Eliminando..." : "Eliminar"}
               </button>
             </div>
           </div>
