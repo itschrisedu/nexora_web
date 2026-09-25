@@ -95,6 +95,11 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [editSucursalForm, setEditSucursalForm] = useState({ name: '', ruc: '', direccion: '', telefono: '', email: '', active: true });
   const [savingSucursal, setSavingSucursal] = useState(false);
 
+  // ─── ELIMINAR SUCURSAL ───
+  const [showDeleteSucursalModal, setShowDeleteSucursalModal] = useState(false);
+  const [sucursalToDelete, setSucursalToDelete] = useState<SucursalItem | null>(null);
+  const [deletingSucursal, setDeletingSucursal] = useState(false);
+
   // ─── TRANSFERIR PERSONAL ───
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferringUser, setTransferringUser] = useState<UserListItem | null>(null);
@@ -567,6 +572,39 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     }
   };
 
+  const handleDeleteSucursal = async () => {
+    if (!sucursalToDelete) return;
+    if (sucursalToDelete.isMatriz) {
+      setErrorMsg('No es posible eliminar la Matriz Principal.');
+      return;
+    }
+
+    setDeletingSucursal(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const data = await ApiService.delete(`/configuracion/sucursales/${sucursalToDelete.id}`);
+      if (Array.isArray(data)) setSucursales(data);
+      if (selectedSucursalId === sucursalToDelete.id) {
+        setSelectedSucursalId(null);
+        setPersonalSucursal([]);
+      }
+      setSuccessMsg(`Sucursal "${sucursalToDelete.name}" eliminada exitosamente.`);
+      setShowDeleteSucursalModal(false);
+      setShowEditSucursalModal(false);
+      setSucursalToDelete(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('nexora:sucursales-changed'));
+      }
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al eliminar la sucursal.');
+    } finally {
+      setDeletingSucursal(false);
+    }
+  };
+
   const handleOpenTransfer = (user: UserListItem) => {
     setTransferringUser(user);
     setTargetSucursalId('');
@@ -767,6 +805,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   key={sucursal.id}
                   onClick={() => handleSelectSucursal(sucursal.id)}
                   className={`bg-[var(--card)] border rounded-2xl p-5 space-y-4 shadow-sm transition-all cursor-pointer hover:shadow-md ${
+                    !sucursal.active ? 'opacity-80 bg-[var(--muted)]/20' : ''
+                  } ${
                     selectedSucursalId === sucursal.id
                       ? 'border-[#0F172A] ring-2 ring-[#0F172A]/20'
                       : sucursal.isCurrent ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-[var(--border)]'
@@ -780,29 +820,56 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                         {sucursal.isMatriz ? 'M' : 'S'}
                       </div>
                       <div>
-                        <div className="font-bold text-sm">{sucursal.name}</div>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="font-bold text-sm flex items-center gap-2">
+                          <span>{sucursal.name}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                             sucursal.isMatriz ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
                           }`}>
                             {sucursal.isMatriz ? 'Matriz Principal' : 'Sucursal'}
                           </span>
+
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            sucursal.active
+                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                              : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                          }`}>
+                            {sucursal.active ? 'Activa' : 'Inactiva'}
+                          </span>
+
                           {sucursal.isCurrent && (
                             <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full">
-                              Sesion Actual
+                              Sesión Actual
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleEditSucursal(sucursal); }}
-                      className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
-                      title="Editar Sucursal"
-                    >
-                      <Edit2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleEditSucursal(sucursal); }}
+                        className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
+                        title="Editar Sucursal"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      {!sucursal.isMatriz && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSucursalToDelete(sucursal);
+                            setShowDeleteSucursalModal(true);
+                          }}
+                          className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 text-rose-600 transition-colors"
+                          title="Eliminar Sucursal"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-[var(--muted-foreground)]">
@@ -1881,6 +1948,19 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               </div>
 
               <div className="flex gap-2 pt-2">
+                {!editingSucursal.isMatriz && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSucursalToDelete(editingSucursal);
+                      setShowDeleteSucursalModal(true);
+                    }}
+                    className="px-3 py-2.5 border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5"
+                    title="Eliminar esta sucursal"
+                  >
+                    <Trash2 size={14} /> Eliminar
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowEditSucursalModal(false)}
@@ -1897,6 +1977,54 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL CONFIRMAR ELIMINAR SUCURSAL ═══ */}
+      {showDeleteSucursalModal && sucursalToDelete && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-rose-500/30 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 border-b border-[var(--border)] bg-rose-500/10 text-rose-700 dark:text-rose-400">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500/20 rounded-2xl text-rose-600 font-bold">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-rose-700 dark:text-rose-400">¿Eliminar Sucursal?</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">Acción permanente</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4 text-xs">
+              <p className="text-[var(--foreground)] leading-relaxed">
+                ¿Estás seguro de que deseas eliminar la sucursal <strong>"{sucursalToDelete.name}"</strong>?
+              </p>
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-xl text-[11px] leading-tight">
+                Nota: Si la sucursal ya cuenta con pedidos o notas de venta registradas, el sistema no permitirá borrarla para no afectar el historial contable. En ese caso, debes cambiar su estado a <strong>"Inactiva"</strong>.
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteSucursalModal(false);
+                    setSucursalToDelete(null);
+                  }}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingSucursal}
+                  onClick={handleDeleteSucursal}
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {deletingSucursal ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  {deletingSucursal ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
