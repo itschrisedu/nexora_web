@@ -608,10 +608,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
       if (online) {
         const [prvs, ords, pgs, ents, clis, pends, devs] = await Promise.all([
-          ApiService.get('/proveedores'),
-          ApiService.get('/proveedores/ordenes-compra'),
-          ApiService.get('/proveedores/pagos/todos'),
-          ApiService.get('/proveedores/entradas'),
+          ApiService.get('/proveedores').catch((e) => { console.warn('Error cargando proveedores:', e); return []; }),
+          ApiService.get('/proveedores/ordenes-compra').catch((e) => { console.warn('Error cargando ordenes:', e); return []; }),
+          ApiService.get('/proveedores/pagos/todos').catch((e) => { console.warn('Error cargando pagos:', e); return []; }),
+          ApiService.get('/proveedores/entradas').catch((e) => { console.warn('Error cargando entradas:', e); return []; }),
           ApiService.get('/clientes').catch(() => []),
           ApiService.get('/devoluciones/cliente/pendientes-proveedor').catch(() => []),
           ApiService.get('/devoluciones/proveedor').catch(() => []),
@@ -1615,8 +1615,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   };
 
   const proveedoresFiltrados = useMemo(() => {
-    if (!searchQuery) return proveedores;
-    const q = searchQuery.toLowerCase();
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (!q) return proveedores;
     return proveedores.filter(
       (p) =>
         p.nombre?.toLowerCase().includes(q) ||
