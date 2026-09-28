@@ -636,8 +636,29 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     e.preventDefault();
     setPromoError("");
 
-    if (!promoForm.titulo.trim()) {
+    const tituloTrim = promoForm.titulo.trim();
+    if (!tituloTrim) {
       setPromoError("El título de la campaña es obligatorio.");
+      return;
+    }
+
+    // Validación preventiva de duplicidad de nombre de campaña
+    const existeDuplicada = promociones.some(
+      (p) => p.titulo.trim().toLowerCase() === tituloTrim.toLowerCase() && (p as any).activo !== false
+    );
+
+    if (existeDuplicada) {
+      setConfirmModal({
+        isOpen: true,
+        title: "Campaña Promocional Ya Registrada",
+        message: `Ya existe una campaña activa registrada con el nombre "${tituloTrim}".\n\nPara evitar confusiones comerciales en los cupones y en las listas de difusión de clientes, por favor asigna un título distintivo a tu nueva campaña.`,
+        confirmText: "Entendido, Cambiar Nombre",
+        cancelText: "Cerrar",
+        danger: false,
+        onConfirm: () => {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
       return;
     }
 
@@ -661,7 +682,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     try {
       await ApiService.post("/clientes/promociones", {
         codigo: promoForm.codigo.toUpperCase().trim(),
-        titulo: promoForm.titulo.trim(),
+        titulo: tituloTrim,
         descripcion: promoForm.descripcion.trim() || undefined,
         tipoDescuento: promoForm.tipoDescuento,
         valorDescuento: parseFloat(promoForm.valorDescuento) || 10,
@@ -672,7 +693,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         mensajePlantilla: promoForm.mensajePlantilla.trim() || undefined,
       });
 
-      setSuccess(`¡Campaña "${promoForm.titulo.trim()}" creada con éxito!`);
+      setSuccess(`¡Campaña "${tituloTrim}" creada con éxito!`);
       setShowPromoModal(false);
       setPromoError("");
       setPromoForm({
@@ -692,7 +713,22 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     } catch (err: any) {
       console.error("Error al crear promoción:", err);
       const errMsg = err.response?.data?.message || err.message || "Error al crear la campaña promocional.";
-      setPromoError(errMsg);
+      
+      if (err.response?.status === 409 || (typeof errMsg === "string" && (errMsg.toLowerCase().includes("ya existe") || errMsg.toLowerCase().includes("duplicad")))) {
+        setConfirmModal({
+          isOpen: true,
+          title: "Campaña Promocional Ya Registrada",
+          message: typeof errMsg === "string" ? errMsg : `Ya existe una campaña registrada con el nombre "${tituloTrim}". Por favor ingresa un título diferente.`,
+          confirmText: "Entendido, Cambiar Nombre",
+          cancelText: "Cerrar",
+          danger: false,
+          onConfirm: () => {
+            setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          },
+        });
+      } else {
+        setPromoError(errMsg);
+      }
     } finally {
       setGuardandoPromo(false);
     }
@@ -1706,13 +1742,24 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                   placeholder="Ej: Descuento 10% por temporada escolar o feria artesanal"
                   value={promoForm.titulo}
                   onChange={(e) => handleTituloPromoChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
+                  className={`w-full px-3.5 py-2.5 bg-[var(--muted)]/30 border ${
+                    promociones.some(p => p.titulo.trim().toLowerCase() === promoForm.titulo.trim().toLowerCase() && (p as any).activo !== false && promoForm.titulo.trim().length > 0)
+                      ? "border-amber-500 focus:border-amber-600"
+                      : "border-[var(--border)] focus:border-purple-600"
+                  } rounded-xl text-xs font-bold focus:outline-none`}
                   required
                   autoFocus
                 />
-                <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
-                  💡 Al escribir el título se generará automáticamente el código de validación único.
-                </span>
+                {promociones.some(p => p.titulo.trim().toLowerCase() === promoForm.titulo.trim().toLowerCase() && (p as any).activo !== false && promoForm.titulo.trim().length > 0) ? (
+                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded-xl flex items-center gap-2 text-[11px] font-semibold mt-1.5 animate-in fade-in duration-150">
+                    <AlertTriangle size={14} className="shrink-0 text-amber-600" />
+                    <span>Ya existe una campaña activa con este nombre. Se requerirá un nombre diferente para guardarla.</span>
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                    💡 Al escribir el título se generará automáticamente el código de validación único.
+                  </span>
+                )}
               </div>
 
               {/* 2. CÓDIGO DE VALIDACIÓN AUTOMÁTICO & CUPOS */}
