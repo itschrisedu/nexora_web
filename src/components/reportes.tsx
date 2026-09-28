@@ -26,12 +26,31 @@ import {
   ChevronDown,
   Loader2,
   CheckCircle2,
+  Eye,
+  Search,
+  Megaphone,
+  Percent,
+  Tag,
+  AlertCircle,
+  FileSpreadsheet,
+  FileText,
+  ShieldAlert,
+  ChevronRight,
+  UserCheck,
 } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 import { useToast } from '@/components/ui/toast';
+import PdfPreviewModal from '@/components/ui/pdf-preview-modal';
+import {
+  generarReporteCobranzasPdf,
+  generarReporteCampanasPdf,
+  ClienteDeudor,
+  CampanaReporte,
+} from '@/services/pdf-reportes.service';
+import { jsPDF } from 'jspdf';
 
 type PeriodoTipo = 'HOY' | 'SEMANAL' | 'MENSUAL' | 'TRIMESTRAL' | 'ANUAL' | 'PERSONALIZADO';
-type TabReporte = 'resumen' | 'modelos' | 'vendedores' | 'finanzas' | 'proyeccion_ml';
+type TabReporte = 'resumen' | 'modelos' | 'vendedores' | 'finanzas' | 'cobranzas' | 'campanas' | 'proyeccion_ml';
 
 interface Vendedor {
   id: string;
@@ -51,23 +70,63 @@ export default function ReportesComponent() {
   const [vendedorSeleccionado, setVendedorSeleccionado] = useState<string>('TODOS');
   const [canalSeleccionado, setCanalSeleccionado] = useState<string>('TODOS');
 
-  // Estados de Datos
+  // Estados de Datos Generales
   const [loading, setLoading] = useState(true);
   const [reporteData, setReporteData] = useState<any>(null);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [tabActiva, setTabActiva] = useState<TabReporte>('resumen');
+  const [negocioInfo, setNegocioInfo] = useState<any>(null);
+
+  // Estado de Reporte de Cobranzas (Clientes Deudores)
+  const [loadingCobranzas, setLoadingCobranzas] = useState(false);
+  const [cobranzasData, setCobranzasData] = useState<any>(null);
+  const [filtroDeudor, setFiltroDeudor] = useState('');
+  const [filtroScoreDeudor, setFiltroScoreDeudor] = useState('TODOS');
+  const [clienteExpandidoId, setClienteExpandidoId] = useState<string | null>(null);
+
+  // Estado de Reporte de Campañas
+  const [loadingCampanas, setLoadingCampanas] = useState(false);
+  const [campanasData, setCampanasData] = useState<any>(null);
+  const [filtroCampanaEstado, setFiltroCampanaEstado] = useState('TODAS');
+  const [busquedaCampana, setBusquedaCampana] = useState('');
 
   // Estado de Proyección ML
   const [loadingMl, setLoadingMl] = useState(false);
   const [proyeccionMl, setProyeccionMl] = useState<any>(null);
 
+  // Estado del Modal de Previsualización de PDF Universal
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [pdfDocPreview, setPdfDocPreview] = useState<jsPDF | null>(null);
+  const [previewTitulo, setPreviewTitulo] = useState('Previsualización de Documento');
+  const [previewNombreArchivo, setPreviewNombreArchivo] = useState('reporte-nexora.pdf');
+
   useEffect(() => {
     cargarVendedores();
+    cargarNegocioInfo();
   }, []);
 
   useEffect(() => {
     cargarReporte();
   }, [periodo, vendedorSeleccionado, canalSeleccionado]);
+
+  useEffect(() => {
+    if (tabActiva === 'cobranzas' && !cobranzasData) {
+      cargarCobranzas();
+    } else if (tabActiva === 'campanas' && !campanasData) {
+      cargarCampanas();
+    } else if (tabActiva === 'proyeccion_ml' && !proyeccionMl) {
+      cargarProyeccionMl();
+    }
+  }, [tabActiva]);
+
+  const cargarNegocioInfo = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/negocio');
+      if (data) setNegocioInfo(data);
+    } catch (err: any) {
+      console.warn('No se pudo cargar config negocio:', err?.message);
+    }
+  };
 
   const cargarVendedores = async () => {
     try {
@@ -107,6 +166,32 @@ export default function ReportesComponent() {
     }
   };
 
+  const cargarCobranzas = async () => {
+    setLoadingCobranzas(true);
+    try {
+      const data = await ApiService.get('/reportes/cobranzas');
+      setCobranzasData(data);
+    } catch (err: any) {
+      console.error('Error al cargar reporte de cobranzas:', err);
+      showToast('Error al obtener reporte de clientes deudores.', 'warning');
+    } finally {
+      setLoadingCobranzas(false);
+    }
+  };
+
+  const cargarCampanas = async () => {
+    setLoadingCampanas(true);
+    try {
+      const data = await ApiService.get('/reportes/campanas');
+      setCampanasData(data);
+    } catch (err: any) {
+      console.error('Error al cargar reporte de campañas:', err);
+      showToast('Error al obtener reporte de campañas promocionales.', 'warning');
+    } finally {
+      setLoadingCampanas(false);
+    }
+  };
+
   const cargarProyeccionMl = async () => {
     setLoadingMl(true);
     try {
@@ -117,6 +202,75 @@ export default function ReportesComponent() {
       showToast('Error al conectar con el motor de predicción ML.', 'warning');
     } finally {
       setLoadingMl(false);
+    }
+  };
+
+  // ── Generación de PDF de Cobranzas ──
+  const handleReporteCobranzasPdf = (modo: 'preview' | 'download') => {
+    if (!cobranzasData || !cobranzasData.clientes) {
+      showToast('No hay datos de cobranzas disponibles para generar el PDF.', 'warning');
+      return;
+    }
+
+    const payload = {
+      negocio: {
+        nombre: negocioInfo?.nombre || 'CALZADO COMERCIAL',
+        ruc: negocioInfo?.ruc || '1800000000001',
+        direccion: negocioInfo?.direccion || 'Cevallos, Tungurahua, Ecuador',
+        telefono: negocioInfo?.telefono || '',
+      },
+      periodo: periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      totalCartera: cobranzasData.totalCartera || 0,
+      totalClientes: cobranzasData.totalClientes || 0,
+      totalRecaudado: kpis.totalRecaudadoCobros || 0,
+      clientes: cobranzasData.clientes as ClienteDeudor[],
+    };
+
+    const doc = generarReporteCobranzasPdf(payload);
+    const nombre = `reporte_cobranzas_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Cobranzas — Clientes Deudores');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de cobranzas descargado exitosamente.', 'success');
+    }
+  };
+
+  // ── Generación de PDF de Campañas ──
+  const handleReporteCampanasPdf = (modo: 'preview' | 'download') => {
+    if (!campanasData || !campanasData.campanas) {
+      showToast('No hay datos de campañas disponibles para generar el PDF.', 'warning');
+      return;
+    }
+
+    const payload = {
+      negocio: {
+        nombre: negocioInfo?.nombre || 'CALZADO COMERCIAL',
+        ruc: negocioInfo?.ruc || '1800000000001',
+        direccion: negocioInfo?.direccion || 'Cevallos, Tungurahua, Ecuador',
+        telefono: negocioInfo?.telefono || '',
+      },
+      periodo: periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      campanas: campanasData.campanas as CampanaReporte[],
+    };
+
+    const doc = generarReporteCampanasPdf(payload);
+    const nombre = `reporte_campanas_promociones_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Rendimiento de Campañas y Promociones');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de campañas descargado exitosamente.', 'success');
     }
   };
 
@@ -303,7 +457,9 @@ export default function ReportesComponent() {
           { id: 'resumen' as TabReporte, label: 'Resumen Ejecutivo & KPIs', icon: <BarChart3 size={15} /> },
           { id: 'modelos' as TabReporte, label: 'Rotación de Calzado & Modelos', icon: <ShoppingBag size={15} /> },
           { id: 'vendedores' as TabReporte, label: 'Productividad por Trabajador', icon: <Users size={15} /> },
-          { id: 'finanzas' as TabReporte, label: 'Cobranzas & Finanzas', icon: <DollarSign size={15} /> },
+          { id: 'cobranzas' as TabReporte, label: 'Cobranzas & Clientes Deudores', icon: <Receipt size={15} /> },
+          { id: 'campanas' as TabReporte, label: 'Rendimiento de Campañas & Promos', icon: <Megaphone size={15} /> },
+          { id: 'finanzas' as TabReporte, label: 'Finanzas & Métodos de Pago', icon: <DollarSign size={15} /> },
           { id: 'proyeccion_ml' as TabReporte, label: 'Proyección IA / Machine Learning', icon: <BrainCircuit size={15} /> },
         ].map((tab) => (
           <button
@@ -313,6 +469,10 @@ export default function ReportesComponent() {
               setTabActiva(tab.id);
               if (tab.id === 'proyeccion_ml' && !proyeccionMl) {
                 cargarProyeccionMl();
+              } else if (tab.id === 'cobranzas' && !cobranzasData) {
+                cargarCobranzas();
+              } else if (tab.id === 'campanas' && !campanasData) {
+                cargarCampanas();
               }
             }}
             className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer ${
@@ -743,7 +903,528 @@ export default function ReportesComponent() {
           )}
 
           {/* ══════════════════════════════════════════════════════════════ */}
-          {/* TAB 4: FINANZAS & COBRANZAS                                    */}
+          {/* TAB: REPORTE DE COBRANZAS — CLIENTES QUE DEBEN                */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'cobranzas' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-red-500/10 text-red-600 rounded-2xl">
+                    <Receipt size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Cobranzas — Clientes Deudores
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Detalle nominal de clientes con saldo pendiente, notas de entrega a crédito y antigüedad de deuda
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarCobranzas}
+                    disabled={loadingCobranzas}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={13} className={loadingCobranzas ? 'animate-spin' : ''} />
+                    <span>Actualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteCobranzasPdf('preview')}
+                    disabled={loadingCobranzas || !cobranzasData?.clientes?.length}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteCobranzasPdf('download')}
+                    disabled={loadingCobranzas || !cobranzasData?.clientes?.length}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* KPIs de Cobranzas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Cartera Pendiente Total</span>
+                  <div className="text-2xl font-black text-red-600">
+                    ${(cobranzasData?.totalCartera || 0).toFixed(2)}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Monto total por recaudar en el negocio</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Clientes con Deuda</span>
+                  <div className="text-2xl font-black text-[var(--foreground)]">
+                    {cobranzasData?.totalClientes || 0}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Clientes con notas o créditos pendientes</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Deuda Promedio / Cliente</span>
+                  <div className="text-2xl font-black text-amber-600">
+                    ${cobranzasData?.totalClientes > 0 ? ((cobranzasData.totalCartera || 0) / cobranzasData.totalClientes).toFixed(2) : '0.00'}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Promedio adeudado por comprador activo</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Recaudado en Periodo</span>
+                  <div className="text-2xl font-black text-emerald-600">
+                    ${kpis.totalRecaudadoCobros.toFixed(2)}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Abonos y pagos ingresados efectivamente</p>
+                </div>
+              </div>
+
+              {/* Filtros de búsqueda de deudores */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
+                <div className="relative flex-1 w-full">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={filtroDeudor}
+                    onChange={(e) => setFiltroDeudor(e.target.value)}
+                    placeholder="Buscar por nombre, cédula o teléfono..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+
+                <div className="w-full sm:w-56">
+                  <select
+                    value={filtroScoreDeudor}
+                    onChange={(e) => setFiltroScoreDeudor(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="TODOS">Todos los Niveles Crediticios</option>
+                    <option value="EXCELENTE">Nivel Excelente</option>
+                    <option value="BUENO">Nivel Bueno</option>
+                    <option value="REGULAR">Nivel Regular</option>
+                    <option value="RIESGO">Nivel Riesgo</option>
+                    <option value="CRITICO">Nivel Crítico</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tabla de Clientes Deudores */}
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                {loadingCobranzas ? (
+                  <div className="p-14 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
+                    <Loader2 size={30} className="animate-spin text-red-600" />
+                    <span>Cargando estado de cartera y notas pendientes...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                        <tr>
+                          <th className="px-4 py-3">Cliente / Identificación</th>
+                          <th className="px-4 py-3 text-center">Nivel / Score</th>
+                          <th className="px-4 py-3 text-center">Notas Pendientes</th>
+                          <th className="px-4 py-3 text-right">Saldo Deudor Total</th>
+                          <th className="px-4 py-3 text-center">Último Abono</th>
+                          <th className="px-4 py-3 text-center">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {(() => {
+                          const clientesFiltrados = (cobranzasData?.clientes || []).filter((c: ClienteDeudor) => {
+                            const matchTexto =
+                              !filtroDeudor ||
+                              c.nombre?.toLowerCase().includes(filtroDeudor.toLowerCase()) ||
+                              c.cedula?.includes(filtroDeudor) ||
+                              c.telefono?.includes(filtroDeudor);
+                            const matchNivel =
+                              filtroScoreDeudor === 'TODOS' ||
+                              c.nivelCredito?.toUpperCase() === filtroScoreDeudor;
+                            return matchTexto && matchNivel;
+                          });
+
+                          if (clientesFiltrados.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={6} className="p-10 text-center text-xs text-[var(--muted-foreground)]">
+                                  No se encontraron clientes deudores con los criterios seleccionados.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return clientesFiltrados.map((c: ClienteDeudor) => {
+                            const expandido = clienteExpandidoId === c.clienteId;
+                            return (
+                              <React.Fragment key={c.clienteId}>
+                                <tr className="hover:bg-[var(--muted)]/20 transition-colors">
+                                  <td className="px-4 py-3.5">
+                                    <div className="font-extrabold text-[var(--foreground)] text-xs">
+                                      {c.nombre}
+                                    </div>
+                                    <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 mt-0.5">
+                                      <span>C.I./RUC: {c.cedula}</span>
+                                      {c.telefono && <span>• Tel: {c.telefono}</span>}
+                                    </div>
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-center">
+                                    <div className="inline-flex flex-col items-center">
+                                      <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] rounded-md font-extrabold text-[10px] uppercase">
+                                        {c.nivelCredito || 'REGULAR'}
+                                      </span>
+                                      <span className="text-[10px] text-[var(--muted-foreground)] font-semibold mt-0.5">
+                                        Score: {c.scoreCrediticio ?? 50}/100
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-center">
+                                    <span className="px-2.5 py-1 bg-amber-500/10 text-amber-700 dark:text-amber-300 font-extrabold text-xs rounded-lg">
+                                      {c.notasPendientes} {c.notasPendientes === 1 ? 'nota' : 'notas'}
+                                    </span>
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-right font-black text-sm text-red-600">
+                                    ${c.totalDeuda.toFixed(2)}
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-center">
+                                    {c.ultimoAbono ? (
+                                      <div>
+                                        <span className="font-bold text-[var(--foreground)] text-[11px]">
+                                          ${(c.ultimoAbonoMonto || 0).toFixed(2)}
+                                        </span>
+                                        <div className="text-[10px] text-[var(--muted-foreground)]">
+                                          {c.ultimoAbono}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin abonos</span>
+                                    )}
+                                  </td>
+
+                                  <td className="px-4 py-3.5 text-center">
+                                    {c.detalleNotas && c.detalleNotas.length > 0 ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setClienteExpandidoId(expandido ? null : c.clienteId)}
+                                        className="px-2.5 py-1 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-[var(--foreground)] text-[11px] font-bold rounded-lg border border-[var(--border)] transition-all cursor-pointer inline-flex items-center gap-1"
+                                      >
+                                        <span>{expandido ? 'Ocultar' : 'Ver Notas'}</span>
+                                        <ChevronDown size={12} className={`transition-transform ${expandido ? 'rotate-180' : ''}`} />
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-[var(--muted-foreground)]">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+
+                                {/* Desglose expandido de notas */}
+                                {expandido && c.detalleNotas && (
+                                  <tr className="bg-[var(--muted)]/10">
+                                    <td colSpan={6} className="px-6 py-3 border-y border-[var(--border)]">
+                                      <div className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] mb-2">
+                                        Desglose de Comprobantes Pendientes:
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        {c.detalleNotas.map((n, i) => (
+                                          <div key={i} className="p-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl flex items-center justify-between text-xs shadow-2xs">
+                                            <div>
+                                              <span className="font-extrabold text-[var(--foreground)] block">
+                                                {n.numero}
+                                              </span>
+                                              <span className="text-[10px] text-[var(--muted-foreground)]">
+                                                Fecha: {n.fecha}
+                                              </span>
+                                            </div>
+                                            <div className="text-right">
+                                              <span className="text-[10px] text-[var(--muted-foreground)] block">
+                                                Total: ${n.montoTotal.toFixed(2)}
+                                              </span>
+                                              <span className="font-extrabold text-red-600">
+                                                Saldo: ${n.saldoPendiente.toFixed(2)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB: REPORTE DE CAMPAÑAS Y PROMOCIONES                        */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'campanas' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-purple-500/10 text-purple-600 rounded-2xl">
+                    <Megaphone size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Campañas & Promociones
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Métricas de efectividad, cupones canjeados, volumen de calzado comercializado y ROI
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarCampanas}
+                    disabled={loadingCampanas}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={13} className={loadingCampanas ? 'animate-spin' : ''} />
+                    <span>Actualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteCampanasPdf('preview')}
+                    disabled={loadingCampanas || !campanasData?.campanas?.length}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteCampanasPdf('download')}
+                    disabled={loadingCampanas || !campanasData?.campanas?.length}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* KPIs de Campañas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Total Campañas Registradas</span>
+                  <div className="text-2xl font-black text-[var(--foreground)]">
+                    {campanasData?.totalCampanas || 0}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Estrategias promocionales creadas</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Campañas Activas</span>
+                  <div className="text-2xl font-black text-purple-600">
+                    {campanasData?.campanasActivas || 0}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Vigentes para canje en venta y POS</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Total Canjes Usados</span>
+                  <div className="text-2xl font-black text-indigo-600">
+                    {campanasData?.totalCanjes || 0}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Cupones y promociones redimidos</p>
+                </div>
+
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                  <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)]">Ingresos Brutos Asociados</span>
+                  <div className="text-2xl font-black text-emerald-600">
+                    ${(campanasData?.montoGeneradoTotal || 0).toFixed(2)}
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)]">Facturación generada con campañas</p>
+                </div>
+              </div>
+
+              {/* Filtros de campañas */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
+                <div className="relative flex-1 w-full">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={busquedaCampana}
+                    onChange={(e) => setBusquedaCampana(e.target.value)}
+                    placeholder="Buscar por código promocional o título..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+
+                <div className="w-full sm:w-48">
+                  <select
+                    value={filtroCampanaEstado}
+                    onChange={(e) => setFiltroCampanaEstado(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="TODAS">Todos los Estados</option>
+                    <option value="ACTIVAS">Solo Activas</option>
+                    <option value="INACTIVAS">Solo Finalizadas / Inactivas</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tabla de Rendimiento de Campañas */}
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                {loadingCampanas ? (
+                  <div className="p-14 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
+                    <Loader2 size={30} className="animate-spin text-purple-600" />
+                    <span>Analizando métricas de campañas y canjes...</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                        <tr>
+                          <th className="px-4 py-3">Campaña / Código</th>
+                          <th className="px-4 py-3 text-center">Tipo de Descuento</th>
+                          <th className="px-4 py-3 text-center">Canjes / Límite</th>
+                          <th className="px-4 py-3 text-center">Efectividad</th>
+                          <th className="px-4 py-3 text-right">Venta Generada</th>
+                          <th className="px-4 py-3 text-center">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {(() => {
+                          const campanasFiltradas = (campanasData?.campanas || []).filter((c: CampanaReporte) => {
+                            const matchTexto =
+                              !busquedaCampana ||
+                              c.titulo?.toLowerCase().includes(busquedaCampana.toLowerCase()) ||
+                              c.codigo?.toLowerCase().includes(busquedaCampana.toLowerCase());
+                            const matchEstado =
+                              filtroCampanaEstado === 'TODAS' ||
+                              (filtroCampanaEstado === 'ACTIVAS' && c.activo) ||
+                              (filtroCampanaEstado === 'INACTIVAS' && !c.activo);
+                            return matchTexto && matchEstado;
+                          });
+
+                          if (campanasFiltradas.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={6} className="p-10 text-center text-xs text-[var(--muted-foreground)]">
+                                  No se encontraron campañas promocionales con los filtros seleccionados.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return campanasFiltradas.map((c: CampanaReporte) => {
+                            const usoPct = c.maximoCanjes > 0 ? (c.canjesUsados / c.maximoCanjes) * 100 : 0;
+                            const funciono = c.canjesUsados > 0;
+                            return (
+                              <tr key={c.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                                <td className="px-4 py-3.5">
+                                  <div className="font-extrabold text-[var(--foreground)] text-xs">
+                                    {c.titulo}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 rounded font-mono font-bold text-[10px]">
+                                      {c.codigo}
+                                    </span>
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                                      Desde {new Date(c.fechaInicio).toLocaleDateString('es-EC')}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-center">
+                                  <span className="font-bold text-[var(--foreground)] text-[11px]">
+                                    {c.tipoDescuento === 'PORCENTAJE' && `${c.valorDescuento}% de descuento`}
+                                    {c.tipoDescuento === 'MONTO_FIJO' && `$${c.valorDescuento.toFixed(2)} fijos`}
+                                    {c.tipoDescuento === 'DESCUENTO_POR_PAR' && `$${c.valorDescuento.toFixed(2)} por par`}
+                                  </span>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-center">
+                                  <div className="space-y-1">
+                                    <div className="font-bold text-xs">
+                                      {c.canjesUsados} / {c.maximoCanjes > 0 ? c.maximoCanjes : '∞'}
+                                    </div>
+                                    {c.maximoCanjes > 0 && (
+                                      <div className="w-20 mx-auto bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
+                                        <div
+                                          style={{ width: `${Math.min(usoPct, 100)}%` }}
+                                          className={`h-full rounded-full ${usoPct >= 80 ? 'bg-emerald-500' : 'bg-purple-600'}`}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-center">
+                                  {funciono ? (
+                                    <span className={`px-2 py-0.5 rounded-md font-extrabold text-[10px] ${
+                                      usoPct >= 50
+                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                        : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
+                                    }`}>
+                                      {usoPct >= 50 ? '🔥 Alta Efectividad' : '⚡ Desempeño Positivo'}
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 bg-slate-500/15 text-slate-600 dark:text-slate-400 rounded-md font-bold text-[10px]">
+                                      ⚪ Sin Canjes
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="px-4 py-3.5 text-right">
+                                  <div className="font-black text-sm text-emerald-600">
+                                    ${(c.montoTotalGenerado || 0).toFixed(2)}
+                                  </div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    {c.paresVendidos || 0} pares comercializados
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3.5 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full font-extrabold text-[10px] ${
+                                    c.activo
+                                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                                      : 'bg-slate-500/10 text-slate-600 border border-slate-500/20'
+                                  }`}>
+                                    {c.activo ? 'ACTIVA' : 'FINALIZADA'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 4: FINANZAS & MÉTODOS DE PAGO                              */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'finanzas' && (
             <div className="space-y-6">
@@ -908,6 +1589,15 @@ export default function ReportesComponent() {
           )}
         </>
       )}
+
+      {/* Modal Universal de Previsualización de PDF */}
+      <PdfPreviewModal
+        isOpen={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        pdfDoc={pdfDocPreview}
+        titulo={previewTitulo}
+        nombreArchivo={previewNombreArchivo}
+      />
     </div>
   );
 }
