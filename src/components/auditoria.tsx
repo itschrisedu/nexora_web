@@ -28,12 +28,26 @@ import {
   FileText,
   Clock,
   Laptop,
+  Filter,
+  RotateCcw,
+  CalendarRange,
+  UserCheck,
+  ChevronDown,
 } from "lucide-react";
 
 type SegmentoTab = "TODOS" | "COBROS" | "VENTAS" | "PEDIDOS";
+type PeriodoAuditoria = "TODOS" | "HOY" | "SEMANA" | "MES" | "ULTIMOS_30_DIAS" | "PERSONALIZADO";
+
+interface Empleado {
+  id: string;
+  nombre: string;
+  email: string;
+  rol?: string;
+}
 
 interface AuditLog {
   id: string;
+  userId?: string;
   userEmail?: string;
   userRol?: string;
   accion: string;
@@ -75,13 +89,21 @@ export default function AuditoriaComponent() {
   const [logSeleccionado, setLogSeleccionado] = useState<AuditLog | null>(null);
   const [mostrarTecnico, setMostrarTecnico] = useState<boolean>(false);
 
+  // Estados de Filtros por Responsable y Periodo
+  const [usuarios, setUsuarios] = useState<Empleado[]>([]);
+  const [responsableFiltro, setResponsableFiltro] = useState<string>("TODOS");
+  const [periodoFiltro, setPeriodoFiltro] = useState<PeriodoAuditoria>("TODOS");
+  const [fechaInicio, setFechaInicio] = useState<string>("");
+  const [fechaFin, setFechaFin] = useState<string>("");
+
   useEffect(() => {
     cargarResumen();
+    cargarUsuarios();
   }, []);
 
   useEffect(() => {
     cargarLogs();
-  }, [pagina, accionFiltro, segmentoActivo]);
+  }, [pagina, accionFiltro, segmentoActivo, responsableFiltro, fechaInicio, fechaFin]);
 
   // Manejador global de la tecla Escape
   useEffect(() => {
@@ -106,6 +128,71 @@ export default function AuditoriaComponent() {
     }
   };
 
+  const cargarUsuarios = async () => {
+    try {
+      const res = await ApiService.get("/auth/usuarios");
+      if (Array.isArray(res)) {
+        setUsuarios(res);
+      } else if (res && Array.isArray(res.data)) {
+        setUsuarios(res.data);
+      }
+    } catch (err) {
+      try {
+        const resVend = await ApiService.get("/reportes/vendedores");
+        if (Array.isArray(resVend)) {
+          setUsuarios(resVend.map((v: any) => ({
+            id: v.userId || v.id,
+            nombre: v.nombre,
+            email: v.email,
+            rol: v.rol,
+          })));
+        }
+      } catch (e2) {
+        console.warn("No se pudo cargar lista de colaboradores para filtro:", e2);
+      }
+    }
+  };
+
+  const aplicarPeriodo = (p: PeriodoAuditoria) => {
+    setPeriodoFiltro(p);
+    setPagina(1);
+    const hoy = new Date().toISOString().split('T')[0];
+
+    if (p === 'TODOS') {
+      setFechaInicio('');
+      setFechaFin('');
+    } else if (p === 'HOY') {
+      setFechaInicio(hoy);
+      setFechaFin(hoy);
+    } else if (p === 'SEMANA') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      setFechaInicio(d.toISOString().split('T')[0]);
+      setFechaFin(hoy);
+    } else if (p === 'MES') {
+      const d = new Date();
+      const primerDia = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+      setFechaInicio(primerDia);
+      setFechaFin(hoy);
+    } else if (p === 'ULTIMOS_30_DIAS') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      setFechaInicio(d.toISOString().split('T')[0]);
+      setFechaFin(hoy);
+    }
+  };
+
+  const limpiarFiltros = () => {
+    setAccionFiltro("TODAS");
+    setSegmentoActivo("TODOS");
+    setResponsableFiltro("TODOS");
+    setPeriodoFiltro("TODOS");
+    setFechaInicio("");
+    setFechaFin("");
+    setSearch("");
+    setPagina(1);
+  };
+
   const cargarLogs = async () => {
     setLoading(true);
     try {
@@ -113,6 +200,15 @@ export default function AuditoriaComponent() {
       if (accionFiltro !== "TODAS") query += `&accion=${accionFiltro}`;
       if (segmentoActivo !== "TODOS") query += `&segmento=${segmentoActivo}`;
       if (search.trim()) query += `&entidad=${encodeURIComponent(search.trim())}`;
+      if (responsableFiltro !== "TODOS") {
+        if (responsableFiltro.includes('@')) {
+          query += `&userEmail=${encodeURIComponent(responsableFiltro)}`;
+        } else {
+          query += `&userId=${encodeURIComponent(responsableFiltro)}`;
+        }
+      }
+      if (fechaInicio) query += `&fechaInicio=${encodeURIComponent(fechaInicio)}`;
+      if (fechaFin) query += `&fechaFin=${encodeURIComponent(fechaFin)}`;
 
       const res = await ApiService.get(query);
       if (res && Array.isArray(res.logs)) {
@@ -134,6 +230,31 @@ export default function AuditoriaComponent() {
       setLoading(false);
     }
   };
+
+  const listaResponsables = (() => {
+    const mapa = new Map<string, { id: string; nombre: string; email: string; rol?: string }>();
+    usuarios.forEach((u) => {
+      if (u.id || u.email) {
+        mapa.set(u.id || u.email, {
+          id: u.id || u.email,
+          nombre: u.nombre || u.email,
+          email: u.email,
+          rol: u.rol,
+        });
+      }
+    });
+    logs.forEach((l) => {
+      if (l.userEmail && !mapa.has(l.userEmail) && (!l.userId || !mapa.has(l.userId))) {
+        mapa.set(l.userId || l.userEmail, {
+          id: l.userId || l.userEmail,
+          nombre: l.userEmail,
+          email: l.userEmail,
+          rol: l.userRol,
+        });
+      }
+    });
+    return Array.from(mapa.values());
+  })();
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -534,20 +655,137 @@ export default function AuditoriaComponent() {
         })}
       </div>
 
-      {/* ══════ Filtros y Tabla ══════ */}
-      <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 space-y-4">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+      {/* ══════ PANEL AVANZADO DE FILTROS: RESPONSABLE, PERIODO & ACCIÓN ══════ */}
+      <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-3xl p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-[#0F172A] text-white rounded-xl shadow-xs">
+              <Filter size={15} />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider">
+                Filtros de Auditoría & Trazabilidad de Empleados
+              </h3>
+              <p className="text-[11px] text-[var(--muted-foreground)]">
+                Consulta las acciones realizadas por cada colaborador en un rango de fechas determinado
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+            title="Restablecer todos los filtros a sus valores predeterminados"
+          >
+            <RotateCcw size={12} />
+            <span>Limpiar Filtros</span>
+          </button>
+        </div>
+
+        {/* Rejilla de Filtros Principales */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {/* 1. Filtro por Responsable / Empleado */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase flex items-center gap-1.5">
+              <User size={12} className="text-[#0F172A]" />
+              <span>1. Responsable / Empleado</span>
+            </label>
+            <div className="relative">
+              <select
+                value={responsableFiltro}
+                onChange={(e) => {
+                  setResponsableFiltro(e.target.value);
+                  setPagina(1);
+                }}
+                className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none pr-8 cursor-pointer"
+              >
+                <option value="TODOS">👤 Todos los Responsables / Sistema</option>
+                {listaResponsables.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre} {u.rol ? `(${u.rol.replace('ROL_', '')})` : ''} - {u.email}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+            </div>
+          </div>
+
+          {/* 2. Selector de Periodo de Tiempo */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase flex items-center gap-1.5">
+              <Calendar size={12} className="text-[#0F172A]" />
+              <span>2. Periodo de Tiempo</span>
+            </label>
+            <div className="relative">
+              <select
+                value={periodoFiltro}
+                onChange={(e) => aplicarPeriodo(e.target.value as PeriodoAuditoria)}
+                className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none pr-8 cursor-pointer"
+              >
+                <option value="TODOS">📅 Histórico Completo</option>
+                <option value="HOY">⚡ Hoy</option>
+                <option value="SEMANA">🗓️ Últimos 7 Días</option>
+                <option value="MES">📆 Este Mes</option>
+                <option value="ULTIMOS_30_DIAS">📊 Últimos 30 Días</option>
+                <option value="PERSONALIZADO">🛠️ Rango Personalizado...</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+            </div>
+          </div>
+
+          {/* 3. Rango de Fechas (Desde / Hasta) */}
+          <div className="space-y-1.5 md:col-span-1 lg:col-span-2">
+            <label className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase flex items-center gap-1.5">
+              <CalendarRange size={12} className="text-[#0F172A]" />
+              <span>3. Rango de Fechas (Desde / Hasta)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => {
+                    setFechaInicio(e.target.value);
+                    setPeriodoFiltro("PERSONALIZADO");
+                    setPagina(1);
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  title="Fecha de Inicio"
+                />
+              </div>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={fechaFin}
+                  onChange={(e) => {
+                    setFechaFin(e.target.value);
+                    setPeriodoFiltro("PERSONALIZADO");
+                    setPagina(1);
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  title="Fecha de Fin"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filtro de Tipo de Acción y Buscador */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-3 border-t border-[var(--border)]">
           {/* Tabs de Filtro de Tipo de Acción */}
           <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
             {[
-              { id: "TODAS", label: "Todas" },
+              { id: "TODAS", label: "Todas las Acciones" },
               { id: "CREAR", label: "Nuevos Registros" },
               { id: "ACTUALIZAR", label: "Modificaciones" },
               { id: "ELIMINAR", label: "Eliminaciones" },
               { id: "LOGIN", label: "Inicios de Sesión" },
+              { id: "OPERACION_CRITICA", label: "Operaciones Críticas" },
             ].map((acc) => (
               <button
                 key={acc.id}
+                type="button"
                 onClick={() => { setAccionFiltro(acc.id); setPagina(1); }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                   accionFiltro === acc.id
@@ -572,6 +810,37 @@ export default function AuditoriaComponent() {
             <Search size={14} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
           </form>
         </div>
+
+        {/* Resumen de Filtros Aplicados */}
+        {(responsableFiltro !== 'TODOS' || periodoFiltro !== 'TODOS' || fechaInicio || fechaFin || accionFiltro !== 'TODAS' || search.trim()) && (
+          <div className="flex items-center gap-2 flex-wrap pt-2 text-[11px] text-[var(--muted-foreground)]">
+            <span className="font-bold text-[var(--foreground)]">Filtros Activos:</span>
+            {responsableFiltro !== 'TODOS' && (
+              <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-md font-semibold">
+                👤 {listaResponsables.find(u => u.id === responsableFiltro)?.nombre || responsableFiltro}
+              </span>
+            )}
+            {periodoFiltro !== 'TODOS' && (
+              <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 rounded-md font-semibold">
+                🗓️ Periodo: {periodoFiltro} {fechaInicio && fechaFin ? `(${fechaInicio} a ${fechaFin})` : ''}
+              </span>
+            )}
+            {accionFiltro !== 'TODAS' && (
+              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-md font-semibold">
+                ⚡ Acción: {accionFiltro}
+              </span>
+            )}
+            {search.trim() && (
+              <span className="px-2 py-0.5 bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20 rounded-md font-semibold">
+                🔍 {search.trim()}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ══════ Tabla Principal ══════ */}
+      <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-4 space-y-4">
 
         {/* Tabla Principal de Auditoría */}
         <div className="overflow-x-auto -mx-4 sm:mx-0">
