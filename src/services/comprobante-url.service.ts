@@ -77,25 +77,60 @@ export function codificarPayload(data: any): string {
 }
 
 /**
- * Decodifica una cadena Base64 a su objeto JSON original
+ * Decodifica una cadena Base64 a su objeto JSON original con máxima resiliencia
  */
-export function decodificarPayload(base64Str: string): any {
+export function decodificarPayload(rawInput: string): any {
   try {
-    if (!base64Str) return null;
+    if (!rawInput || typeof rawInput !== 'string') return null;
+    let str = rawInput.trim();
+
+    // Eliminar posibles envoltorios de comillas
+    if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+      str = str.slice(1, -1).trim();
+    }
+
+    // Intentar parseo directo si ya es un JSON string o URL-encoded JSON
+    if (str.startsWith('{') || str.startsWith('%7B')) {
+      try {
+        const decodedUri = decodeURIComponent(str);
+        return JSON.parse(decodedUri);
+      } catch {
+        // Continuar con decodificación base64
+      }
+    }
+
+    // Reemplazar espacios generados por la conversión automática de '+' en query params
+    str = str.replace(/ /g, '+');
+
+    // Convertir de base64url a base64 standard si aplica
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
+
+    // Asegurar padding '=' correcto
+    const mod4 = str.length % 4;
+    if (mod4 === 2) str += '==';
+    else if (mod4 === 3) str += '=';
+    else if (mod4 === 1) str += '===';
+
     if (typeof window !== 'undefined' && typeof window.atob === 'function') {
       try {
-        const binary = window.atob(base64Str);
+        const binary = window.atob(str);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {
           bytes[i] = binary.charCodeAt(i);
         }
-        const jsonStr = new TextDecoder().decode(bytes);
+        const jsonStr = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
         return JSON.parse(jsonStr);
       } catch {
-        return JSON.parse(decodeURIComponent(base64Str));
+        try {
+          const jsonStr = decodeURIComponent(escape(window.atob(str)));
+          return JSON.parse(jsonStr);
+        } catch {
+          return JSON.parse(decodeURIComponent(str));
+        }
       }
     }
-    const jsonStr = Buffer.from(base64Str, 'base64').toString('utf-8');
+
+    const jsonStr = Buffer.from(str, 'base64').toString('utf-8');
     return JSON.parse(jsonStr);
   } catch (e) {
     console.error('Error al decodificar payload de comprobante:', e);

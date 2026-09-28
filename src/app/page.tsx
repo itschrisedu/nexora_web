@@ -239,6 +239,14 @@ function MainApp() {
   });
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('d')) {
+        window.location.replace('/comprobante' + window.location.search);
+        return;
+      }
+    }
+
     setOnline(SyncService.isOnline());
     SyncService.init((isOnline) => setOnline(isOnline));
 

@@ -62,6 +62,7 @@ import {
   armarMensajeWhatsAppAbono,
   ComprobanteAbonoPdfData,
 } from '../services/pdf-abono.service';
+import { generarUrlPublicaAbono } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
 
 interface FinancieroProps {
@@ -1177,11 +1178,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       const emailDestino = carteraSeleccionada?.clienteEmail || (carteraSeleccionada as any)?.email;
       if (autoEmail && emailDestino) {
         const msgTexto = armarMensajeWhatsAppAbono(dataAbono, false);
+        const urlRecibo = generarUrlPublicaAbono(dataAbono);
         ApiService.post('/notificaciones/email-comprobante', {
           destinatario: emailDestino,
           asunto: `Comprobante de Abono — $${valor.toFixed(2)} — NEXORA`,
           tipo: 'ABONO',
-          detalles: { mensaje: msgTexto },
+          detalles: { 
+            mensaje: msgTexto,
+            urlComprobante: urlRecibo,
+          },
         }).then(() => {
           showToast(`Comprobante enviado por correo a ${emailDestino}`, 'success');
         }).catch((e) => {

@@ -35,12 +35,29 @@ import {
 
 function ComprobanteContent() {
   const searchParams = useSearchParams();
-  const rawData = searchParams.get('d');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // 1. Intentar obtener el payload desde useSearchParams
+    let rawData = searchParams ? searchParams.get('d') : null;
+
+    // 2. Si no viene por searchParams (común en ciertos navegadores móviles o redirecciones), leer directamente de window.location
+    if (!rawData && typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      rawData = urlParams.get('d');
+
+      // 3. Fallback: buscar en el hash si la URL contiene anclas
+      if (!rawData && window.location.hash) {
+        const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+        if (hashQuery) {
+          const hashParams = new URLSearchParams(hashQuery);
+          rawData = hashParams.get('d');
+        }
+      }
+    }
+
     if (!rawData) {
       setError('No se proporcionó información de comprobante en el enlace.');
       setLoading(false);
@@ -53,13 +70,14 @@ function ComprobanteContent() {
         setError('El enlace de comprobante no es válido o ha sido modificado.');
       } else {
         setData(decoded);
+        setError(null);
       }
     } catch (e) {
       setError('Error al decodificar el comprobante digital.');
     } finally {
       setLoading(false);
     }
-  }, [rawData]);
+  }, [searchParams]);
 
   // Cargar fotos reales y nítidas de los modelos desde el backend si se trata de una orden de compra o pedido de cliente
   useEffect(() => {
