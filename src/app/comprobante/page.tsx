@@ -33,6 +33,11 @@ import {
   PedidoClientePdfData,
 } from '@/services/pdf-factura.service';
 
+function getApiUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  return raw.endsWith('/api') ? raw : `${raw.replace(/\/+$/, '')}/api`;
+}
+
 function ComprobanteContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<any>(null);
@@ -42,27 +47,55 @@ function ComprobanteContent() {
   useEffect(() => {
     let rawData = searchParams ? searchParams.get('d') : null;
     let docId = searchParams ? (searchParams.get('id') || searchParams.get('num') || searchParams.get('recibo')) : null;
+    let tokenCorto = searchParams ? searchParams.get('t') : null;
 
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       if (!rawData) rawData = urlParams.get('d');
       if (!docId) docId = urlParams.get('id') || urlParams.get('num') || urlParams.get('recibo');
+      if (!tokenCorto) tokenCorto = urlParams.get('t');
 
-      if (!rawData && !docId && window.location.hash) {
+      if (!rawData && !docId && !tokenCorto && window.location.hash) {
         const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
         if (hashQuery) {
           const hashParams = new URLSearchParams(hashQuery);
           if (!rawData) rawData = hashParams.get('d');
           if (!docId) docId = hashParams.get('id') || hashParams.get('num') || hashParams.get('recibo');
+          if (!tokenCorto) tokenCorto = hashParams.get('t');
         }
       }
     }
 
-    // 1. Si tenemos un ID directo ultra-corto (ej. REC-202609-5139 o PED-0001)
+    // 1. Si tenemos un TOKEN ultra-corto (ej. ?t=a7Bx9kQ2)
+    if (tokenCorto) {
+      const fetchByToken = async () => {
+        try {
+          const apiUrl = getApiUrl();
+          const res = await fetch(`${apiUrl}/catalogo/comprobante/${encodeURIComponent(tokenCorto!.trim())}`);
+          if (res.ok) {
+            const resultData = await res.json();
+            if (resultData) {
+              setData(resultData);
+              setError(null);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Error al consultar comprobante por token:', e);
+        }
+        setError('El enlace del comprobante no es valido o ha expirado. Solicite un nuevo enlace.');
+        setLoading(false);
+      };
+      fetchByToken();
+      return;
+    }
+
+    // 2. Si tenemos un ID directo ultra-corto (ej. REC-202609-5139 o PED-0001)
     if (docId) {
       const fetchById = async () => {
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+          const apiUrl = getApiUrl();
           const cleanId = String(docId).trim();
           
           let endpoint = 'abono-publico';
@@ -91,9 +124,9 @@ function ComprobanteContent() {
           console.warn('Error al consultar comprobante por ID:', e);
         }
 
-        // Si falló por ID y no hay rawData
+        // Si fallo por ID y no hay rawData
         if (!rawData) {
-          setError('No se pudo encontrar el comprobante solicitado con el código provisto.');
+          setError('No se pudo encontrar el comprobante solicitado con el codigo provisto.');
           setLoading(false);
         }
       };
@@ -248,7 +281,7 @@ function ComprobanteContent() {
 
     const fetchOrderImages = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const apiUrl = getApiUrl();
         const numClean = String(data.num).replace(/[^0-9]/g, '');
         const endpoint = data.t === 'ORDEN' ? 'orden-publica' : 'pedido-publico';
         const res = await fetch(`${apiUrl}/catalogo/${endpoint}/${encodeURIComponent(numClean || data.num)}`);

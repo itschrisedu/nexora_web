@@ -335,7 +335,7 @@ export function descargarComprobanteAbonoPdf(data: ComprobanteAbonoPdfData): voi
 /**
  * Genera el texto formal para WhatsApp
  */
-export function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, incluirDescargaPdf = false): string {
+export async function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, incluirDescargaPdf = false): Promise<string> {
   const nombreNegocio = data.emisor.nombre || 'Administración de Cobros';
   let msg = `Estimado/a *${data.cliente.nombre}*,\n\n`;
   msg += `Le saludamos de *${nombreNegocio}*. Confirmamos la recepción de su abono:\n\n`;
@@ -359,7 +359,7 @@ export function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, incluir
 
   // Enlace oficial al recibo digital (se adapta automáticamente al dominio desplegado)
   try {
-    const urlRecibo = generarUrlPublicaAbono(data);
+    const urlRecibo = await generarUrlPublicaAbono(data);
     if (urlRecibo) {
       msg += `📥 *Descarga aquí tu comprobante oficial:*\n👉 ${urlRecibo}\n\n`;
     }
@@ -392,7 +392,7 @@ export async function compartirComprobanteAbonoPdf(
     numLimpio = '593' + numLimpio.substring(1);
   }
 
-  const mensajeTexto = armarMensajeWhatsAppAbono(data, false);
+  const mensajeTexto = await armarMensajeWhatsAppAbono(data, false);
 
   // Si el usuario solicitó expresamente descargar el archivo en su equipo
   if (descargarLocalmente) {

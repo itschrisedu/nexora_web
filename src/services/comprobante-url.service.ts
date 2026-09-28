@@ -1,16 +1,22 @@
 /**
- * Servicio de Generación y Decodificación de Enlaces Públicos de Comprobantes
- * Permite que los clientes accedan a su recibo digital oficial en cualquier dispositivo
- * sin requerir almacenamiento en la nube ni costos de infraestructura externa.
+ * Servicio de Generacion y Decodificacion de Enlaces Publicos de Comprobantes
+ * Genera URLs ultra-cortas almacenando los datos en el backend con un token de 8 caracteres.
+ * Ejemplo de URL resultante: https://nexora-web-dusky-six.vercel.app/c?t=a7Bx9kQ2
  */
 
 import { ComprobanteAbonoPdfData } from './pdf-abono.service';
 import { FacturaPdfData, OrdenCompraPdfData } from './pdf-factura.service';
 
 /**
- * Obtiene el dominio actual de la aplicación de manera automática:
- * - En desarrollo local: http://localhost:3000
- * - En producción desplegada: https://tudominio.com (o el dominio configurado)
+ * Obtiene la URL base del backend (API)
+ */
+function obtenerApiUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  return raw.endsWith('/api') ? raw : `${raw.replace(/\/+$/, '')}/api`;
+}
+
+/**
+ * Obtiene el dominio actual de la aplicacion de manera automatica
  */
 export function obtenerUrlBase(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
@@ -20,7 +26,7 @@ export function obtenerUrlBase(): string {
 }
 
 /**
- * Elimina claves vacías o nulas recursivamente para mantener la URL lo más corta y limpia posible
+ * Elimina claves vacias o nulas recursivamente para mantener el payload limpio
  */
 export function limpiarObjetoPayload(obj: any): any {
   if (Array.isArray(obj)) {
@@ -42,15 +48,15 @@ export function limpiarObjetoPayload(obj: any): any {
 }
 
 /**
- * Genera el formato estándar y profesional de hipervínculo / enlace para WhatsApp
+ * Genera el formato estandar y profesional de hipervinculo / enlace para WhatsApp
  */
-export function formatearEnlaceWhatsAppComprobante(url: string, titulo: string = 'Descarga aquí tu comprobante oficial'): string {
+export function formatearEnlaceWhatsAppComprobante(url: string, titulo: string = 'Descarga aqui tu comprobante oficial'): string {
   if (!url) return '';
-  return `📥 *${titulo}:*\n👉 ${url}`;
+  return `\u{1F4E5} *${titulo}:*\n\u{1F449} ${url}`;
 }
 
 /**
- * Codifica un objeto a Base64 seguro para URL con soporte completo UTF-8
+ * Codifica un objeto a Base64 seguro para URL (fallback si el backend no responde)
  */
 export function codificarPayload(data: any): string {
   try {
@@ -77,35 +83,29 @@ export function codificarPayload(data: any): string {
 }
 
 /**
- * Decodifica una cadena Base64 a su objeto JSON original con máxima resiliencia
+ * Decodifica una cadena Base64 a su objeto JSON original con maxima resiliencia
  */
 export function decodificarPayload(rawInput: string): any {
   try {
     if (!rawInput || typeof rawInput !== 'string') return null;
     let str = rawInput.trim();
 
-    // Eliminar posibles envoltorios de comillas
     if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
       str = str.slice(1, -1).trim();
     }
 
-    // Intentar parseo directo si ya es un JSON string o URL-encoded JSON
-    if (str.startsWith('{') || str.startsWith('%7B')) {
+    if (str.startsWith('{') || str.startsWith('%7B') || str.startsWith('[') || str.startsWith('%5B')) {
       try {
         const decodedUri = decodeURIComponent(str);
         return JSON.parse(decodedUri);
       } catch {
-        // Continuar con decodificación base64
+        // Continuar con decodificacion base64
       }
     }
 
-    // Reemplazar espacios generados por la conversión automática de '+' en query params
     str = str.replace(/ /g, '+');
-
-    // Convertir de base64url a base64 standard si aplica
     str = str.replace(/-/g, '+').replace(/_/g, '/');
 
-    // Asegurar padding '=' correcto
     const mod4 = str.length % 4;
     if (mod4 === 2) str += '==';
     else if (mod4 === 3) str += '=';
@@ -138,91 +138,114 @@ export function decodificarPayload(rawInput: string): any {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// GUARDAR COMPROBANTE EN BACKEND Y OBTENER TOKEN ULTRA-CORTO
+// ─────────────────────────────────────────────────────────────
+
 /**
- * Genera el enlace público dinámico para un Comprobante de Abono
+ * Envia el payload del comprobante al backend y obtiene un token corto de 8 caracteres.
+ * Si el backend no responde (offline), genera un enlace de fallback con Base64.
  */
-export function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): string {
+async function guardarYObtenerToken(tipo: string, payload: any): Promise<string> {
   const base = obtenerUrlBase();
-  const num = data.comprobante.numero?.trim() || 'REC';
+  try {
+    const apiUrl = obtenerApiUrl();
+    const res = await fetch(`${apiUrl}/catalogo/comprobante`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo, payload }),
+    });
 
-  // Formato compacto en array para máxima seguridad y mínima longitud
-  const compactArray = [
-    'A',
-    num,
-    data.comprobante.fecha || '',
-    data.comprobante.hora || '',
-    data.comprobante.formaPago || 'EFECTIVO',
-    data.cliente.nombre || 'Cliente',
-    Math.round(Number(data.movimiento.saldoAnterior || 0) * 100) / 100,
-    Math.round(Number(data.movimiento.montoAbonado || 0) * 100) / 100,
-    Math.round(Number(data.movimiento.saldoRestante || 0) * 100) / 100,
-    data.emisor.nombre || 'NEXORA',
-    data.cliente.cedula || '',
-  ];
+    if (res.ok) {
+      const result = await res.json();
+      if (result?.token) {
+        return `${base}/c?t=${result.token}`;
+      }
+    }
+  } catch (e) {
+    console.warn('Backend no disponible para comprobante, usando fallback Base64:', e);
+  }
 
-  const encoded = codificarPayload(compactArray);
+  // Fallback offline: codificar en la URL (enlace largo)
+  const encoded = codificarPayload(payload);
   return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 
+// ─────────────────────────────────────────────────────────────
+// FUNCIONES PUBLICAS DE GENERACION DE URL
+// ─────────────────────────────────────────────────────────────
+
 /**
- * Genera el enlace público dinámico para una Factura Electrónica
+ * Genera el enlace publico ultra-corto para un Comprobante de Abono
  */
-export function generarUrlPublicaFactura(data: FacturaPdfData): string {
-  const base = obtenerUrlBase();
-  const num = data.comprobante.numero?.trim() || 'FAC';
-  const subtotal = (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0));
-  const iva = Number(data.totales?.iva15 || 0);
-  const total = Number(data.totales?.total || 0);
+export async function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): Promise<string> {
+  const payload = {
+    t: 'ABONO',
+    num: data.comprobante.numero?.trim() || 'REC',
+    f: data.comprobante.fecha || '',
+    h: data.comprobante.hora || '',
+    fp: data.comprobante.formaPago || 'EFECTIVO',
+    c_nom: data.cliente.nombre || 'Cliente',
+    c_id: data.cliente.cedula || '',
+    c_tel: data.cliente.telefono || '',
+    c_dir: data.cliente.direccion || '',
+    m_ant: Math.round(Number(data.movimiento.saldoAnterior || 0) * 100) / 100,
+    m_abo: Math.round(Number(data.movimiento.montoAbonado || 0) * 100) / 100,
+    m_res: Math.round(Number(data.movimiento.saldoRestante || 0) * 100) / 100,
+    e_nom: data.emisor.nombre || 'NEXORA',
+  };
 
-  const compactArray = [
-    'F',
-    num,
-    data.comprobante.fecha || '',
-    data.comprador.nombre || 'Cliente',
-    data.comprador.cedula || '',
-    subtotal,
-    iva,
-    total,
-    data.emisor.nombre || 'NEXORA',
-    (data.detalles || []).slice(0, 10).map((it) => [
-      it.descripcion || 'Calzado',
-      it.cantidad || 1,
-      it.precioUnitario || 0,
-      it.subtotal || 0,
-    ]),
-  ];
-
-  const encoded = codificarPayload(compactArray);
-  return `${base}/c?d=${encodeURIComponent(encoded)}`;
+  return guardarYObtenerToken('ABONO', payload);
 }
 
 /**
- * Genera el enlace público dinámico para una Orden de Compra
+ * Genera el enlace publico ultra-corto para una Factura Electronica
  */
-export function generarUrlPublicaOrden(data: OrdenCompraPdfData): string {
-  const base = obtenerUrlBase();
-  const num = data.orden.numero?.trim() || 'ORD';
+export async function generarUrlPublicaFactura(data: FacturaPdfData): Promise<string> {
+  const payload = {
+    t: 'FACTURA',
+    num: data.comprobante.numero?.trim() || 'FAC',
+    f: data.comprobante.fecha || '',
+    c_nom: data.comprador.nombre || 'Cliente',
+    c_id: data.comprador.cedula || '',
+    sub: (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0)),
+    iva: Number(data.totales?.iva15 || 0),
+    tot: Number(data.totales?.total || 0),
+    e_nom: data.emisor.nombre || 'NEXORA',
+    items: (data.detalles || []).slice(0, 10).map((it) => ({
+      d: it.descripcion || 'Calzado',
+      c: it.cantidad || 1,
+      u: it.precioUnitario || 0,
+      t: it.subtotal || 0,
+    })),
+  };
 
-  const compactArray = [
-    'O',
-    num,
-    data.orden.fecha || '',
-    data.proveedor.nombre || 'Proveedor',
-    data.totales.totalPares || 0,
-    data.totales.totalPagar || 0,
-    data.emisor.nombre || 'NEXORA',
-    (data.lineas || []).slice(0, 10).map((l) => [
-      l.modelo || 'Calzado',
-      l.color || '',
-      l.numeracion || '',
-      l.cantidadPares || 1,
-      l.precioCosto || 0,
-      l.subtotal || 0,
-    ]),
-  ];
+  return guardarYObtenerToken('FACTURA', payload);
+}
 
-  const encoded = codificarPayload(compactArray);
-  return `${base}/c?d=${encodeURIComponent(encoded)}`;
+/**
+ * Genera el enlace publico ultra-corto para una Orden de Compra
+ */
+export async function generarUrlPublicaOrden(data: OrdenCompraPdfData): Promise<string> {
+  const payload = {
+    t: 'ORDEN',
+    num: data.orden.numero?.trim() || 'ORD',
+    f: data.orden.fecha || '',
+    p_nom: data.proveedor.nombre || 'Proveedor',
+    pares: data.totales.totalPares || 0,
+    tot: data.totales.totalPagar || 0,
+    e_nom: data.emisor.nombre || 'NEXORA',
+    lineas: (data.lineas || []).slice(0, 10).map((l) => ({
+      m: l.modelo || 'Calzado',
+      col: l.color || '',
+      num: l.numeracion || '',
+      qty: l.cantidadPares || 1,
+      u: l.precioCosto || 0,
+      tot: l.subtotal || 0,
+    })),
+  };
+
+  return guardarYObtenerToken('ORDEN', payload);
 }
 
 export interface PedidoClienteComprobanteData {
@@ -269,33 +292,30 @@ export interface PedidoClienteComprobanteData {
 }
 
 /**
- * Genera el enlace público dinámico para un Pedido de Cliente
+ * Genera el enlace publico ultra-corto para un Pedido de Cliente
  */
-export function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteData): string {
-  const base = obtenerUrlBase();
+export async function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteData): Promise<string> {
   const num = data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : data.pedido.id.slice(0, 8));
 
-  const compactArray = [
-    'P',
+  const payload = {
+    t: 'PEDIDO',
     num,
-    data.pedido.fecha || '',
-    data.cliente.nombre || 'Cliente',
-    data.totales.totalPares || 0,
-    data.totales.totalPagar || 0,
-    data.totales.adelanto || 0,
-    data.totales.saldoPendiente || 0,
-    data.emisor.nombre || 'NEXORA',
-    (data.lineas || []).slice(0, 8).map((l) => [
-      l.modelo || 'Calzado',
-      l.color || '',
-      l.numeracion || '',
-      l.cantidadPares || 1,
-      l.precioUnitario || 0,
-      l.subtotal || 0,
-    ]),
-  ];
+    f: data.pedido.fecha || '',
+    c_nom: data.cliente.nombre || 'Cliente',
+    pares: data.totales.totalPares || 0,
+    tot: data.totales.totalPagar || 0,
+    ad: data.totales.adelanto || 0,
+    sal: data.totales.saldoPendiente || 0,
+    e_nom: data.emisor.nombre || 'NEXORA',
+    lineas: (data.lineas || []).slice(0, 8).map((l) => ({
+      m: l.modelo || 'Calzado',
+      col: l.color || '',
+      num: l.numeracion || '',
+      qty: l.cantidadPares || 1,
+      u: l.precioUnitario || 0,
+      tot: l.subtotal || 0,
+    })),
+  };
 
-  const encoded = codificarPayload(compactArray);
-  return `${base}/c?d=${encodeURIComponent(encoded)}`;
+  return guardarYObtenerToken('PEDIDO', payload);
 }
-

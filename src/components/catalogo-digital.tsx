@@ -287,7 +287,7 @@ export default function CatalogoDigitalComponent() {
       });
 
       const idPedido = pedidoCreado?.id || `PED-${Date.now().toString().slice(-6)}`;
-      const urlComprobante = generarUrlPublicaPedidoCliente({
+      const urlComprobante = await generarUrlPublicaPedidoCliente({
         pedido: {
           id: idPedido,
           numeroCodigo: pedidoCreado?.numero ? `PED-${String(pedidoCreado.numero).padStart(4, '0')}` : undefined,

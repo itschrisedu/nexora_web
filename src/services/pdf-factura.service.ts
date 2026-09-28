@@ -233,7 +233,7 @@ export async function compartirFacturaPdf(
 
   let urlDigital = "";
   try {
-    urlDigital = generarUrlPublicaFactura(data);
+    urlDigital = await generarUrlPublicaFactura(data);
   } catch (e) {}
 
   const subtotalFactura = (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0));
@@ -553,7 +553,7 @@ export async function compartirOrdenCompraPdf(
 
   let urlDigital = "";
   try {
-    urlDigital = generarUrlPublicaOrden(data);
+    urlDigital = await generarUrlPublicaOrden(data);
   } catch (e) {}
 
   const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe compartimos la *Orden de Compra No. ${data.orden.numero}* (${data.totales.totalPares} pares):\n\n📥 *Descarga aquí la orden de compra oficial en PDF:*\n👉 ${urlDigital}\n\nPor favor confirmar recepción del pedido. ¡Muchas gracias!\n*${data.emisor.nombre || "Gerencia de Compras"}*`;

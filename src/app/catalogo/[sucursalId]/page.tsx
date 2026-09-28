@@ -161,13 +161,13 @@ export default function CatalogoSucursalPage() {
 
   const totalVariantes = modelos.reduce((acc, m) => acc + m.variantes.length, 0);
 
-  const handleWhatsAppPedido = (variante: VarianteItem, modelo: ModeloItem) => {
+  const handleWhatsAppPedido = async (variante: VarianteItem, modelo: ModeloItem) => {
     const tallasDisp = variante.tallas
       .filter((t) => t.stock > 0)
       .map((t) => `T${t.numero} (${t.stock} disp.)`)
       .join(", ");
 
-    const urlComprobante = generarUrlPublicaPedidoCliente({
+    const urlComprobante = await generarUrlPublicaPedidoCliente({
       pedido: {
         id: `PED-${Date.now().toString().slice(-6)}`,
         fecha: new Date().toLocaleDateString('es-EC'),

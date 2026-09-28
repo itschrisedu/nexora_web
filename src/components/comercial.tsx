@@ -819,7 +819,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
-  const handleVerComprobanteDigital = (p: Pedido) => {
+  const handleVerComprobanteDigital = async (p: Pedido) => {
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const telefono = cliente?.telefono;
     const clienteNombre = p.clienteNombre || cliente?.nombre || 'Estimado/a Cliente';
@@ -859,7 +859,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       });
     }
 
-    const urlComprobante = generarUrlPublicaPedidoCliente({
+    const urlComprobante = await generarUrlPublicaPedidoCliente({
       pedido: {
         id: p.id,
         numero: p.numero,
@@ -893,7 +893,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     window.open(urlComprobante, '_blank');
   };
 
-  const handleEnviarConfirmacionWhatsApp = (p: Pedido, clienteTel?: string) => {
+  const handleEnviarConfirmacionWhatsApp = async (p: Pedido, clienteTel?: string) => {
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const telefono = clienteTel || cliente?.telefono;
     if (!telefono) {
@@ -976,7 +976,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const saldoPendiente = Math.max(0, totalPagar - montoAdelanto);
 
     // Generar enlace digital oficial del comprobante
-    const urlComprobante = generarUrlPublicaPedidoCliente({
+    const urlComprobante = await generarUrlPublicaPedidoCliente({
       pedido: {
         id: p.id,
         numero: p.numero,
@@ -1051,7 +1051,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     window.open(url, '_blank');
   };
 
-  const handleEnviarPedidoEntregadoWhatsApp = (p: Pedido, clienteTel?: string) => {
+  const handleEnviarPedidoEntregadoWhatsApp = async (p: Pedido, clienteTel?: string) => {
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const telefono = clienteTel || cliente?.telefono;
     if (!telefono) {
@@ -1142,7 +1142,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const totalParesPedidoGeneral = (p.lines || []).reduce((sum: number, l: any) => sum + Number(l.cantidad || 0), 0);
     const esEntregaTotal = totalParesEntregadosGeneral >= totalParesPedidoGeneral;
 
-    const urlComprobante = generarUrlPublicaPedidoCliente({
+    const urlComprobante = await generarUrlPublicaPedidoCliente({
       pedido: {
         id: p.id,
         numero: p.numero,

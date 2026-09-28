@@ -974,7 +974,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       showToast('Abriendo WhatsApp con el comprobante oficial de abono...', 'info');
     } catch (err: any) {
       console.error('Error al generar envío de abono:', err);
-      const msg = armarMensajeWhatsAppAbono(dataAbono, false);
+      const msg = await armarMensajeWhatsAppAbono(dataAbono, false);
       handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
     }
   };
@@ -1149,7 +1149,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       // Envío AUTOMÁTICO por WhatsApp estandarizado
       if (autoEnviarWhatsAppAbono && telefonoCliente) {
-        const msg = armarMensajeWhatsAppAbono(dataAbono, false);
+        const msg = await armarMensajeWhatsAppAbono(dataAbono, false);
         let numLimpio = telefonoCliente.replace(/\D/g, '');
         if (numLimpio.startsWith('09') && numLimpio.length === 10) {
           numLimpio = '593' + numLimpio.substring(1);
@@ -1177,8 +1177,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
       const emailDestino = carteraSeleccionada?.clienteEmail || (carteraSeleccionada as any)?.email;
       if (autoEmail && emailDestino) {
-        const msgTexto = armarMensajeWhatsAppAbono(dataAbono, false);
-        const urlRecibo = generarUrlPublicaAbono(dataAbono);
+        const msgTexto = await armarMensajeWhatsAppAbono(dataAbono, false);
+        const urlRecibo = await generarUrlPublicaAbono(dataAbono);
         ApiService.post('/notificaciones/email-comprobante', {
           destinatario: emailDestino,
           asunto: `Comprobante de Abono — $${valor.toFixed(2)} — NEXORA`,
