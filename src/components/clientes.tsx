@@ -648,17 +648,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     );
 
     if (existeDuplicada) {
-      setConfirmModal({
-        isOpen: true,
-        title: "Campaña Promocional Ya Registrada",
-        message: `Ya existe una campaña activa registrada con el nombre "${tituloTrim}".\n\nPara evitar confusiones comerciales en los cupones y en las listas de difusión de clientes, por favor asigna un título distintivo a tu nueva campaña.`,
-        confirmText: "Entendido, Cambiar Nombre",
-        cancelText: "Cerrar",
-        danger: false,
-        onConfirm: () => {
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        },
-      });
+      setPromoError(`Ya existe una campaña activa registrada con el nombre "${tituloTrim}". Por favor utiliza un título diferente o desactiva la campaña anterior.`);
       return;
     }
 
@@ -1721,17 +1711,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
             </div>
 
             <form onSubmit={handleCrearPromocion} className="p-5 space-y-4 max-h-[82vh] overflow-y-auto">
-              {/* Alerta de Error dentro del Modal */}
-              {promoError && (
-                <div className="p-3.5 bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 rounded-2xl flex items-start gap-2.5 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
-                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
-                  <div className="flex-1">
-                    <span className="font-extrabold block">Atención:</span>
-                    <span className="font-semibold text-[11px] leading-relaxed">{promoError}</span>
-                  </div>
-                </div>
-              )}
-
               {/* 1. TÍTULO DE LA CAMPAÑA (Primero) */}
               <div>
                 <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
@@ -1964,6 +1943,17 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-[11px] text-purple-900 dark:text-purple-300">
                 💡 El sistema llevará el control estricto de canjes. Cuando {promoForm.maximoCanjes} clientes utilicen este código, la promoción se desactivará automáticamente.
               </div>
+
+              {/* Alerta de Error en la parte inferior (justo arriba del botón Crear Campaña) */}
+              {promoError && (
+                <div className="p-3.5 bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 rounded-2xl flex items-start gap-2.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
+                  <div className="flex-1">
+                    <span className="font-extrabold block">Atención:</span>
+                    <span className="font-semibold text-[11px] leading-relaxed">{promoError}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
                 <button

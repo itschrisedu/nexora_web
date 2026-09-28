@@ -406,6 +406,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
           requestCloseCreateTenant();
           return;
         }
+        if (showReportPreviewModal) {
+          setShowReportPreviewModal(false);
+          return;
+        }
         if (showDetailModal) {
           setShowDetailModal(false);
           setSelectedTenantDetail(null);
@@ -420,6 +424,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     confirmDeleteUser,
     confirmDeleteTenant,
     confirmToggle,
+    showReportPreviewModal,
     showEditUserModal,
     showCreateUserModal,
     showEditTenantModal,
@@ -3166,7 +3171,14 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL PREVISUALIZADOR DE REPORTE PDF ═══ */}
       {showReportPreviewModal && reportPreviewUrl && (
         <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-md z-[85] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-[85] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200 focus:outline-none"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setShowReportPreviewModal(false);
+            }
+          }}
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowReportPreviewModal(false); }}
         >
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
