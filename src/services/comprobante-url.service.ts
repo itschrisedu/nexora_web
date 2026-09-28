@@ -143,21 +143,22 @@ export function decodificarPayload(rawInput: string): any {
  */
 export function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): string {
   const base = obtenerUrlBase();
-  const numComprobante = data.comprobante.numero?.trim();
-  
-  if (numComprobante) {
-    return `${base}/c?id=${encodeURIComponent(numComprobante)}`;
-  }
+  const numComprobante = data.comprobante.numero?.trim() || 'REC';
 
   const payload = {
     t: 'A',
-    n: numComprobante || 'REC',
+    n: numComprobante,
     f: data.comprobante.fecha,
-    fp: data.comprobante.formaPago,
+    h: data.comprobante.hora || '',
+    fp: data.comprobante.formaPago || 'EFECTIVO',
     c: data.cliente.nombre,
-    id: data.cliente.cedula,
-    m: [data.movimiento.saldoAnterior, data.movimiento.montoAbonado, data.movimiento.saldoRestante],
-    e: data.emisor.nombre,
+    id: data.cliente.cedula || '',
+    m: [
+      Math.round(Number(data.movimiento.saldoAnterior || 0) * 100) / 100,
+      Math.round(Number(data.movimiento.montoAbonado || 0) * 100) / 100,
+      Math.round(Number(data.movimiento.saldoRestante || 0) * 100) / 100,
+    ],
+    e: data.emisor.nombre || 'NEXORA',
     ref: data.comprobante.referencia || undefined,
   };
 
@@ -170,11 +171,7 @@ export function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): string {
  */
 export function generarUrlPublicaFactura(data: FacturaPdfData): string {
   const base = obtenerUrlBase();
-  const numFactura = data.comprobante.numero?.trim();
-
-  if (numFactura) {
-    return `${base}/c?id=${encodeURIComponent(numFactura)}`;
-  }
+  const numFactura = data.comprobante.numero?.trim() || 'FAC';
 
   const subtotalFactura = (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0));
   const ivaFactura = Number(data.totales?.iva15 || 0);
@@ -182,7 +179,7 @@ export function generarUrlPublicaFactura(data: FacturaPdfData): string {
 
   const payload = {
     t: 'F',
-    n: numFactura || 'FAC',
+    n: numFactura,
     f: data.comprobante.fecha,
     c: data.comprador.nombre,
     id: data.comprador.cedula,
@@ -201,20 +198,24 @@ export function generarUrlPublicaFactura(data: FacturaPdfData): string {
  */
 export function generarUrlPublicaOrden(data: OrdenCompraPdfData): string {
   const base = obtenerUrlBase();
-  const numOrden = data.orden.numero?.trim();
-
-  if (numOrden) {
-    return `${base}/c?id=${encodeURIComponent(numOrden)}`;
-  }
+  const numOrden = data.orden.numero?.trim() || 'ORD';
 
   const payload = {
     t: 'O',
-    n: numOrden || 'ORD',
+    n: numOrden,
     f: data.orden.fecha,
     p: data.proveedor.nombre,
     pares: data.totales.totalPares,
     tot: data.totales.totalPagar,
     e: data.emisor.nombre,
+    l: (data.lineas || []).slice(0, 10).map((l) => ({
+      m: l.modelo,
+      col: l.color || '',
+      num: l.numeracion || '',
+      qty: l.cantidadPares,
+      u: l.precioCosto,
+      tot: l.subtotal,
+    })),
   };
 
   const encoded = codificarPayload(payload);
@@ -269,15 +270,11 @@ export interface PedidoClienteComprobanteData {
  */
 export function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteData): string {
   const base = obtenerUrlBase();
-  const idPedido = data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : data.pedido.id);
-
-  if (idPedido) {
-    return `${base}/c?id=${encodeURIComponent(idPedido)}`;
-  }
+  const idPedido = data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : data.pedido.id.slice(0, 8));
 
   const payload = {
     t: 'P',
-    n: idPedido || 'PED',
+    n: idPedido,
     f: data.pedido.fecha,
     c: data.cliente.nombre,
     pares: data.totales.totalPares,
@@ -285,6 +282,14 @@ export function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteDat
     ad: data.totales.adelanto || 0,
     sal: data.totales.saldoPendiente || 0,
     e: data.emisor.nombre,
+    l: (data.lineas || []).slice(0, 10).map((l) => ({
+      m: l.modelo,
+      col: l.color || '',
+      num: l.numeracion || '',
+      qty: l.cantidadPares,
+      u: l.precioUnitario,
+      tot: l.subtotal,
+    })),
   };
 
   const encoded = codificarPayload(payload);
