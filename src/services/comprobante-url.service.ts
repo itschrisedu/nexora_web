@@ -256,6 +256,8 @@ export interface PedidoClienteComprobanteData {
     fecha: string;
     hora?: string;
     tipoPago?: string;
+    numeroComprobante?: string;
+    referenciaPago?: string;
     observaciones?: string;
   };
   cliente: {
@@ -288,6 +290,7 @@ export interface PedidoClienteComprobanteData {
     adelanto?: number;
     saldoPendiente?: number;
     metodoAdelanto?: string;
+    referenciaAdelanto?: string;
   };
 }
 
@@ -297,23 +300,39 @@ export interface PedidoClienteComprobanteData {
 export async function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteData): Promise<string> {
   const num = data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : data.pedido.id.slice(0, 8));
 
+  const montoAdelanto = Number(data.totales.adelanto || 0);
+  const saldoPendiente = data.totales.saldoPendiente !== undefined
+    ? Number(data.totales.saldoPendiente)
+    : Math.max(0, Number(data.totales.totalPagar || 0) - montoAdelanto);
+
+  const refComprobante = data.pedido.numeroComprobante || data.pedido.referenciaPago || data.totales.referenciaAdelanto || '';
+
   const payload = {
     t: 'PEDIDO',
     num,
     f: data.pedido.fecha || '',
     c_nom: data.cliente.nombre || 'Cliente',
+    c_tel: data.cliente.telefono || '',
+    c_id: data.cliente.cedula || '',
+    c_dir: data.cliente.direccion || '',
+    fp: data.pedido.tipoPago || (refComprobante ? 'TRANSFERENCIA BANCARIA' : 'CONTADO'),
+    ref: refComprobante,
     pares: data.totales.totalPares || 0,
     tot: data.totales.totalPagar || 0,
-    ad: data.totales.adelanto || 0,
-    sal: data.totales.saldoPendiente || 0,
+    ad: montoAdelanto,
+    sal: saldoPendiente,
+    met_ad: data.totales.metodoAdelanto || (refComprobante ? 'TRANSFERENCIA' : 'EFECTIVO'),
     e_nom: data.emisor.nombre || 'NEXORA',
-    lineas: (data.lineas || []).slice(0, 8).map((l) => ({
+    obs: data.pedido.observaciones || '',
+    lineas: (data.lineas || []).slice(0, 10).map((l) => ({
       m: l.modelo || 'Calzado',
       col: l.color || '',
       num: l.numeracion || '',
       qty: l.cantidadPares || 1,
       u: l.precioUnitario || 0,
       tot: l.subtotal || 0,
+      img: l.imageUrl || '',
+      obs: l.observacion || '',
     })),
   };
 

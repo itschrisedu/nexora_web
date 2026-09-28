@@ -172,8 +172,15 @@ function LandingContent() {
   // Datos del cliente para el pedido
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
+  const [clienteCedula, setClienteCedula] = useState("");
+  const [clienteEmail, setClienteEmail] = useState("");
   const [clienteDireccion, setClienteDireccion] = useState("");
+  const [tipoPago, setTipoPago] = useState<"TRANSFERENCIA" | "EFECTIVO">("TRANSFERENCIA");
+  const [numeroComprobante, setNumeroComprobante] = useState("");
+  const [montoAdelanto, setMontoAdelanto] = useState("");
   const [notasPedido, setNotasPedido] = useState("");
+  const [esClienteExistente, setEsClienteExistente] = useState<boolean | null>(null);
+  const [verificandoCliente, setVerificandoCliente] = useState(false);
 
   // Filtros del catálogo
   const [searchQuery, setSearchQuery] = useState("");
@@ -202,6 +209,45 @@ function LandingContent() {
       }
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const telLimpio = clienteTelefono.replace(/\D/g, "");
+    if (telLimpio.length >= 9 || clienteCedula.trim().length >= 10) {
+      const timer = setTimeout(async () => {
+        try {
+          setVerificandoCliente(true);
+          const tenantParam = effectiveTenantId || (data?.negocio ? data.negocio.tenantId : "");
+          const res = await fetch(
+            `${API_BASE_URL}/catalogo/verificar-cliente?tenantId=${encodeURIComponent(tenantParam)}&telefono=${encodeURIComponent(telLimpio)}&cedula=${encodeURIComponent(clienteCedula.trim())}`
+          );
+          if (res.ok) {
+            const dataCli = await res.json();
+            if (dataCli?.existe) {
+              setEsClienteExistente(true);
+              if (!clienteNombre.trim() && dataCli.nombre) {
+                setClienteNombre(`${dataCli.nombre} ${dataCli.apellido || ""}`.trim());
+              }
+              if (!clienteEmail.trim() && dataCli.email) {
+                setClienteEmail(dataCli.email);
+              }
+              if (!clienteDireccion.trim() && dataCli.direccion) {
+                setClienteDireccion(dataCli.direccion);
+              }
+            } else {
+              setEsClienteExistente(false);
+            }
+          }
+        } catch (e) {
+          console.warn("Aviso al verificar cliente:", e);
+        } finally {
+          setVerificandoCliente(false);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setEsClienteExistente(null);
+    }
+  }, [clienteTelefono, clienteCedula, effectiveTenantId, data?.negocio]);
 
   useEffect(() => {
     const fetchLanding = async () => {
@@ -478,6 +524,19 @@ function LandingContent() {
       return;
     }
 
+    // Si es cliente nuevo y no ingresó seña / comprobante
+    if (esClienteExistente === false) {
+      const tieneSena = numeroComprobante.trim().length > 0 || Number(montoAdelanto || 0) > 0;
+      if (!tieneSena) {
+        mostrarAlerta(
+          "Anticipo / Seña Requerida",
+          "Al ser su primer pedido con nosotros, se requiere ingresar el número de comprobante o monto de seña para asegurar la confección y reserva de su calzado.",
+          "warning"
+        );
+        return;
+      }
+    }
+
     setEnviandoPedido(true);
     try {
       const rawPhone = negocio.whatsappContacto || negocio.telefono || "";
@@ -518,6 +577,9 @@ function LandingContent() {
 
       // 2. Registrar el pedido en el backend si está disponible
       let pedidoCreado: any = null;
+      const montoAdelantoNum = Number(montoAdelanto || 0);
+      const saldoPendiente = Math.max(0, totalPrecioCarrito - montoAdelantoNum);
+
       try {
         const urlBackend = `${API_BASE_URL.replace(/\/+$/, '')}/catalogo/pedido-whatsapp`;
         const lineasParaBackend: any[] = [];
@@ -548,9 +610,16 @@ function LandingContent() {
             cliente: {
               nombre: clienteNombre.trim(),
               telefono: clienteTelefono.trim(),
+              identificacion: clienteCedula.trim() || undefined,
+              email: clienteEmail.trim() || undefined,
               direccion: clienteDireccion.trim() || undefined,
             },
             lineas: lineasParaBackend,
+            tipoPago,
+            numeroComprobante: numeroComprobante.trim() || undefined,
+            montoAdelanto: montoAdelantoNum > 0 ? montoAdelantoNum : undefined,
+            metodoAdelanto: tipoPago === 'TRANSFERENCIA' ? 'TRANSFERENCIA' : 'EFECTIVO',
+            referenciaAdelanto: numeroComprobante.trim() || undefined,
             notas: notasPedido.trim() || undefined,
           }),
         });
@@ -570,11 +639,14 @@ function LandingContent() {
           id: idPedido,
           numeroCodigo: numCodigo,
           fecha: new Date().toLocaleDateString('es-EC'),
-          tipoPago: 'CONTADO',
+          tipoPago: tipoPago === 'TRANSFERENCIA' ? 'TRANSFERENCIA BANCARIA' : 'EFECTIVO / PAGO EN ENTREGA',
+          numeroComprobante: numeroComprobante.trim() || undefined,
+          referenciaPago: numeroComprobante.trim() || undefined,
           observaciones: notasPedido.trim() || 'Pedido generado desde el Catálogo Web',
         },
         cliente: {
           nombre: clienteNombre.trim() || 'Cliente Catálogo Web',
+          cedula: clienteCedula.trim() || undefined,
           telefono: clienteTelefono.trim() || undefined,
           direccion: clienteDireccion.trim() || undefined,
         },
@@ -588,6 +660,10 @@ function LandingContent() {
         totales: {
           totalPares: totalParesCarrito,
           totalPagar: totalPrecioCarrito,
+          adelanto: montoAdelantoNum > 0 ? montoAdelantoNum : undefined,
+          saldoPendiente: montoAdelantoNum > 0 ? saldoPendiente : undefined,
+          metodoAdelanto: tipoPago === 'TRANSFERENCIA' ? 'TRANSFERENCIA' : 'EFECTIVO',
+          referenciaAdelanto: numeroComprobante.trim() || undefined,
         },
       });
 
@@ -596,6 +672,8 @@ function LandingContent() {
       texto += `──────────────────────\n`;
       if (clienteNombre.trim()) texto += `👤 *Cliente:* ${clienteNombre.trim()}\n`;
       if (clienteTelefono.trim()) texto += `📱 *Teléfono:* ${clienteTelefono.trim()}\n`;
+      if (clienteCedula.trim()) texto += `🆔 *Cédula/RUC:* ${clienteCedula.trim()}\n`;
+      if (clienteEmail.trim()) texto += `📧 *Correo:* ${clienteEmail.trim()}\n`;
       if (clienteDireccion.trim()) texto += `📍 *Entrega / Ciudad:* ${clienteDireccion.trim()}\n`;
       texto += `──────────────────────\n`;
       texto += `📦 *DETALLE DE ARTÍCULOS:*\n\n`;
@@ -624,6 +702,14 @@ function LandingContent() {
       texto += `👟 *TOTAL PARES:* ${totalParesCarrito} pares\n`;
       if (totalPrecioCarrito > 0) {
         texto += `💰 *TOTAL ESTIMADO:* $${totalPrecioCarrito.toFixed(2)}\n`;
+      }
+      texto += `💳 *Forma de Pago:* ${tipoPago === 'TRANSFERENCIA' ? 'TRANSFERENCIA / DEPÓSITO BANCARIO' : 'EFECTIVO / PAGO EN ENTREGA'}\n`;
+      if (numeroComprobante.trim()) {
+        texto += `🧾 *N° Comprobante / Ref Bancaria:* #${numeroComprobante.trim()}\n`;
+      }
+      if (montoAdelantoNum > 0) {
+        texto += `💵 *Anticipo Depositado:* $${montoAdelantoNum.toFixed(2)}\n`;
+        texto += `⏳ *Saldo Pendiente:* $${saldoPendiente.toFixed(2)}\n`;
       }
       if (notasPedido.trim()) {
         texto += `📝 *Observaciones:* ${notasPedido.trim()}\n`;
@@ -1987,6 +2073,37 @@ function LandingContent() {
                       )}
                     </div>
 
+                    {/* Insignia de Verificación de Cliente */}
+                    {esClienteExistente === true && (
+                      <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-semibold flex items-center gap-1.5">
+                        <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        <span>Cliente registrado: Pago en entrega habilitado sin anticipo obligatorio.</span>
+                      </div>
+                    )}
+                    {esClienteExistente === false && (
+                      <div className="p-2 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-[11px] font-semibold flex items-center gap-1.5">
+                        <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+                        <span>Primer pedido: Se requiere ingresar seña/anticipo para asegurar la confección.</span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Cédula o RUC (opcional)"
+                        value={clienteCedula}
+                        onChange={(e) => setClienteCedula(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Correo electrónico (opcional)"
+                        value={clienteEmail}
+                        onChange={(e) => setClienteEmail(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900"
+                      />
+                    </div>
+
                     <input
                       type="text"
                       placeholder="Ciudad / Dirección de entrega (opcional)"
@@ -2002,6 +2119,70 @@ function LandingContent() {
                       onChange={(e) => setNotasPedido(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900 resize-none"
                     />
+
+                    {/* Selector de Pago & Comprobante */}
+                    <div className="pt-2 border-t border-slate-200 space-y-2">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        Forma de Pago:
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTipoPago("TRANSFERENCIA")}
+                          className={`py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all border text-left flex items-center gap-1.5 ${
+                            tipoPago === "TRANSFERENCIA"
+                              ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          <span>💳</span>
+                          <span>Transferencia</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTipoPago("EFECTIVO")}
+                          className={`py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all border text-left flex items-center gap-1.5 ${
+                            tipoPago === "EFECTIVO"
+                              ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          <span>💵</span>
+                          <span>Pago en Entrega</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {tipoPago === "TRANSFERENCIA" && (
+                      <div className="space-y-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                        <div>
+                          <label className="block text-[11px] text-amber-900 font-bold mb-1">
+                            N° Comprobante / Referencia Bancaria
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ej. #049281 o código de transferencia"
+                            value={numeroComprobante}
+                            onChange={(e) => setNumeroComprobante(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] text-slate-600 font-medium mb-1">
+                            Monto de Anticipo o Depósito ($) (Opcional - Total: ${totalPrecioCarrito.toFixed(2)})
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder={`Ej. ${totalPrecioCarrito.toFixed(2)}`}
+                            value={montoAdelanto}
+                            onChange={(e) => setMontoAdelanto(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-slate-900"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

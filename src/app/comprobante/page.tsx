@@ -430,7 +430,9 @@ function ComprobanteContent() {
         pedido: {
           numero: data.num || 'PED-0000',
           fecha: data.f || '',
-          tipoPago: data.fp || 'Contado',
+          tipoPago: data.fp || (data.ref ? 'TRANSFERENCIA BANCARIA' : 'CONTADO'),
+          comprobantePago: data.ref || undefined,
+          referenciaPago: data.ref || undefined,
           observaciones: data.obs || '',
         },
         lineas: (data.lineas || []).map((l: any) => ({
@@ -446,6 +448,10 @@ function ComprobanteContent() {
         totales: {
           totalPares: Number(data.pares || 0),
           totalPagar: Number(data.tot || 0),
+          adelanto: Number(data.ad || 0),
+          saldoPendiente: data.sal !== undefined ? Number(data.sal) : Math.max(0, Number(data.tot || 0) - Number(data.ad || 0)),
+          metodoAdelanto: data.met_ad || (data.ref ? 'TRANSFERENCIA' : 'EFECTIVO'),
+          referenciaAdelanto: data.ref || undefined,
         },
       };
       descargarPedidoClientePdf(pdfData);
@@ -788,13 +794,40 @@ function ComprobanteContent() {
                 </table>
               </div>
 
-              <div className="flex justify-between items-center pt-3 border-t border-slate-200">
-                <span className="text-xs text-slate-500 font-medium">
-                  Total de pares: <strong className="text-slate-900 font-mono">{data.pares} pares</strong>
-                </span>
-                <div className="text-right">
-                  <span className="text-xs text-slate-500 block">{esPedido ? 'Total del Pedido:' : 'Total a Liquidar:'}</span>
-                  <span className="text-lg font-black font-mono text-emerald-700">${Number(data.tot || 0).toFixed(2)}</span>
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">
+                      Total de pares: <strong className="text-slate-900 dark:text-white font-mono">{data.pares} pares</strong>
+                    </span>
+                    {(data.fp || data.ref) && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold border border-slate-200 dark:border-slate-700">
+                        <CreditCard size={12} className="text-emerald-600" />
+                        <span>Pago: <strong>{data.fp || 'TRANSFERENCIA'}</strong></span>
+                        {data.ref ? <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">• Ref: #{data.ref}</span> : null}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-right space-y-1 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 min-w-[200px]">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500 dark:text-slate-400">{esPedido ? 'Total Pedido:' : 'Total Liquidar:'}</span>
+                      <span className="font-bold font-mono text-slate-900 dark:text-white">${Number(data.tot || 0).toFixed(2)}</span>
+                    </div>
+
+                    {Number(data.ad || 0) > 0 && (
+                      <>
+                        <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                          <span>Anticipo ({data.met_ad || 'Depósito'}):</span>
+                          <span className="font-mono font-bold">-${Number(data.ad).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm font-black pt-1 border-t border-slate-200 dark:border-slate-700">
+                          <span className="text-amber-700 dark:text-amber-400">Saldo Pendiente:</span>
+                          <span className="font-mono text-amber-600 dark:text-amber-400">${Number(data.sal || 0).toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

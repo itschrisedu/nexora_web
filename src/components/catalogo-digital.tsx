@@ -17,6 +17,10 @@ import {
   Phone,
   MapPin,
   MessageSquare,
+  AlertTriangle,
+  AlertCircle,
+  CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "./ui/toast";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
@@ -90,14 +94,71 @@ export default function CatalogoDigitalComponent() {
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [clienteCedula, setClienteCedula] = useState("");
+  const [clienteEmail, setClienteEmail] = useState("");
   const [clienteDireccion, setClienteDireccion] = useState("");
+  const [tipoPago, setTipoPago] = useState<"TRANSFERENCIA" | "EFECTIVO">("TRANSFERENCIA");
+  const [numeroComprobante, setNumeroComprobante] = useState("");
+  const [montoAdelanto, setMontoAdelanto] = useState("");
   const [notasPedido, setNotasPedido] = useState("");
   const [enviandoPedido, setEnviandoPedido] = useState(false);
   const [pedidoExitoso, setPedidoExitoso] = useState(false);
+  const [esClienteExistente, setEsClienteExistente] = useState<boolean | null>(null);
+  const [verificandoCliente, setVerificandoCliente] = useState(false);
+  const [modalAlerta, setModalAlerta] = useState<{
+    isOpen: boolean;
+    tipo: "warning" | "error" | "success" | "info";
+    titulo: string;
+    mensaje: string;
+  } | null>(null);
+
+  const mostrarAlerta = (
+    titulo: string,
+    mensaje: string,
+    tipo: "warning" | "error" | "success" | "info" = "warning"
+  ) => {
+    setModalAlerta({ isOpen: true, titulo, mensaje, tipo });
+  };
 
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // Verificación en tiempo real si el cliente ya está registrado
+  useEffect(() => {
+    const telLimpio = clienteTelefono.replace(/\D/g, "");
+    if (telLimpio.length >= 9 || clienteCedula.trim().length >= 10) {
+      const timer = setTimeout(async () => {
+        try {
+          setVerificandoCliente(true);
+          const tenantParam = tienda?.tenantId || "";
+          const res = await ApiService.get(
+            `/catalogo/verificar-cliente?tenantId=${encodeURIComponent(tenantParam)}&telefono=${encodeURIComponent(telLimpio)}&cedula=${encodeURIComponent(clienteCedula.trim())}`
+          );
+          if (res?.existe) {
+            setEsClienteExistente(true);
+            if (!clienteNombre.trim() && res.nombre) {
+              setClienteNombre(`${res.nombre} ${res.apellido || ""}`.trim());
+            }
+            if (!clienteEmail.trim() && res.email) {
+              setClienteEmail(res.email);
+            }
+            if (!clienteDireccion.trim() && res.direccion) {
+              setClienteDireccion(res.direccion);
+            }
+          } else {
+            setEsClienteExistente(false);
+          }
+        } catch (e) {
+          console.warn("Aviso al verificar cliente:", e);
+        } finally {
+          setVerificandoCliente(false);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setEsClienteExistente(null);
+    }
+  }, [clienteTelefono, clienteCedula, tienda?.tenantId]);
 
   // Manejador global de la tecla Escape
   useEffect(() => {
@@ -196,6 +257,28 @@ export default function CatalogoDigitalComponent() {
     e.preventDefault();
     if (carrito.length === 0) return;
 
+    if (!clienteNombre.trim() || !clienteTelefono.trim()) {
+      mostrarAlerta(
+        "Datos para el Pedido",
+        "Por favor ingrese su nombre y número de WhatsApp en el formulario del pedido para poder procesar y enviarle su comprobante oficial.",
+        "warning"
+      );
+      return;
+    }
+
+    // Si es cliente nuevo y no ingresó seña / comprobante
+    if (esClienteExistente === false) {
+      const tieneSena = numeroComprobante.trim().length > 0 || Number(montoAdelanto || 0) > 0;
+      if (!tieneSena) {
+        mostrarAlerta(
+          "Anticipo / Seña Requerida",
+          "Al ser su primer pedido con nosotros, se requiere ingresar el número de comprobante o monto de seña para asegurar la confección y reserva de su calzado.",
+          "warning"
+        );
+        return;
+      }
+    }
+
     try {
       setEnviandoPedido(true);
 
@@ -244,14 +327,18 @@ export default function CatalogoDigitalComponent() {
 
       // 2. Registrar el pedido en el backend
       let pedidoCreado: any = null;
+      const montoAdelantoNum = Number(montoAdelanto || 0);
+      const saldoPendiente = Math.max(0, totalCarrito - montoAdelantoNum);
+
       try {
         pedidoCreado = await ApiService.post("/catalogo/pedido-whatsapp", {
           tenantId: tienda?.tenantId,
           cliente: {
-            nombre: clienteNombre,
-            identificacion: clienteCedula || "9999999999",
-            telefono: clienteTelefono,
-            direccion: clienteDireccion,
+            nombre: clienteNombre.trim(),
+            identificacion: clienteCedula.trim() || undefined,
+            telefono: clienteTelefono.trim(),
+            email: clienteEmail.trim() || undefined,
+            direccion: clienteDireccion.trim() || undefined,
           },
           lineas: carrito.map((item) => ({
             productId: item.productId,
@@ -260,7 +347,12 @@ export default function CatalogoDigitalComponent() {
             cantidad: item.cantidad,
             precioUnitario: item.precioUnitario,
           })),
-          notas: notasPedido,
+          tipoPago,
+          numeroComprobante: numeroComprobante.trim() || undefined,
+          montoAdelanto: montoAdelantoNum > 0 ? montoAdelantoNum : undefined,
+          metodoAdelanto: tipoPago === "TRANSFERENCIA" ? "TRANSFERENCIA" : "EFECTIVO",
+          referenciaAdelanto: numeroComprobante.trim() || undefined,
+          notas: notasPedido.trim() || undefined,
         });
       } catch (errBackend) {
         console.warn("Aviso al registrar pedido en backend:", errBackend);
@@ -292,14 +384,16 @@ export default function CatalogoDigitalComponent() {
           id: idPedido,
           numeroCodigo: pedidoCreado?.numero ? `PED-${String(pedidoCreado.numero).padStart(4, '0')}` : undefined,
           fecha: new Date().toLocaleDateString('es-EC'),
-          tipoPago: 'CONTADO',
+          tipoPago: tipoPago === 'TRANSFERENCIA' ? 'TRANSFERENCIA BANCARIA' : 'EFECTIVO / PAGO EN ENTREGA',
+          numeroComprobante: numeroComprobante.trim() || undefined,
+          referenciaPago: numeroComprobante.trim() || undefined,
           observaciones: notasPedido || 'Pedido recibido desde Catálogo Digital Web',
         },
         cliente: {
-          nombre: clienteNombre,
-          cedula: clienteCedula,
-          telefono: clienteTelefono,
-          direccion: clienteDireccion,
+          nombre: clienteNombre.trim(),
+          cedula: clienteCedula.trim() || undefined,
+          telefono: clienteTelefono.trim() || undefined,
+          direccion: clienteDireccion.trim() || undefined,
         },
         emisor: {
           nombre: tienda?.nombreNegocio || 'NEXORA CALZADO',
@@ -311,16 +405,21 @@ export default function CatalogoDigitalComponent() {
         totales: {
           totalPares,
           totalPagar: totalCarrito,
+          adelanto: montoAdelantoNum > 0 ? montoAdelantoNum : undefined,
+          saldoPendiente: montoAdelantoNum > 0 ? saldoPendiente : undefined,
+          metodoAdelanto: tipoPago === 'TRANSFERENCIA' ? 'TRANSFERENCIA' : 'EFECTIVO',
+          referenciaAdelanto: numeroComprobante.trim() || undefined,
         },
       });
 
       // 4. Construir mensaje formateado y profesional de WhatsApp
       let mensajeWA = `🛍️ *NUEVO PEDIDO DESDE CATÁLOGO DIGITAL*\n`;
       mensajeWA += `─────────────────────────\n`;
-      mensajeWA += `👤 *Cliente:* ${clienteNombre}\n`;
-      mensajeWA += `📱 *Teléfono:* ${clienteTelefono}\n`;
-      if (clienteCedula) mensajeWA += `🆔 *Cédula/RUC:* ${clienteCedula}\n`;
-      if (clienteDireccion) mensajeWA += `📍 *Dirección:* ${clienteDireccion}\n`;
+      mensajeWA += `👤 *Cliente:* ${clienteNombre.trim()}\n`;
+      mensajeWA += `📱 *Teléfono:* ${clienteTelefono.trim()}\n`;
+      if (clienteCedula.trim()) mensajeWA += `🆔 *Cédula/RUC:* ${clienteCedula.trim()}\n`;
+      if (clienteEmail.trim()) mensajeWA += `📧 *Correo:* ${clienteEmail.trim()}\n`;
+      if (clienteDireccion.trim()) mensajeWA += `📍 *Dirección:* ${clienteDireccion.trim()}\n`;
       mensajeWA += `─────────────────────────\n`;
       mensajeWA += `👟 *DETALLE DE MODELOS Y TALLAS:*\n`;
 
@@ -341,7 +440,15 @@ export default function CatalogoDigitalComponent() {
       mensajeWA += `\n─────────────────────────\n`;
       mensajeWA += `📊 *TOTAL DE CALZADO:* ${totalPares} pares\n`;
       mensajeWA += `💰 *VALOR TOTAL A PAGAR:* *$${totalCarrito.toFixed(2)}*\n`;
-      if (notasPedido) mensajeWA += `📝 *Observaciones:* ${notasPedido}\n`;
+      mensajeWA += `💳 *Forma de Pago:* ${tipoPago === 'TRANSFERENCIA' ? 'TRANSFERENCIA / DEPÓSITO BANCARIO' : 'EFECTIVO / PAGO EN ENTREGA'}\n`;
+      if (numeroComprobante.trim()) {
+        mensajeWA += `🧾 *N° Comprobante / Ref Bancaria:* #${numeroComprobante.trim()}\n`;
+      }
+      if (montoAdelantoNum > 0) {
+        mensajeWA += `💵 *Anticipo Depositado:* $${montoAdelantoNum.toFixed(2)}\n`;
+        mensajeWA += `⏳ *Saldo Pendiente:* $${saldoPendiente.toFixed(2)}\n`;
+      }
+      if (notasPedido.trim()) mensajeWA += `📝 *Observaciones:* ${notasPedido.trim()}\n`;
       mensajeWA += `─────────────────────────\n`;
       mensajeWA += `\n📥 *Descarga aquí tu comprobante oficial de pedido en PDF:*\n👉 ${urlComprobante}\n\n`;
       mensajeWA += `¡Muchas gracias por su preferencia!\n*${tienda?.nombreNegocio || 'NEXORA'}*`;
@@ -714,15 +821,46 @@ export default function CatalogoDigitalComponent() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Cédula / RUC (Opcional)</label>
-                  <input
-                    type="text"
-                    placeholder="1801234567"
-                    value={clienteCedula}
-                    onChange={(e) => setClienteCedula(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-                  />
+                {verificandoCliente && (
+                  <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-400 text-[11px] flex items-center gap-1.5">
+                    <span className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin shrink-0" />
+                    <span>Verificando cliente en el sistema...</span>
+                  </div>
+                )}
+                {esClienteExistente === true && (
+                  <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                    <span>Cliente frecuente registrado: Pedido listo para confección directa.</span>
+                  </div>
+                )}
+                {esClienteExistente === false && (
+                  <div className="p-2 rounded-xl bg-amber-950/60 border border-amber-500/40 text-amber-300 text-[11px] font-semibold flex items-center gap-1.5">
+                    <AlertTriangle size={13} className="text-amber-400 shrink-0" />
+                    <span>Primer pedido: Se requiere ingresar seña/anticipo para asegurar la confección.</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Cédula / RUC (Opcional)</label>
+                    <input
+                      type="text"
+                      placeholder="1801234567"
+                      value={clienteCedula}
+                      onChange={(e) => setClienteCedula(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Correo Electrónico (Opcional)</label>
+                    <input
+                      type="email"
+                      placeholder="correo@ejemplo.com"
+                      value={clienteEmail}
+                      onChange={(e) => setClienteEmail(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -736,6 +874,76 @@ export default function CatalogoDigitalComponent() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Observaciones / Notas</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. entrega a domicilio, envío interprovincial..."
+                    value={notasPedido}
+                    onChange={(e) => setNotasPedido(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <label className="block text-xs font-bold text-slate-300">Forma de Pago</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTipoPago("TRANSFERENCIA")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border text-left ${
+                        tipoPago === "TRANSFERENCIA"
+                          ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      💳 Transferencia / Depósito
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTipoPago("EFECTIVO")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border text-left ${
+                        tipoPago === "EFECTIVO"
+                          ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      💵 Pago en Entrega
+                    </button>
+                  </div>
+                </div>
+
+                {tipoPago === "TRANSFERENCIA" && (
+                  <div className="space-y-2 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+                    <div>
+                      <label className="block text-xs text-emerald-400 font-semibold mb-1">
+                        N° de Comprobante / Referencia de Transferencia o Depósito *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. #00492819 o código de transacción"
+                        value={numeroComprobante}
+                        onChange={(e) => setNumeroComprobante(e.target.value)}
+                        className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">
+                        Monto de Anticipo o Pago ($) (Opcional - Total: ${totalCarrito.toFixed(2)})
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder={`Ej. ${totalCarrito.toFixed(2)}`}
+                        value={montoAdelanto}
+                        onChange={(e) => setMontoAdelanto(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={enviandoPedido}
@@ -746,6 +954,53 @@ export default function CatalogoDigitalComponent() {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alerta / Notificación Estilizado NEXORA */}
+      {modalAlerta?.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-center">
+              {modalAlerta.tipo === "warning" && (
+                <div className="w-14 h-14 rounded-2xl bg-amber-950/60 text-amber-400 flex items-center justify-center border border-amber-500/40 shadow-xs">
+                  <AlertTriangle size={28} />
+                </div>
+              )}
+              {modalAlerta.tipo === "error" && (
+                <div className="w-14 h-14 rounded-2xl bg-rose-950/60 text-rose-400 flex items-center justify-center border border-rose-500/40 shadow-xs">
+                  <AlertCircle size={28} />
+                </div>
+              )}
+              {modalAlerta.tipo === "success" && (
+                <div className="w-14 h-14 rounded-2xl bg-emerald-950/60 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shadow-xs">
+                  <CheckCircle2 size={28} />
+                </div>
+              )}
+              {modalAlerta.tipo === "info" && (
+                <div className="w-14 h-14 rounded-2xl bg-sky-950/60 text-sky-400 flex items-center justify-center border border-sky-500/40 shadow-xs">
+                  <Sparkles size={28} />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="font-extrabold text-base text-white">
+                {modalAlerta.titulo}
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed mt-2">
+                {modalAlerta.mensaje}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setModalAlerta(null)}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-extrabold text-xs rounded-xl transition-all shadow-md"
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}

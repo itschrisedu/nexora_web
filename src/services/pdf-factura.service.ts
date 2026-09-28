@@ -603,6 +603,8 @@ export interface PedidoClientePdfData {
     tipoEntrega?: string;
     courier?: string;
     guiaEnvio?: string;
+    comprobantePago?: string;
+    referenciaPago?: string;
     observaciones?: string;
   };
   cliente: {
@@ -634,6 +636,7 @@ export interface PedidoClientePdfData {
     adelanto?: number;
     saldoPendiente?: number;
     metodoAdelanto?: string;
+    referenciaAdelanto?: string;
   };
 }
 
@@ -709,8 +712,9 @@ export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
   const entregaStr = data.pedido.tipoEntrega === "ENVIO"
     ? `Envío (${data.pedido.courier || "Courier"}${data.pedido.guiaEnvio ? " - Guía: " + data.pedido.guiaEnvio : ""})`
     : "Retiro Presencial en Local";
+  const refPago = data.pedido.comprobantePago || data.pedido.referenciaPago || data.totales.referenciaAdelanto;
   doc.text(`Entrega: ${entregaStr}`, pageWidth / 2 + 10, y + 11);
-  doc.text(`Pago: ${data.pedido.tipoPago || "Contado"}`, pageWidth / 2 + 10, y + 16);
+  doc.text(`Pago: ${data.pedido.tipoPago || "Contado"}${refPago ? ` (Ref: ${refPago})` : ""}`, pageWidth / 2 + 10, y + 16);
   if (data.cliente.direccion) {
     doc.text(`Dirección: ${data.cliente.direccion}`, pageWidth / 2 + 10, y + 21);
   }
@@ -833,7 +837,8 @@ export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(5, 150, 105); // Emerald 600
-    doc.text(`ANTICIPO RECIBIDO (${data.totales.metodoAdelanto || "EFECTIVO"}):`, startTotalsX + 4, y + 19);
+    const metodoStr = data.totales.metodoAdelanto || (refPago ? "TRANSFERENCIA" : "EFECTIVO");
+    doc.text(`ANTICIPO (${metodoStr}${refPago ? ` #${refPago}` : ""}):`, startTotalsX + 4, y + 19);
     doc.setFont("helvetica", "bold");
     doc.text(`-$${montoAdelanto.toFixed(2)}`, startTotalsX + 74, y + 19, { align: "right" });
 
