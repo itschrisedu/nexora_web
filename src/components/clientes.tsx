@@ -141,13 +141,14 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   const [loadingPromociones, setLoadingPromociones] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [guardandoPromo, setGuardandoPromo] = useState(false);
+  const [promoError, setPromoError] = useState("");
   const [promoForm, setPromoForm] = useState({
     codigo: '',
     titulo: '',
     descripcion: '',
     tipoDescuento: 'PORCENTAJE' as 'PORCENTAJE' | 'MONTO_FIJO' | 'DESCUENTO_POR_PAR',
     valorDescuento: '10',
-    minimoPares: '6',
+    minimoPares: '1',
     maximoCanjes: '10', // Ej: primeras 10 personas
     aplicaPara: 'AMBAS' as 'AMBAS' | 'SOLO_CONTADO' | 'SOLO_CREDITO',
     fechaFin: '',
@@ -588,13 +589,74 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     setShowModalWhatsApp(false);
   };
 
+  // ── Generador automático de código de validación único ──
+  const generarCodigoCampanaUnico = (titulo: string) => {
+    if (!titulo || !titulo.trim()) return '';
+    const clean = titulo
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, '')
+      .trim();
+
+    const words = clean.split(/\s+/).filter(Boolean);
+    let prefix = 'PROMO';
+    if (words.length === 1) {
+      prefix = words[0].slice(0, 6);
+    } else if (words.length >= 2) {
+      prefix = words.slice(0, 2).map((w) => w.slice(0, 4)).join('');
+    }
+
+    // Sufijo alfanumérico aleatorio y año para garantizar unicidad total e irrepetible
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const yearSuffix = new Date().getFullYear().toString().slice(-2);
+
+    return `${prefix}-${yearSuffix}${randomSuffix}`;
+  };
+
+  const handleTituloPromoChange = (titulo: string) => {
+    const nuevoCodigo = generarCodigoCampanaUnico(titulo);
+    setPromoForm((prev) => ({
+      ...prev,
+      titulo,
+      codigo: nuevoCodigo,
+    }));
+    if (promoError) setPromoError("");
+  };
+
+  const handleRegenerarCodigo = () => {
+    if (!promoForm.titulo.trim()) return;
+    const nuevoCodigo = generarCodigoCampanaUnico(promoForm.titulo);
+    setPromoForm((prev) => ({ ...prev, codigo: nuevoCodigo }));
+    if (promoError) setPromoError("");
+  };
+
   // ── Gestión de Campañas Promocionales & Cupones ──
   const handleCrearPromocion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!promoForm.codigo.trim() || !promoForm.titulo.trim()) {
-      setError("Código y Título de la promoción son obligatorios.");
+    setPromoError("");
+
+    if (!promoForm.titulo.trim()) {
+      setPromoError("El título de la campaña es obligatorio.");
       return;
     }
+
+    if (!promoForm.codigo.trim()) {
+      setPromoError("Debe generarse un código de validación para la campaña.");
+      return;
+    }
+
+    if (!promoForm.fechaFin) {
+      setPromoError("Debes seleccionar obligatoriamente una fecha de vigencia para la campaña.");
+      return;
+    }
+
+    const hoyStr = new Date().toISOString().split('T')[0];
+    if (promoForm.fechaFin < hoyStr) {
+      setPromoError("La fecha de vigencia no puede ser menor a la fecha actual ni una fecha pasada.");
+      return;
+    }
+
     setGuardandoPromo(true);
     try {
       await ApiService.post("/clientes/promociones", {
@@ -603,21 +665,23 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         descripcion: promoForm.descripcion.trim() || undefined,
         tipoDescuento: promoForm.tipoDescuento,
         valorDescuento: parseFloat(promoForm.valorDescuento) || 10,
-        minimoPares: parseInt(promoForm.minimoPares, 10) || 6,
+        minimoPares: parseInt(promoForm.minimoPares, 10) || 1,
         maximoCanjes: parseInt(promoForm.maximoCanjes, 10) || 10,
         aplicaPara: promoForm.aplicaPara,
-        fechaFin: promoForm.fechaFin || undefined,
+        fechaFin: promoForm.fechaFin,
         mensajePlantilla: promoForm.mensajePlantilla.trim() || undefined,
       });
-      setSuccess(`¡Campaña "${promoForm.codigo.toUpperCase().trim()}" creada con éxito!`);
+
+      setSuccess(`¡Campaña "${promoForm.titulo.trim()}" creada con éxito!`);
       setShowPromoModal(false);
+      setPromoError("");
       setPromoForm({
         codigo: '',
         titulo: '',
         descripcion: '',
         tipoDescuento: 'PORCENTAJE',
         valorDescuento: '10',
-        minimoPares: '6',
+        minimoPares: '1',
         maximoCanjes: '10',
         aplicaPara: 'AMBAS',
         fechaFin: '',
@@ -626,7 +690,9 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       await loadPromociones();
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
-      setError(err.message || "Error al crear la promoción.");
+      console.error("Error al crear promoción:", err);
+      const errMsg = err.response?.data?.message || err.message || "Error al crear la campaña promocional.";
+      setPromoError(errMsg);
     } finally {
       setGuardandoPromo(false);
     }
@@ -1611,28 +1677,78 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 </div>
               </div>
               <button
-                onClick={() => setShowPromoModal(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                onClick={() => { setShowPromoModal(false); setPromoError(""); }}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
             <form onSubmit={handleCrearPromocion} className="p-5 space-y-4 max-h-[82vh] overflow-y-auto">
+              {/* Alerta de Error dentro del Modal */}
+              {promoError && (
+                <div className="p-3.5 bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 rounded-2xl flex items-start gap-2.5 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
+                  <div className="flex-1">
+                    <span className="font-extrabold block">Atención:</span>
+                    <span className="font-semibold text-[11px] leading-relaxed">{promoError}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 1. TÍTULO DE LA CAMPAÑA (Primero) */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                  1. Título de la Campaña *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Descuento 10% por temporada escolar o feria artesanal"
+                  value={promoForm.titulo}
+                  onChange={(e) => handleTituloPromoChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
+                  required
+                  autoFocus
+                />
+                <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                  💡 Al escribir el título se generará automáticamente el código de validación único.
+                </span>
+              </div>
+
+              {/* 2. CÓDIGO DE VALIDACIÓN AUTOMÁTICO & CUPOS */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                    Código de Validación *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej: NEXORA10, CUERO2026..."
-                    value={promoForm.codigo}
-                    onChange={(e) => setPromoForm({ ...promoForm, codigo: e.target.value.toUpperCase() })}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-mono font-black focus:outline-none focus:border-purple-600 uppercase"
-                    required
-                    autoFocus
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[var(--foreground)]">
+                      2. Código de Validación *
+                    </label>
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-purple-500/15 text-purple-700 dark:text-purple-300 rounded">
+                      🔒 Automático
+                    </span>
+                  </div>
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      readOnly
+                      placeholder="Escribe el título primero..."
+                      value={promoForm.codigo}
+                      className="w-full pl-3 pr-8 py-2 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl text-xs font-mono font-black text-purple-700 dark:text-purple-300 uppercase cursor-not-allowed select-all"
+                      required
+                    />
+                    {promoForm.codigo && (
+                      <button
+                        type="button"
+                        onClick={handleRegenerarCodigo}
+                        title="Regenerar código aleatorio"
+                        className="absolute right-2 p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <RefreshCw size={13} />
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-[9.5px] text-[var(--muted-foreground)] mt-0.5 block">
+                    Código único e irrepetible en el sistema.
+                  </span>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
@@ -1647,25 +1763,16 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                     className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
                     required
                   />
+                  <span className="text-[9.5px] text-[var(--muted-foreground)] mt-0.5 block">
+                    Número máximo de canjes permitidos.
+                  </span>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">Título de la Campaña *</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Descuento 10% por inauguración de temporada escolar"
-                  value={promoForm.titulo}
-                  onChange={(e) => setPromoForm({ ...promoForm, titulo: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
-                  required
-                />
               </div>
 
               {/* Modalidad de Descuento: Monto Fijo ($), Porcentaje (%) o Por Par */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-[var(--foreground)]">
-                  Modalidad de Descuento *
+                  3. Modalidad de Descuento *
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
@@ -1751,23 +1858,36 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               {/* Mínimo de pares y Fecha de Expiración */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">Mínimo de Pares Requeridos</label>
+                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                    Mínimo de Pares Requeridos *
+                  </label>
                   <input
                     type="number"
                     min="1"
                     value={promoForm.minimoPares}
                     onChange={(e) => setPromoForm({ ...promoForm, minimoPares: e.target.value })}
                     className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">Fecha de Expiración (Opcional)</label>
+                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                    Fecha Límite de la Campaña *
+                  </label>
                   <input
                     type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={promoForm.fechaFin}
-                    onChange={(e) => setPromoForm({ ...promoForm, fechaFin: e.target.value })}
+                    onChange={(e) => {
+                      setPromoForm({ ...promoForm, fechaFin: e.target.value });
+                      if (promoError) setPromoError("");
+                    }}
                     className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
+                    required
                   />
+                  <span className="text-[9.5px] text-[var(--muted-foreground)] mt-0.5 block">
+                    📅 Obligatorio: debe ser hoy o una fecha posterior.
+                  </span>
                 </div>
               </div>
 
@@ -1801,8 +1921,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
                 <button
                   type="button"
-                  onClick={() => setShowPromoModal(false)}
-                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
+                  onClick={() => { setShowPromoModal(false); setPromoError(""); }}
+                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
                 >
                   Cancelar
                 </button>
