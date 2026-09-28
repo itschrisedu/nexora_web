@@ -455,14 +455,11 @@ function ComprobanteContent() {
         },
       };
       descargarPedidoClientePdf(pdfData);
-    }
-  };
-
-  if (loading) {
+      if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-sm font-semibold text-slate-600 dark:text-slate-300">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-sm font-semibold text-slate-600">
           Cargando comprobante oficial digital...
         </p>
       </div>
@@ -471,18 +468,18 @@ function ComprobanteContent() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full text-center shadow-xl">
-          <div className="w-16 h-16 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 max-w-md w-full text-center shadow-lg">
+          <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-100">
             <Receipt size={32} />
           </div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Enlace No Válido</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Enlace No Válido</h2>
+          <p className="text-xs text-slate-500 mt-2 mb-6">
             {error || 'No se pudo cargar el documento digital. Por favor solicite un nuevo enlace.'}
           </p>
           <a
             href="/"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-bold shadow-sm"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
           >
             Ir al inicio
           </a>
@@ -497,12 +494,12 @@ function ComprobanteContent() {
   const esPedido = data.t === 'PEDIDO';
 
   return (
-    <div className="min-h-screen w-full bg-slate-100 dark:bg-slate-950 py-6 sm:py-10 px-3 sm:px-6 pb-24 flex flex-col items-center justify-start overflow-y-auto">
+    <div className="min-h-screen w-full bg-slate-100/70 py-6 sm:py-10 px-3 sm:px-6 pb-24 flex flex-col items-center justify-start overflow-y-auto">
       {/* Botones de acción flotantes / superiores */}
       <div className="w-full max-w-3xl mb-4 flex items-center justify-between gap-3 print:hidden">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+          <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
             Comprobante Digital Oficial
           </span>
         </div>
@@ -511,7 +508,7 @@ function ComprobanteContent() {
           <button
             type="button"
             onClick={() => window.print()}
-            className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Printer size={14} />
             <span>Imprimir</span>
@@ -529,9 +526,9 @@ function ComprobanteContent() {
       </div>
 
       {/* Tarjeta Oficial del Comprobante */}
-      <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xl w-full max-w-3xl overflow-hidden print:shadow-none print:border-0 mb-10">
+      <div className="bg-white text-slate-900 border border-slate-200 rounded-3xl shadow-xl w-full max-w-3xl overflow-hidden print:shadow-none print:border-0 mb-10">
         {/* Cabecera decorativa */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white p-6 sm:p-8">
+        <div className="bg-[#0F172A] text-white p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg text-[10px] font-extrabold uppercase tracking-wider mb-2 border border-emerald-500/30">
@@ -552,7 +549,7 @@ function ComprobanteContent() {
               )}
             </div>
 
-            <div className="sm:text-right bg-white/5 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10 shrink-0">
+            <div className="sm:text-right bg-white/10 p-3.5 rounded-2xl border border-white/15 shrink-0">
               <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">
                 {esAbono
                   ? 'Recibo Oficial de Abono'
@@ -576,8 +573,8 @@ function ComprobanteContent() {
         {/* Cuerpo del comprobante */}
         <div className="p-6 sm:p-8 space-y-6">
           {/* Datos del Cliente o Proveedor */}
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-2">
+          <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-2xl">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-2">
               {esOrden ? 'DATOS DEL PROVEEDOR' : 'DATOS DEL CLIENTE / RECEPTOR'}
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -630,7 +627,7 @@ function ComprobanteContent() {
                   </span>
                 </div>
 
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
+                <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
                   <span className="text-[11px] font-bold text-emerald-800 block">Abono Aplicado</span>
                   <span className="text-lg font-black font-mono text-emerald-700 mt-1 block">
                     -${Number(data.m_abo || 0).toFixed(2)}
@@ -639,8 +636,8 @@ function ComprobanteContent() {
 
                 <div className={`p-4 rounded-2xl border ${
                   Number(data.m_res || 0) <= 0
-                    ? 'bg-blue-50 border-blue-200'
-                    : 'bg-amber-50 border-amber-200'
+                    ? 'bg-blue-50/80 border-blue-200'
+                    : 'bg-amber-50/80 border-amber-200'
                 }`}>
                   <span className={`text-[11px] font-bold block ${
                     Number(data.m_res || 0) <= 0 ? 'text-blue-800' : 'text-amber-800'
@@ -656,7 +653,7 @@ function ComprobanteContent() {
               </div>
 
               {Number(data.m_res || 0) <= 0 ? (
-                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-2.5 text-emerald-800 text-xs font-bold">
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-emerald-800 text-xs font-bold">
                   <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                   <span>¡Excelente! Este abono ha saldado completamente la cuenta pendiente.</span>
                 </div>
@@ -689,9 +686,9 @@ function ComprobanteContent() {
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {(data.items || []).map((it: any, idx: number) => (
                       <tr key={idx}>
-                        <td className="py-2.5 font-bold font-mono">{it.c}</td>
+                        <td className="py-2.5 font-bold font-mono text-slate-900">{it.c}</td>
                         <td className="py-2.5 text-slate-800">{it.d}</td>
-                        <td className="py-2.5 text-right font-mono">${Number(it.u).toFixed(2)}</td>
+                        <td className="py-2.5 text-right font-mono text-slate-700">${Number(it.u).toFixed(2)}</td>
                         <td className="py-2.5 text-right font-mono font-bold text-slate-900">${Number(it.t).toFixed(2)}</td>
                       </tr>
                     ))}
@@ -722,11 +719,11 @@ function ComprobanteContent() {
           {(esOrden || esPedido) && (
             <div className="space-y-4">
               {data.obs && (
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-900 dark:text-amber-200">
-                  <span className="font-extrabold text-[11px] uppercase tracking-wider block text-amber-800 dark:text-amber-300">
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900">
+                  <span className="font-extrabold text-[11px] uppercase tracking-wider block text-amber-800">
                     📝 {esPedido ? 'Observaciones del Pedido:' : 'Observaciones / Instrucciones de Producción:'}
                   </span>
-                  <p className="mt-1 leading-relaxed text-slate-700 dark:text-slate-200">{data.obs}</p>
+                  <p className="mt-1 leading-relaxed text-slate-800">{data.obs}</p>
                 </div>
               )}
 
@@ -734,10 +731,10 @@ function ComprobanteContent() {
                 {esPedido ? 'Artículos y Modelos del Pedido' : 'Modelos y Numeración para Producción'}
               </span>
 
-              <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-2xs">
+              <div className="overflow-x-auto border border-slate-200 rounded-2xl bg-white shadow-2xs">
                 <table className="w-full text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600">
                       <th className="py-3 px-3.5 text-left font-bold tracking-tight">Modelo / Detalle</th>
                       <th className="py-3 px-3.5 text-left font-bold tracking-tight">Color</th>
                       <th className="py-3 px-3.5 text-left font-bold tracking-tight">Curva / Numeración</th>
@@ -745,12 +742,12 @@ function ComprobanteContent() {
                       <th className="py-3 px-4 text-right font-bold tracking-tight">Subtotal</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                  <tbody className="divide-y divide-slate-100 font-medium">
                     {(data.lineas || []).map((l: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                         <td className="py-3 px-3.5">
                           <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                            <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
                               {l.img ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -760,32 +757,32 @@ function ComprobanteContent() {
                                   loading="lazy"
                                 />
                               ) : (
-                                <Package size={18} className="text-slate-400 dark:text-slate-500" />
+                                <Package size={18} className="text-slate-400" />
                               )}
                             </div>
                             <div className="min-w-0">
-                              <span className="font-bold text-slate-900 dark:text-slate-100 block truncate">{l.m}</span>
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
+                              <span className="font-bold text-slate-900 block truncate">{l.m}</span>
+                              <span className="text-[10px] text-slate-500 font-mono block">
                                 {l.c} {l.ser ? `• ${l.ser}` : ''}
                               </span>
                               {l.obs && (
-                                <span className="text-[10px] text-amber-800 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 block mt-1 font-medium max-w-xs">
+                                <span className="text-[10px] text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 block mt-1 font-medium max-w-xs">
                                   Nota: {l.obs}
                                 </span>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 px-3.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">{l.col || '—'}</td>
-                        <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 font-mono text-[11px] leading-relaxed">
+                        <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap">{l.col || '—'}</td>
+                        <td className="py-3 px-3.5 text-slate-600 font-mono text-[11px] leading-relaxed">
                           {l.num || 'Serie Estándar'}
                         </td>
                         <td className="py-3 px-4 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono font-bold text-xs border border-slate-200/80 dark:border-slate-700">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-mono font-bold text-xs border border-slate-200">
                             {l.qty} pares
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 text-xs whitespace-nowrap">
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 text-xs whitespace-nowrap">
                           ${Number(l.tot || 0).toFixed(2)}
                         </td>
                       </tr>
@@ -794,36 +791,36 @@ function ComprobanteContent() {
                 </table>
               </div>
 
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="pt-4 border-t border-slate-200 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">
-                      Total de pares: <strong className="text-slate-900 dark:text-white font-mono">{data.pares} pares</strong>
+                    <span className="text-xs text-slate-500 font-medium block">
+                      Total de pares: <strong className="text-slate-900 font-mono">{data.pares} pares</strong>
                     </span>
                     {(data.fp || data.ref) && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold border border-slate-200 dark:border-slate-700">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold border border-slate-200">
                         <CreditCard size={12} className="text-emerald-600" />
                         <span>Pago: <strong>{data.fp || 'TRANSFERENCIA'}</strong></span>
-                        {data.ref ? <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">• Ref: #{data.ref}</span> : null}
+                        {data.ref ? <span className="font-mono text-emerald-600 font-bold">• Ref: #{data.ref}</span> : null}
                       </div>
                     )}
                   </div>
 
-                  <div className="text-right space-y-1 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 min-w-[200px]">
+                  <div className="text-right space-y-1 bg-slate-50 p-3 rounded-2xl border border-slate-200 min-w-[200px]">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500 dark:text-slate-400">{esPedido ? 'Total Pedido:' : 'Total Liquidar:'}</span>
-                      <span className="font-bold font-mono text-slate-900 dark:text-white">${Number(data.tot || 0).toFixed(2)}</span>
+                      <span className="text-slate-500">{esPedido ? 'Total Pedido:' : 'Total Liquidar:'}</span>
+                      <span className="font-bold font-mono text-slate-900">${Number(data.tot || 0).toFixed(2)}</span>
                     </div>
 
                     {Number(data.ad || 0) > 0 && (
                       <>
-                        <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                        <div className="flex justify-between items-center text-xs text-emerald-600 font-semibold">
                           <span>Anticipo ({data.met_ad || 'Depósito'}):</span>
                           <span className="font-mono font-bold">-${Number(data.ad).toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-sm font-black pt-1 border-t border-slate-200 dark:border-slate-700">
-                          <span className="text-amber-700 dark:text-amber-400">Saldo Pendiente:</span>
-                          <span className="font-mono text-amber-600 dark:text-amber-400">${Number(data.sal || 0).toFixed(2)}</span>
+                        <div className="flex justify-between items-center text-sm font-black pt-1 border-t border-slate-200">
+                          <span className="text-amber-700">Saldo Pendiente:</span>
+                          <span className="font-mono text-amber-600">${Number(data.sal || 0).toFixed(2)}</span>
                         </div>
                       </>
                     )}
@@ -853,8 +850,8 @@ export default function ComprobantePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex items-center justify-center">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
         </div>
       }
     >
