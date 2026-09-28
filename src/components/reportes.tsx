@@ -44,8 +44,16 @@ import PdfPreviewModal from '@/components/ui/pdf-preview-modal';
 import {
   generarReporteCobranzasPdf,
   generarReporteCampanasPdf,
+  generarReporteResumenEjecutivoPdf,
+  generarReporteModelosRotacionPdf,
+  generarReporteProductividadVendedoresPdf,
+  generarReporteFinanzasMetodosPdf,
+  generarReporteProyeccionMlPdf,
+  generarReporteGeneralIntegralPdf,
   ClienteDeudor,
   CampanaReporte,
+  ModeloReporte,
+  VendedorReporte,
 } from '@/services/pdf-reportes.service';
 import { jsPDF } from 'jspdf';
 
@@ -77,6 +85,11 @@ export default function ReportesComponent() {
   const [tabActiva, setTabActiva] = useState<TabReporte>('resumen');
   const [negocioInfo, setNegocioInfo] = useState<any>(null);
 
+  // Filtros específicos para Productividad por Trabajador
+  const [filtroTrabajadorTexto, setFiltroTrabajadorTexto] = useState('');
+  const [filtroTrabajadorRol, setFiltroTrabajadorRol] = useState('TODOS');
+  const [filtroTrabajadorOrden, setFiltroTrabajadorOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PEDIDOS_DESC' | 'VENTAS_ASC'>('VENTAS_DESC');
+
   // Estado de Reporte de Cobranzas (Clientes Deudores)
   const [loadingCobranzas, setLoadingCobranzas] = useState(false);
   const [cobranzasData, setCobranzasData] = useState<any>(null);
@@ -99,6 +112,7 @@ export default function ReportesComponent() {
   const [pdfDocPreview, setPdfDocPreview] = useState<jsPDF | null>(null);
   const [previewTitulo, setPreviewTitulo] = useState('Previsualización de Documento');
   const [previewNombreArchivo, setPreviewNombreArchivo] = useState('reporte-nexora.pdf');
+  const [generandoGeneralPdf, setGenerandoGeneralPdf] = useState(false);
 
   useEffect(() => {
     cargarVendedores();
@@ -188,7 +202,7 @@ export default function ReportesComponent() {
       console.error('Error al cargar reporte de campañas:', err);
       showToast('Error al obtener reporte de campañas promocionales.', 'warning');
     } finally {
-      setLoadingCampanas(false);
+      setLoadingCobranzas(false);
     }
   };
 
@@ -205,7 +219,161 @@ export default function ReportesComponent() {
     }
   };
 
-  // ── Generación de PDF de Cobranzas ──
+  const obtenerNegocioPayload = () => ({
+    nombre: negocioInfo?.nombre || 'CALZADO COMERCIAL',
+    ruc: negocioInfo?.ruc || '1800000000001',
+    direccion: negocioInfo?.direccion || 'Cevallos, Tungurahua, Ecuador',
+    telefono: negocioInfo?.telefono || '',
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // GENERADORES DE PDF PARA TODAS LAS SECCIONES
+  // ══════════════════════════════════════════════════════════════
+
+  // 1. INFORME GENERAL CONSOLIDADO (UNIFICA TODO EL NEGOCIO)
+  const handleReporteGeneralIntegral = async (modo: 'preview' | 'download') => {
+    setGenerandoGeneralPdf(true);
+    try {
+      let cobData = cobranzasData;
+      let campData = campanasData;
+      let mlData = proyeccionMl;
+
+      if (!cobData) {
+        try {
+          cobData = await ApiService.get('/reportes/cobranzas');
+          setCobranzasData(cobData);
+        } catch (e) {}
+      }
+      if (!campData) {
+        try {
+          campData = await ApiService.get('/reportes/campanas');
+          setCampanasData(campData);
+        } catch (e) {}
+      }
+      if (!mlData) {
+        try {
+          mlData = await ApiService.get('/reportes/proyeccion-ml?horizonteDias=30');
+          setProyeccionMl(mlData);
+        } catch (e) {}
+      }
+
+      const payload = {
+        negocio: obtenerNegocioPayload(),
+        periodo,
+        fechaGeneracion: new Date().toLocaleString('es-EC'),
+        kpis,
+        serieTemporal: reporteData?.serieTemporal || [],
+        topModelos: reporteData?.topModelos || [],
+        bajaRotacion: reporteData?.bajaRotacion || [],
+        rankingVendedores: reporteData?.rankingVendedores || [],
+        cobranzas: cobData ? {
+          totalCartera: cobData.totalCartera || 0,
+          totalClientes: cobData.totalClientes || 0,
+          clientes: cobData.clientes || [],
+        } : undefined,
+        campanas: campData?.campanas || [],
+        distribucionMetodos: reporteData?.distribucionMetodosAbono || {},
+        proyeccionMl: mlData || undefined,
+      };
+
+      const doc = generarReporteGeneralIntegralPdf(payload);
+      const nombre = `informe_general_consolidado_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo('Informe General Consolidado — Business Intelligence');
+        setPreviewNombreArchivo(nombre);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombre);
+        showToast('Informe General Consolidado descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando informe general:', err);
+      showToast('Error al generar el informe general consolidado.', 'error');
+    } finally {
+      setGenerandoGeneralPdf(false);
+    }
+  };
+
+  // 2. RESUMEN EJECUTIVO
+  const handleReporteResumenPdf = (modo: 'preview' | 'download') => {
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      kpis,
+      serieTemporal: reporteData?.serieTemporal || [],
+      topModelos: reporteData?.topModelos || [],
+      rankingVendedores: reporteData?.rankingVendedores || [],
+    };
+
+    const doc = generarReporteResumenEjecutivoPdf(payload);
+    const nombre = `reporte_resumen_ejecutivo_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Resumen Ejecutivo & KPIs');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Resumen Ejecutivo descargado exitosamente.', 'success');
+    }
+  };
+
+  // 3. ROTACIÓN DE CALZADO & MODELOS
+  const handleReporteModelosPdf = (modo: 'preview' | 'download') => {
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      topModelos: (reporteData?.topModelos as ModeloReporte[]) || [],
+      bajaRotacion: reporteData?.bajaRotacion || [],
+      totalParesVendidos: kpis.totalParesVendidos || 0,
+      totalIngresosModelos: kpis.totalIngresos || 0,
+    };
+
+    const doc = generarReporteModelosRotacionPdf(payload);
+    const nombre = `reporte_rotacion_calzado_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Rotación de Calzado & Modelos');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Rotación de Calzado descargado exitosamente.', 'success');
+    }
+  };
+
+  // 4. PRODUCTIVIDAD POR TRABAJADOR
+  const handleReporteProductividadPdf = (modo: 'preview' | 'download') => {
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      totalIngresosSucursal: kpis.totalIngresos || 0,
+      totalParesSucursal: kpis.totalParesVendidos || 0,
+      vendedores: (reporteData?.rankingVendedores as VendedorReporte[]) || [],
+    };
+
+    const doc = generarReporteProductividadVendedoresPdf(payload);
+    const nombre = `reporte_productividad_personal_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Productividad por Trabajador');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Productividad descargado exitosamente.', 'success');
+    }
+  };
+
+  // 5. COBRANZAS & CLIENTES DEUDORES
   const handleReporteCobranzasPdf = (modo: 'preview' | 'download') => {
     if (!cobranzasData || !cobranzasData.clientes) {
       showToast('No hay datos de cobranzas disponibles para generar el PDF.', 'warning');
@@ -213,13 +381,8 @@ export default function ReportesComponent() {
     }
 
     const payload = {
-      negocio: {
-        nombre: negocioInfo?.nombre || 'CALZADO COMERCIAL',
-        ruc: negocioInfo?.ruc || '1800000000001',
-        direccion: negocioInfo?.direccion || 'Cevallos, Tungurahua, Ecuador',
-        telefono: negocioInfo?.telefono || '',
-      },
-      periodo: periodo,
+      negocio: obtenerNegocioPayload(),
+      periodo,
       fechaGeneracion: new Date().toLocaleString('es-EC'),
       totalCartera: cobranzasData.totalCartera || 0,
       totalClientes: cobranzasData.totalClientes || 0,
@@ -241,7 +404,7 @@ export default function ReportesComponent() {
     }
   };
 
-  // ── Generación de PDF de Campañas ──
+  // 6. CAMPAÑAS Y PROMOCIONES
   const handleReporteCampanasPdf = (modo: 'preview' | 'download') => {
     if (!campanasData || !campanasData.campanas) {
       showToast('No hay datos de campañas disponibles para generar el PDF.', 'warning');
@@ -249,13 +412,8 @@ export default function ReportesComponent() {
     }
 
     const payload = {
-      negocio: {
-        nombre: negocioInfo?.nombre || 'CALZADO COMERCIAL',
-        ruc: negocioInfo?.ruc || '1800000000001',
-        direccion: negocioInfo?.direccion || 'Cevallos, Tungurahua, Ecuador',
-        telefono: negocioInfo?.telefono || '',
-      },
-      periodo: periodo,
+      negocio: obtenerNegocioPayload(),
+      periodo,
       fechaGeneracion: new Date().toLocaleString('es-EC'),
       campanas: campanasData.campanas as CampanaReporte[],
     };
@@ -271,6 +429,59 @@ export default function ReportesComponent() {
     } else {
       doc.save(nombre);
       showToast('Reporte de campañas descargado exitosamente.', 'success');
+    }
+  };
+
+  // 7. FINANZAS & MÉTODOS DE PAGO
+  const handleReporteFinanzasPdf = (modo: 'preview' | 'download') => {
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      periodo,
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      totalRecaudadoCobros: kpis.totalRecaudadoCobros || 0,
+      saldoCarteraTotal: kpis.saldoCarteraTotal || 0,
+      totalIngresosVentas: kpis.totalIngresos || 0,
+      distribucionMetodosAbono: reporteData?.distribucionMetodosAbono || {},
+    };
+
+    const doc = generarReporteFinanzasMetodosPdf(payload);
+    const nombre = `reporte_finanzas_metodos_pago_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Finanzas & Métodos de Recaudación');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Finanzas descargado exitosamente.', 'success');
+    }
+  };
+
+  // 8. PROYECCIÓN IA / MACHINE LEARNING
+  const handleReporteProyeccionMlPdf = (modo: 'preview' | 'download') => {
+    if (!proyeccionMl) {
+      showToast('Por favor calcula la inferencia IA antes de previsualizar el reporte.', 'warning');
+      return;
+    }
+
+    const payload = {
+      negocio: obtenerNegocioPayload(),
+      fechaGeneracion: new Date().toLocaleString('es-EC'),
+      ml: proyeccionMl,
+    };
+
+    const doc = generarReporteProyeccionMlPdf(payload);
+    const nombre = `reporte_proyeccion_ia_ml_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (modo === 'preview') {
+      setPdfDocPreview(doc);
+      setPreviewTitulo('Reporte de Pronóstico de Demanda Inteligente (Nexora ML)');
+      setPreviewNombreArchivo(nombre);
+      setPreviewModalOpen(true);
+    } else {
+      doc.save(nombre);
+      showToast('Reporte de Proyección IA descargado exitosamente.', 'success');
     }
   };
 
@@ -310,12 +521,12 @@ export default function ReportesComponent() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={cargarReporte}
             disabled={loading}
-            className="px-4 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            className="px-3.5 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             <span>Actualizar</span>
@@ -323,11 +534,24 @@ export default function ReportesComponent() {
 
           <button
             type="button"
-            onClick={handleImprimirReporte}
-            className="px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+            onClick={() => handleReporteGeneralIntegral('preview')}
+            disabled={generandoGeneralPdf || loading}
+            className="px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+            title="Previsualizar el informe integral consolidado de toda la sucursal"
           >
-            <Printer size={14} />
-            <span>Imprimir Informe</span>
+            {generandoGeneralPdf ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+            <span>Previsualizar Informe General</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleReporteGeneralIntegral('download')}
+            disabled={generandoGeneralPdf || loading}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+            title="Descargar PDF consolidado con todas las áreas del negocio"
+          >
+            <Download size={14} />
+            <span>Descargar Informe General</span>
           </button>
         </div>
       </div>
@@ -500,6 +724,44 @@ export default function ReportesComponent() {
           {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'resumen' && (
             <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Resumen */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl">
+                    <BarChart3 size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Resumen Ejecutivo & Indicadores Clave (KPIs)
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Facturación total, volumen de calzado, margen bruto y comportamiento de ventas
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteResumenPdf('preview')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteResumenPdf('download')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
               {/* Tarjetas KPIs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* 1. Facturación Total */}
@@ -713,6 +975,44 @@ export default function ReportesComponent() {
           {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'modelos' && (
             <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Modelos */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-500/10 text-amber-600 rounded-2xl">
+                    <ShoppingBag size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Rotación de Calzado & Catálogo de Modelos
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Análisis de modelos estrella más demandados y alertas de calzado con baja rotación en bodega
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteModelosPdf('preview')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteModelosPdf('download')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
               {/* Top 10 Modelos Estrella */}
               <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
@@ -822,82 +1122,195 @@ export default function ReportesComponent() {
           {/* TAB 3: PRODUCTIVIDAD POR TRABAJADOR                            */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'vendedores' && (
-            <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
-                    <Users className="text-[#0F172A]" size={18} />
-                    <span>Ranking y Rendimiento del Personal de Ventas</span>
-                  </h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Desglose de pedidos, pares comercializados y volumen facturado por cada colaborador
-                  </p>
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Productividad */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-indigo-500/10 text-indigo-600 rounded-2xl">
+                    <Users size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Productividad por Trabajador
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Rendimiento individual, pedidos atendidos, pares comercializados y contribución al local
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs font-bold text-[var(--muted-foreground)] px-3 py-1 bg-[var(--muted)]/40 rounded-xl">
-                  {reporteData?.rankingVendedores?.length || 0} trabajadores
-                </span>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProductividadPdf('preview')}
+                    disabled={loading || !reporteData?.rankingVendedores?.length}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProductividadPdf('download')}
+                    disabled={loading || !reporteData?.rankingVendedores?.length}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-                    <tr>
-                      <th className="px-4 py-3">Posición / Trabajador</th>
-                      <th className="px-4 py-3 text-center">Rol</th>
-                      <th className="px-4 py-3 text-center">Pedidos Realizados</th>
-                      <th className="px-4 py-3 text-center">Pares Vendidos</th>
-                      <th className="px-4 py-3 text-right">Monto Total Facturado</th>
-                      <th className="px-4 py-3 text-right">% Contribución Sucursal</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border)]">
-                    {reporteData?.rankingVendedores?.map((v: any, index: number) => {
-                      const contribucionPct = kpis.totalIngresos > 0 ? (v.ingresosFacturados / kpis.totalIngresos) * 100 : 0;
-                      return (
-                        <tr key={v.userId ? `vend-${v.userId}` : `vend-${index}`} className="hover:bg-[var(--muted)]/20">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
-                                index === 0 ? 'bg-amber-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : 'bg-slate-200 text-slate-700'
-                              }`}>
-                                #{index + 1}
-                              </span>
-                              <div>
-                                <span className="font-extrabold text-xs text-[var(--foreground)] block">{v.nombre}</span>
-                                <span className="text-[10px] text-[var(--muted-foreground)]">{v.email || 'Sin correo'}</span>
-                              </div>
-                            </div>
-                          </td>
+              {/* Componente de Filtro Avanzado para Trabajadores */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col md:flex-row items-center gap-3 shadow-xs">
+                <div className="relative flex-1 w-full">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={filtroTrabajadorTexto}
+                    onChange={(e) => setFiltroTrabajadorTexto(e.target.value)}
+                    placeholder="Buscar trabajador por nombre o correo electrónico..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
 
-                          <td className="px-4 py-3 text-center">
-                            <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] rounded-md font-bold text-[10px]">
-                              {v.rol.replace('ROL_', '')}
-                            </span>
-                          </td>
+                <div className="w-full md:w-48">
+                  <select
+                    value={filtroTrabajadorRol}
+                    onChange={(e) => setFiltroTrabajadorRol(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="TODOS">Todos los Roles</option>
+                    <option value="ADMIN">Administrador</option>
+                    <option value="VENDEDOR">Vendedor</option>
+                    <option value="BODEGUERO">Bodeguero</option>
+                    <option value="PRODUCCION">Producción</option>
+                  </select>
+                </div>
 
-                          <td className="px-4 py-3 text-center font-bold">{v.pedidosCount} pedidos</td>
+                <div className="w-full md:w-56">
+                  <select
+                    value={filtroTrabajadorOrden}
+                    onChange={(e) => setFiltroTrabajadorOrden(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="VENTAS_DESC">Mayor Facturación ($)</option>
+                    <option value="PARES_DESC">Más Pares Vendidos</option>
+                    <option value="PEDIDOS_DESC">Más Pedidos Atendidos</option>
+                    <option value="VENTAS_ASC">Menor Facturación ($)</option>
+                  </select>
+                </div>
+              </div>
 
-                          <td className="px-4 py-3 text-center font-black text-indigo-600 dark:text-indigo-400">
-                            {v.paresVendidos} pares
-                          </td>
+              {/* Tabla de Ranking y Productividad */}
+              <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                      <Users className="text-[#0F172A]" size={18} />
+                      <span>Ranking y Rendimiento del Personal de Ventas</span>
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Desglose de pedidos, pares comercializados y volumen facturado por cada colaborador
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-[var(--muted-foreground)] px-3 py-1 bg-[var(--muted)]/40 rounded-xl">
+                    {reporteData?.rankingVendedores?.length || 0} trabajadores
+                  </span>
+                </div>
 
-                          <td className="px-4 py-3 text-right font-black text-emerald-600 text-sm">
-                            ${v.ingresosFacturados.toFixed(2)}
-                          </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                      <tr>
+                        <th className="px-4 py-3">Posición / Trabajador</th>
+                        <th className="px-4 py-3 text-center">Rol</th>
+                        <th className="px-4 py-3 text-center">Pedidos Realizados</th>
+                        <th className="px-4 py-3 text-center">Pares Vendidos</th>
+                        <th className="px-4 py-3 text-right">Monto Total Facturado</th>
+                        <th className="px-4 py-3 text-right">% Contribución Sucursal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {(() => {
+                        const listaTrabajadores: any[] = (reporteData?.rankingVendedores || []).filter((v: any) => {
+                          const matchTexto =
+                            !filtroTrabajadorTexto ||
+                            v.nombre?.toLowerCase().includes(filtroTrabajadorTexto.toLowerCase()) ||
+                            v.email?.toLowerCase().includes(filtroTrabajadorTexto.toLowerCase());
+                          const matchRol =
+                            filtroTrabajadorRol === 'TODOS' ||
+                            v.rol === filtroTrabajadorRol ||
+                            v.rol === `ROL_${filtroTrabajadorRol}`;
+                          return matchTexto && matchRol;
+                        }).sort((a: any, b: any) => {
+                          if (filtroTrabajadorOrden === 'VENTAS_DESC') return (b.ingresosFacturados || 0) - (a.ingresosFacturados || 0);
+                          if (filtroTrabajadorOrden === 'PARES_DESC') return (b.paresVendidos || 0) - (a.paresVendidos || 0);
+                          if (filtroTrabajadorOrden === 'PEDIDOS_DESC') return (b.pedidosCount || 0) - (a.pedidosCount || 0);
+                          if (filtroTrabajadorOrden === 'VENTAS_ASC') return (a.ingresosFacturados || 0) - (b.ingresosFacturados || 0);
+                          return 0;
+                        });
 
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="w-16 bg-[var(--muted)] h-2 rounded-full overflow-hidden">
-                                <div style={{ width: `${contribucionPct}%` }} className="bg-[#0F172A] h-full rounded-full" />
-                              </div>
-                              <span className="font-bold text-[11px] text-[var(--foreground)]">{contribucionPct.toFixed(1)}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        if (listaTrabajadores.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={6} className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                                No se encontraron colaboradores que coincidan con los filtros de búsqueda.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return listaTrabajadores.map((v: any, index: number) => {
+                          const contribucionPct = kpis.totalIngresos > 0 ? (v.ingresosFacturados / kpis.totalIngresos) * 100 : 0;
+                          return (
+                            <tr key={v.userId ? `vend-${v.userId}` : `vend-${index}`} className="hover:bg-[var(--muted)]/20">
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2.5">
+                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
+                                    index === 0 ? 'bg-amber-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : 'bg-slate-200 text-slate-700'
+                                  }`}>
+                                    #{index + 1}
+                                  </span>
+                                  <div>
+                                    <span className="font-extrabold text-xs text-[var(--foreground)] block">{v.nombre}</span>
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">{v.email || 'Sin correo'}</span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] rounded-md font-bold text-[10px]">
+                                  {v.rol.replace('ROL_', '')}
+                                </span>
+                              </td>
+
+                              <td className="px-4 py-3 text-center font-bold">{v.pedidosCount} pedidos</td>
+
+                              <td className="px-4 py-3 text-center font-black text-indigo-600 dark:text-indigo-400">
+                                {v.paresVendidos} pares
+                              </td>
+
+                              <td className="px-4 py-3 text-right font-black text-emerald-600 text-sm">
+                                ${v.ingresosFacturados.toFixed(2)}
+                              </td>
+
+                              <td className="px-4 py-3 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="w-16 bg-[var(--muted)] h-2 rounded-full overflow-hidden">
+                                    <div style={{ width: `${contribucionPct}%` }} className="bg-[#0F172A] h-full rounded-full" />
+                                  </div>
+                                  <span className="font-bold text-[11px] text-[var(--foreground)]">{contribucionPct.toFixed(1)}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1428,6 +1841,44 @@ export default function ReportesComponent() {
           {/* ══════════════════════════════════════════════════════════════ */}
           {tabActiva === 'finanzas' && (
             <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Finanzas */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+                    <DollarSign size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte Financiero & Canales de Recaudación
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Desglose de liquidez por método de abono, efectivo, transferencias bancarias y cartera pendiente
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteFinanzasPdf('preview')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteFinanzasPdf('download')}
+                    disabled={loading || !reporteData}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Desglose de Métodos de Pago en Cobranzas */}
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
@@ -1511,15 +1962,37 @@ export default function ReportesComponent() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={cargarProyeccionMl}
-                  disabled={loadingMl}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                >
-                  <Sparkles size={14} className={loadingMl ? 'animate-spin' : ''} />
-                  <span>{loadingMl ? 'Calculando Inferencia...' : 'Recalcular Proyección IA'}</span>
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarProyeccionMl}
+                    disabled={loadingMl}
+                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Sparkles size={14} className={loadingMl ? 'animate-spin' : ''} />
+                    <span>{loadingMl ? 'Calculando...' : 'Recalcular Proyección'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProyeccionMlPdf('preview')}
+                    disabled={loadingMl || !proyeccionMl}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProyeccionMlPdf('download')}
+                    disabled={loadingMl || !proyeccionMl}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
               </div>
 
               {loadingMl ? (
