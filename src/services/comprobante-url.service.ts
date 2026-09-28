@@ -143,26 +143,24 @@ export function decodificarPayload(rawInput: string): any {
  */
 export function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): string {
   const base = obtenerUrlBase();
-  const numComprobante = data.comprobante.numero?.trim() || 'REC';
+  const num = data.comprobante.numero?.trim() || 'REC';
 
-  const payload = {
-    t: 'A',
-    n: numComprobante,
-    f: data.comprobante.fecha,
-    h: data.comprobante.hora || '',
-    fp: data.comprobante.formaPago || 'EFECTIVO',
-    c: data.cliente.nombre,
-    id: data.cliente.cedula || '',
-    m: [
-      Math.round(Number(data.movimiento.saldoAnterior || 0) * 100) / 100,
-      Math.round(Number(data.movimiento.montoAbonado || 0) * 100) / 100,
-      Math.round(Number(data.movimiento.saldoRestante || 0) * 100) / 100,
-    ],
-    e: data.emisor.nombre || 'NEXORA',
-    ref: data.comprobante.referencia || undefined,
-  };
+  // Formato compacto en array para máxima seguridad y mínima longitud
+  const compactArray = [
+    'A',
+    num,
+    data.comprobante.fecha || '',
+    data.comprobante.hora || '',
+    data.comprobante.formaPago || 'EFECTIVO',
+    data.cliente.nombre || 'Cliente',
+    Math.round(Number(data.movimiento.saldoAnterior || 0) * 100) / 100,
+    Math.round(Number(data.movimiento.montoAbonado || 0) * 100) / 100,
+    Math.round(Number(data.movimiento.saldoRestante || 0) * 100) / 100,
+    data.emisor.nombre || 'NEXORA',
+    data.cliente.cedula || '',
+  ];
 
-  const encoded = codificarPayload(payload);
+  const encoded = codificarPayload(compactArray);
   return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 
@@ -171,25 +169,30 @@ export function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): string {
  */
 export function generarUrlPublicaFactura(data: FacturaPdfData): string {
   const base = obtenerUrlBase();
-  const numFactura = data.comprobante.numero?.trim() || 'FAC';
+  const num = data.comprobante.numero?.trim() || 'FAC';
+  const subtotal = (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0));
+  const iva = Number(data.totales?.iva15 || 0);
+  const total = Number(data.totales?.total || 0);
 
-  const subtotalFactura = (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0));
-  const ivaFactura = Number(data.totales?.iva15 || 0);
-  const totalFactura = Number(data.totales?.total || 0);
+  const compactArray = [
+    'F',
+    num,
+    data.comprobante.fecha || '',
+    data.comprador.nombre || 'Cliente',
+    data.comprador.cedula || '',
+    subtotal,
+    iva,
+    total,
+    data.emisor.nombre || 'NEXORA',
+    (data.detalles || []).slice(0, 10).map((it) => [
+      it.descripcion || 'Calzado',
+      it.cantidad || 1,
+      it.precioUnitario || 0,
+      it.subtotal || 0,
+    ]),
+  ];
 
-  const payload = {
-    t: 'F',
-    n: numFactura,
-    f: data.comprobante.fecha,
-    c: data.comprador.nombre,
-    id: data.comprador.cedula,
-    sub: subtotalFactura,
-    iva: ivaFactura,
-    tot: totalFactura,
-    e: data.emisor.nombre,
-  };
-
-  const encoded = codificarPayload(payload);
+  const encoded = codificarPayload(compactArray);
   return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 
@@ -198,27 +201,27 @@ export function generarUrlPublicaFactura(data: FacturaPdfData): string {
  */
 export function generarUrlPublicaOrden(data: OrdenCompraPdfData): string {
   const base = obtenerUrlBase();
-  const numOrden = data.orden.numero?.trim() || 'ORD';
+  const num = data.orden.numero?.trim() || 'ORD';
 
-  const payload = {
-    t: 'O',
-    n: numOrden,
-    f: data.orden.fecha,
-    p: data.proveedor.nombre,
-    pares: data.totales.totalPares,
-    tot: data.totales.totalPagar,
-    e: data.emisor.nombre,
-    l: (data.lineas || []).slice(0, 10).map((l) => ({
-      m: l.modelo,
-      col: l.color || '',
-      num: l.numeracion || '',
-      qty: l.cantidadPares,
-      u: l.precioCosto,
-      tot: l.subtotal,
-    })),
-  };
+  const compactArray = [
+    'O',
+    num,
+    data.orden.fecha || '',
+    data.proveedor.nombre || 'Proveedor',
+    data.totales.totalPares || 0,
+    data.totales.totalPagar || 0,
+    data.emisor.nombre || 'NEXORA',
+    (data.lineas || []).slice(0, 10).map((l) => [
+      l.modelo || 'Calzado',
+      l.color || '',
+      l.numeracion || '',
+      l.cantidadPares || 1,
+      l.precioCosto || 0,
+      l.subtotal || 0,
+    ]),
+  ];
 
-  const encoded = codificarPayload(payload);
+  const encoded = codificarPayload(compactArray);
   return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 
@@ -270,29 +273,29 @@ export interface PedidoClienteComprobanteData {
  */
 export function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteData): string {
   const base = obtenerUrlBase();
-  const idPedido = data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : data.pedido.id.slice(0, 8));
+  const num = data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : data.pedido.id.slice(0, 8));
 
-  const payload = {
-    t: 'P',
-    n: idPedido,
-    f: data.pedido.fecha,
-    c: data.cliente.nombre,
-    pares: data.totales.totalPares,
-    tot: data.totales.totalPagar,
-    ad: data.totales.adelanto || 0,
-    sal: data.totales.saldoPendiente || 0,
-    e: data.emisor.nombre,
-    l: (data.lineas || []).slice(0, 10).map((l) => ({
-      m: l.modelo,
-      col: l.color || '',
-      num: l.numeracion || '',
-      qty: l.cantidadPares,
-      u: l.precioUnitario,
-      tot: l.subtotal,
-    })),
-  };
+  const compactArray = [
+    'P',
+    num,
+    data.pedido.fecha || '',
+    data.cliente.nombre || 'Cliente',
+    data.totales.totalPares || 0,
+    data.totales.totalPagar || 0,
+    data.totales.adelanto || 0,
+    data.totales.saldoPendiente || 0,
+    data.emisor.nombre || 'NEXORA',
+    (data.lineas || []).slice(0, 8).map((l) => [
+      l.modelo || 'Calzado',
+      l.color || '',
+      l.numeracion || '',
+      l.cantidadPares || 1,
+      l.precioUnitario || 0,
+      l.subtotal || 0,
+    ]),
+  ];
 
-  const encoded = codificarPayload(payload);
+  const encoded = codificarPayload(compactArray);
   return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 

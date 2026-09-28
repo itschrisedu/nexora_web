@@ -106,10 +106,93 @@ function ComprobanteContent() {
     if (rawData) {
       try {
         const decoded = decodificarPayload(rawData);
-        if (!decoded || (!decoded.t && !decoded.num && !decoded.n)) {
+        if (!decoded) {
           setError('El enlace de comprobante no es válido o ha sido modificado.');
-        } else {
-          // Normalizar si viene en formato ultra-compacto
+        } else if (Array.isArray(decoded)) {
+          // Formato Array Ultracompacto
+          const tipo = decoded[0];
+          let normalized: any = null;
+
+          if (tipo === 'A') {
+            normalized = {
+              t: 'ABONO',
+              num: decoded[1] || 'REC',
+              f: decoded[2] || '',
+              h: decoded[3] || '',
+              fp: decoded[4] || 'EFECTIVO',
+              c_nom: decoded[5] || 'Cliente',
+              m_ant: Number(decoded[6] || 0),
+              m_abo: Number(decoded[7] || 0),
+              m_res: Number(decoded[8] || 0),
+              e_nom: decoded[9] || 'NEXORA',
+              c_id: decoded[10] || '',
+            };
+          } else if (tipo === 'P') {
+            normalized = {
+              t: 'PEDIDO',
+              num: decoded[1] || 'PED',
+              f: decoded[2] || '',
+              c_nom: decoded[3] || 'Cliente',
+              pares: Number(decoded[4] || 0),
+              tot: Number(decoded[5] || 0),
+              ad: Number(decoded[6] || 0),
+              sal: Number(decoded[7] || 0),
+              e_nom: decoded[8] || 'NEXORA',
+              lineas: (decoded[9] || []).map((l: any) => Array.isArray(l) ? {
+                m: l[0] || 'Calzado',
+                col: l[1] || '',
+                num: l[2] || '',
+                qty: Number(l[3] || 1),
+                u: Number(l[4] || 0),
+                tot: Number(l[5] || 0),
+              } : l),
+            };
+          } else if (tipo === 'O') {
+            normalized = {
+              t: 'ORDEN',
+              num: decoded[1] || 'ORD',
+              f: decoded[2] || '',
+              p_nom: decoded[3] || 'Proveedor',
+              pares: Number(decoded[4] || 0),
+              tot: Number(decoded[5] || 0),
+              e_nom: decoded[6] || 'NEXORA',
+              lineas: (decoded[7] || []).map((l: any) => Array.isArray(l) ? {
+                m: l[0] || 'Calzado',
+                col: l[1] || '',
+                num: l[2] || '',
+                qty: Number(l[3] || 1),
+                u: Number(l[4] || 0),
+                tot: Number(l[5] || 0),
+              } : l),
+            };
+          } else if (tipo === 'F') {
+            normalized = {
+              t: 'FACTURA',
+              num: decoded[1] || 'FAC',
+              f: decoded[2] || '',
+              c_nom: decoded[3] || 'Cliente',
+              c_id: decoded[4] || '',
+              sub: Number(decoded[5] || 0),
+              iva: Number(decoded[6] || 0),
+              tot: Number(decoded[7] || 0),
+              e_nom: decoded[8] || 'NEXORA',
+              items: (decoded[9] || []).map((it: any) => Array.isArray(it) ? {
+                d: it[0] || 'Calzado',
+                c: Number(it[1] || 1),
+                u: Number(it[2] || 0),
+                t: Number(it[3] || 0),
+              } : it),
+            };
+          }
+
+          if (normalized) {
+            setData(normalized);
+            setError(null);
+          } else {
+            setError('Formato de comprobante no reconocido.');
+          }
+        } else if (decoded.t || decoded.num || decoded.n) {
+          // Formato Objeto tradicional
           const normalized = {
             t: decoded.t === 'A' ? 'ABONO' : (decoded.t === 'P' ? 'PEDIDO' : (decoded.t === 'O' ? 'ORDEN' : decoded.t)),
             num: decoded.num || decoded.n || 'S/N',
@@ -129,7 +212,14 @@ function ComprobanteContent() {
             e_dir: decoded.e_dir || '',
             e_tel: decoded.e_tel || '',
             items: decoded.items || decoded.i || [],
-            lineas: decoded.lineas || decoded.l || [],
+            lineas: (decoded.lineas || decoded.l || []).map((l: any) => Array.isArray(l) ? {
+              m: l[0],
+              col: l[1],
+              num: l[2],
+              qty: l[3],
+              u: l[4],
+              tot: l[5],
+            } : l),
             pares: decoded.pares || decoded.p || 0,
             tot: decoded.tot || decoded.total || 0,
             sub: decoded.sub || 0,
@@ -138,6 +228,8 @@ function ComprobanteContent() {
           };
           setData(normalized);
           setError(null);
+        } else {
+          setError('El enlace de comprobante no es válido.');
         }
       } catch (e) {
         setError('Error al decodificar el comprobante digital.');
