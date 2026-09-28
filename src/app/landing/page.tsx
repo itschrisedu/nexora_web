@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { getContrastColor } from "@/components/ui/color-picker";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
+import SlideToVerifyModal, { isHumanVerified } from "@/components/slide-to-verify-modal";
 
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const API_BASE_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl.replace(/\/+$/, '')}/api`;
@@ -145,6 +146,7 @@ function LandingContent() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [enviandoPedido, setEnviandoPedido] = useState(false);
   const [formIntentado, setFormIntentado] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [modalAlerta, setModalAlerta] = useState<{
     isOpen: boolean;
     tipo: "warning" | "error" | "success" | "info";
@@ -464,7 +466,7 @@ function LandingContent() {
     setTallaSeleccionadaConfig(primeraTalla);
   };
 
-  const handleAgregarAlCarrito = () => {
+  const ejecutarAgregarAlCarrito = () => {
     if (!modeloConfig || !varianteConfig) return;
 
     const paresPorSerieCalc = varianteConfig.tallas && varianteConfig.tallas.length > 0 ? varianteConfig.tallas.length : 6;
@@ -492,6 +494,18 @@ function LandingContent() {
     setCarrito((prev) => [...prev, nuevoItem]);
     setModalConfigOpen(false);
     setIsCartOpen(true);
+  };
+
+  const handleAgregarAlCarrito = () => {
+    if (!modeloConfig || !varianteConfig) return;
+
+    // Validación anti-bot: Solo se activa en la primera adición al carrito por sesión
+    if (!isHumanVerified()) {
+      setShowVerifyModal(true);
+      return;
+    }
+
+    ejecutarAgregarAlCarrito();
   };
 
   const handleUpdateCantidadCarrito = (id: string, delta: number) => {
@@ -2267,6 +2281,17 @@ function LandingContent() {
           </div>
         </div>
       )}
+
+      {/* Modal Deslizador de Verificación Anti-Bot (Slide to Verify) */}
+      <SlideToVerifyModal
+        isOpen={showVerifyModal}
+        onClose={() => setShowVerifyModal(false)}
+        onSuccess={() => {
+          ejecutarAgregarAlCarrito();
+        }}
+        title="Verificación de Seguridad"
+        description="Para procesar tu pedido de calzado y proteger el catálogo, por favor desliza la barra para confirmar que eres humano."
+      />
     </div>
   );
 }

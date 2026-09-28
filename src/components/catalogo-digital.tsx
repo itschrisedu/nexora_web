@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useToast } from "./ui/toast";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
+import SlideToVerifyModal, { isHumanVerified } from "./slide-to-verify-modal";
 
 interface TiendaInfo {
   tenantId: string;
@@ -89,6 +90,7 @@ export default function CatalogoDigitalComponent() {
   const [varianteSeleccionada, setVarianteSeleccionada] = useState<Variante | null>(null);
   const [tallaSeleccionada, setTallaSeleccionada] = useState<TallaStock | null>(null);
   const [cantidadPares, setCantidadPares] = useState(1);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   // Client Data Form for WhatsApp Order
   const [clienteNombre, setClienteNombre] = useState("");
@@ -204,7 +206,7 @@ export default function CatalogoDigitalComponent() {
     }
   };
 
-  const handleAgregarAlCarrito = () => {
+  const ejecutarAgregarAlCarrito = () => {
     if (!modeloSeleccionado || !varianteSeleccionada || !tallaSeleccionada) {
       showToast("Por favor seleccione un modelo, variante y talla.", "warning");
       return;
@@ -244,6 +246,26 @@ export default function CatalogoDigitalComponent() {
     showToast("Producto agregado al carrito", "success");
     setModeloSeleccionado(null);
     setIsCartOpen(true);
+  };
+
+  const handleAgregarAlCarrito = () => {
+    if (!modeloSeleccionado || !varianteSeleccionada || !tallaSeleccionada) {
+      showToast("Por favor seleccione un modelo, variante y talla.", "warning");
+      return;
+    }
+
+    if (tallaSeleccionada.cantidad < cantidadPares) {
+      showToast(`Solo hay ${tallaSeleccionada.cantidad} pares disponibles en talla ${tallaSeleccionada.numero}.`, "warning");
+      return;
+    }
+
+    // Validación anti-bot: Solo en el primer producto de la sesión
+    if (!isHumanVerified()) {
+      setShowVerifyModal(true);
+      return;
+    }
+
+    ejecutarAgregarAlCarrito();
   };
 
   const handleRemoverDelCarrito = (index: number) => {
@@ -1004,6 +1026,17 @@ export default function CatalogoDigitalComponent() {
           </div>
         </div>
       )}
+
+      {/* Modal Deslizador de Verificación Anti-Bot (Slide to Verify) */}
+      <SlideToVerifyModal
+        isOpen={showVerifyModal}
+        onClose={() => setShowVerifyModal(false)}
+        onSuccess={() => {
+          ejecutarAgregarAlCarrito();
+        }}
+        title="Verificación de Seguridad"
+        description="Para procesar tu pedido de calzado y proteger el catálogo, por favor desliza la barra para confirmar que eres humano."
+      />
     </div>
   );
 }
