@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
@@ -161,16 +162,62 @@ export default function CatalogoSucursalPage() {
   const totalVariantes = modelos.reduce((acc, m) => acc + m.variantes.length, 0);
 
   const handleWhatsAppPedido = (variante: VarianteItem, modelo: ModeloItem) => {
-    const tallasDisp = variante.tallas.filter((t) => t.stock > 0).map((t) => `Talla ${t.numero}`).join(", ");
-    const msg = `Hola ${sucursalActual.nombre}, me interesa el modelo:\n\n` +
-      `👟 *${modelo.name}* (${modelo.brand})\n` +
-      `🎨 Color: ${variante.color}\n` +
-      `📐 Serie: ${variante.serieNombre}\n` +
-      (mostrarPrecios ? `💰 Precio: $${variante.salePrice.toFixed(2)}\n` : "") +
-      (tallasDisp ? `📏 Tallas disponibles: ${tallasDisp}\n` : "") +
-      `\n¿Tienen disponibilidad?`;
-    const whatsapp = sucursalActual.whatsappContacto || negocio.whatsappContacto;
-    window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`, "_blank");
+    const tallasDisp = variante.tallas
+      .filter((t) => t.stock > 0)
+      .map((t) => `T${t.numero} (${t.stock} disp.)`)
+      .join(", ");
+
+    const urlComprobante = generarUrlPublicaPedidoCliente({
+      pedido: {
+        id: `PED-${Date.now().toString().slice(-6)}`,
+        fecha: new Date().toLocaleDateString('es-EC'),
+        tipoPago: 'CONTADO',
+        observaciones: 'Consulta / Pedido directo desde Catálogo Digital Web',
+      },
+      cliente: {
+        nombre: 'Cliente Catálogo Web',
+      },
+      emisor: {
+        nombre: negocio.nombreNegocio || sucursalActual.nombre,
+        ruc: negocio.ruc,
+        direccion: sucursalActual.direccion || negocio.direccion,
+        telefono: sucursalActual.telefono || negocio.telefono,
+      },
+      lineas: [{
+        modelo: `${modelo.brand} ${modelo.name}`,
+        codigo: variante.code,
+        color: variante.color,
+        serie: variante.serieNombre,
+        imageUrl: variante.imageUrl || undefined,
+        numeracion: tallasDisp || 'Curva estándar de tallas',
+        cantidadPares: 1,
+        precioUnitario: variante.salePrice,
+        subtotal: variante.salePrice,
+      }],
+      totales: {
+        totalPares: 1,
+        totalPagar: variante.salePrice,
+      },
+    });
+
+    let msg = `🛍️ *CONSULTA Y PEDIDO DE CALZADO*\n`;
+    msg += `─────────────────────────\n`;
+    msg += `Hola *${sucursalActual.nombre}*, me interesa realizar el pedido de este modelo:\n\n`;
+    msg += `👟 *MODELO:* ${modelo.name} (${modelo.brand})\n`;
+    msg += `🎨 *Color:* ${variante.color}\n`;
+    msg += `📐 *Serie:* ${variante.serieNombre}\n`;
+    if (mostrarPrecios) msg += `💰 *Valor / Precio:* $${variante.salePrice.toFixed(2)} por par\n`;
+    if (tallasDisp) msg += `📏 *Tallas disponibles:* ${tallasDisp}\n`;
+    msg += `─────────────────────────\n`;
+    msg += `\n📥 *Descarga aquí la ficha / comprobante oficial en PDF:*\n👉 ${urlComprobante}\n\n`;
+    msg += `¿Tienen disponibilidad inmediata para entrega?`;
+
+    const whatsapp = sucursalActual.whatsappContacto || negocio.whatsappContacto || "593991234567";
+    let numLimpio = whatsapp.replace(/\D/g, '');
+    if (numLimpio.startsWith('09') && numLimpio.length === 10) numLimpio = '593' + numLimpio.substring(1);
+    else if (numLimpio.startsWith('0') && numLimpio.length === 10) numLimpio = '593' + numLimpio.substring(1);
+
+    window.open(`https://wa.me/${numLimpio || '593991234567'}?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   return (

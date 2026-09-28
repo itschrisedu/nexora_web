@@ -19,6 +19,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useToast } from "./ui/toast";
+import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
 
 interface TiendaInfo {
   tenantId: string;
@@ -198,51 +199,163 @@ export default function CatalogoDigitalComponent() {
     try {
       setEnviandoPedido(true);
 
-      // 1. Registrar el pedido en el backend
-      await ApiService.post("/catalogo/pedido-whatsapp", {
-        tenantId: tienda?.tenantId,
+      // 1. Agrupar ítems por modelo + color + serie para estructurar la curva de tallas
+      const grupos: Record<string, {
+        productId: string;
+        modeloNombre: string;
+        color: string;
+        serieNombre: string;
+        imageUrl?: string;
+        precioUnitario: number;
+        totalPares: number;
+        subtotal: number;
+        tallas: Array<{ numero: number; cantidad: number }>;
+      }> = {};
+
+      carrito.forEach((item) => {
+        const key = `${item.productId}_${item.color}_${item.serieNombre}`;
+        if (!grupos[key]) {
+          grupos[key] = {
+            productId: item.productId,
+            modeloNombre: item.modeloNombre,
+            color: item.color,
+            serieNombre: item.serieNombre,
+            imageUrl: item.imageUrl,
+            precioUnitario: item.precioUnitario,
+            totalPares: 0,
+            subtotal: 0,
+            tallas: [],
+          };
+        }
+        grupos[key].totalPares += item.cantidad;
+        grupos[key].subtotal += item.cantidad * item.precioUnitario;
+        const tExistente = grupos[key].tallas.find((t) => t.numero === item.tallaNumero);
+        if (tExistente) {
+          tExistente.cantidad += item.cantidad;
+        } else {
+          grupos[key].tallas.push({ numero: item.tallaNumero, cantidad: item.cantidad });
+        }
+      });
+
+      const listaModelosAgrupados = Object.values(grupos).map((g) => {
+        g.tallas.sort((a, b) => a.numero - b.numero);
+        return g;
+      });
+
+      // 2. Registrar el pedido en el backend
+      let pedidoCreado: any = null;
+      try {
+        pedidoCreado = await ApiService.post("/catalogo/pedido-whatsapp", {
+          tenantId: tienda?.tenantId,
+          cliente: {
+            nombre: clienteNombre,
+            identificacion: clienteCedula || "9999999999",
+            telefono: clienteTelefono,
+            direccion: clienteDireccion,
+          },
+          lineas: carrito.map((item) => ({
+            productId: item.productId,
+            serieId: item.serieId,
+            tallaId: item.tallaId,
+            cantidad: item.cantidad,
+            precioUnitario: item.precioUnitario,
+          })),
+          notas: notasPedido,
+        });
+      } catch (errBackend) {
+        console.warn("Aviso al registrar pedido en backend:", errBackend);
+      }
+
+      // 3. Generar enlace público dinámico del comprobante en PDF con curva de tallas y fotos
+      const lineasComprobante = listaModelosAgrupados.map((g) => {
+        const curvaTexto = g.tallas.map((t) => `T${t.numero} (${t.cantidad})`).join(' | ');
+        let volumenTexto = `${g.totalPares} pares`;
+        if (g.totalPares === 6) volumenTexto = '½ Docena (6 pares)';
+        else if (g.totalPares === 12) volumenTexto = '1 Docena (12 pares)';
+        else if (g.totalPares > 12 && g.totalPares % 12 === 0) volumenTexto = `${g.totalPares / 12} Docenas (${g.totalPares} pares)`;
+
+        return {
+          modelo: g.modeloNombre,
+          color: g.color,
+          serie: g.serieNombre,
+          imageUrl: g.imageUrl,
+          numeracion: `${curvaTexto} — ${volumenTexto}`,
+          cantidadPares: g.totalPares,
+          precioUnitario: g.precioUnitario,
+          subtotal: g.subtotal,
+        };
+      });
+
+      const idPedido = pedidoCreado?.id || `PED-${Date.now().toString().slice(-6)}`;
+      const urlComprobante = generarUrlPublicaPedidoCliente({
+        pedido: {
+          id: idPedido,
+          numeroCodigo: pedidoCreado?.numero ? `PED-${String(pedidoCreado.numero).padStart(4, '0')}` : undefined,
+          fecha: new Date().toLocaleDateString('es-EC'),
+          tipoPago: 'CONTADO',
+          observaciones: notasPedido || 'Pedido recibido desde Catálogo Digital Web',
+        },
         cliente: {
           nombre: clienteNombre,
-          identificacion: clienteCedula || "9999999999",
+          cedula: clienteCedula,
           telefono: clienteTelefono,
           direccion: clienteDireccion,
         },
-        lineas: carrito.map((item) => ({
-          productId: item.productId,
-          serieId: item.serieId,
-          tallaId: item.tallaId,
-          cantidad: item.cantidad,
-          precioUnitario: item.precioUnitario,
-        })),
-        notas: notasPedido,
+        emisor: {
+          nombre: tienda?.nombreNegocio || 'NEXORA CALZADO',
+          ruc: tienda?.ruc,
+          direccion: tienda?.direccion,
+          telefono: tienda?.telefono,
+        },
+        lineas: lineasComprobante,
+        totales: {
+          totalPares,
+          totalPagar: totalCarrito,
+        },
       });
 
-      // 2. Construir mensaje formateado de WhatsApp
-      let mensajeWA = `*NUEVO PEDIDO DESDE CATÁLOGO DIGITAL*\n`;
-      mensajeWA += `──────────────────────\n`;
+      // 4. Construir mensaje formateado y profesional de WhatsApp
+      let mensajeWA = `🛍️ *NUEVO PEDIDO DESDE CATÁLOGO DIGITAL*\n`;
+      mensajeWA += `─────────────────────────\n`;
       mensajeWA += `👤 *Cliente:* ${clienteNombre}\n`;
       mensajeWA += `📱 *Teléfono:* ${clienteTelefono}\n`;
+      if (clienteCedula) mensajeWA += `🆔 *Cédula/RUC:* ${clienteCedula}\n`;
       if (clienteDireccion) mensajeWA += `📍 *Dirección:* ${clienteDireccion}\n`;
-      mensajeWA += `──────────────────────\n`;
-      mensajeWA += `📦 *DETALLE DEL PEDIDO:*\n`;
+      mensajeWA += `─────────────────────────\n`;
+      mensajeWA += `👟 *DETALLE DE MODELOS Y TALLAS:*\n`;
 
-      carrito.forEach((item, idx) => {
-        mensajeWA += `${idx + 1}. *${item.modeloNombre}* (${item.color})\n`;
-        mensajeWA += `   • Talla: ${item.tallaNumero} | Cantidad: ${item.cantidad} par(es)\n`;
-        mensajeWA += `   • P. Unit: $${item.precioUnitario.toFixed(2)} | Subtotal: $${(item.precioUnitario * item.cantidad).toFixed(2)}\n`;
+      listaModelosAgrupados.forEach((g, idx) => {
+        const curvaTexto = g.tallas.map((t) => `T${t.numero}: ${t.cantidad} par(es)`).join(', ');
+        let volumenTexto = `${g.totalPares} pares`;
+        if (g.totalPares === 6) volumenTexto = '½ Docena';
+        else if (g.totalPares === 12) volumenTexto = '1 Docena';
+
+        mensajeWA += `\n${idx + 1}. 📦 *${g.modeloNombre}*\n`;
+        mensajeWA += `   • Color: *${g.color}*\n`;
+        mensajeWA += `   • Serie: *${g.serieNombre}*\n`;
+        mensajeWA += `   • Curva de Tallas: *${curvaTexto}*\n`;
+        mensajeWA += `   • Cantidad: *${volumenTexto}* (${g.totalPares} pares)\n`;
+        mensajeWA += `   • P. Unit: $${g.precioUnitario.toFixed(2)} | Subtotal: *$${g.subtotal.toFixed(2)}*\n`;
       });
 
-      mensajeWA += `──────────────────────\n`;
-      mensajeWA += `💰 *TOTAL A PAGAR:* $${totalCarrito.toFixed(2)} (${totalPares} pares)\n`;
-      if (notasPedido) mensajeWA += `📝 *Notas:* ${notasPedido}\n`;
+      mensajeWA += `\n─────────────────────────\n`;
+      mensajeWA += `📊 *TOTAL DE CALZADO:* ${totalPares} pares\n`;
+      mensajeWA += `💰 *VALOR TOTAL A PAGAR:* *$${totalCarrito.toFixed(2)}*\n`;
+      if (notasPedido) mensajeWA += `📝 *Observaciones:* ${notasPedido}\n`;
+      mensajeWA += `─────────────────────────\n`;
+      mensajeWA += `\n📥 *Descarga aquí tu comprobante oficial de pedido en PDF:*\n👉 ${urlComprobante}\n\n`;
+      mensajeWA += `¡Muchas gracias por su preferencia!\n*${tienda?.nombreNegocio || 'NEXORA'}*`;
 
-      // 3. Formatear número de teléfono destino WhatsApp
-      const numeroDestino = tienda?.telefono.replace(/\D/g, "") || "593991234567";
+      // 5. Formatear número de teléfono destino WhatsApp
+      let numeroDestino = (tienda?.telefono || "593991234567").replace(/\D/g, "");
+      if (numeroDestino.startsWith('09') && numeroDestino.length === 10) numeroDestino = '593' + numeroDestino.substring(1);
+      else if (numeroDestino.startsWith('0') && numeroDestino.length === 10) numeroDestino = '593' + numeroDestino.substring(1);
+
       const urlWA = `https://wa.me/${numeroDestino}?text=${encodeURIComponent(mensajeWA)}`;
 
-      // 4. Abrir WhatsApp y limpiar estado
+      // 6. Abrir WhatsApp y limpiar estado
       window.open(urlWA, "_blank");
-      showToast("Pedido enviado por WhatsApp", "success");
+      showToast("Pedido generado y enviado por WhatsApp exitosamente", "success");
       setPedidoExitoso(true);
       setCarrito([]);
       setIsCartOpen(false);
