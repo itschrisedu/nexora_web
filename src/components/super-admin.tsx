@@ -45,6 +45,7 @@ import {
 import {
   descargarReporteSuscripcionesPdf,
   descargarReporteSuscripcionesCsv,
+  previsualizarReporteSuscripcionesPdf,
   SuperAdminReportData,
 } from "@/services/pdf-super-admin-reporte.service";
 
@@ -144,6 +145,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [reportSearch, setReportSearch] = useState("");
   const [reportFilterPlan, setReportFilterPlan] = useState("TODOS");
   const [reportFilterEstado, setReportFilterEstado] = useState("TODOS");
+  const [showReportPreviewModal, setShowReportPreviewModal] = useState(false);
+  const [reportPreviewUrl, setReportPreviewUrl] = useState<string | null>(null);
 
   // Modales Tenant
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -1341,8 +1344,28 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                     </div>
                   </div>
 
-                  {/* Botones de Descarga */}
+                  {/* Botones de Descarga y Previsualización */}
                   <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!reportData) return;
+                        try {
+                          const url = previsualizarReporteSuscripcionesPdf(reportData);
+                          setReportPreviewUrl(url);
+                          setShowReportPreviewModal(true);
+                        } catch (err) {
+                          console.error("Error generando previsualización de PDF:", err);
+                          setErrorMsg("No se pudo generar la previsualización del reporte");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      title="Previsualizar Reporte Formal en Pantalla"
+                    >
+                      <Eye size={14} />
+                      <span>Previsualizar</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => descargarReporteSuscripcionesPdf(reportData)}
@@ -3135,6 +3158,57 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
               >
                 Descartar Cambios
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL PREVISUALIZADOR DE REPORTE PDF ═══ */}
+      {showReportPreviewModal && reportPreviewUrl && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-[85] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowReportPreviewModal(false); }}
+        >
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header del Modal */}
+            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/40 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center">
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--foreground)]">Vista Previa del Reporte de Suscripciones</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">Documento oficial generado en formato A4 para auditoría e impresión</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => reportData && descargarReporteSuscripcionesPdf(reportData)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  title="Descargar este reporte en PDF"
+                >
+                  <Download size={14} />
+                  <span>Descargar PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReportPreviewModal(false)}
+                  className="p-2 rounded-xl hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                  title="Cerrar vista previa"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenedor del PDF (iFrame) */}
+            <div className="flex-1 bg-slate-900/50 p-1 sm:p-2 relative overflow-hidden">
+              <iframe
+                src={`${reportPreviewUrl}#toolbar=1&navpanes=0`}
+                className="w-full h-full rounded-xl border border-[var(--border)] bg-white shadow-inner"
+                title="Previsualización de Reporte PDF"
+              />
             </div>
           </div>
         </div>

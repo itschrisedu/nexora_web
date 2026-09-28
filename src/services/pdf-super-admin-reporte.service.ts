@@ -271,6 +271,11 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
   return doc;
 }
 
+export function previsualizarReporteSuscripcionesPdf(data: SuperAdminReportData): string {
+  const doc = generarReporteSuscripcionesPdfDoc(data);
+  return doc.output('bloburl').toString();
+}
+
 export function descargarReporteSuscripcionesPdf(data: SuperAdminReportData) {
   const doc = generarReporteSuscripcionesPdfDoc(data);
   const fechaStr = new Date().toISOString().split('T')[0];
