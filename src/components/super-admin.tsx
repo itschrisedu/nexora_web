@@ -921,20 +921,6 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
             Nueva Empresa / Local
           </button>
         )}
-
-        {activeMainTab === 'SUPER_ADMINS' && (
-          <button
-            onClick={() => {
-              setSuperAdminForm({ nombre: '', email: '', password: '', activo: true });
-              setShowCreateSuperAdminModal(true);
-            }}
-            disabled={!online}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
-          >
-            <UserPlus size={16} />
-            Nuevo Super Admin
-          </button>
-        )}
       </div>
 
       {/* Messages */}
