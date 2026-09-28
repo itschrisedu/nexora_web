@@ -28,7 +28,9 @@ import {
   Minus,
   Trash2,
   Package,
-  Check
+  Check,
+  AlertTriangle,
+  AlertCircle
 } from "lucide-react";
 import { getContrastColor } from "@/components/ui/color-picker";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
@@ -142,6 +144,21 @@ function LandingContent() {
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [enviandoPedido, setEnviandoPedido] = useState(false);
+  const [formIntentado, setFormIntentado] = useState(false);
+  const [modalAlerta, setModalAlerta] = useState<{
+    isOpen: boolean;
+    tipo: "warning" | "error" | "success" | "info";
+    titulo: string;
+    mensaje: string;
+  } | null>(null);
+
+  const mostrarAlerta = (
+    titulo: string,
+    mensaje: string,
+    tipo: "warning" | "error" | "success" | "info" = "warning"
+  ) => {
+    setModalAlerta({ isOpen: true, titulo, mensaje, tipo });
+  };
 
   // Estado del Modal de Selección de Pedido (Por Par / Por Serie Completa)
   const [modalConfigOpen, setModalConfigOpen] = useState(false);
@@ -451,8 +468,13 @@ function LandingContent() {
 
   const handleEnviarPedidoWhatsApp = async () => {
     if (carrito.length === 0) return;
+    setFormIntentado(true);
     if (!clienteNombre.trim() || !clienteTelefono.trim()) {
-      alert("Por favor ingrese su nombre y número de WhatsApp para poder procesar su pedido.");
+      mostrarAlerta(
+        "Datos para el Pedido",
+        "Por favor ingrese su nombre y número de WhatsApp en el formulario del pedido para poder procesar y enviarle su comprobante oficial.",
+        "warning"
+      );
       return;
     }
 
@@ -614,9 +636,14 @@ function LandingContent() {
       window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(texto)}`, "_blank");
       setIsCartOpen(false);
       setCarrito([]);
+      setFormIntentado(false);
     } catch (err: any) {
       console.error('Error al generar comprobante de pedido:', err);
-      alert('Hubo un inconveniente al generar el comprobante. Por favor intente nuevamente.');
+      mostrarAlerta(
+        "Aviso del Sistema",
+        "Hubo un inconveniente al generar el comprobante. Por favor intente nuevamente.",
+        "error"
+      );
     } finally {
       setEnviandoPedido(false);
     }
@@ -1921,21 +1948,45 @@ function LandingContent() {
                   <h4 className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">
                     Datos para el Pedido:
                   </h4>
-                  <div className="space-y-2 text-xs">
-                    <input
-                      type="text"
-                      placeholder="Tu nombre completo *"
-                      value={clienteNombre}
-                      onChange={(e) => setClienteNombre(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Número de WhatsApp *"
-                      value={clienteTelefono}
-                      onChange={(e) => setClienteTelefono(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900"
-                    />
+                  <div className="space-y-2.5 text-xs">
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Tu nombre completo *"
+                        value={clienteNombre}
+                        onChange={(e) => setClienteNombre(e.target.value)}
+                        className={`w-full px-3 py-2 bg-white border rounded-xl text-xs font-semibold focus:outline-none transition-colors ${
+                          formIntentado && !clienteNombre.trim()
+                            ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
+                            : "border-slate-200 focus:border-slate-900"
+                        }`}
+                      />
+                      {formIntentado && !clienteNombre.trim() && (
+                        <span className="text-[10px] text-rose-500 font-bold ml-1 mt-0.5 block">
+                          * El nombre completo es obligatorio
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <input
+                        type="tel"
+                        placeholder="Número de WhatsApp *"
+                        value={clienteTelefono}
+                        onChange={(e) => setClienteTelefono(e.target.value)}
+                        className={`w-full px-3 py-2 bg-white border rounded-xl text-xs font-semibold focus:outline-none transition-colors ${
+                          formIntentado && !clienteTelefono.trim()
+                            ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
+                            : "border-slate-200 focus:border-slate-900"
+                        }`}
+                      />
+                      {formIntentado && !clienteTelefono.trim() && (
+                        <span className="text-[10px] text-rose-500 font-bold ml-1 mt-0.5 block">
+                          * El número de WhatsApp es obligatorio
+                        </span>
+                      )}
+                    </div>
+
                     <input
                       type="text"
                       placeholder="Ciudad / Dirección de entrega (opcional)"
@@ -1943,6 +1994,7 @@ function LandingContent() {
                       onChange={(e) => setClienteDireccion(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900"
                     />
+
                     <textarea
                       placeholder="Observaciones adicionales (ej. entrega a domicilio, envío interprovincial...)"
                       rows={2}
@@ -1984,6 +2036,53 @@ function LandingContent() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alerta / Notificación Estilizado NEXORA */}
+      {modalAlerta?.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center animate-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex justify-center">
+              {modalAlerta.tipo === "warning" && (
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-200/60 shadow-xs">
+                  <AlertTriangle size={28} />
+                </div>
+              )}
+              {modalAlerta.tipo === "error" && (
+                <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center border border-rose-200/60 shadow-xs">
+                  <AlertCircle size={28} />
+                </div>
+              )}
+              {modalAlerta.tipo === "success" && (
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-200/60 shadow-xs">
+                  <CheckCircle2 size={28} />
+                </div>
+              )}
+              {modalAlerta.tipo === "info" && (
+                <div className="w-14 h-14 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center border border-sky-200/60 shadow-xs">
+                  <Sparkles size={28} />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="font-extrabold text-base text-slate-900">
+                {modalAlerta.titulo}
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed mt-2">
+                {modalAlerta.mensaje}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setModalAlerta(null)}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-extrabold text-xs rounded-xl transition-all shadow-md"
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}
