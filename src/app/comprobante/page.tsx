@@ -455,7 +455,10 @@ function ComprobanteContent() {
         },
       };
       descargarPedidoClientePdf(pdfData);
-      if (loading) {
+    }
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
