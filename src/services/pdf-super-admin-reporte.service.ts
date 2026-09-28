@@ -63,21 +63,24 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  let y = 14;
+  const marginX = 12;
+  const contentWidth = pageWidth - marginX * 2;
+  let y = 12;
 
-  // ── Header Institucional Super Admin ─────────────
+  // ── 1. Header Institucional Super Admin ─────────────
+  const headerHeight = 32;
   doc.setFillColor(15, 23, 42); // Slate 900
-  doc.roundedRect(12, y, pageWidth - 24, 32, 3, 3, 'F');
+  doc.roundedRect(marginX, y, contentWidth, headerHeight, 3, 3, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('NEXORA SaaS — REPORTE DE SUSCRIPCIONES Y RECAUDACIÓN', 18, y + 12);
+  doc.setFontSize(12);
+  doc.text('NEXORA SaaS — REPORTE DE SUSCRIPCIONES Y RECAUDACIÓN', marginX + 6, y + 11);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(148, 163, 184); // Slate 400
-  doc.text('Panel de Control Super Admin · Auditoría de Ingresos y Estado de Locales Comerciales', 18, y + 19);
+  doc.text('Panel de Control Super Admin · Auditoría de Ingresos y Estado de Locales Comerciales', marginX + 6, y + 18);
 
   const fechaEmision = new Date().toLocaleDateString('es-EC', {
     year: 'numeric',
@@ -86,80 +89,110 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
     hour: '2-digit',
     minute: '2-digit',
   });
-  doc.text(`Fecha de emisión: ${fechaEmision}`, pageWidth - 18, y + 26, { align: 'right' });
+  doc.setFontSize(7.5);
+  doc.setTextColor(203, 213, 225);
+  doc.text(`Fecha de emisión: ${fechaEmision}`, pageWidth - marginX - 6, y + 26, { align: 'right' });
 
-  y += 38;
+  y += headerHeight + 5;
 
   // ── 2. Resumen Financiero y Métricas Clave (KPIs) ─────────────
+  const kpiHeight = 28;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(12, y, pageWidth - 24, 24, 2, 2, 'FD');
+  doc.roundedRect(marginX, y, contentWidth, kpiHeight, 2.5, 2.5, 'FD');
 
-  const colWidth = (pageWidth - 24) / 4;
+  const colWidth = contentWidth / 4;
+
+  // Separadores verticales
+  doc.setDrawColor(226, 232, 240);
+  for (let c = 1; c < 4; c++) {
+    doc.line(marginX + colWidth * c, y + 4, marginX + colWidth * c, y + kpiHeight - 4);
+  }
 
   // KPI 1: Total Recaudado
+  const col1X = marginX + 4;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text('RECAUDACIÓN TOTAL', 12 + 6, y + 7);
-  doc.setFontSize(13);
+  doc.text('RECAUDACIÓN TOTAL', col1X, y + 7.5);
+  doc.setFontSize(11.5);
   doc.setTextColor(16, 185, 129); // Emerald 600
-  doc.text(`$${Number(data.kpis.totalRecaudado || 0).toFixed(2)}`, 12 + 6, y + 17);
+  doc.text(`$${Number(data.kpis?.totalRecaudado || 0).toFixed(2)}`, col1X, y + 17.5);
 
   // KPI 2: Ingresos Mes Actual
-  doc.setFontSize(8);
+  const col2X = marginX + colWidth + 4;
+  doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text('INGRESOS ESTE MES', 12 + colWidth + 6, y + 7);
-  doc.setFontSize(13);
+  doc.text('INGRESOS ESTE MES', col2X, y + 7.5);
+  doc.setFontSize(11.5);
   doc.setTextColor(15, 23, 42);
-  doc.text(`$${Number(data.kpis.ingresosMesActual || 0).toFixed(2)}`, 12 + colWidth + 6, y + 17);
+  doc.text(`$${Number(data.kpis?.ingresosMesActual || 0).toFixed(2)}`, col2X, y + 17.5);
 
   // KPI 3: MRR Proyectado
-  doc.setFontSize(8);
+  const col3X = marginX + colWidth * 2 + 4;
+  doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text('MRR MENSUAL ACTIVO', 12 + colWidth * 2 + 6, y + 7);
-  doc.setFontSize(13);
+  doc.text('MRR MENSUAL ACTIVO', col3X, y + 7.5);
+  doc.setFontSize(11.5);
   doc.setTextColor(59, 130, 246); // Blue 500
-  doc.text(`$${Number(data.kpis.mrrProyectado || 0).toFixed(2)} / mes`, 12 + colWidth * 2 + 6, y + 17);
-
-  // KPI 4: Locales Al Día vs Vencidos
-  doc.setFontSize(8);
+  doc.text(`$${Number(data.kpis?.mrrProyectado || 0).toFixed(2)}`, col3X, y + 16.5);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text('ESTADO DE LOCALES', 12 + colWidth * 3 + 6, y + 7);
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`${data.kpis.localesAlDia} Al Día · ${data.kpis.localesVencidos} Vencidos · ${data.kpis.localesEnPrueba} Prueba`, 12 + colWidth * 3 + 6, y + 17);
+  doc.text('/ mes proyectado', col3X, y + 22.5);
 
-  y += 30;
+  // KPI 4: Estado de Locales
+  const col4X = marginX + colWidth * 3 + 4;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text('ESTADO DE LOCALES', col4X, y + 7.5);
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${data.kpis?.localesAlDia || 0} Al Día · ${data.kpis?.localesEnPrueba || 0} Prueba`, col4X, y + 15);
+  
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  const vencidos = data.kpis?.localesVencidos || 0;
+  if (vencidos > 0) {
+    doc.setTextColor(239, 68, 68);
+  } else {
+    doc.setTextColor(100, 116, 139);
+  }
+  doc.text(`${vencidos} Vencidos · ${data.kpis?.totalLocales || 0} Total`, col4X, y + 21);
+
+  y += kpiHeight + 7;
 
   // ── 3. Tabla Detallada de Historial de Pagos de Suscripción ─────────────
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
+  doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42);
-  doc.text('Historial Detallado de Pagos Registrados', 12, y);
-  y += 5;
+  doc.text('Historial Detallado de Pagos Registrados', marginX, y);
+  y += 4.5;
 
   // Cabecera de Tabla
   doc.setFillColor(15, 23, 42);
-  doc.rect(12, y, pageWidth - 24, 7, 'F');
+  doc.rect(marginX, y, contentWidth, 7, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.text('EMPRESA / LOCAL', 15, y + 4.8);
-  doc.text('PLAN', 70, y + 4.8);
-  doc.text('MÉTODO', 105, y + 4.8);
-  doc.text('FECHA PAGO', 135, y + 4.8);
-  doc.text('VIGENCIA HASTA', 162, y + 4.8);
-  doc.text('MONTO ($)', pageWidth - 15, y + 4.8, { align: 'right' });
+  doc.setFontSize(7.5);
+  doc.text('EMPRESA / LOCAL', marginX + 3, y + 4.8);
+  doc.text('PLAN', marginX + 58, y + 4.8);
+  doc.text('MÉTODO', marginX + 90, y + 4.8);
+  doc.text('FECHA PAGO', marginX + 118, y + 4.8);
+  doc.text('VIGENCIA', marginX + 144, y + 4.8);
+  doc.text('MONTO ($)', pageWidth - marginX - 3, y + 4.8, { align: 'right' });
 
   y += 7;
 
   if (!data.pagos || data.pagos.length === 0) {
     doc.setFillColor(255, 255, 255);
-    doc.rect(12, y, pageWidth - 24, 10, 'FD');
+    doc.rect(marginX, y, contentWidth, 9, 'FD');
     doc.setTextColor(100, 116, 139);
     doc.setFont('helvetica', 'normal');
-    doc.text('No hay registros de pagos de suscripción en el sistema.', pageWidth / 2, y + 6.5, { align: 'center' });
-    y += 12;
+    doc.setFontSize(8);
+    doc.text('No hay registros de pagos de suscripción en el sistema.', pageWidth / 2, y + 5.8, { align: 'center' });
+    y += 11;
   } else {
     data.pagos.forEach((p, idx) => {
       if (y > pageHeight - 25) {
@@ -169,32 +202,35 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
 
       doc.setFillColor(idx % 2 === 0 ? 255 : 248, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 252);
       doc.setDrawColor(241, 245, 249);
-      doc.rect(12, y, pageWidth - 24, 7.5, 'FD');
+      doc.rect(marginX, y, contentWidth, 7, 'FD');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setTextColor(15, 23, 42);
-      doc.text(p.tenantName.substring(0, 26), 15, y + 5);
+      const safeTenantName = (p.tenantName || 'Local Comercial').length > 28
+        ? (p.tenantName || '').substring(0, 27) + '...'
+        : p.tenantName;
+      doc.text(safeTenantName, marginX + 3, y + 4.7);
 
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(71, 85, 105);
-      doc.text(formatPlan(p.tenantPlan), 70, y + 5);
-      doc.text(p.metodoPago || 'TRANSFERENCIA', 105, y + 5);
+      doc.text(formatPlan(p.tenantPlan), marginX + 58, y + 4.7);
+      doc.text(p.metodoPago || 'TRANSFERENCIA', marginX + 90, y + 4.7);
 
       const fechaP = p.fechaPago ? new Date(p.fechaPago).toLocaleDateString('es-EC') : '—';
       const fechaF = p.fechaFin ? new Date(p.fechaFin).toLocaleDateString('es-EC') : '—';
-      doc.text(fechaP, 135, y + 5);
-      doc.text(fechaF, 162, y + 5);
+      doc.text(fechaP, marginX + 118, y + 4.7);
+      doc.text(fechaF, marginX + 144, y + 4.7);
 
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(16, 185, 129);
-      doc.text(`$${Number(p.monto).toFixed(2)}`, pageWidth - 15, y + 5, { align: 'right' });
+      doc.text(`$${Number(p.monto || 0).toFixed(2)}`, pageWidth - marginX - 3, y + 4.7, { align: 'right' });
 
-      y += 7.5;
+      y += 7;
     });
   }
 
-  y += 8;
+  y += 6;
 
   // ── 4. Estado Actual de Todos los Locales y Clientes SaaS ─────────────
   if (y > pageHeight - 45) {
@@ -203,20 +239,20 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
+  doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42);
-  doc.text('Estado y Próximos Vencimientos de Locales SaaS', 12, y);
-  y += 5;
+  doc.text('Estado y Próximos Vencimientos de Locales SaaS', marginX, y);
+  y += 4.5;
 
   doc.setFillColor(51, 65, 85); // Slate 700
-  doc.rect(12, y, pageWidth - 24, 7, 'F');
+  doc.rect(marginX, y, contentWidth, 7, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.text('LOCAL / EMPRESA', 15, y + 4.8);
-  doc.text('PLAN ASIGNADO', 70, y + 4.8);
-  doc.text('TARIFA MENSUAL', 105, y + 4.8);
-  doc.text('DÍAS RESTANTES', 140, y + 4.8);
-  doc.text('ESTADO SUSCRIPCIÓN', pageWidth - 15, y + 4.8, { align: 'right' });
+  doc.setFontSize(7.5);
+  doc.text('LOCAL / EMPRESA', marginX + 3, y + 4.8);
+  doc.text('PLAN ASIGNADO', marginX + 58, y + 4.8);
+  doc.text('TARIFA MENSUAL', marginX + 95, y + 4.8);
+  doc.text('DÍAS RESTANTES', marginX + 132, y + 4.8);
+  doc.text('ESTADO SUSCRIPCIÓN', pageWidth - marginX - 3, y + 4.8, { align: 'right' });
 
   y += 7;
 
@@ -228,22 +264,25 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
 
     doc.setFillColor(idx % 2 === 0 ? 255 : 248, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 252);
     doc.setDrawColor(241, 245, 249);
-    doc.rect(12, y, pageWidth - 24, 7, 'FD');
+    doc.rect(marginX, y, contentWidth, 7, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(15, 23, 42);
-    doc.text(loc.name.substring(0, 26), 15, y + 4.7);
+    const safeLocName = (loc.name || 'Local').length > 28
+      ? (loc.name || '').substring(0, 27) + '...'
+      : loc.name;
+    doc.text(safeLocName, marginX + 3, y + 4.7);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text(formatPlan(loc.plan), 70, y + 4.7);
-    doc.text(`$${Number(loc.precioMensualPlan || 0).toFixed(2)}/mes`, 105, y + 4.7);
+    doc.text(formatPlan(loc.plan), marginX + 58, y + 4.7);
+    doc.text(`$${Number(loc.precioMensualPlan || 0).toFixed(2)}/mes`, marginX + 95, y + 4.7);
 
     let diasTxt = `${loc.diasRestantes} días`;
     if (loc.estadoCalculado === 'EN_PRUEBA') diasTxt = 'Prueba Gratis';
     else if (loc.diasRestantes < 0) diasTxt = `Vencido (${Math.abs(loc.diasRestantes)}d)`;
-    doc.text(diasTxt, 140, y + 4.7);
+    doc.text(diasTxt, marginX + 132, y + 4.7);
 
     doc.setFont('helvetica', 'bold');
     if (loc.estadoCalculado === 'AL_DIA') doc.setTextColor(16, 185, 129);
@@ -251,7 +290,7 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
     else if (loc.estadoCalculado === 'EN_PRUEBA') doc.setTextColor(59, 130, 246);
     else doc.setTextColor(239, 68, 68);
 
-    doc.text(formatEstado(loc.estadoCalculado), pageWidth - 15, y + 4.7, { align: 'right' });
+    doc.text(formatEstado(loc.estadoCalculado), pageWidth - marginX - 3, y + 4.7, { align: 'right' });
 
     y += 7;
   });
@@ -261,9 +300,9 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(148, 163, 184);
-    doc.text(`NEXORA Platform — Documento Oficial de Auditoría SaaS · Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 7, {
+    doc.text(`NEXORA Platform — Documento Oficial de Auditoría SaaS · Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 6, {
       align: 'center',
     });
   }
