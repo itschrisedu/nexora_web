@@ -31,8 +31,10 @@ import {
   Check
 } from "lucide-react";
 import { getContrastColor } from "@/components/ui/color-picker";
+import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl.replace(/\/+$/, '')}/api`;
 
 interface NegocioInfo {
   tenantId: string;
@@ -139,6 +141,7 @@ function LandingContent() {
   // Estado del Carrito de Pedidos
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [enviandoPedido, setEnviandoPedido] = useState(false);
 
   // Estado del Modal de Selección de Pedido (Por Par / Por Serie Completa)
   const [modalConfigOpen, setModalConfigOpen] = useState(false);
@@ -446,52 +449,177 @@ function LandingContent() {
     setCarrito((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleEnviarPedidoWhatsApp = () => {
+  const handleEnviarPedidoWhatsApp = async () => {
     if (carrito.length === 0) return;
-    const rawPhone = negocio.whatsappContacto || negocio.telefono || "";
-    const cleanPhone = formatWhatsAppNumber(rawPhone);
+    if (!clienteNombre.trim() || !clienteTelefono.trim()) {
+      alert("Por favor ingrese su nombre y número de WhatsApp para poder procesar su pedido.");
+      return;
+    }
 
-    let texto = `🛒 *NUEVO PEDIDO - ${negocio.nombreNegocio.toUpperCase()}*\n`;
-    texto += `──────────────────────\n`;
-    if (clienteNombre.trim()) texto += `👤 *Cliente:* ${clienteNombre.trim()}\n`;
-    if (clienteTelefono.trim()) texto += `📱 *Teléfono:* ${clienteTelefono.trim()}\n`;
-    if (clienteDireccion.trim()) texto += `📍 *Entrega / Ciudad:* ${clienteDireccion.trim()}\n`;
-    texto += `──────────────────────\n`;
-    texto += `📦 *DETALLE DE ARTÍCULOS:*\n\n`;
+    setEnviandoPedido(true);
+    try {
+      const rawPhone = negocio.whatsappContacto || negocio.telefono || "";
+      const cleanPhone = formatWhatsAppNumber(rawPhone);
 
-    carrito.forEach((item, idx) => {
-      texto += `${idx + 1}. *${item.modeloNombre}*\n`;
-      texto += `   • Color: ${item.color} | Serie: ${item.serieNombre}\n`;
-      if (item.tipoPedido === "PAR") {
-        texto += `   • Modalidad: *Por Par* (Talla: ${item.tallaNumero})\n`;
-        texto += `   • Cantidad: ${item.cantidad} par(es)\n`;
-        if (item.precioUnitario > 0) {
-          texto += `   • Subtotal: $${(item.cantidad * item.precioUnitario).toFixed(2)}\n`;
+      // 1. Mapear líneas para el comprobante PDF oficial
+      const lineasComprobante = carrito.map((item) => {
+        if (item.tipoPedido === "PAR") {
+          return {
+            modelo: item.modeloNombre,
+            color: item.color,
+            serie: item.serieNombre,
+            imageUrl: item.fotoUrl,
+            numeracion: `T${item.tallaNumero} (${item.cantidad} par${item.cantidad > 1 ? 'es' : ''})`,
+            cantidadPares: item.cantidad,
+            precioUnitario: item.precioUnitario,
+            subtotal: item.cantidad * item.precioUnitario,
+          };
+        } else {
+          const totalParesSerie = item.cantidad * (item.paresPorSerie || 6);
+          let formato = `${totalParesSerie} pares`;
+          if (totalParesSerie === 6) formato = '½ Docena';
+          else if (totalParesSerie === 12) formato = '1 Docena';
+          else if (item.cantidad > 1) formato = `${item.cantidad} Series (${totalParesSerie} pares)`;
+
+          return {
+            modelo: item.modeloNombre,
+            color: item.color,
+            serie: item.serieNombre,
+            imageUrl: item.fotoUrl,
+            numeracion: `${item.desgloseTallas || 'Curva comercial'} (${formato})`,
+            cantidadPares: totalParesSerie,
+            precioUnitario: item.precioUnitario,
+            subtotal: totalParesSerie * item.precioUnitario,
+          };
         }
-      } else {
-        const totalParesSerie = item.cantidad * (item.paresPorSerie || 6);
-        texto += `   • Modalidad: *Por Serie Completa* (${item.desgloseTallas || "Curva comercial"})\n`;
-        texto += `   • Cantidad: ${item.cantidad} serie(s) (${totalParesSerie} pares)\n`;
-        if (item.precioUnitario > 0) {
-          texto += `   • Subtotal: $${(totalParesSerie * item.precioUnitario).toFixed(2)}\n`;
+      });
+
+      // 2. Registrar el pedido en el backend si está disponible
+      let pedidoCreado: any = null;
+      try {
+        const urlBackend = `${API_BASE_URL.replace(/\/+$/, '')}/catalogo/pedido-whatsapp`;
+        const lineasParaBackend: any[] = [];
+        carrito.forEach((item) => {
+          if (item.tipoPedido === 'PAR') {
+            lineasParaBackend.push({
+              productId: item.varianteId || item.modeloId,
+              serieId: item.serieNombre,
+              tallaId: String(item.tallaNumero || '0'),
+              cantidad: item.cantidad,
+              precioUnitario: item.precioUnitario,
+            });
+          } else {
+            lineasParaBackend.push({
+              productId: item.varianteId || item.modeloId,
+              serieId: item.serieNombre,
+              cantidad: item.cantidad * (item.paresPorSerie || 6),
+              precioUnitario: item.precioUnitario,
+            });
+          }
+        });
+
+        const resBackend = await fetch(urlBackend, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId: negocio.tenantId || effectiveTenantId,
+            cliente: {
+              nombre: clienteNombre.trim(),
+              telefono: clienteTelefono.trim(),
+              direccion: clienteDireccion.trim() || undefined,
+            },
+            lineas: lineasParaBackend,
+            notas: notasPedido.trim() || undefined,
+          }),
+        });
+        if (resBackend.ok) {
+          pedidoCreado = await resBackend.json();
         }
+      } catch (errBackend) {
+        console.warn('Aviso al registrar pedido en backend:', errBackend);
       }
-      texto += `\n`;
-    });
 
-    texto += `──────────────────────\n`;
-    texto += `👟 *TOTAL PARES:* ${totalParesCarrito} pares\n`;
-    if (totalPrecioCarrito > 0) {
-      texto += `💰 *TOTAL ESTIMADO:* $${totalPrecioCarrito.toFixed(2)}\n`;
-    }
-    if (notasPedido.trim()) {
-      texto += `📝 *Observaciones:* ${notasPedido.trim()}\n`;
-    }
-    texto += `⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables (Confección artesanal directa de fábrica).\n`;
-    texto += `──────────────────────\n`;
-    texto += `_Pedido generado desde el catálogo web oficial de ${negocio.nombreNegocio}_`;
+      // 3. Generar enlace público dinámico y ultra-corto del comprobante en PDF
+      const idPedido = pedidoCreado?.id || `PED-${Date.now().toString().slice(-6)}`;
+      const numCodigo = pedidoCreado?.numero ? `PED-${String(pedidoCreado.numero).padStart(4, '0')}` : undefined;
 
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(texto)}`, "_blank");
+      const urlComprobante = await generarUrlPublicaPedidoCliente({
+        pedido: {
+          id: idPedido,
+          numeroCodigo: numCodigo,
+          fecha: new Date().toLocaleDateString('es-EC'),
+          tipoPago: 'CONTADO',
+          observaciones: notasPedido.trim() || 'Pedido generado desde el Catálogo Web',
+        },
+        cliente: {
+          nombre: clienteNombre.trim() || 'Cliente Catálogo Web',
+          telefono: clienteTelefono.trim() || undefined,
+          direccion: clienteDireccion.trim() || undefined,
+        },
+        emisor: {
+          nombre: negocio.nombreNegocio || 'NEXORA CALZADO',
+          ruc: negocio.ruc,
+          direccion: negocio.direccion,
+          telefono: negocio.telefono || negocio.whatsappContacto,
+        },
+        lineas: lineasComprobante,
+        totales: {
+          totalPares: totalParesCarrito,
+          totalPagar: totalPrecioCarrito,
+        },
+      });
+
+      // 4. Construir mensaje enriquecido y profesional para WhatsApp
+      let texto = `🛒 *NUEVO PEDIDO - ${negocio.nombreNegocio.toUpperCase()}*\n`;
+      texto += `──────────────────────\n`;
+      if (clienteNombre.trim()) texto += `👤 *Cliente:* ${clienteNombre.trim()}\n`;
+      if (clienteTelefono.trim()) texto += `📱 *Teléfono:* ${clienteTelefono.trim()}\n`;
+      if (clienteDireccion.trim()) texto += `📍 *Entrega / Ciudad:* ${clienteDireccion.trim()}\n`;
+      texto += `──────────────────────\n`;
+      texto += `📦 *DETALLE DE ARTÍCULOS:*\n\n`;
+
+      carrito.forEach((item, idx) => {
+        texto += `${idx + 1}. *${item.modeloNombre}*\n`;
+        texto += `   • Color: ${item.color} | Serie: ${item.serieNombre}\n`;
+        if (item.tipoPedido === "PAR") {
+          texto += `   • Modalidad: *Por Par* (Talla: ${item.tallaNumero})\n`;
+          texto += `   • Cantidad: ${item.cantidad} par(es)\n`;
+          if (item.precioUnitario > 0) {
+            texto += `   • Subtotal: $${(item.cantidad * item.precioUnitario).toFixed(2)}\n`;
+          }
+        } else {
+          const totalParesSerie = item.cantidad * (item.paresPorSerie || 6);
+          texto += `   • Modalidad: *Por Serie Completa* (${item.desgloseTallas || "Curva comercial"})\n`;
+          texto += `   • Cantidad: ${item.cantidad} serie(s) (${totalParesSerie} pares)\n`;
+          if (item.precioUnitario > 0) {
+            texto += `   • Subtotal: $${(totalParesSerie * item.precioUnitario).toFixed(2)}\n`;
+          }
+        }
+        texto += `\n`;
+      });
+
+      texto += `──────────────────────\n`;
+      texto += `👟 *TOTAL PARES:* ${totalParesCarrito} pares\n`;
+      if (totalPrecioCarrito > 0) {
+        texto += `💰 *TOTAL ESTIMADO:* $${totalPrecioCarrito.toFixed(2)}\n`;
+      }
+      if (notasPedido.trim()) {
+        texto += `📝 *Observaciones:* ${notasPedido.trim()}\n`;
+      }
+      texto += `⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables (Confección artesanal directa de fábrica).\n`;
+      texto += `──────────────────────\n`;
+      texto += `\n📥 *Descarga aquí tu comprobante oficial de pedido en PDF:*\n👉 ${urlComprobante}\n\n`;
+      texto += `_Pedido generado desde el catálogo web oficial de ${negocio.nombreNegocio}_`;
+
+      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(texto)}`, "_blank");
+      setIsCartOpen(false);
+      setCarrito([]);
+    } catch (err: any) {
+      console.error('Error al generar comprobante de pedido:', err);
+      alert('Hubo un inconveniente al generar el comprobante. Por favor intente nuevamente.');
+    } finally {
+      setEnviandoPedido(false);
+    }
   };
 
 
@@ -1848,10 +1976,11 @@ function LandingContent() {
                 <button
                   type="button"
                   onClick={handleEnviarPedidoWhatsApp}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-extrabold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
+                  disabled={enviandoPedido}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-extrabold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <MessageCircle size={18} />
-                  <span>Enviar Pedido por WhatsApp</span>
+                  <span>{enviandoPedido ? "Generando pedido..." : "Enviar Pedido por WhatsApp"}</span>
                 </button>
               </div>
             )}
