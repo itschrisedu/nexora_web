@@ -358,7 +358,7 @@ export default function AuditoriaComponent() {
     // 6. Ventas (POS / Notas)
     if (e.includes("VENTA") || e.includes("SALE") || e.includes("POS") || e.includes("NOTA")) {
       return {
-        nombre: "Ventas & Facturación",
+        nombre: "Ventas & Comprobantes",
         badge: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20",
       };
     }
@@ -583,7 +583,7 @@ export default function AuditoriaComponent() {
 
         {/* ══════ KPIs Rápidos de Auditoría ══════ */}
         {resumen && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-[var(--border)]">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6 pt-6 border-t border-[var(--border)]">
             <div className="bg-[var(--muted)]/40 border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-3">
               <div className="p-2.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl">
                 <Activity size={18} />
@@ -621,6 +621,16 @@ export default function AuditoriaComponent() {
               <div>
                 <span className="text-[10px] text-[var(--muted-foreground)] font-medium block">Pedidos a Talleres</span>
                 <span className="text-lg font-black text-amber-600 dark:text-amber-400 font-mono">{resumen.totalPedidos ?? 0}</span>
+              </div>
+            </div>
+
+            <div className="bg-[var(--muted)]/40 border border-[var(--border)] shadow-sm rounded-2xl p-4 flex items-center gap-3 col-span-2 sm:col-span-1">
+              <div className="p-2.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                <UserCheck size={18} />
+              </div>
+              <div>
+                <span className="text-[10px] text-[var(--muted-foreground)] font-medium block">Inicios de Sesión (24h)</span>
+                <span className="text-lg font-black text-indigo-600 dark:text-indigo-400 font-mono">{resumen.loginsUltimas24h ?? 0}</span>
               </div>
             </div>
           </div>
