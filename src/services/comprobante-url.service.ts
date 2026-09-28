@@ -142,105 +142,83 @@ export function decodificarPayload(rawInput: string): any {
  * Genera el enlace público dinámico para un Comprobante de Abono
  */
 export function generarUrlPublicaAbono(data: ComprobanteAbonoPdfData): string {
+  const base = obtenerUrlBase();
+  const numComprobante = data.comprobante.numero?.trim();
+  
+  if (numComprobante) {
+    return `${base}/c?id=${encodeURIComponent(numComprobante)}`;
+  }
+
   const payload = {
-    t: 'ABONO',
-    num: data.comprobante.numero,
+    t: 'A',
+    n: numComprobante || 'REC',
     f: data.comprobante.fecha,
-    h: data.comprobante.hora || '',
     fp: data.comprobante.formaPago,
-    ref: data.comprobante.referencia || '',
-    c_nom: data.cliente.nombre,
-    c_id: data.cliente.cedula,
-    c_tel: data.cliente.telefono || '',
-    c_dir: data.cliente.direccion || '',
-    m_ant: data.movimiento.saldoAnterior,
-    m_abo: data.movimiento.montoAbonado,
-    m_res: data.movimiento.saldoRestante,
-    e_nom: data.emisor.nombre,
-    e_ruc: data.emisor.ruc,
-    e_dir: data.emisor.direccion,
-    e_tel: data.emisor.telefono,
-    not: data.comprobante.notas || '',
+    c: data.cliente.nombre,
+    id: data.cliente.cedula,
+    m: [data.movimiento.saldoAnterior, data.movimiento.montoAbonado, data.movimiento.saldoRestante],
+    e: data.emisor.nombre,
+    ref: data.comprobante.referencia || undefined,
   };
 
   const encoded = codificarPayload(payload);
-  const base = obtenerUrlBase();
-  return `${base}/comprobante?d=${encodeURIComponent(encoded)}`;
+  return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 
 /**
  * Genera el enlace público dinámico para una Factura Electrónica
  */
 export function generarUrlPublicaFactura(data: FacturaPdfData): string {
+  const base = obtenerUrlBase();
+  const numFactura = data.comprobante.numero?.trim();
+
+  if (numFactura) {
+    return `${base}/c?id=${encodeURIComponent(numFactura)}`;
+  }
+
   const subtotalFactura = (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0));
   const ivaFactura = Number(data.totales?.iva15 || 0);
   const totalFactura = Number(data.totales?.total || 0);
 
   const payload = {
-    t: 'FACTURA',
-    num: data.comprobante.numero,
+    t: 'F',
+    n: numFactura || 'FAC',
     f: data.comprobante.fecha,
-    aut: data.comprobante.claveAcceso || '',
-    c_nom: data.comprador.nombre,
-    c_id: data.comprador.cedula,
-    c_dir: data.comprador.direccion || '',
-    c_tel: data.comprador.telefono || '',
-    c_mail: data.comprador.email || '',
+    c: data.comprador.nombre,
+    id: data.comprador.cedula,
     sub: subtotalFactura,
     iva: ivaFactura,
     tot: totalFactura,
-    e_nom: data.emisor.nombre,
-    e_ruc: data.emisor.ruc,
-    e_dir: data.emisor.direccion,
-    e_tel: data.emisor.telefono,
-    items: (data.detalles || []).slice(0, 15).map((it) => ({
-      d: it.descripcion,
-      c: it.cantidad,
-      u: it.precioUnitario,
-      t: it.subtotal,
-    })),
+    e: data.emisor.nombre,
   };
 
   const encoded = codificarPayload(payload);
-  const base = obtenerUrlBase();
-  return `${base}/comprobante?d=${encodeURIComponent(encoded)}`;
+  return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 
 /**
  * Genera el enlace público dinámico para una Orden de Compra
  */
 export function generarUrlPublicaOrden(data: OrdenCompraPdfData): string {
+  const base = obtenerUrlBase();
+  const numOrden = data.orden.numero?.trim();
+
+  if (numOrden) {
+    return `${base}/c?id=${encodeURIComponent(numOrden)}`;
+  }
+
   const payload = {
-    t: 'ORDEN',
-    num: data.orden.numero,
+    t: 'O',
+    n: numOrden || 'ORD',
     f: data.orden.fecha,
-    p_nom: data.proveedor.nombre,
-    p_ruc: data.proveedor.ruc || '',
-    p_tel: data.proveedor.contacto || '',
+    p: data.proveedor.nombre,
     pares: data.totales.totalPares,
     tot: data.totales.totalPagar,
-    e_nom: data.emisor.nombre,
-    e_ruc: data.emisor.ruc,
-    e_dir: data.emisor.direccion,
-    e_tel: data.emisor.telefono,
-    lineas: (data.lineas || []).slice(0, 15).map((l) => ({
-      m: l.modelo,
-      c: l.codigo,
-      col: l.color || '',
-      ser: l.serie || '',
-      img: l.imageUrl && l.imageUrl.length < 500 ? l.imageUrl : undefined,
-      num: l.numeracion || '',
-      obs: l.observacion || undefined,
-      qty: l.cantidadPares,
-      u: l.precioCosto,
-      tot: l.subtotal,
-    })),
-    obs: data.orden.observaciones || '',
+    e: data.emisor.nombre,
   };
 
   const encoded = codificarPayload(payload);
-  const base = obtenerUrlBase();
-  return `${base}/comprobante?d=${encodeURIComponent(encoded)}`;
+  return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 
 export interface PedidoClienteComprobanteData {
@@ -290,42 +268,26 @@ export interface PedidoClienteComprobanteData {
  * Genera el enlace público dinámico para un Pedido de Cliente
  */
 export function generarUrlPublicaPedidoCliente(data: PedidoClienteComprobanteData): string {
+  const base = obtenerUrlBase();
+  const idPedido = data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : data.pedido.id);
+
+  if (idPedido) {
+    return `${base}/c?id=${encodeURIComponent(idPedido)}`;
+  }
+
   const payload = {
-    t: 'PEDIDO',
-    num: data.pedido.numeroCodigo || (data.pedido.numero ? `PED-${String(data.pedido.numero).padStart(4, '0')}` : `#${data.pedido.id.slice(0, 6).toUpperCase()}`),
+    t: 'P',
+    n: idPedido || 'PED',
     f: data.pedido.fecha,
-    h: data.pedido.hora || '',
-    fp: data.pedido.tipoPago || 'CONTADO',
-    c_nom: data.cliente.nombre,
-    c_id: data.cliente.cedula || '',
-    c_tel: data.cliente.telefono || '',
-    c_dir: data.cliente.direccion || '',
+    c: data.cliente.nombre,
     pares: data.totales.totalPares,
     tot: data.totales.totalPagar,
     ad: data.totales.adelanto || 0,
-    sal: data.totales.saldoPendiente !== undefined ? data.totales.saldoPendiente : Math.max(0, data.totales.totalPagar - (data.totales.adelanto || 0)),
-    m_ad: data.totales.metodoAdelanto || '',
-    e_nom: data.emisor.nombre,
-    e_ruc: data.emisor.ruc,
-    e_dir: data.emisor.direccion,
-    e_tel: data.emisor.telefono,
-    lineas: (data.lineas || []).slice(0, 20).map((l) => ({
-      m: l.modelo,
-      c: l.codigo || '',
-      col: l.color || '',
-      ser: l.serie || '',
-      img: l.imageUrl && l.imageUrl.length < 500 ? l.imageUrl : undefined,
-      num: l.numeracion || '',
-      obs: l.observacion?.trim() || undefined,
-      qty: l.cantidadPares,
-      u: l.precioUnitario,
-      tot: l.subtotal,
-    })),
-    obs: data.pedido.observaciones?.trim() || undefined,
+    sal: data.totales.saldoPendiente || 0,
+    e: data.emisor.nombre,
   };
 
   const encoded = codificarPayload(payload);
-  const base = obtenerUrlBase();
-  return `${base}/comprobante?d=${encodeURIComponent(encoded)}`;
+  return `${base}/c?d=${encodeURIComponent(encoded)}`;
 }
 

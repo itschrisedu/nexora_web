@@ -40,41 +40,112 @@ function ComprobanteContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Intentar obtener el payload desde useSearchParams
     let rawData = searchParams ? searchParams.get('d') : null;
+    let docId = searchParams ? (searchParams.get('id') || searchParams.get('num') || searchParams.get('recibo')) : null;
 
-    // 2. Si no viene por searchParams (común en ciertos navegadores móviles o redirecciones), leer directamente de window.location
-    if (!rawData && typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      rawData = urlParams.get('d');
+      if (!rawData) rawData = urlParams.get('d');
+      if (!docId) docId = urlParams.get('id') || urlParams.get('num') || urlParams.get('recibo');
 
-      // 3. Fallback: buscar en el hash si la URL contiene anclas
-      if (!rawData && window.location.hash) {
+      if (!rawData && !docId && window.location.hash) {
         const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
         if (hashQuery) {
           const hashParams = new URLSearchParams(hashQuery);
-          rawData = hashParams.get('d');
+          if (!rawData) rawData = hashParams.get('d');
+          if (!docId) docId = hashParams.get('id') || hashParams.get('num') || hashParams.get('recibo');
         }
       }
     }
 
-    if (!rawData) {
-      setError('No se proporcionó información de comprobante en el enlace.');
-      setLoading(false);
-      return;
+    // 1. Si tenemos un ID directo ultra-corto (ej. REC-202609-5139 o PED-0001)
+    if (docId) {
+      const fetchById = async () => {
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+          const cleanId = String(docId).trim();
+          
+          let endpoint = 'abono-publico';
+          if (cleanId.toUpperCase().startsWith('OC') || cleanId.toUpperCase().startsWith('ORD')) {
+            endpoint = 'orden-publica';
+          } else if (cleanId.toUpperCase().startsWith('PED') || cleanId.toUpperCase().startsWith('#')) {
+            endpoint = 'pedido-publico';
+          }
+
+          let res = await fetch(`${apiUrl}/catalogo/${endpoint}/${encodeURIComponent(cleanId)}`);
+          if (!res.ok && endpoint !== 'abono-publico') {
+            // Intentar abono como fallback
+            res = await fetch(`${apiUrl}/catalogo/abono-publico/${encodeURIComponent(cleanId)}`);
+          }
+
+          if (res.ok) {
+            const resultData = await res.json();
+            if (resultData) {
+              setData(resultData);
+              setError(null);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Error al consultar comprobante por ID:', e);
+        }
+
+        // Si falló por ID y no hay rawData
+        if (!rawData) {
+          setError('No se pudo encontrar el comprobante solicitado con el código provisto.');
+          setLoading(false);
+        }
+      };
+
+      fetchById();
+      if (!rawData) return;
     }
 
-    try {
-      const decoded = decodificarPayload(rawData);
-      if (!decoded || !decoded.t) {
-        setError('El enlace de comprobante no es válido o ha sido modificado.');
-      } else {
-        setData(decoded);
-        setError(null);
+    // 2. Si viene un payload en base64
+    if (rawData) {
+      try {
+        const decoded = decodificarPayload(rawData);
+        if (!decoded || (!decoded.t && !decoded.num && !decoded.n)) {
+          setError('El enlace de comprobante no es válido o ha sido modificado.');
+        } else {
+          // Normalizar si viene en formato ultra-compacto
+          const normalized = {
+            t: decoded.t === 'A' ? 'ABONO' : (decoded.t === 'P' ? 'PEDIDO' : (decoded.t === 'O' ? 'ORDEN' : decoded.t)),
+            num: decoded.num || decoded.n || 'S/N',
+            f: decoded.f || decoded.fecha || '',
+            h: decoded.h || decoded.hora || '',
+            fp: decoded.fp || decoded.formaPago || 'EFECTIVO',
+            ref: decoded.ref || '',
+            c_nom: decoded.c_nom || decoded.c || 'Cliente',
+            c_id: decoded.c_id || decoded.id || '',
+            c_tel: decoded.c_tel || decoded.tel || '',
+            c_dir: decoded.c_dir || decoded.dir || '',
+            m_ant: Array.isArray(decoded.m) ? decoded.m[0] : (decoded.m_ant || 0),
+            m_abo: Array.isArray(decoded.m) ? decoded.m[1] : (decoded.m_abo || 0),
+            m_res: Array.isArray(decoded.m) ? decoded.m[2] : (decoded.m_res || 0),
+            e_nom: decoded.e_nom || decoded.e || 'NEXORA',
+            e_ruc: decoded.e_ruc || decoded.ruc || '',
+            e_dir: decoded.e_dir || '',
+            e_tel: decoded.e_tel || '',
+            items: decoded.items || decoded.i || [],
+            lineas: decoded.lineas || decoded.l || [],
+            pares: decoded.pares || decoded.p || 0,
+            tot: decoded.tot || decoded.total || 0,
+            sub: decoded.sub || 0,
+            iva: decoded.iva || 0,
+            obs: decoded.obs || decoded.not || '',
+          };
+          setData(normalized);
+          setError(null);
+        }
+      } catch (e) {
+        setError('Error al decodificar el comprobante digital.');
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      setError('Error al decodificar el comprobante digital.');
-    } finally {
+    } else if (!docId) {
+      setError('No se proporcionó información de comprobante en el enlace.');
       setLoading(false);
     }
   }, [searchParams]);
