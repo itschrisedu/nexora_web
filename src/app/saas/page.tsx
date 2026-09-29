@@ -79,7 +79,7 @@ export default function SaasLandingPage() {
     const horasAhorradasMes = localesCount * 24;
     const valorTiempoAhorrado = horasAhorradasMes * 7.5;
     const ahorroTotalMensual = perdidasMorosidadEvitadas + valorTiempoAhorrado;
-    const costoPlanMensual = 59.0;
+    const costoPlanMensual = 29.0;
     const roiPorcentaje = Math.round(((ahorroTotalMensual - costoPlanMensual) / costoPlanMensual) * 100);
 
     return {
@@ -125,8 +125,8 @@ export default function SaasLandingPage() {
       id: "PLAN_BASICO",
       name: "Plan Básico",
       tagline: "Ideal para talleres artesanales y locales individuales que inician su organización digital.",
-      priceMonthly: 29.0,
-      priceYearly: 24.0,
+      priceMonthly: 15.0,
+      priceYearly: 12.0,
       popular: false,
       badge: "Esencial",
       icon: <Store className="w-5 h-5 text-slate-700" />,
@@ -151,8 +151,8 @@ export default function SaasLandingPage() {
       id: "PLAN_PRO",
       name: "Plan Profesional",
       tagline: "El paquete recomendado para negocios en expansión, distribuidores y locales con venta a crédito.",
-      priceMonthly: 59.0,
-      priceYearly: 49.0,
+      priceMonthly: 29.0,
+      priceYearly: 24.0,
       popular: true,
       badge: "Más Solicitado",
       icon: <Award className="w-5 h-5 text-emerald-600" />,
@@ -176,8 +176,8 @@ export default function SaasLandingPage() {
       id: "PLAN_ENTERPRISE",
       name: "Plan Corporativo",
       tagline: "Solución integral para cadenas de tiendas, fábricas de calzado y mayoristas de gran volumen.",
-      priceMonthly: 120.0,
-      priceYearly: 99.0,
+      priceMonthly: 49.0,
+      priceYearly: 39.0,
       popular: false,
       badge: "Escalabilidad Total",
       icon: <Building2 className="w-5 h-5 text-slate-900" />,

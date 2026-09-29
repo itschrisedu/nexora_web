@@ -158,7 +158,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     adminPassword: "",
     plan: "PLAN_COMERCIAL",
     diasPruebaGratis: 15,
-    precioMensualPlan: 50,
+    precioMensualPlan: 29,
   });
   const [showPassTenant, setShowPassTenant] = useState(false);
   const [showPassCreateUser, setShowPassCreateUser] = useState(false);
@@ -309,7 +309,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
             adminPassword: "",
             plan: "PLAN_COMERCIAL",
             diasPruebaGratis: 15,
-            precioMensualPlan: 50,
+            precioMensualPlan: 29,
           });
           setDiscardConfirm(null);
         },
@@ -567,7 +567,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       await ApiService.post("/tenants", {
         ...newTenant,
         diasPruebaGratis: Number(newTenant.diasPruebaGratis || 0),
-        precioMensualPlan: (newTenant.precioMensualPlan as any) !== "" && newTenant.precioMensualPlan !== undefined && newTenant.precioMensualPlan !== null ? Number(newTenant.precioMensualPlan) : 50,
+        precioMensualPlan: (newTenant.precioMensualPlan as any) !== "" && newTenant.precioMensualPlan !== undefined && newTenant.precioMensualPlan !== null ? Number(newTenant.precioMensualPlan) : 29,
       });
       setSuccessMsg(`Tenant "${newTenant.name}" creado con ${newTenant.plan} y ${newTenant.diasPruebaGratis} días de prueba.`);
       setShowCreateModal(false);
@@ -579,7 +579,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         adminPassword: "",
         plan: "PLAN_COMERCIAL",
         diasPruebaGratis: 15,
-        precioMensualPlan: 50,
+        precioMensualPlan: 29,
       });
       await fetchTenants();
     } catch (err: any) {
@@ -595,7 +595,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       name: tenant.name,
       plan: tenant.plan || "PLAN_COMERCIAL",
       estadoSuscripcion: tenant.estadoSuscripcion || "ACTIVA",
-      precioMensualPlan: (tenant.precioMensualPlan !== undefined && tenant.precioMensualPlan !== null) ? tenant.precioMensualPlan : 50,
+      precioMensualPlan: (tenant.precioMensualPlan !== undefined && tenant.precioMensualPlan !== null) ? tenant.precioMensualPlan : 29,
       ruc: "",
       direccion: "",
       telefono: "",
@@ -609,7 +609,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         name: detail.name,
         plan: detail.plan || "PLAN_COMERCIAL",
         estadoSuscripcion: detail.estadoSuscripcion || "ACTIVA",
-        precioMensualPlan: (detail.precioMensualPlan !== undefined && detail.precioMensualPlan !== null) ? detail.precioMensualPlan : 50,
+        precioMensualPlan: (detail.precioMensualPlan !== undefined && detail.precioMensualPlan !== null) ? detail.precioMensualPlan : 29,
         ruc: detail.businessConfig?.ruc || "",
         direccion: detail.businessConfig?.direccion || "",
         telefono: detail.businessConfig?.telefono || "",
@@ -654,7 +654,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     setSubscribingTenant(tenant);
     const defaultMonto = (tenant.precioMensualPlan !== undefined && tenant.precioMensualPlan !== null)
       ? tenant.precioMensualPlan
-      : (tenant.plan === "PLAN_BASICO" ? 30 : tenant.plan === "PLAN_MAYORISTA" ? 90 : 50);
+      : (tenant.plan === "PLAN_BASICO" ? 15 : tenant.plan === "PLAN_MAYORISTA" ? 49 : 29);
     setNewPayment({
       monto: defaultMonto,
       periodoMeses: 1,
@@ -1799,7 +1799,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newTenant.plan}
                   onChange={(e) => {
                     const planVal = e.target.value;
-                    const precioDefecto = planVal === "PLAN_BASICO" ? 30 : planVal === "PLAN_MAYORISTA" ? 90 : 50;
+                    const precioDefecto = planVal === "PLAN_BASICO" ? 15 : planVal === "PLAN_MAYORISTA" ? 49 : 29;
                     setNewTenant({ ...newTenant, plan: planVal, precioMensualPlan: precioDefecto });
                   }}
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
@@ -2110,7 +2110,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Plan Actual</span>
                   <span className="text-base font-black text-white">{subscribingTenant.plan || "PLAN_COMERCIAL"}</span>
                   <p className="text-xs text-emerald-400 font-semibold mt-0.5">
-                    Tarifa: ${(subscribingTenant.precioMensualPlan !== undefined && subscribingTenant.precioMensualPlan !== null ? Number(subscribingTenant.precioMensualPlan) : 50).toFixed(2)} / mes
+                    Tarifa: ${(subscribingTenant.precioMensualPlan !== undefined && subscribingTenant.precioMensualPlan !== null ? Number(subscribingTenant.precioMensualPlan) : 29).toFixed(2)} / mes
                   </p>
                 </div>
                 <div className="text-right">
@@ -2145,7 +2145,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                       value={newPayment.periodoMeses}
                       onChange={(e) => {
                         const meses = Number(e.target.value);
-                        const mensual = subscribingTenant.precioMensualPlan !== undefined && subscribingTenant.precioMensualPlan !== null ? Number(subscribingTenant.precioMensualPlan) : 50;
+                        const mensual = subscribingTenant.precioMensualPlan !== undefined && subscribingTenant.precioMensualPlan !== null ? Number(subscribingTenant.precioMensualPlan) : 29;
                         setNewPayment({ ...newPayment, periodoMeses: meses, monto: mensual * meses });
                       }}
                       className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm"

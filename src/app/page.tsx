@@ -1810,7 +1810,7 @@ function SuperAdminDashboard({ online, onNavigateToTenants }: { online: boolean;
                     <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
                   </div>
                   <div>
-                    <div className="font-bold text-emerald-500">${t.precioMensualPlan !== undefined && t.precioMensualPlan !== null ? t.precioMensualPlan : 50}/m</div>
+                    <div className="font-bold text-emerald-500">${t.precioMensualPlan !== undefined && t.precioMensualPlan !== null ? t.precioMensualPlan : 29}/m</div>
                     <div className="text-[9px] text-[var(--muted-foreground)]">Tarifa</div>
                   </div>
                 </div>

@@ -1613,16 +1613,6 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                           <MessageCircle size={13} />
                           <span>WhatsApp</span>
                         </a>
-
-                        <a
-                          href={saasUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs hover:shadow-md"
-                        >
-                          <ExternalLink size={13} />
-                          <span>Ver Sitio Web Oficial</span>
-                        </a>
                       </div>
                     </div>
                   );
@@ -1645,7 +1635,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     href="/saas"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-xl transition-all flex items-center gap-2 shrink-0 shadow-md"
+                    className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-xl transition-all flex items-center gap-2 shrink-0 shadow-md"
                   >
                     <span>Explorar Landing Page</span>
                     <ExternalLink size={14} />
@@ -1671,10 +1661,10 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     <div className="p-4 rounded-2xl bg-[var(--muted)]/30 border border-[var(--border)] space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[var(--foreground)]">Plan Básico</span>
-                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$29/mes</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$15/mes</span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
-                        Ideal para talleres artesanales y comercios pequeños con 1 sucursal.
+                        Ideal para talleres artesanales y comercios individuales con 1 sucursal.
                       </p>
                       <ul className="text-[10px] text-[var(--muted-foreground)] space-y-1">
                         <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> 1 Sucursal / 2 Usuarios</li>
@@ -1690,7 +1680,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       </span>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[var(--foreground)]">Plan Pro</span>
-                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$59/mes</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$29/mes</span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
                         Diseñado para negocios en expansión con hasta 3 sucursales.
@@ -1698,7 +1688,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       <ul className="text-[10px] text-[var(--muted-foreground)] space-y-1">
                         <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> 3 Sucursales / 8 Usuarios</li>
                         <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Scoring Crediticio Progresivo</li>
-                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Predicción de Demanda Inteligente</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Análisis de Rotación de Modelos</li>
                       </ul>
                     </div>
 
@@ -1706,15 +1696,15 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     <div className="p-4 rounded-2xl bg-[var(--muted)]/30 border border-[var(--border)] space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[var(--foreground)]">Plan Enterprise</span>
-                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$120/mes</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$49/mes</span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
                         Para cadenas comerciales y fábricas de calzado de gran escala.
                       </p>
                       <ul className="text-[10px] text-[var(--muted-foreground)] space-y-1">
                         <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Sucursales & Usuarios Ilimitados</li>
-                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Auditoría Forense & Rastreo GPS</li>
-                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Soporte Dedicado y SLA 99.9%</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Auditoría Completa de Inicios de Sesión</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Soporte Dedicado y Capacitación Continua</li>
                       </ul>
                     </div>
                   </div>
