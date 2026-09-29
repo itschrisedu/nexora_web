@@ -94,6 +94,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
   }, []);
 
   const isPersonal = user?.rol === "ROL_VENDEDOR" || user?.rol === "ROL_BODEGUERO";
+  const isSuperAdmin = user?.rol === "ROL_SUPER_ADMIN";
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -635,14 +636,20 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     );
   }
 
-  const allTabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: "general", label: "Identidad & Negocio", icon: <Building2 size={16} /> },
-    { id: "credito", label: "Scoring & Crédito", icon: <DollarSign size={16} /> },
-    { id: "operaciones", label: "Operaciones & Logística", icon: <Truck size={16} /> },
-    { id: "fiscal", label: "Parámetros Fiscales", icon: <Shield size={16} /> },
-    { id: "catalogo", label: "Sitio Web & Catálogo", icon: <Globe size={16} /> },
-    { id: "seguridad", label: "Seguridad & Contraseña", icon: <KeyRound size={16} /> },
-  ];
+  const allTabs: { id: TabType; label: string; icon: React.ReactNode }[] = isSuperAdmin
+    ? [
+        { id: "general", label: "Identidad Corporativa", icon: <Building2 size={16} /> },
+        { id: "catalogo", label: "Sitio Web Oficial SaaS", icon: <Globe size={16} /> },
+        { id: "seguridad", label: "Seguridad & Contraseña", icon: <KeyRound size={16} /> },
+      ]
+    : [
+        { id: "general", label: "Identidad & Negocio", icon: <Building2 size={16} /> },
+        { id: "credito", label: "Scoring & Crédito", icon: <DollarSign size={16} /> },
+        { id: "operaciones", label: "Operaciones & Logística", icon: <Truck size={16} /> },
+        { id: "fiscal", label: "Parámetros Fiscales", icon: <Shield size={16} /> },
+        { id: "catalogo", label: "Sitio Web & Catálogo", icon: <Globe size={16} /> },
+        { id: "seguridad", label: "Seguridad & Contraseña", icon: <KeyRound size={16} /> },
+      ];
 
   const tabs = isPersonal
     ? allTabs.filter((t) => t.id === "seguridad" || t.id === "catalogo")
@@ -693,19 +700,21 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
               <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
                 <Building2 className="text-amber-500" size={18} />
-                <h3 className="text-sm font-bold text-[var(--foreground)]">Datos Comerciales del Establecimiento</h3>
+                <h3 className="text-sm font-bold text-[var(--foreground)]">
+                  {isSuperAdmin ? "Identidad Corporativa de la Plataforma Global" : "Datos Comerciales del Establecimiento"}
+                </h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Nombre Comercial
+                    {isSuperAdmin ? "Nombre de la Plataforma SaaS" : "Nombre Comercial"}
                   </label>
                   <input
                     type="text"
                     required
                     value={config.nombre}
                     onChange={(e) => setConfig(prev => ({ ...prev, nombre: e.target.value }))}
-                    placeholder="Ej: Calzados Don Pepe"
+                    placeholder={isSuperAdmin ? "Ej: NEXORA Platform" : "Ej: Calzados Don Pepe"}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
                   />
                 </div>
@@ -1528,21 +1537,267 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </div>
         )}
 
-        {/* ══════════════ PESTAÑA 5: SITIO WEB & CATÁLOGO ══════════════ */}
+        {/* ══════════════ PESTAÑA 5: SITIO WEB & CATÁLOGO / PORTAL SAAS ══════════════ */}
         {activeTab === "catalogo" && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            <div className="bg-[var(--card)] border border-emerald-500/30 rounded-2xl p-5 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
-                <div className="flex items-center gap-2">
-                  <Globe className="text-emerald-600" size={18} />
-                  <div>
-                    <h3 className="text-sm font-bold text-[var(--foreground)]">Sitio Web Oficial & Catálogo Digital</h3>
-                    <p className="text-[11px] text-[var(--muted-foreground)]">
-                      Portal público de exhibición de calzado de cuero con pedidos directos vía WhatsApp y consulta de sucursales.
+            {isSuperAdmin ? (
+              /* ─── VISTA EXCLUSIVA PARA SUPER ADMIN: PORTAL SAAS DE PLANES ─── */
+              <div className="bg-[var(--card)] border border-indigo-500/30 rounded-2xl p-5 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                      <Globe size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-[var(--foreground)]">Sitio Web Oficial SaaS & Oferta de Planes</h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                          NEXORA Global
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--muted-foreground)]">
+                        Portal público oficial para la presentación corporativa, cotización interactiva de planes y captación comercial vía WhatsApp.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ENLACE PÚBLICO OFICIAL DE LA PLATAFORMA SAAS */}
+                {(() => {
+                  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                  const saasUrl = `${baseUrl}/saas`;
+                  const msgWhatsApp = `¡Hola! Te invito a conocer la plataforma NEXORA SaaS y explorar todos los planes de suscripción para optimizar tu comercio de calzado:\n👉 ${saasUrl}`;
+                  const waShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msgWhatsApp)}`;
+
+                  return (
+                    <div className="p-3.5 bg-gradient-to-r from-indigo-500/5 via-[var(--muted)]/50 to-emerald-500/5 border border-indigo-500/20 rounded-2xl space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5 uppercase tracking-wider">
+                          <Share2 size={13} className="text-indigo-600 dark:text-indigo-400" />
+                          <span>Enlace Público Oficial del Portal SaaS</span>
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          🟢 Portal Público Activo
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/50 rounded-xl font-mono text-xs text-indigo-950 dark:text-indigo-200 truncate select-all shadow-inner">
+                          {saasUrl}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                              navigator.clipboard.writeText(saasUrl);
+                              setCopiadoLink(true);
+                              setTimeout(() => setCopiadoLink(false), 2500);
+                            }
+                          }}
+                          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 ${
+                            copiadoLink ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 shadow-xs'
+                          }`}
+                        >
+                          {copiadoLink ? <Check size={13} /> : <Copy size={13} />}
+                          <span>{copiadoLink ? 'Copiado' : 'Copiar'}</span>
+                        </button>
+
+                        <a
+                          href={waShareUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs hover:shadow-md"
+                        >
+                          <MessageCircle size={13} />
+                          <span>WhatsApp</span>
+                        </a>
+
+                        <a
+                          href={saasUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs hover:shadow-md"
+                        >
+                          <ExternalLink size={13} />
+                          <span>Ver Sitio Web Oficial</span>
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* TARJETA INFORMATIVA: ALCANCE DEL SUPER ADMIN */}
+                <div className="p-4 bg-slate-900 text-white rounded-2xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="text-amber-400" size={16} />
+                      <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+                        Portal Corporativo de Planes & Suscripciones
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                      Como Super Administrador, tu sitio web público promociona exclusivamente los paquetes del sistema (Básico, Pro y Enterprise). La exhibición de calzado y catálogo comercial corresponde de manera independiente a cada negocio registrado en sus respectivos perfiles.
                     </p>
+                  </div>
+                  <a
+                    href="/saas"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-xl transition-all flex items-center gap-2 shrink-0 shadow-md"
+                  >
+                    <span>Explorar Landing Page</span>
+                    <ExternalLink size={14} />
+                  </a>
+                </div>
+
+                {/* SECCIÓN: VISTA PREVIA DE PLANES COMERCIALES EN VIVO */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                    <div className="flex items-center gap-2">
+                      <Layers className="text-indigo-600 dark:text-indigo-400" size={16} />
+                      <h4 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
+                        Planes Comerciales Ofertados en el Sitio Web
+                      </h4>
+                    </div>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                      Cotización interactiva y simulación ROI activa
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Plan Básico */}
+                    <div className="p-4 rounded-2xl bg-[var(--muted)]/30 border border-[var(--border)] space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[var(--foreground)]">Plan Básico</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$29/mes</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
+                        Ideal para talleres artesanales y comercios pequeños con 1 sucursal.
+                      </p>
+                      <ul className="text-[10px] text-[var(--muted-foreground)] space-y-1">
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> 1 Sucursal / 2 Usuarios</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Control de Inventario & Ventas</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Catálogo Web para Clientes</li>
+                      </ul>
+                    </div>
+
+                    {/* Plan Pro */}
+                    <div className="p-4 rounded-2xl bg-indigo-500/5 border-2 border-indigo-500/40 space-y-2.5 relative">
+                      <span className="absolute -top-2.5 right-3 px-2 py-0.5 bg-indigo-600 text-white rounded-full text-[9px] font-black uppercase tracking-wider shadow-xs">
+                        Más Solicitado
+                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[var(--foreground)]">Plan Pro</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$59/mes</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
+                        Diseñado para negocios en expansión con hasta 3 sucursales.
+                      </p>
+                      <ul className="text-[10px] text-[var(--muted-foreground)] space-y-1">
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> 3 Sucursales / 8 Usuarios</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Scoring Crediticio Progresivo</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Predicción de Demanda Inteligente</li>
+                      </ul>
+                    </div>
+
+                    {/* Plan Enterprise */}
+                    <div className="p-4 rounded-2xl bg-[var(--muted)]/30 border border-[var(--border)] space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[var(--foreground)]">Plan Enterprise</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$120/mes</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
+                        Para cadenas comerciales y fábricas de calzado de gran escala.
+                      </p>
+                      <ul className="text-[10px] text-[var(--muted-foreground)] space-y-1">
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Sucursales & Usuarios Ilimitados</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Auditoría Forense & Rastreo GPS</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Soporte Dedicado y SLA 99.9%</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CANALES DE CONTACTO COMERCIAL OFICIAL */}
+                <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
+                    <Phone className="text-indigo-600 dark:text-indigo-400" size={16} />
+                    <label className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                      Canales de Atención Comercial del Portal SaaS
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                        📱 WhatsApp de Ventas de Planes
+                      </label>
+                      <input
+                        type="text"
+                        value={config.whatsappContacto || ""}
+                        onChange={(e) => setConfig({ ...config, whatsappContacto: e.target.value })}
+                        placeholder="0998765432"
+                        className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                      />
+                      <span className="text-[10px] text-[var(--muted-foreground)] block mt-0.5">
+                        Número al que contactarán los clientes desde el SaaS
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                        ✉️ Correo de Soporte / Ventas
+                      </label>
+                      <input
+                        type="email"
+                        value={config.email || ""}
+                        onChange={(e) => setConfig({ ...config, email: e.target.value })}
+                        placeholder="ventas@nexorasaas.com"
+                        className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                        📘 Facebook Oficial
+                      </label>
+                      <input
+                        type="url"
+                        value={config.facebookUrl || ""}
+                        onChange={(e) => setConfig({ ...config, facebookUrl: e.target.value })}
+                        placeholder="https://facebook.com/nexora"
+                        className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                        📸 Instagram Oficial
+                      </label>
+                      <input
+                        type="url"
+                        value={config.instagramUrl || ""}
+                        onChange={(e) => setConfig({ ...config, instagramUrl: e.target.value })}
+                        placeholder="https://instagram.com/nexora"
+                        className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
+            ) : (
+              /* ─── VISTA PARA NEGOCIOS DE CALZADO: CATÁLOGO DIGITAL Y PORTADA ─── */
+              <div className="bg-[var(--card)] border border-emerald-500/30 rounded-2xl p-5 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Globe className="text-emerald-600" size={18} />
+                    <div>
+                      <h3 className="text-sm font-bold text-[var(--foreground)]">Sitio Web Oficial & Catálogo Digital</h3>
+                      <p className="text-[11px] text-[var(--muted-foreground)]">
+                        Portal público de exhibición de calzado de cuero con pedidos directos vía WhatsApp y consulta de sucursales.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
               {/* ENLACE PÚBLICO */}
               {(() => {
@@ -2027,6 +2282,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </div>
               </div>
             </div>
+            )}
 
             {/* ACCIÓN DE GUARDAR PESTAÑA SITIO WEB & CATÁLOGO */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
@@ -2034,18 +2290,18 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 {hasChanges ? (
                   <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Tienes cambios pendientes en Sitio Web & Catálogo
+                    {isSuperAdmin ? "Tienes cambios pendientes en el Portal SaaS" : "Tienes cambios pendientes en Sitio Web & Catálogo"}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
                     <CheckCircle size={13} className="text-emerald-500" />
-                    Catálogo y portada al día
+                    {isSuperAdmin ? "Portal SaaS al día" : "Catálogo y portada al día"}
                   </span>
                 )}
               </div>
               <button
                 type="button"
-                onClick={() => handleSave(undefined, "Sitio Web & Catálogo")}
+                onClick={() => handleSave(undefined, isSuperAdmin ? "Portal SaaS & Planes" : "Sitio Web & Catálogo")}
                 disabled={!hasChanges || saving}
                 title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
                 className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
@@ -2055,7 +2311,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 }`}
               >
                 {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                <span>{saving ? "Guardando..." : "Guardar Sitio Web & Catálogo"}</span>
+                <span>{saving ? "Guardando..." : isSuperAdmin ? "Guardar Configuración SaaS" : "Guardar Sitio Web & Catálogo"}</span>
               </button>
             </div>
           </div>

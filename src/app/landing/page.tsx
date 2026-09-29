@@ -197,6 +197,10 @@ function LandingContent() {
   useEffect(() => {
     const fromParam = searchParams.get("tenantId");
     if (fromParam) {
+      if (fromParam === "SUPER_ADMIN" || fromParam === "null" || fromParam === "undefined") {
+        if (typeof window !== "undefined") window.location.href = "/saas";
+        return;
+      }
       setEffectiveTenantId(fromParam);
       return;
     }
@@ -206,8 +210,10 @@ function LandingContent() {
         (localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user") || "{}").tenantId : "") ||
         localStorage.getItem("tenantId") ||
         "";
-      if (stored) {
+      if (stored && stored !== "SUPER_ADMIN") {
         setEffectiveTenantId(stored);
+      } else {
+        window.location.href = "/saas";
       }
     }
   }, [searchParams]);
