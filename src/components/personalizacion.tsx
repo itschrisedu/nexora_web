@@ -17,6 +17,7 @@ import ColorPicker, { getContrastColor } from "./ui/color-picker";
 import ImageCropperModal from "./ui/image-cropper-modal";
 import VaultPasswordMeter, { analyzePassword } from "./ui/VaultPasswordMeter";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
+import { getStoredPlanPrices, setStoredPlanPrices, calculateYearlyEquivalent } from "../utils/saas-plans";
 
 interface CreditLevelConfigItem {
   id?: string;
@@ -79,6 +80,9 @@ interface BusinessConfig {
   tiktokUrl?: string;
   mostrarPreciosPublico?: boolean;
   mostrarStockPublico?: boolean;
+  precioPlanBasico?: number;
+  precioPlanComercial?: number;
+  precioPlanMayorista?: number;
 }
 
 type TabType = "general" | "credito" | "operaciones" | "fiscal" | "catalogo" | "seguridad";
@@ -325,6 +329,9 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     tiktokUrl: "",
     mostrarPreciosPublico: true,
     mostrarStockPublico: true,
+    precioPlanBasico: 15,
+    precioPlanComercial: 29,
+    precioPlanMayorista: 49,
   });
 
   const [nivelesCredito, setNivelesCredito] = useState<CreditLevelConfigItem[]>([
@@ -515,6 +522,9 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             tiktokUrl: data.tiktokUrl || "",
             mostrarPreciosPublico: data.mostrarPreciosPublico ?? true,
             mostrarStockPublico: data.mostrarStockPublico ?? true,
+            precioPlanBasico: Number(data.precioPlanBasico) > 0 ? Number(data.precioPlanBasico) : getStoredPlanPrices().basico,
+            precioPlanComercial: Number(data.precioPlanComercial) > 0 ? Number(data.precioPlanComercial) : getStoredPlanPrices().comercial,
+            precioPlanMayorista: Number(data.precioPlanMayorista) > 0 ? Number(data.precioPlanMayorista) : getStoredPlanPrices().mayorista,
           };
 
           setConfig(loadedConfig);
@@ -576,6 +586,14 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         ApiService.put("/configuracion/negocio", finalConfig),
         ApiService.put("/configuracion/niveles-credito", { niveles: nivelesCredito }),
       ]);
+
+      if (isSuperAdmin) {
+        setStoredPlanPrices({
+          basico: config.precioPlanBasico || 15,
+          comercial: config.precioPlanComercial || 29,
+          mayorista: config.precioPlanMayorista || 49,
+        });
+      }
 
       setInitialConfig({ ...finalConfig });
       setInitialNiveles([...nivelesCredito]);
@@ -1642,17 +1660,116 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   </a>
                 </div>
 
+                {/* SECCIÓN: CONFIGURACIÓN Y FIJACIÓN DE PRECIOS DE PLANES SAAS */}
+                <div className="bg-[var(--card)] border border-indigo-500/30 rounded-2xl p-5 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="text-emerald-500" size={18} />
+                      <h4 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
+                        Tarifas y Precios de Planes SaaS (Configurables)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      Impacta en la web pública y cobros
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                    Ajusta los valores mensuales de cada plan. Estos precios se mostrarán en la página web pública oficial y se usarán por defecto al dar de alta nuevos negocios.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                    {/* Input Plan Básico */}
+                    <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-[var(--foreground)]">Plan Básico ($/mes)</label>
+                        <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                          Anual: ${calculateYearlyEquivalent(Number(config.precioPlanBasico || 15))}/m
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={config.precioPlanBasico ?? 15}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setConfig((prev) => ({ ...prev, precioPlanBasico: val }));
+                            setStoredPlanPrices({ basico: val });
+                          }}
+                          className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-[var(--foreground)] focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block leading-tight">Para talleres y locales individuales.</span>
+                    </div>
+
+                    {/* Input Plan Pro */}
+                    <div className="p-3.5 bg-indigo-500/5 border border-indigo-500/30 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-[var(--foreground)]">Plan Profesional ($/mes)</label>
+                        <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                          Anual: ${calculateYearlyEquivalent(Number(config.precioPlanComercial || 29))}/m
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={config.precioPlanComercial ?? 29}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setConfig((prev) => ({ ...prev, precioPlanComercial: val }));
+                            setStoredPlanPrices({ comercial: val });
+                          }}
+                          className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-indigo-300 dark:border-indigo-700 rounded-lg text-xs font-bold text-[var(--foreground)] focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block leading-tight">Multi-sucursal con scoring crediticio.</span>
+                    </div>
+
+                    {/* Input Plan Enterprise */}
+                    <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-[var(--foreground)]">Plan Corporativo ($/mes)</label>
+                        <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                          Anual: ${calculateYearlyEquivalent(Number(config.precioPlanMayorista || 49))}/m
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={config.precioPlanMayorista ?? 49}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setConfig((prev) => ({ ...prev, precioPlanMayorista: val }));
+                            setStoredPlanPrices({ mayorista: val });
+                          }}
+                          className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-[var(--foreground)] focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block leading-tight">Fábricas y cadenas comerciales ilimitadas.</span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* SECCIÓN: VISTA PREVIA DE PLANES COMERCIALES EN VIVO */}
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
                     <div className="flex items-center gap-2">
                       <Layers className="text-indigo-600 dark:text-indigo-400" size={16} />
                       <h4 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
-                        Planes Comerciales Ofertados en el Sitio Web
+                        Vista Previa en Vivo de las Tarjetas Públicas
                       </h4>
                     </div>
                     <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
-                      Cotización interactiva y simulación ROI activa
+                      Sincronizado en tiempo real con /saas
                     </span>
                   </div>
 
@@ -1661,7 +1778,9 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     <div className="p-4 rounded-2xl bg-[var(--muted)]/30 border border-[var(--border)] space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[var(--foreground)]">Plan Básico</span>
-                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$15/mes</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                          ${config.precioPlanBasico || 15}/mes
+                        </span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
                         Ideal para talleres artesanales y comercios individuales con 1 sucursal.
@@ -1680,7 +1799,9 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       </span>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[var(--foreground)]">Plan Pro</span>
-                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$29/mes</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                          ${config.precioPlanComercial || 29}/mes
+                        </span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
                         Diseñado para negocios en expansión con hasta 3 sucursales.
@@ -1696,7 +1817,9 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     <div className="p-4 rounded-2xl bg-[var(--muted)]/30 border border-[var(--border)] space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[var(--foreground)]">Plan Enterprise</span>
-                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">$49/mes</span>
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                          ${config.precioPlanMayorista || 49}/mes
+                        </span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
                         Para cadenas comerciales y fábricas de calzado de gran escala.

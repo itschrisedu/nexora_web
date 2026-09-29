@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { ApiService } from "@/services/api.service";
 import { formatearEmail, validarEmailEstricto, handleEmailKeyDown } from "@/utils/text-formatters";
+import { getStoredPlanPrices } from "@/utils/saas-plans";
 import {
   Building2,
   Plus,
@@ -652,9 +653,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
   const handleOpenSubscriptionModal = async (tenant: Tenant) => {
     setSubscribingTenant(tenant);
+    const configuredPrices = getStoredPlanPrices();
     const defaultMonto = (tenant.precioMensualPlan !== undefined && tenant.precioMensualPlan !== null)
       ? tenant.precioMensualPlan
-      : (tenant.plan === "PLAN_BASICO" ? 15 : tenant.plan === "PLAN_MAYORISTA" ? 49 : 29);
+      : (tenant.plan === "PLAN_BASICO" ? configuredPrices.basico : tenant.plan === "PLAN_MAYORISTA" ? configuredPrices.mayorista : configuredPrices.comercial);
     setNewPayment({
       monto: defaultMonto,
       periodoMeses: 1,
@@ -1799,7 +1801,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   value={newTenant.plan}
                   onChange={(e) => {
                     const planVal = e.target.value;
-                    const precioDefecto = planVal === "PLAN_BASICO" ? 15 : planVal === "PLAN_MAYORISTA" ? 49 : 29;
+                    const configuredPrices = getStoredPlanPrices();
+                    const precioDefecto = planVal === "PLAN_BASICO" ? configuredPrices.basico : planVal === "PLAN_MAYORISTA" ? configuredPrices.mayorista : configuredPrices.comercial;
                     setNewTenant({ ...newTenant, plan: planVal, precioMensualPlan: precioDefecto });
                   }}
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"

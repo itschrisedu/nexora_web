@@ -43,6 +43,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
+import UserAvatar from '@/components/ui/UserAvatar';
 import { ToastProvider } from '@/components/ui/toast';
 import { GyreOtpVerification } from '@/components/ui/GyreOtpVerification';
 import SubscriptionGraceBanner from '@/components/ui/SubscriptionGraceBanner';
@@ -1185,12 +1186,12 @@ function MainApp() {
         {/* Usuario (Fijo abajo) */}
         <div className="shrink-0 p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
           <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-xs shrink-0"
-              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-            >
-              {user?.nombre ? user.nombre.slice(0, 2).toUpperCase() : 'US'}
-            </div>
+            <UserAvatar
+              nombre={user?.nombre}
+              email={user?.email}
+              sizeClassName="w-8 h-8"
+              textClassName="text-xs font-bold"
+            />
             <div className="min-w-0">
               <div className="text-xs font-semibold truncate max-w-[110px]">{user?.nombre || 'Usuario'}</div>
               <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[110px]">

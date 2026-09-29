@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   ShoppingBag,
@@ -45,6 +45,12 @@ import {
   Receipt,
   Sparkles
 } from "lucide-react";
+import {
+  getStoredPlanPrices,
+  calculateYearlyEquivalent,
+  SaasPlanPrices,
+  DEFAULT_SAAS_PLAN_PRICES,
+} from "@/utils/saas-plans";
 
 export default function SaasLandingPage() {
   const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
@@ -55,6 +61,27 @@ export default function SaasLandingPage() {
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [selectedPlanForDemo, setSelectedPlanForDemo] = useState("Plan Profesional");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [planPrices, setPlanPrices] = useState<SaasPlanPrices>(DEFAULT_SAAS_PLAN_PRICES);
+
+  useEffect(() => {
+    setPlanPrices(getStoredPlanPrices());
+
+    const handlePlansChanged = (e: any) => {
+      if (e?.detail) {
+        setPlanPrices(e.detail);
+      } else {
+        setPlanPrices(getStoredPlanPrices());
+      }
+    };
+
+    window.addEventListener("nexora:saas-plans-changed", handlePlansChanged);
+    window.addEventListener("storage", handlePlansChanged);
+
+    return () => {
+      window.removeEventListener("nexora:saas-plans-changed", handlePlansChanged);
+      window.removeEventListener("storage", handlePlansChanged);
+    };
+  }, []);
 
   // Formulario Demo / Contacto
   const [demoForm, setDemoForm] = useState({
@@ -79,7 +106,7 @@ export default function SaasLandingPage() {
     const horasAhorradasMes = localesCount * 24;
     const valorTiempoAhorrado = horasAhorradasMes * 7.5;
     const ahorroTotalMensual = perdidasMorosidadEvitadas + valorTiempoAhorrado;
-    const costoPlanMensual = 29.0;
+    const costoPlanMensual = planPrices.comercial || 29.0;
     const roiPorcentaje = Math.round(((ahorroTotalMensual - costoPlanMensual) / costoPlanMensual) * 100);
 
     return {
@@ -89,7 +116,7 @@ export default function SaasLandingPage() {
       ahorroTotalMensual: Math.round(ahorroTotalMensual),
       roiPorcentaje: Math.max(120, roiPorcentaje),
     };
-  }, [localesCount, paresPromedioMes, porcentajeCredito]);
+  }, [localesCount, paresPromedioMes, porcentajeCredito, planPrices.comercial]);
 
   const toggleFaq = (index: number) => {
     setFaqOpen(faqOpen === index ? null : index);
@@ -125,8 +152,8 @@ export default function SaasLandingPage() {
       id: "PLAN_BASICO",
       name: "Plan Básico",
       tagline: "Ideal para talleres artesanales y locales individuales que inician su organización digital.",
-      priceMonthly: 15.0,
-      priceYearly: 12.0,
+      priceMonthly: planPrices.basico,
+      priceYearly: calculateYearlyEquivalent(planPrices.basico),
       popular: false,
       badge: "Esencial",
       icon: <Store className="w-5 h-5 text-slate-700" />,
@@ -151,8 +178,8 @@ export default function SaasLandingPage() {
       id: "PLAN_PRO",
       name: "Plan Profesional",
       tagline: "El paquete recomendado para negocios en expansión, distribuidores y locales con venta a crédito.",
-      priceMonthly: 29.0,
-      priceYearly: 24.0,
+      priceMonthly: planPrices.comercial,
+      priceYearly: calculateYearlyEquivalent(planPrices.comercial),
       popular: true,
       badge: "Más Solicitado",
       icon: <Award className="w-5 h-5 text-emerald-600" />,
@@ -176,8 +203,8 @@ export default function SaasLandingPage() {
       id: "PLAN_ENTERPRISE",
       name: "Plan Corporativo",
       tagline: "Solución integral para cadenas de tiendas, fábricas de calzado y mayoristas de gran volumen.",
-      priceMonthly: 49.0,
-      priceYearly: 39.0,
+      priceMonthly: planPrices.mayorista,
+      priceYearly: calculateYearlyEquivalent(planPrices.mayorista),
       popular: false,
       badge: "Escalabilidad Total",
       icon: <Building2 className="w-5 h-5 text-slate-900" />,
