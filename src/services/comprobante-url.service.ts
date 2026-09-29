@@ -338,3 +338,98 @@ export async function generarUrlPublicaPedidoCliente(data: PedidoClienteComproba
 
   return guardarYObtenerToken('PEDIDO', payload);
 }
+
+// ─────────────────────────────────────────────────────────────
+// COMPROBANTE DE VENTA POS (Nota de Venta en Mostrador)
+// ─────────────────────────────────────────────────────────────
+
+export interface VentaPosComprobanteData {
+  negocio: {
+    nombre: string;
+    ruc?: string;
+    direccion?: string;
+    telefono?: string;
+  };
+  fecha: string;
+  tipoComprobante: string;
+  clienteNombre: string;
+  clienteIdentificacion?: string;
+  clienteEmail?: string;
+  clienteTelefono?: string;
+  items: Array<{
+    cantidad: number;
+    nombre: string;
+    tallaNumero: number | string;
+    precioUnitario: number;
+  }>;
+  subtotal: number;
+  descuento: number;
+  total: number;
+  metodoPago: string;
+  pagaCon?: number;
+  vuelto?: number;
+}
+
+/**
+ * Genera el enlace publico ultra-corto para una Venta POS (Nota de Venta en Mostrador)
+ */
+export async function generarUrlPublicaVentaPOS(data: VentaPosComprobanteData): Promise<string> {
+  const payload = {
+    t: 'VENTA_POS',
+    f: data.fecha || '',
+    tc: data.tipoComprobante || 'NOTA_DE_VENTA',
+    c_nom: data.clienteNombre || 'Consumidor Final',
+    c_id: data.clienteIdentificacion || '9999999999',
+    fp: data.metodoPago || 'EFECTIVO',
+    sub: data.subtotal || 0,
+    desc: data.descuento || 0,
+    tot: data.total || 0,
+    e_nom: data.negocio.nombre || 'LOCAL COMERCIAL',
+    e_ruc: data.negocio.ruc || '',
+    e_dir: data.negocio.direccion || '',
+    items: (data.items || []).slice(0, 15).map((it) => ({
+      d: it.nombre || 'Calzado',
+      c: it.cantidad || 1,
+      t: it.tallaNumero || '',
+      u: it.precioUnitario || 0,
+      tot: (it.cantidad || 1) * (it.precioUnitario || 0),
+    })),
+  };
+
+  return guardarYObtenerToken('VENTA_POS', payload);
+}
+
+/**
+ * Genera el mensaje de WhatsApp para enviar el comprobante de venta POS al cliente
+ */
+export function armarMensajeWhatsAppVentaPOS(data: VentaPosComprobanteData, urlComprobante?: string): string {
+  const negocioNombre = data.negocio.nombre || 'LOCAL COMERCIAL';
+  const totalPares = data.items.reduce((sum, i) => sum + (i.cantidad || 1), 0);
+
+  const lineasTexto = data.items
+    .map((it) => `  ${it.cantidad}x ${it.nombre} (Talla ${it.tallaNumero}) — $${((it.cantidad || 1) * (it.precioUnitario || 0)).toFixed(2)}`)
+    .join('\n');
+
+  let msg = `🧾 *COMPROBANTE DE VENTA — ${negocioNombre}*\n\n`;
+  msg += `📅 *Fecha:* ${data.fecha}\n`;
+  msg += `👤 *Cliente:* ${data.clienteNombre}\n`;
+  if (data.clienteIdentificacion && data.clienteIdentificacion !== '9999999999') {
+    msg += `🆔 *C.I./RUC:* ${data.clienteIdentificacion}\n`;
+  }
+  msg += `\n👟 *Detalle de Calzado (${totalPares} ${totalPares === 1 ? 'par' : 'pares'}):*\n${lineasTexto}\n`;
+
+  if (data.descuento > 0) {
+    msg += `\n💰 Subtotal: $${data.subtotal.toFixed(2)}`;
+    msg += `\n🎁 Descuento: -$${data.descuento.toFixed(2)}`;
+  }
+  msg += `\n\n💵 *TOTAL: $${data.total.toFixed(2)}*`;
+  msg += `\n💳 *Forma de Pago:* ${data.metodoPago}`;
+
+  if (urlComprobante) {
+    msg += `\n\n📥 *Descarga tu comprobante digital:*\n👉 ${urlComprobante}`;
+  }
+
+  msg += `\n\n¡Gracias por su compra y preferencia!\n*${negocioNombre}*`;
+
+  return msg;
+}

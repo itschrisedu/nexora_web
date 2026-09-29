@@ -5,6 +5,11 @@ import { ApiService } from "@/services/api.service";
 import { useToast } from "./ui/toast";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 import {
+  generarUrlPublicaVentaPOS,
+  armarMensajeWhatsAppVentaPOS,
+  type VentaPosComprobanteData,
+} from "@/services/comprobante-url.service";
+import {
   Store,
   DollarSign,
   CreditCard,
@@ -41,6 +46,10 @@ import {
   Receipt,
   BarChart3,
   Sparkles,
+  Send,
+  Mail,
+  MessageCircle,
+  Phone,
 } from "lucide-react";
 
 interface CajaEstado {
@@ -188,6 +197,7 @@ export default function PosComponent() {
   // Tipo de Comprobante & Datos de Cliente
   const [tipoComprobante, setTipoComprobante] = useState<"CONSUMIDOR_FINAL" | "FACTURA">("CONSUMIDOR_FINAL");
   const [clienteFactura, setClienteFactura] = useState({
+    id: "",
     cedula: "",
     nombre: "",
     apellido: "",
@@ -195,7 +205,9 @@ export default function PosComponent() {
     telefono: "",
     direccion: "",
   });
+  const [clienteRegistrado, setClienteRegistrado] = useState(false);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [sugerenciasClientes, setSugerenciasClientes] = useState<any[]>([]);
 
   // Detalle de Pago (Transferencia o Tarjeta)
   const [detalleTransferencia, setDetalleTransferencia] = useState({
@@ -217,6 +229,10 @@ export default function PosComponent() {
   const [ultimoTicket, setUltimoTicket] = useState<any>(null);
   const [negocioInfo, setNegocioInfo] = useState<any>(null);
   const [anchoTicket, setAnchoTicket] = useState<"58mm" | "80mm">("80mm");
+
+  // Envío de Comprobante POS por WhatsApp y Email
+  const [enviandoComprobantePOS, setEnviandoComprobantePOS] = useState(false);
+  const [comprobanteEnviadoPOS, setComprobanteEnviadoPOS] = useState(false);
 
   // Cierre de caja
   const [modalCierreOpen, setModalCierreOpen] = useState(false);
@@ -439,31 +455,69 @@ export default function PosComponent() {
     setItemsVenta(itemsVenta.filter((_, i) => i !== index));
   };
 
-  const buscarClientePorCedula = async (ident: string) => {
-    const cleanIdent = ident.trim();
-    if (!cleanIdent || cleanIdent.length < 5) return;
+  const buscarCliente = async (query: string) => {
+    const clean = query.trim();
+    if (!clean || clean.length < 3) {
+      setSugerenciasClientes([]);
+      return;
+    }
     try {
       setBuscandoCliente(true);
-      const res = await ApiService.get(`/clientes?busqueda=${encodeURIComponent(cleanIdent)}`);
+      const res = await ApiService.get(`/clientes?q=${encodeURIComponent(clean)}`);
       const lista = res?.data || (Array.isArray(res) ? res : []);
       if (Array.isArray(lista) && lista.length > 0) {
-        const c = lista[0];
-        setClienteFactura((prev) => ({
-          ...prev,
-          cedula: c.cedula || c.ruc || cleanIdent,
-          nombre: c.nombre || prev.nombre,
-          apellido: c.apellido || prev.apellido,
-          email: c.email || prev.email,
-          telefono: c.telefono || prev.telefono,
-          direccion: c.direccion || prev.direccion,
-        }));
-        showToast(`Cliente encontrado: ${c.nombre} ${c.apellido || ""}`, "success");
+        setSugerenciasClientes(lista);
+        // Si la búsqueda es una cédula/RUC exacta de 10 o 13 dígitos
+        if (clean.length === 10 || clean.length === 13) {
+          const matchExact = lista.find(
+            (c: any) =>
+              (c.cedula && c.cedula.trim() === clean) ||
+              (c.ruc && c.ruc.trim() === clean)
+          );
+          if (matchExact) {
+            seleccionarCliente(matchExact);
+          }
+        }
+      } else {
+        setSugerenciasClientes([]);
+        if (clean.length === 10 || clean.length === 13) {
+          setClienteRegistrado(false);
+        }
       }
     } catch {
-      // Ignorar si no existe
+      setSugerenciasClientes([]);
     } finally {
       setBuscandoCliente(false);
     }
+  };
+
+  const seleccionarCliente = (c: any) => {
+    setClienteFactura({
+      id: c.id || "",
+      cedula: c.cedula || c.ruc || "",
+      nombre: c.nombre || "",
+      apellido: c.apellido || "",
+      email: c.email || "",
+      telefono: c.telefono || "",
+      direccion: c.direccion || "",
+    });
+    setClienteRegistrado(true);
+    setSugerenciasClientes([]);
+    showToast(`Cliente cargado: ${c.nombre} ${c.apellido || ""}`, "success");
+  };
+
+  const limpiarClienteFactura = () => {
+    setClienteFactura({
+      id: "",
+      cedula: "",
+      nombre: "",
+      apellido: "",
+      email: "",
+      telefono: "",
+      direccion: "",
+    });
+    setClienteRegistrado(false);
+    setSugerenciasClientes([]);
   };
 
   const handleAplicarCuponPOS = async () => {
@@ -539,6 +593,7 @@ export default function PosComponent() {
       await ApiService.post("/pos/venta-directa", {
         metodoPago,
         tipoComprobante,
+        clienteId: tipoComprobante === "FACTURA" && clienteFactura.id ? clienteFactura.id : undefined,
         detallePago: detallePagoPayload,
         clienteData:
           tipoComprobante === "FACTURA"
@@ -562,21 +617,26 @@ export default function PosComponent() {
       });
       showToast("Venta registrada exitosamente", "success");
       setVentaExitosa(true);
+      setComprobanteEnviadoPOS(false);
 
       // Generar ticket térmico
       const nombreComercial = negocioInfo?.nombre || "CALZADO COMERCIAL";
+      const clienteTelefonoFinal = tipoComprobante === "FACTURA" ? clienteFactura.telefono.trim() : "";
+      const clienteEmailFinal = tipoComprobante === "FACTURA" ? clienteFactura.email.trim() : "";
+      const clienteNombreFinal = tipoComprobante === "FACTURA"
+        ? `${clienteFactura.nombre} ${clienteFactura.apellido}`.trim()
+        : "Consumidor Final";
+      const clienteIdentFinal = tipoComprobante === "FACTURA"
+        ? clienteFactura.cedula.trim() || "9999999999"
+        : "9999999999";
+
       const ticketData = {
         fecha: new Date().toLocaleString("es-EC"),
         tipoComprobante,
-        clienteNombre:
-          tipoComprobante === "FACTURA"
-            ? `${clienteFactura.nombre} ${clienteFactura.apellido}`.trim()
-            : "Consumidor Final",
-        clienteIdentificacion:
-          tipoComprobante === "FACTURA"
-            ? clienteFactura.cedula.trim() || "9999999999"
-            : "9999999999",
-        clienteEmail: tipoComprobante === "FACTURA" ? clienteFactura.email.trim() : "",
+        clienteNombre: clienteNombreFinal,
+        clienteIdentificacion: clienteIdentFinal,
+        clienteEmail: clienteEmailFinal,
+        clienteTelefono: clienteTelefonoFinal,
         clienteDireccion: tipoComprobante === "FACTURA" ? clienteFactura.direccion.trim() : "",
         items: [...itemsVenta],
         subtotal: subtotalVenta,
@@ -607,6 +667,11 @@ export default function PosComponent() {
       setUltimoTicket(ticketData);
       setTicketModalOpen(true);
 
+      // ── ENVIO AUTOMATICO POR WHATSAPP Y CORREO ──
+      if (tipoComprobante === "FACTURA" && (clienteTelefonoFinal || clienteEmailFinal)) {
+        enviarComprobantePOSAuto(ticketData);
+      }
+
       setItemsVenta([]);
       setDescuentoVenta("");
       setPagaCon("");
@@ -615,6 +680,7 @@ export default function PosComponent() {
       setCuponErrorPOS("");
       if (tipoComprobante === "FACTURA") {
         setClienteFactura({
+          id: "",
           cedula: "",
           nombre: "",
           apellido: "",
@@ -622,6 +688,8 @@ export default function PosComponent() {
           telefono: "",
           direccion: "",
         });
+        setClienteRegistrado(false);
+        setSugerenciasClientes([]);
       }
       await cargarEstadoCaja();
       await cargarProductos();
@@ -691,6 +759,131 @@ export default function PosComponent() {
     };
     setUltimoTicket(ticketData);
     setTicketModalOpen(true);
+  };
+
+  // ─── FUNCIONES DE ENVÍO AUTOMÁTICO Y MANUAL DE COMPROBANTE POS ───
+
+  const construirComprobanteData = (ticket: any): VentaPosComprobanteData => ({
+    negocio: ticket.negocio,
+    fecha: ticket.fecha,
+    tipoComprobante: ticket.tipoComprobante,
+    clienteNombre: ticket.clienteNombre,
+    clienteIdentificacion: ticket.clienteIdentificacion,
+    clienteEmail: ticket.clienteEmail || "",
+    clienteTelefono: ticket.clienteTelefono || "",
+    items: (ticket.items || []).map((it: any) => ({
+      cantidad: it.cantidad,
+      nombre: it.nombre,
+      tallaNumero: it.tallaNumero,
+      precioUnitario: it.precioUnitario,
+    })),
+    subtotal: ticket.subtotal,
+    descuento: ticket.descuento,
+    total: ticket.total,
+    metodoPago: ticket.metodoPago,
+    pagaCon: ticket.pagaCon,
+    vuelto: ticket.vuelto,
+  });
+
+  const enviarComprobantePOSAuto = async (ticket: any) => {
+    try {
+      const data = construirComprobanteData(ticket);
+      const urlComprobante = await generarUrlPublicaVentaPOS(data);
+      const mensaje = armarMensajeWhatsAppVentaPOS(data, urlComprobante);
+
+      // WhatsApp automatico (si hay telefono)
+      if (ticket.clienteTelefono) {
+        let numLimpio = ticket.clienteTelefono.replace(/\D/g, "");
+        if (numLimpio.startsWith("09") && numLimpio.length === 10) {
+          numLimpio = "593" + numLimpio.substring(1);
+        } else if (numLimpio.startsWith("0") && numLimpio.length === 10) {
+          numLimpio = "593" + numLimpio.substring(1);
+        }
+        const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+        const a = document.createElement("a");
+        a.href = waUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast("Comprobante de venta enviado por WhatsApp", "success");
+      }
+
+      // Email automatico (si hay correo)
+      if (ticket.clienteEmail) {
+        ApiService.post("/notificaciones/email-comprobante", {
+          destinatario: ticket.clienteEmail,
+          asunto: `Comprobante de Venta — $${ticket.total.toFixed(2)} — ${ticket.negocio?.nombre || "Calzado"}`,
+          tipo: "GENERAL",
+          detalles: {
+            mensaje: mensaje,
+            urlComprobante,
+          },
+        })
+          .then(() => showToast(`Comprobante enviado por correo a ${ticket.clienteEmail}`, "success"))
+          .catch((e) => console.warn("Error enviando email POS:", e));
+      }
+
+      setComprobanteEnviadoPOS(true);
+    } catch (err) {
+      console.error("Error en envío automático de comprobante POS:", err);
+    }
+  };
+
+  const handleEnviarComprobanteManual = async () => {
+    if (!ultimoTicket) return;
+    setEnviandoComprobantePOS(true);
+    try {
+      await enviarComprobantePOSAuto(ultimoTicket);
+    } catch (err: any) {
+      showToast("Error al enviar comprobante: " + (err.message || ""), "error");
+    } finally {
+      setEnviandoComprobantePOS(false);
+    }
+  };
+
+  const handleEnviarWhatsAppDirecto = async () => {
+    if (!ultimoTicket) return;
+    try {
+      const data = construirComprobanteData(ultimoTicket);
+      const urlComprobante = await generarUrlPublicaVentaPOS(data);
+      const mensaje = armarMensajeWhatsAppVentaPOS(data, urlComprobante);
+
+      let numLimpio = (ultimoTicket.clienteTelefono || "").replace(/\D/g, "");
+      if (numLimpio.startsWith("09") && numLimpio.length === 10) {
+        numLimpio = "593" + numLimpio.substring(1);
+      } else if (numLimpio.startsWith("0") && numLimpio.length === 10) {
+        numLimpio = "593" + numLimpio.substring(1);
+      }
+      const waUrl = numLimpio
+        ? `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`
+        : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+      const a = document.createElement("a");
+      a.href = waUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast("WhatsApp abierto para enviar comprobante", "success");
+    } catch (err: any) {
+      showToast("Error abriendo WhatsApp: " + (err.message || ""), "error");
+    }
+  };
+
+  const handleCopiarMensajeWhatsApp = async () => {
+    if (!ultimoTicket) return;
+    try {
+      const data = construirComprobanteData(ultimoTicket);
+      const urlComprobante = await generarUrlPublicaVentaPOS(data);
+      const mensaje = armarMensajeWhatsAppVentaPOS(data, urlComprobante);
+      await navigator.clipboard.writeText(mensaje);
+      showToast("Mensaje de comprobante copiado al portapapeles", "success");
+    } catch {
+      showToast("No se pudo copiar el mensaje", "error");
+    }
   };
 
   // Filtrar catálogo en vivo
@@ -1178,34 +1371,178 @@ export default function PosComponent() {
                         </div>
 
                         {tipoComprobante === "FACTURA" && (
-                          <div className="space-y-2 pt-2 border-t border-[var(--border)] text-xs">
-                            <div>
+                          <div className="space-y-2.5 pt-2 border-t border-[var(--border)] text-xs">
+                            {/* Aviso informativo de comprobante digital */}
+                            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1">
+                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5">
+                                <Send size={12} />
+                                Envío automático de comprobante
+                              </p>
+                              <p className="text-[10px] text-[var(--muted-foreground)]">
+                                Se enviará el comprobante digital al WhatsApp y correo del cliente al cobrar.
+                              </p>
+                            </div>
+
+                            {/* Estado de Registro del Cliente */}
+                            {clienteFactura.nombre && (
+                              <div
+                                className={`p-2 rounded-xl text-[11px] font-semibold flex items-center justify-between border ${
+                                  clienteRegistrado
+                                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-blue-500/15 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <Users size={13} />
+                                  <span>
+                                    {clienteRegistrado
+                                      ? `Cliente frecuente: ${clienteFactura.nombre} ${clienteFactura.apellido}`.trim()
+                                      : `Nuevo cliente (Se guardará con esta venta)`}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={limpiarClienteFactura}
+                                  className="text-[10px] underline hover:opacity-80 cursor-pointer ml-2"
+                                >
+                                  Limpiar
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Campo de C.I. / RUC con búsqueda en vivo */}
+                            <div className="relative">
                               <div className="flex items-center justify-between pb-0.5">
-                                <label className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase">C.I. / RUC:</label>
-                                {buscandoCliente && <span className="text-[10px] text-emerald-500 animate-pulse">Buscando...</span>}
+                                <label className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase flex items-center gap-1">
+                                  <span>C.I. / RUC:</span>
+                                </label>
+                                {buscandoCliente && (
+                                  <span className="text-[10px] text-emerald-500 font-semibold animate-pulse flex items-center gap-1">
+                                    <Loader2 size={10} className="animate-spin" /> Buscando...
+                                  </span>
+                                )}
                               </div>
                               <input
                                 type="text"
                                 maxLength={13}
-                                placeholder="1801234567"
+                                placeholder="Ingresa cédula o RUC (ej. 1801234567)"
                                 value={clienteFactura.cedula}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setClienteFactura((prev) => ({ ...prev, cedula: val }));
-                                  if (val.length === 10 || val.length === 13) {
-                                    buscarClientePorCedula(val);
+                                  if (val.trim().length >= 3) {
+                                    buscarCliente(val);
+                                  } else {
+                                    setSugerenciasClientes([]);
                                   }
                                 }}
                                 className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] text-xs font-mono focus:outline-none focus:border-emerald-500"
                               />
+
+                              {/* Dropdown de Sugerencias de Clientes */}
+                              {sugerenciasClientes.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-xl z-30 max-h-48 overflow-y-auto divide-y divide-[var(--border)]">
+                                  {sugerenciasClientes.map((c: any) => (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => seleccionarCliente(c)}
+                                      className="w-full p-2 text-left hover:bg-emerald-500/10 transition-colors flex flex-col gap-0.5 cursor-pointer"
+                                    >
+                                      <div className="font-bold text-xs text-[var(--foreground)] flex items-center justify-between">
+                                        <span>{c.nombre} {c.apellido || ""}</span>
+                                        <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                                          {c.cedula || c.ruc || ""}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-2">
+                                        {c.telefono && <span>📱 {c.telefono}</span>}
+                                        {c.email && <span>✉️ {c.email}</span>}
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
+
+                            {/* Nombre y Apellido */}
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div>
+                                <label className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block pb-0.5">
+                                  Nombres *:
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Nombres"
+                                  value={clienteFactura.nombre}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setClienteFactura((prev) => ({ ...prev, nombre: val }));
+                                    if (val.length >= 3 && !clienteRegistrado) {
+                                      buscarCliente(val);
+                                    }
+                                  }}
+                                  className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] text-xs focus:outline-none focus:border-emerald-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block pb-0.5">
+                                  Apellidos:
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Apellidos"
+                                  value={clienteFactura.apellido}
+                                  onChange={(e) => setClienteFactura((prev) => ({ ...prev, apellido: e.target.value }))}
+                                  className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] text-xs focus:outline-none focus:border-emerald-500"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Teléfono / WhatsApp */}
                             <div>
-                              <label className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block pb-0.5">Nombre / Razón Social *:</label>
+                              <label className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block pb-0.5 flex items-center justify-between">
+                                <span className="flex items-center gap-1">
+                                  <Phone size={10} className="text-emerald-500" />
+                                  Teléfono / WhatsApp:
+                                </span>
+                                <span className="text-[9px] text-[var(--muted-foreground)]">Para envío del ticket</span>
+                              </label>
+                              <input
+                                type="tel"
+                                placeholder="0987654321"
+                                maxLength={13}
+                                value={clienteFactura.telefono}
+                                onChange={(e) => setClienteFactura((prev) => ({ ...prev, telefono: e.target.value }))}
+                                className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] text-xs font-mono focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+
+                            {/* Correo Electrónico */}
+                            <div>
+                              <label className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block pb-0.5 flex items-center gap-1">
+                                <Mail size={10} className="text-blue-500" />
+                                Correo Electrónico:
+                              </label>
+                              <input
+                                type="email"
+                                placeholder="cliente@email.com"
+                                value={clienteFactura.email}
+                                onChange={(e) => setClienteFactura((prev) => ({ ...prev, email: e.target.value }))}
+                                className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+
+                            {/* Dirección */}
+                            <div>
+                              <label className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block pb-0.5">
+                                Dirección:
+                              </label>
                               <input
                                 type="text"
-                                placeholder="Nombre del cliente"
-                                value={clienteFactura.nombre}
-                                onChange={(e) => setClienteFactura((prev) => ({ ...prev, nombre: e.target.value }))}
+                                placeholder="Ciudad, Sector, Calle (opcional)"
+                                value={clienteFactura.direccion}
+                                onChange={(e) => setClienteFactura((prev) => ({ ...prev, direccion: e.target.value }))}
                                 className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] text-xs focus:outline-none focus:border-emerald-500"
                               />
                             </div>
@@ -2189,20 +2526,88 @@ export default function PosComponent() {
               </div>
             </div>
 
-            <div className="p-4 bg-slate-100 border-t flex gap-2">
-              <button
-                onClick={() => setTicketModalOpen(false)}
-                className="flex-1 py-2.5 border rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200"
-              >
-                Cerrar
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Printer size={14} />
-                <span>Imprimir Ticket</span>
-              </button>
+            <div className="p-4 bg-slate-100 border-t space-y-2">
+              {/* Indicador de datos de contacto del cliente */}
+              {(ultimoTicket.clienteTelefono || ultimoTicket.clienteEmail) && (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Datos de Contacto del Cliente:</span>
+                  {ultimoTicket.clienteTelefono && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                      <MessageCircle size={12} className="text-emerald-600" />
+                      <span className="font-mono font-semibold">{ultimoTicket.clienteTelefono}</span>
+                    </div>
+                  )}
+                  {ultimoTicket.clienteEmail && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                      <Mail size={12} className="text-blue-600" />
+                      <span className="font-semibold">{ultimoTicket.clienteEmail}</span>
+                    </div>
+                  )}
+                  {comprobanteEnviadoPOS && (
+                    <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold mt-1">
+                      <CheckCircle size={11} />
+                      <span>Comprobante enviado automaticamente</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Botones de Envío Digital y Acciones */}
+              <div className="space-y-1.5">
+                {(ultimoTicket.clienteTelefono || ultimoTicket.clienteEmail) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {ultimoTicket.clienteTelefono && (
+                      <button
+                        type="button"
+                        onClick={handleEnviarWhatsAppDirecto}
+                        className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        title="Abrir WhatsApp para enviar comprobante"
+                      >
+                        <MessageCircle size={14} />
+                        <span>Abrir WhatsApp</span>
+                      </button>
+                    )}
+
+                    {ultimoTicket.clienteEmail && (
+                      <button
+                        type="button"
+                        onClick={handleEnviarComprobanteManual}
+                        disabled={enviandoComprobantePOS}
+                        className="py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                        title="Enviar comprobante al correo"
+                      >
+                        {enviandoComprobantePOS ? <Loader2 size={13} className="animate-spin" /> : <Mail size={14} />}
+                        <span>Enviar a Correo</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTicketModalOpen(false)}
+                    className="flex-1 py-2.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors"
+                  >
+                    Cerrar
+                  </button>
+
+                  <button
+                    onClick={handleCopiarMensajeWhatsApp}
+                    className="py-2.5 px-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    title="Copiar texto del comprobante"
+                  >
+                    <span>Copiar Texto</span>
+                  </button>
+
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Printer size={14} />
+                    <span>Imprimir Ticket</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
