@@ -51,6 +51,7 @@ import {
   previsualizarReporteSuscripcionesPdf,
   SuperAdminReportData,
 } from "@/services/pdf-super-admin-reporte.service";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 interface TenantStats {
   users: number;
@@ -79,6 +80,7 @@ interface Tenant {
   fechaVencimientoPlan?: string;
   diasRestantes?: number;
   precioMensualPlan?: number;
+  logoUrl?: string | null;
   stats: TenantStats;
   admins: TenantAdmin[];
 }
@@ -1081,13 +1083,21 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm ${
+                            className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border ${
                               tenant.active
-                                ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
-                                : "bg-slate-500"
+                                ? "bg-gradient-to-br from-slate-900 to-slate-800 border-amber-500/30 text-amber-400 shadow-xs"
+                                : "bg-slate-500 border-slate-600 text-white"
                             }`}
                           >
-                            {tenant.name.slice(0, 2).toUpperCase()}
+                            {tenant.logoUrl ? (
+                              <img
+                                src={tenant.logoUrl}
+                                alt={tenant.name}
+                                className="w-full h-full object-contain p-0.5 bg-white rounded-xl"
+                              />
+                            ) : (
+                              tenant.name.slice(0, 2).toUpperCase()
+                            )}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
@@ -1273,7 +1283,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 })}
               </div>
             ) : (
-              /* ── MODO LISTA (HORIZONTAL LIST) ── */
+              /* ── MODO LISTA (HORIZONTAL LIST ALINEADO CON CSS GRID) ── */
               <div className="space-y-3">
                 {tenantsFiltrados.map((tenant) => {
                   const planBadge =
@@ -1296,29 +1306,39 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   return (
                     <div
                       key={tenant.id}
-                      className={`bg-[var(--card)] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-4 ${
+                      className={`bg-[var(--card)] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all grid grid-cols-1 lg:grid-cols-12 items-center gap-4 ${
                         tenant.active ? "border-[var(--border)]" : "border-rose-500/30 opacity-70"
                       }`}
                     >
-                      {/* Info principal y Empresa */}
-                      <div className="flex items-center gap-3.5 min-w-[260px]">
+                      {/* Columna 1: Info principal y Empresa con Logo (4 cols) */}
+                      <div className="lg:col-span-4 flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 ${
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border ${
                             tenant.active
-                              ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
-                              : "bg-slate-500"
+                              ? "bg-gradient-to-br from-slate-900 to-slate-800 border-amber-500/30 text-amber-400 shadow-xs"
+                              : "bg-slate-500 border-slate-600 text-white"
                           }`}
                         >
-                          {tenant.name.slice(0, 2).toUpperCase()}
+                          {tenant.logoUrl ? (
+                            <img
+                              src={tenant.logoUrl}
+                              alt={tenant.name}
+                              className="w-full h-full object-contain p-0.5 bg-white rounded-xl"
+                            />
+                          ) : (
+                            tenant.name.slice(0, 2).toUpperCase()
+                          )}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-sm text-[var(--foreground)]">{tenant.name}</h3>
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${planBadge}`}>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h3 className="font-bold text-sm text-[var(--foreground)] truncate" title={tenant.name}>
+                              {tenant.name}
+                            </h3>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 ${planBadge}`}>
                               {planName}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             <span
                               className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                                 tenant.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
@@ -1333,7 +1353,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                             )}
                             {isOverdue ? (
                               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse">
-                                VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d gracia)
+                                VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d)
                               </span>
                             ) : isNearRenewal ? (
                               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -1348,61 +1368,65 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                         </div>
                       </div>
 
-                      {/* Métricas rápidas (Píldoras) */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Usuarios">
-                          <Users size={13} className="text-amber-500" />
-                          <span className="font-bold text-[var(--foreground)]">{tenant.stats.users}</span>
-                          <span className="text-[10px] text-[var(--muted-foreground)]">Usr</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Modelos de Calzado">
-                          <Package size={13} className="text-emerald-500" />
-                          <span className="font-bold text-[var(--foreground)]">{tenant.stats.models}</span>
-                          <span className="text-[10px] text-[var(--muted-foreground)]">Mod</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Clientes Registrados">
-                          <UserCircle size={13} className="text-amber-500" />
-                          <span className="font-bold text-[var(--foreground)]">{tenant.stats.clients}</span>
-                          <span className="text-[10px] text-[var(--muted-foreground)]">Cli</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Pedidos">
-                          <ShoppingCart size={13} className="text-amber-500" />
-                          <span className="font-bold text-[var(--foreground)]">{tenant.stats.orders}</span>
-                          <span className="text-[10px] text-[var(--muted-foreground)]">Ped</span>
+                      {/* Columna 2: Métricas Rápidas en Subgrid 4 columnas fijas (3 cols) */}
+                      <div className="lg:col-span-3 min-w-0">
+                        <div className="grid grid-cols-4 gap-1.5 w-full">
+                          <div className="flex items-center justify-center gap-1 px-1.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Usuarios">
+                            <Users size={12} className="text-amber-500 shrink-0" />
+                            <span className="font-bold text-[var(--foreground)]">{tenant.stats.users}</span>
+                            <span className="text-[9px] text-[var(--muted-foreground)]">Usr</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-1 px-1.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Modelos de Calzado">
+                            <Package size={12} className="text-emerald-500 shrink-0" />
+                            <span className="font-bold text-[var(--foreground)]">{tenant.stats.models}</span>
+                            <span className="text-[9px] text-[var(--muted-foreground)]">Mod</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-1 px-1.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Clientes Registrados">
+                            <UserCircle size={12} className="text-amber-500 shrink-0" />
+                            <span className="font-bold text-[var(--foreground)]">{tenant.stats.clients}</span>
+                            <span className="text-[9px] text-[var(--muted-foreground)]">Cli</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-1 px-1.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Pedidos">
+                            <ShoppingCart size={12} className="text-amber-500 shrink-0" />
+                            <span className="font-bold text-[var(--foreground)]">{tenant.stats.orders}</span>
+                            <span className="text-[9px] text-[var(--muted-foreground)]">Ped</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Administrador Principal */}
-                      <div className="min-w-[180px] text-xs">
+                      {/* Columna 3: Administrador Principal Alineado (2 cols) */}
+                      <div className="lg:col-span-2 min-w-0 text-xs">
                         <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block mb-0.5">
-                          Administrador:
+                          ADMINISTRADOR:
                         </span>
                         {tenant.admins.length > 0 ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-semibold truncate max-w-[140px]">{tenant.admins[0].nombre}</span>
-                            <span className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[120px]">
-                              ({tenant.admins[0].email})
-                            </span>
+                          <div className="min-w-0" title={`${tenant.admins[0].nombre} (${tenant.admins[0].email})`}>
+                            <div className="font-semibold text-xs text-[var(--foreground)] truncate">
+                              {tenant.admins[0].nombre}
+                            </div>
+                            <div className="text-[10px] text-[var(--muted-foreground)] truncate">
+                              {tenant.admins[0].email}
+                            </div>
                           </div>
                         ) : (
                           <span className="text-[11px] text-[var(--muted-foreground)]">Sin admin</span>
                         )}
                       </div>
 
-                      {/* Fechas de Registro y Vencimiento */}
-                      <div className="text-[10px] text-[var(--muted-foreground)] min-w-[130px] space-y-0.5">
-                        <div>
+                      {/* Columna 4: Fechas (1 col) */}
+                      <div className="lg:col-span-1 min-w-0 text-[10px] text-[var(--muted-foreground)] space-y-0.5">
+                        <div className="truncate">
                           Creado: <span className="font-semibold text-[var(--foreground)]">{new Date(tenant.createdAt).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "2-digit" })}</span>
                         </div>
                         {tenant.fechaVencimientoPlan && (
-                          <div>
+                          <div className="truncate">
                             Vence: <span className="font-semibold text-[var(--foreground)]">{new Date(tenant.fechaVencimientoPlan).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "2-digit" })}</span>
                           </div>
                         )}
                       </div>
 
-                      {/* Acciones */}
-                      <div className="flex items-center gap-1 shrink-0">
+                      {/* Columna 5: Acciones (2 cols) */}
+                      <div className="lg:col-span-2 flex items-center justify-end gap-1 shrink-0">
                         <button
                           onClick={() => handleOpenSubscriptionModal(tenant)}
                           className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
@@ -1939,9 +1963,12 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                         <tr key={sa.id} className="hover:bg-[var(--muted)]/30 transition-colors">
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 font-black flex items-center justify-center text-sm shadow-xs shrink-0">
-                                {sa.nombre.charAt(0).toUpperCase()}
-                              </div>
+                              <UserAvatar
+                                nombre={sa.nombre}
+                                email={sa.email}
+                                sizeClassName="w-9 h-9"
+                                textClassName="text-sm font-black"
+                              />
                               <div>
                                 <span className="font-bold text-[var(--foreground)] block text-xs">
                                   {sa.nombre}
