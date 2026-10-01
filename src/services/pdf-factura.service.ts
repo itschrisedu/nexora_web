@@ -873,3 +873,231 @@ export function obtenerPedidoClientePdfBlobUrl(data: PedidoClientePdfData): stri
   return URL.createObjectURL(blob);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TICKET POS — COMPROBANTE DE COMPRA EN MOSTRADOR
+// ═══════════════════════════════════════════════════════════════
+
+export interface TicketPosPdfData {
+  emisor: {
+    nombre: string;
+    ruc?: string;
+    direccion?: string;
+    telefono?: string;
+  };
+  comprobante: {
+    numero?: string;
+    tipo?: string;
+    fecha: string;
+    formaPago: string;
+    detallePago?: string;
+  };
+  cliente: {
+    nombre: string;
+    cedula?: string;
+    telefono?: string;
+    email?: string;
+    direccion?: string;
+  };
+  items: Array<{
+    nombre: string;
+    cantidad: number;
+    tallaNumero?: string | number;
+    precioUnitario: number;
+    subtotal?: number;
+  }>;
+  totales: {
+    subtotal: number;
+    descuento: number;
+    total: number;
+    pagaCon?: number;
+    vuelto?: number;
+  };
+}
+
+export function generarTicketPosPdfDoc(data: TicketPosPdfData): jsPDF {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 14;
+
+  // 1. Encabezado Oficial del Establecimiento
+  doc.setFillColor(15, 23, 42); // Slate 900
+  doc.roundedRect(12, y, pageWidth - 24, 38, 2.5, 2.5, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text((data.emisor.nombre || "CALZADO COMERCIAL").toUpperCase(), 20, y + 12);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(203, 213, 225); // Slate 300
+  if (data.emisor.ruc) {
+    doc.text(`RUC: ${data.emisor.ruc}`, 20, y + 19);
+  }
+  doc.text(`Dirección: ${data.emisor.direccion || "Cevallos, Tungurahua"}`, 20, y + 25);
+  if (data.emisor.telefono) {
+    doc.text(`Tel: ${data.emisor.telefono}`, 20, y + 31);
+  }
+
+  // Tarjeta derecha de Tipo de Documento
+  doc.setFillColor(30, 41, 59); // Slate 800
+  doc.roundedRect(pageWidth - 85, y + 5, 67, 28, 2, 2, "F");
+
+  doc.setTextColor(52, 211, 153); // Emerald 400
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text("COMPROBANTE DE VENTA", pageWidth - 51.5, y + 13, { align: "center" });
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(data.comprobante.numero || "TICKET DE CAJA", pageWidth - 51.5, y + 21, { align: "center" });
+
+  doc.setTextColor(148, 163, 184); // Slate 400
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.text(data.comprobante.fecha || new Date().toLocaleString("es-EC"), pageWidth - 51.5, y + 27, { align: "center" });
+
+  y += 44;
+
+  // 2. Información del Cliente
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(12, y, pageWidth - 24, 22, 2, 2, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text("DATOS DEL CLIENTE:", 18, y + 6);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text(`Cliente: ${data.cliente.nombre || "Consumidor Final"}`, 18, y + 12);
+  if (data.cliente.cedula && data.cliente.cedula !== "9999999999") {
+    doc.text(`C.I. / RUC: ${data.cliente.cedula}`, 18, y + 18);
+  }
+
+  if (data.cliente.telefono) {
+    doc.text(`Teléfono / WhatsApp: ${data.cliente.telefono}`, pageWidth / 2 + 10, y + 12);
+  }
+  if (data.cliente.email) {
+    doc.text(`Email: ${data.cliente.email}`, pageWidth / 2 + 10, y + 18);
+  }
+
+  y += 28;
+
+  // 3. Tabla de Productos y Tallas
+  doc.setFillColor(15, 23, 42);
+  doc.roundedRect(12, y, pageWidth - 24, 8, 1.5, 1.5, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(255, 255, 255);
+  doc.text("CANT.", 18, y + 5.5);
+  doc.text("DESCRIPCIÓN / MODELO DE CALZADO", 35, y + 5.5);
+  doc.text("TALLA", pageWidth - 65, y + 5.5, { align: "center" });
+  doc.text("P. UNIT.", pageWidth - 38, y + 5.5, { align: "right" });
+  doc.text("SUBTOTAL", pageWidth - 18, y + 5.5, { align: "right" });
+
+  y += 10;
+
+  // Filas de productos
+  data.items.forEach((it, index) => {
+    const isEven = index % 2 === 0;
+    if (isEven) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(12, y - 1.5, pageWidth - 24, 7.5, "F");
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(it.cantidad), 18, y + 3.5);
+
+    doc.setFont("helvetica", "normal");
+    doc.text(it.nombre || "Calzado", 35, y + 3.5);
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(5, 150, 105);
+    doc.text(it.tallaNumero ? `T${it.tallaNumero}` : "—", pageWidth - 65, y + 3.5, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(51, 65, 85);
+    doc.text(`$${it.precioUnitario.toFixed(2)}`, pageWidth - 38, y + 3.5, { align: "right" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    const sub = (it.subtotal !== undefined ? it.subtotal : it.cantidad * it.precioUnitario);
+    doc.text(`$${sub.toFixed(2)}`, pageWidth - 18, y + 3.5, { align: "right" });
+
+    y += 7.5;
+  });
+
+  y += 4;
+
+  // 4. Totales y Método de Pago
+  const startTotalsX = pageWidth - 90;
+  const boxHeight = data.totales.descuento > 0 ? 32 : 24;
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(startTotalsX, y, 78, boxHeight, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Subtotal:", startTotalsX + 4, y + 5);
+  doc.text(`$${data.totales.subtotal.toFixed(2)}`, startTotalsX + 74, y + 5, { align: "right" });
+
+  let offsetTot = 10;
+  if (data.totales.descuento > 0) {
+    doc.setTextColor(217, 119, 6);
+    doc.text("Descuento:", startTotalsX + 4, y + 10);
+    doc.text(`-$${data.totales.descuento.toFixed(2)}`, startTotalsX + 74, y + 10, { align: "right" });
+    offsetTot = 16;
+  }
+
+  doc.setDrawColor(203, 213, 225);
+  doc.line(startTotalsX + 4, y + offsetTot - 1, startTotalsX + 74, y + offsetTot - 1);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(15, 23, 42);
+  doc.text("TOTAL PAGADO:", startTotalsX + 4, y + offsetTot + 4);
+  doc.setTextColor(5, 150, 105);
+  doc.text(`$${data.totales.total.toFixed(2)}`, startTotalsX + 74, y + offsetTot + 4, { align: "right" });
+
+  // Método de pago info
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Forma de pago: ${data.comprobante.formaPago}`, startTotalsX + 4, y + offsetTot + 9);
+
+  // Pie de página
+  y += boxHeight + 10;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7.5);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`¡Gracias por su compra y preferencia! — ${data.emisor.nombre || "Comercio de Calzado"}`, pageWidth / 2, y, { align: "center" });
+
+  return doc;
+}
+
+export function descargarTicketPosPdf(data: TicketPosPdfData): void {
+  const doc = generarTicketPosPdfDoc(data);
+  const clienteNom = (data.cliente.nombre || "Ticket").replace(/\s+/g, "_");
+  doc.save(`Ticket_Venta_${clienteNom}.pdf`);
+}
+
+export function obtenerTicketPosPdfBlobUrl(data: TicketPosPdfData): string {
+  const doc = generarTicketPosPdfDoc(data);
+  const blob = doc.output("blob");
+  return URL.createObjectURL(blob);
+}
+

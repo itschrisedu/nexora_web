@@ -1040,15 +1040,49 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
     const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares${desgloseFinancieroTexto}\n\n📥 *Descarga aquí tu comprobante oficial de pedido:*\n👉 ${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
 
-    let numLimpio = telefono.replace(/\D/g, '');
-    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
-      numLimpio = '593' + numLimpio.substring(1);
-    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
-      numLimpio = '593' + numLimpio.substring(1);
+    const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
+    const autoWhatsApp = typeof window !== 'undefined' ? (localStorage.getItem('nexora_auto_whatsapp_abono') !== 'false' && localStorage.getItem('nexora_auto_whatsapp_comprobante') !== 'false') : true;
+
+    if (!autoEmail && !autoWhatsApp) {
+      showToast('Los envíos automáticos por WhatsApp y Correo están desactivados en Configuración.', 'info');
+      return;
     }
 
-    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-    window.open(url, '_blank');
+    // Envío automático por Correo en segundo plano si está activo y el cliente tiene email
+    const emailDestino = cliente?.email || (p as any).clienteEmail || (p as any).email;
+    let enviadoCorreo = false;
+    if (autoEmail && emailDestino) {
+      ApiService.post('/notificaciones/email-comprobante', {
+        destinatario: emailDestino,
+        asunto: `Comprobante de Pedido ${numPedido} — ${negocioNombre}`,
+        tipo: 'PEDIDO',
+        detalles: {
+          mensaje,
+          urlComprobante,
+        },
+      })
+        .then(() => showToast(`Comprobante de pedido enviado al correo ${emailDestino}`, 'success'))
+        .catch((e) => console.warn('Error enviando correo de pedido:', e));
+      enviadoCorreo = true;
+    }
+
+    let enviadoWhatsApp = false;
+    if (autoWhatsApp && telefono) {
+      let numLimpio = telefono.replace(/\D/g, '');
+      if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+        numLimpio = '593' + numLimpio.substring(1);
+      } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+        numLimpio = '593' + numLimpio.substring(1);
+      }
+
+      const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+      window.open(url, '_blank');
+      enviadoWhatsApp = true;
+    }
+
+    if (enviadoCorreo && !enviadoWhatsApp) {
+      showToast(`Comprobante de pedido enviado por correo a ${emailDestino}`, 'success');
+    }
   };
 
   const handleEnviarPedidoEntregadoWhatsApp = async (p: Pedido, clienteTel?: string) => {
@@ -1175,15 +1209,49 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
     const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📄 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n📥 *Descarga aquí tu comprobante oficial de entrega en PDF:*\n👉 ${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
 
-    let numLimpio = telefono.replace(/\D/g, '');
-    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
-      numLimpio = '593' + numLimpio.substring(1);
-    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
-      numLimpio = '593' + numLimpio.substring(1);
+    const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
+    const autoWhatsApp = typeof window !== 'undefined' ? (localStorage.getItem('nexora_auto_whatsapp_abono') !== 'false' && localStorage.getItem('nexora_auto_whatsapp_comprobante') !== 'false') : true;
+
+    if (!autoEmail && !autoWhatsApp) {
+      showToast('Los envíos automáticos por WhatsApp y Correo están desactivados en Configuración.', 'info');
+      return;
     }
 
-    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-    window.open(url, '_blank');
+    // Envío automático por Correo en segundo plano si está activo y el cliente tiene email
+    const emailDestino = cliente?.email || (p as any).clienteEmail || (p as any).email;
+    let enviadoCorreo = false;
+    if (autoEmail && emailDestino) {
+      ApiService.post('/notificaciones/email-comprobante', {
+        destinatario: emailDestino,
+        asunto: `Comprobante de Entrega de Pedido ${numPedido} — ${negocioNombre}`,
+        tipo: 'PEDIDO',
+        detalles: {
+          mensaje,
+          urlComprobante,
+        },
+      })
+        .then(() => showToast(`Comprobante de entrega enviado al correo ${emailDestino}`, 'success'))
+        .catch((e) => console.warn('Error enviando correo de entrega:', e));
+      enviadoCorreo = true;
+    }
+
+    let enviadoWhatsApp = false;
+    if (autoWhatsApp && telefono) {
+      let numLimpio = telefono.replace(/\D/g, '');
+      if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+        numLimpio = '593' + numLimpio.substring(1);
+      } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+        numLimpio = '593' + numLimpio.substring(1);
+      }
+
+      const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+      window.open(url, '_blank');
+      enviadoWhatsApp = true;
+    }
+
+    if (enviadoCorreo && !enviadoWhatsApp) {
+      showToast(`Comprobante de entrega enviado por correo a ${emailDestino}`, 'success');
+    }
   };
 
   const cargarCatalogo = async () => {

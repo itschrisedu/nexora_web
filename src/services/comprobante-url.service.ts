@@ -356,9 +356,10 @@ export interface VentaPosComprobanteData {
   clienteIdentificacion?: string;
   clienteEmail?: string;
   clienteTelefono?: string;
+  clienteDireccion?: string;
   items: Array<{
-    cantidad: number;
     nombre: string;
+    cantidad: number;
     tallaNumero: number | string;
     precioUnitario: number;
   }>;
@@ -377,17 +378,23 @@ export async function generarUrlPublicaVentaPOS(data: VentaPosComprobanteData): 
   const payload = {
     t: 'VENTA_POS',
     f: data.fecha || '',
-    tc: data.tipoComprobante || 'NOTA_DE_VENTA',
+    tc: data.tipoComprobante || 'COMPROBANTE_VENTA',
     c_nom: data.clienteNombre || 'Consumidor Final',
     c_id: data.clienteIdentificacion || '9999999999',
+    c_tel: data.clienteTelefono || '',
+    c_mail: data.clienteEmail || '',
+    c_dir: data.clienteDireccion || '',
     fp: data.metodoPago || 'EFECTIVO',
     sub: data.subtotal || 0,
     desc: data.descuento || 0,
     tot: data.total || 0,
+    pagaCon: data.pagaCon || 0,
+    vuelto: data.vuelto || 0,
     e_nom: data.negocio.nombre || 'LOCAL COMERCIAL',
     e_ruc: data.negocio.ruc || '',
     e_dir: data.negocio.direccion || '',
-    items: (data.items || []).slice(0, 15).map((it) => ({
+    e_tel: data.negocio.telefono || '',
+    items: (data.items || []).slice(0, 30).map((it) => ({
       d: it.nombre || 'Calzado',
       c: it.cantidad || 1,
       t: it.tallaNumero || '',
@@ -426,10 +433,10 @@ export function armarMensajeWhatsAppVentaPOS(data: VentaPosComprobanteData, urlC
   msg += `\n💳 *Forma de Pago:* ${data.metodoPago}`;
 
   if (urlComprobante) {
-    msg += `\n\n📥 *Descarga tu comprobante digital:*\n👉 ${urlComprobante}`;
+    msg += `\n\n📄 *Descarga tu comprobante en PDF aquí:*\n👉 ${urlComprobante}`;
   }
 
-  msg += `\n\n¡Gracias por su compra y preferencia!\n*${negocioNombre}*`;
+  msg += `\n\n¡Gracias por su compra!\n*${negocioNombre}*`;
 
   return msg;
 }

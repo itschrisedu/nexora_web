@@ -228,7 +228,6 @@ export default function PosComponent() {
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [ultimoTicket, setUltimoTicket] = useState<any>(null);
   const [negocioInfo, setNegocioInfo] = useState<any>(null);
-  const [anchoTicket, setAnchoTicket] = useState<"58mm" | "80mm">("80mm");
 
   // Envío de Comprobante POS por WhatsApp y Email
   const [enviandoComprobantePOS, setEnviandoComprobantePOS] = useState(false);
@@ -667,11 +666,6 @@ export default function PosComponent() {
       setUltimoTicket(ticketData);
       setTicketModalOpen(true);
 
-      // ── ENVIO AUTOMATICO POR WHATSAPP Y CORREO ──
-      if (tipoComprobante === "FACTURA" && (clienteTelefonoFinal || clienteEmailFinal)) {
-        enviarComprobantePOSAuto(ticketData);
-      }
-
       setItemsVenta([]);
       setDescuentoVenta("");
       setPagaCon("");
@@ -731,6 +725,7 @@ export default function PosComponent() {
       clienteNombre: venta.cliente?.nombre || "Consumidor Final",
       clienteIdentificacion: venta.cliente?.cedula || "9999999999",
       clienteEmail: venta.cliente?.email || "",
+      clienteTelefono: venta.cliente?.telefono || "",
       clienteDireccion: venta.cliente?.direccion || "",
       items: venta.lineas.map((l) => ({
         cantidad: l.cantidad,
@@ -761,7 +756,7 @@ export default function PosComponent() {
     setTicketModalOpen(true);
   };
 
-  // ─── FUNCIONES DE ENVÍO AUTOMÁTICO Y MANUAL DE COMPROBANTE POS ───
+  // ─── FUNCIÓN UNIFICADA DE ENVÍO DE COMPROBANTE POS (WHATSAPP + CORREO EN SEGUNDO PLANO) ───
 
   const construirComprobanteData = (ticket: any): VentaPosComprobanteData => ({
     negocio: ticket.negocio,
@@ -785,21 +780,52 @@ export default function PosComponent() {
     vuelto: ticket.vuelto,
   });
 
-  const enviarComprobantePOSAuto = async (ticket: any) => {
+  const handleEnviarComprobanteWhatsAppYCorreo = async () => {
+    if (!ultimoTicket) return;
+    setEnviandoComprobantePOS(true);
     try {
-      const data = construirComprobanteData(ticket);
+      const autoEmail = typeof window !== "undefined" ? localStorage.getItem("nexora_auto_email_comprobante") !== "false" : true;
+      const autoWhatsApp = typeof window !== "undefined" ? (localStorage.getItem("nexora_auto_whatsapp_abono") !== "false" && localStorage.getItem("nexora_auto_whatsapp_comprobante") !== "false") : true;
+
+      if (!autoEmail && !autoWhatsApp) {
+        showToast("Los envíos automáticos por WhatsApp y Correo están desactivados en Personalización/Configuración.", "info");
+        return;
+      }
+
+      const data = construirComprobanteData(ultimoTicket);
       const urlComprobante = await generarUrlPublicaVentaPOS(data);
       const mensaje = armarMensajeWhatsAppVentaPOS(data, urlComprobante);
 
-      // WhatsApp automatico (si hay telefono)
-      if (ticket.clienteTelefono) {
-        let numLimpio = ticket.clienteTelefono.replace(/\D/g, "");
+      // 1. Envío automático por Correo en segundo plano (si está activado y hay email)
+      let enviadoCorreo = false;
+      if (autoEmail && ultimoTicket.clienteEmail) {
+        ApiService.post("/notificaciones/email-comprobante", {
+          destinatario: ultimoTicket.clienteEmail,
+          asunto: `Comprobante de Venta — $${ultimoTicket.total.toFixed(2)} — ${ultimoTicket.negocio?.nombre || "Calzado"}`,
+          tipo: "GENERAL",
+          detalles: {
+            mensaje: mensaje,
+            urlComprobante,
+          },
+        })
+          .then(() => showToast(`Comprobante enviado por correo a ${ultimoTicket.clienteEmail}`, "success"))
+          .catch((e) => console.warn("Error enviando email POS:", e));
+        enviadoCorreo = true;
+      }
+
+      // 2. Abrir WhatsApp directamente (si está activado)
+      let enviadoWhatsApp = false;
+      if (autoWhatsApp) {
+        let numLimpio = (ultimoTicket.clienteTelefono || "").replace(/\D/g, "");
         if (numLimpio.startsWith("09") && numLimpio.length === 10) {
           numLimpio = "593" + numLimpio.substring(1);
         } else if (numLimpio.startsWith("0") && numLimpio.length === 10) {
           numLimpio = "593" + numLimpio.substring(1);
         }
-        const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
+        const waUrl = numLimpio
+          ? `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`
+          : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
         const a = document.createElement("a");
         a.href = waUrl;
         a.target = "_blank";
@@ -807,82 +833,21 @@ export default function PosComponent() {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        showToast("Comprobante de venta enviado por WhatsApp", "success");
-      }
-
-      // Email automatico (si hay correo)
-      if (ticket.clienteEmail) {
-        ApiService.post("/notificaciones/email-comprobante", {
-          destinatario: ticket.clienteEmail,
-          asunto: `Comprobante de Venta — $${ticket.total.toFixed(2)} — ${ticket.negocio?.nombre || "Calzado"}`,
-          tipo: "GENERAL",
-          detalles: {
-            mensaje: mensaje,
-            urlComprobante,
-          },
-        })
-          .then(() => showToast(`Comprobante enviado por correo a ${ticket.clienteEmail}`, "success"))
-          .catch((e) => console.warn("Error enviando email POS:", e));
+        enviadoWhatsApp = true;
       }
 
       setComprobanteEnviadoPOS(true);
-    } catch (err) {
-      console.error("Error en envío automático de comprobante POS:", err);
-    }
-  };
-
-  const handleEnviarComprobanteManual = async () => {
-    if (!ultimoTicket) return;
-    setEnviandoComprobantePOS(true);
-    try {
-      await enviarComprobantePOSAuto(ultimoTicket);
+      if (enviadoWhatsApp && enviadoCorreo) {
+        showToast("Comprobante abierto en WhatsApp y enviado al correo", "success");
+      } else if (enviadoWhatsApp) {
+        showToast("Comprobante abierto en WhatsApp", "success");
+      } else if (enviadoCorreo) {
+        showToast(`Comprobante enviado por correo a ${ultimoTicket.clienteEmail}`, "success");
+      }
     } catch (err: any) {
       showToast("Error al enviar comprobante: " + (err.message || ""), "error");
     } finally {
       setEnviandoComprobantePOS(false);
-    }
-  };
-
-  const handleEnviarWhatsAppDirecto = async () => {
-    if (!ultimoTicket) return;
-    try {
-      const data = construirComprobanteData(ultimoTicket);
-      const urlComprobante = await generarUrlPublicaVentaPOS(data);
-      const mensaje = armarMensajeWhatsAppVentaPOS(data, urlComprobante);
-
-      let numLimpio = (ultimoTicket.clienteTelefono || "").replace(/\D/g, "");
-      if (numLimpio.startsWith("09") && numLimpio.length === 10) {
-        numLimpio = "593" + numLimpio.substring(1);
-      } else if (numLimpio.startsWith("0") && numLimpio.length === 10) {
-        numLimpio = "593" + numLimpio.substring(1);
-      }
-      const waUrl = numLimpio
-        ? `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`
-        : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-
-      const a = document.createElement("a");
-      a.href = waUrl;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      showToast("WhatsApp abierto para enviar comprobante", "success");
-    } catch (err: any) {
-      showToast("Error abriendo WhatsApp: " + (err.message || ""), "error");
-    }
-  };
-
-  const handleCopiarMensajeWhatsApp = async () => {
-    if (!ultimoTicket) return;
-    try {
-      const data = construirComprobanteData(ultimoTicket);
-      const urlComprobante = await generarUrlPublicaVentaPOS(data);
-      const mensaje = armarMensajeWhatsAppVentaPOS(data, urlComprobante);
-      await navigator.clipboard.writeText(mensaje);
-      showToast("Mensaje de comprobante copiado al portapapeles", "success");
-    } catch {
-      showToast("No se pudo copiar el mensaje", "error");
     }
   };
 
@@ -2413,31 +2378,16 @@ export default function PosComponent() {
                 <Printer size={18} className="text-slate-700" />
                 <span className="font-bold text-xs uppercase tracking-wider text-slate-700">Ticket Térmico POS</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex bg-slate-200 rounded-lg p-0.5 text-[10px] font-bold">
-                  <button
-                    onClick={() => setAnchoTicket("58mm")}
-                    className={`px-2 py-0.5 rounded ${anchoTicket === "58mm" ? "bg-white shadow-xs" : ""}`}
-                  >
-                    58mm
-                  </button>
-                  <button
-                    onClick={() => setAnchoTicket("80mm")}
-                    className={`px-2 py-0.5 rounded ${anchoTicket === "80mm" ? "bg-white shadow-xs" : ""}`}
-                  >
-                    80mm
-                  </button>
-                </div>
-                <button
-                  onClick={() => setTicketModalOpen(false)}
-                  className="p-1 rounded-lg text-slate-500 hover:bg-slate-200"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+              <button
+                onClick={() => setTicketModalOpen(false)}
+                className="p-1 rounded-lg text-slate-500 hover:bg-slate-200 transition-colors"
+                title="Cerrar modal"
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            {/* Cuerpo del Ticket */}
+            {/* Cuerpo del Ticket - Adaptable automáticamente al contenido */}
             <div className="p-5 font-mono text-xs overflow-y-auto space-y-3 bg-white" id="ticket-pos-print">
               <div className="text-center space-y-0.5 border-b border-dashed pb-3">
                 <h2 className="font-black text-sm uppercase">{ultimoTicket.negocio?.nombre || "LOCAL COMERCIAL"}</h2>
@@ -2526,77 +2476,65 @@ export default function PosComponent() {
               </div>
             </div>
 
-            <div className="p-4 bg-slate-100 border-t space-y-2">
+            <div className="p-4 bg-slate-100 border-t space-y-2.5">
               {/* Indicador de datos de contacto del cliente */}
               {(ultimoTicket.clienteTelefono || ultimoTicket.clienteEmail) && (
                 <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Datos de Contacto del Cliente:</span>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Destinatarios del Comprobante:</span>
                   {ultimoTicket.clienteTelefono && (
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
-                      <MessageCircle size={12} className="text-emerald-600" />
+                      <MessageCircle size={12} className="text-emerald-600 shrink-0" />
                       <span className="font-mono font-semibold">{ultimoTicket.clienteTelefono}</span>
+                      <span className="text-[10px] text-slate-500">(WhatsApp)</span>
                     </div>
                   )}
                   {ultimoTicket.clienteEmail && (
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
-                      <Mail size={12} className="text-blue-600" />
+                      <Mail size={12} className="text-blue-600 shrink-0" />
                       <span className="font-semibold">{ultimoTicket.clienteEmail}</span>
+                      <span className="text-[10px] text-slate-500">(Correo)</span>
                     </div>
                   )}
                   {comprobanteEnviadoPOS && (
                     <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold mt-1">
                       <CheckCircle size={11} />
-                      <span>Comprobante enviado automaticamente</span>
+                      <span>Comprobante enviado exitosamente</span>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Botones de Envío Digital y Acciones */}
-              <div className="space-y-1.5">
+              {/* Botón Único de Envío de Comprobante y Botones de Acción */}
+              <div className="space-y-2">
                 {(ultimoTicket.clienteTelefono || ultimoTicket.clienteEmail) && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {ultimoTicket.clienteTelefono && (
-                      <button
-                        type="button"
-                        onClick={handleEnviarWhatsAppDirecto}
-                        className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                        title="Abrir WhatsApp para enviar comprobante"
-                      >
-                        <MessageCircle size={14} />
-                        <span>Abrir WhatsApp</span>
-                      </button>
+                  <button
+                    type="button"
+                    onClick={handleEnviarComprobanteWhatsAppYCorreo}
+                    disabled={enviandoComprobantePOS}
+                    className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                    title="Enviar comprobante con PDF al cliente"
+                  >
+                    {enviandoComprobantePOS ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <MessageCircle size={14} />
                     )}
-
-                    {ultimoTicket.clienteEmail && (
-                      <button
-                        type="button"
-                        onClick={handleEnviarComprobanteManual}
-                        disabled={enviandoComprobantePOS}
-                        className="py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
-                        title="Enviar comprobante al correo"
-                      >
-                        {enviandoComprobantePOS ? <Loader2 size={13} className="animate-spin" /> : <Mail size={14} />}
-                        <span>Enviar a Correo</span>
-                      </button>
-                    )}
-                  </div>
+                    <span>
+                      {ultimoTicket.clienteTelefono && ultimoTicket.clienteEmail
+                        ? "Enviar Comprobante (WhatsApp y Correo)"
+                        : ultimoTicket.clienteTelefono
+                        ? "Enviar Comprobante por WhatsApp"
+                        : "Enviar Comprobante al Correo"}
+                    </span>
+                  </button>
                 )}
 
                 <div className="flex gap-2">
                   <button
                     onClick={() => setTicketModalOpen(false)}
-                    className="flex-1 py-2.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors"
+                    className="flex-1 py-2.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
                   >
                     Cerrar
-                  </button>
-
-                  <button
-                    onClick={handleCopiarMensajeWhatsApp}
-                    className="py-2.5 px-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    title="Copiar texto del comprobante"
-                  >
-                    <span>Copiar Texto</span>
                   </button>
 
                   <button

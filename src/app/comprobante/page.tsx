@@ -28,9 +28,11 @@ import {
   generarFacturaPdfDoc,
   descargarOrdenCompraPdf,
   descargarPedidoClientePdf,
+  descargarTicketPosPdf,
   FacturaPdfData,
   OrdenCompraPdfData,
   PedidoClientePdfData,
+  TicketPosPdfData,
 } from '@/services/pdf-factura.service';
 
 function getApiUrl(): string {
@@ -455,6 +457,44 @@ function ComprobanteContent() {
         },
       };
       descargarPedidoClientePdf(pdfData);
+    } else if (data.t === 'VENTA_POS') {
+      const pdfData: TicketPosPdfData = {
+        emisor: {
+          nombre: data.e_nom || 'CALZADO COMERCIAL',
+          ruc: data.e_ruc || '',
+          direccion: data.e_dir || 'Cevallos, Tungurahua',
+          telefono: data.e_tel || '',
+        },
+        comprobante: {
+          numero: data.num || data.tc || 'TICKET POS',
+          tipo: data.tc || 'COMPROBANTE DE VENTA',
+          fecha: data.f || new Date().toLocaleString('es-EC'),
+          formaPago: data.fp || 'EFECTIVO',
+          detallePago: data.ref || undefined,
+        },
+        cliente: {
+          nombre: data.c_nom || 'Consumidor Final',
+          cedula: data.c_id || '9999999999',
+          telefono: data.c_tel || '',
+          email: data.c_mail || '',
+          direccion: data.c_dir || '',
+        },
+        items: (data.items || []).map((it: any) => ({
+          nombre: it.d || it.nombre || 'Calzado',
+          cantidad: Number(it.c || it.cantidad || 1),
+          tallaNumero: it.t || it.tallaNumero || '',
+          precioUnitario: Number(it.u || it.precioUnitario || 0),
+          subtotal: Number(it.tot || (Number(it.c || 1) * Number(it.u || 0))),
+        })),
+        totales: {
+          subtotal: Number(data.sub || 0),
+          descuento: Number(data.desc || 0),
+          total: Number(data.tot || 0),
+          pagaCon: data.pagaCon !== undefined ? Number(data.pagaCon) : undefined,
+          vuelto: data.vuelto !== undefined ? Number(data.vuelto) : undefined,
+        },
+      };
+      descargarTicketPosPdf(pdfData);
     }
   };
 
@@ -495,6 +535,7 @@ function ComprobanteContent() {
   const esFactura = data.t === 'FACTURA';
   const esOrden = data.t === 'ORDEN';
   const esPedido = data.t === 'PEDIDO';
+  const esVentaPos = data.t === 'VENTA_POS';
 
   return (
     <div className="min-h-screen w-full bg-slate-100/70 py-6 sm:py-10 px-3 sm:px-6 pb-24 flex flex-col items-center justify-start overflow-y-auto">
@@ -560,10 +601,12 @@ function ComprobanteContent() {
                   ? 'Comprobante de Pedido'
                   : esFactura
                   ? 'Factura Electrónica'
+                  : esVentaPos
+                  ? 'Ticket de Venta en Mostrador'
                   : 'Orden de Compra'}
               </span>
               <span className="text-base sm:text-lg font-mono font-black text-white block mt-0.5">
-                {data.num}
+                {data.num || data.tc || 'TICKET'}
               </span>
               <span className="text-[11px] text-slate-300 flex items-center sm:justify-end gap-1 mt-1">
                 <Calendar size={12} />
@@ -584,19 +627,19 @@ function ComprobanteContent() {
               <div>
                 <span className="text-slate-500 block text-[11px]">Nombre o Razón Social:</span>
                 <strong className="text-slate-900 font-bold text-sm">
-                  {esOrden ? data.p_nom : data.c_nom}
+                  {esOrden ? data.p_nom : data.c_nom || 'Consumidor Final'}
                 </strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[11px]">RUC / Cédula:</span>
                 <strong className="text-slate-900 font-mono font-semibold">
-                  {esOrden ? data.p_ruc || 'N/A' : data.c_id || 'Consumidor Final'}
+                  {esOrden ? data.p_ruc || 'N/A' : (data.c_id && data.c_id !== '9999999999' ? data.c_id : 'Consumidor Final')}
                 </strong>
               </div>
               {(data.c_tel || data.p_tel) && (
                 <div>
-                  <span className="text-slate-500 block text-[11px]">Teléfono:</span>
-                  <span className="text-slate-700">{data.c_tel || data.p_tel}</span>
+                  <span className="text-slate-500 block text-[11px]">Teléfono / WhatsApp:</span>
+                  <span className="text-slate-700 font-mono">{data.c_tel || data.p_tel}</span>
                 </div>
               )}
               {data.c_dir && (
@@ -709,6 +752,74 @@ function ComprobanteContent() {
                     <span>IVA (15%):</span>
                     <span className="font-mono font-bold">${Number(data.iva || 0).toFixed(2)}</span>
                   </div>
+                  <div className="flex justify-between text-base font-black text-slate-900 pt-1.5 border-t border-slate-300">
+                    <span>TOTAL:</span>
+                    <span className="font-mono text-emerald-700">${Number(data.tot || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ CUERPO: VENTA POS / TICKET DE MOSTRADOR ═══ */}
+          {esVentaPos && (
+            <div className="space-y-4">
+              <span className="text-xs font-extrabold uppercase text-slate-700 tracking-wider block">
+                Detalle de Calzado y Artículos Adquiridos
+              </span>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-2xl bg-white shadow-2xs">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                      <th className="py-3 px-3.5 text-center font-bold tracking-tight">Cant.</th>
+                      <th className="py-3 px-3.5 text-left font-bold tracking-tight">Modelo / Descripción</th>
+                      <th className="py-3 px-3.5 text-center font-bold tracking-tight">Talla</th>
+                      <th className="py-3 px-4 text-right font-bold tracking-tight">P. Unitario</th>
+                      <th className="py-3 px-4 text-right font-bold tracking-tight">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {(data.items || []).map((it: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 px-3.5 text-center font-mono font-bold text-slate-900">
+                          {it.c || it.cantidad || 1}
+                        </td>
+                        <td className="py-3 px-3.5 font-bold text-slate-900">
+                          {it.d || it.nombre || 'Calzado'}
+                        </td>
+                        <td className="py-3 px-3.5 text-center font-mono text-emerald-700 font-bold">
+                          {it.t || it.tallaNumero ? `T${it.t || it.tallaNumero}` : '—'}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-600">
+                          ${Number(it.u || it.precioUnitario || 0).toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                          ${Number(it.tot || (Number(it.c || 1) * Number(it.u || 0))).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
+                <div className="text-xs text-slate-600">
+                  <span>Forma de Pago: </span>
+                  <strong className="font-bold text-slate-900">{data.fp || 'EFECTIVO'}</strong>
+                </div>
+
+                <div className="w-64 space-y-1.5 text-xs bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal:</span>
+                    <span className="font-mono font-bold">${Number(data.sub || 0).toFixed(2)}</span>
+                  </div>
+                  {Number(data.desc || 0) > 0 && (
+                    <div className="flex justify-between text-amber-600 font-bold">
+                      <span>Descuento aplicado:</span>
+                      <span className="font-mono">-${Number(data.desc).toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-base font-black text-slate-900 pt-1.5 border-t border-slate-300">
                     <span>TOTAL:</span>
                     <span className="font-mono text-emerald-700">${Number(data.tot || 0).toFixed(2)}</span>

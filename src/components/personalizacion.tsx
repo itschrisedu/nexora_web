@@ -1280,10 +1280,10 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   <div className="space-y-1">
                     <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-2">
                       <MessageCircle size={15} className="text-emerald-500" />
-                      <span>Enviar comprobante oficial por WhatsApp al confirmar</span>
+                      <span>Enviar comprobantes y notificaciones automáticamente por WhatsApp</span>
                     </span>
                     <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
-                      Abre directamente el chat de WhatsApp con el desglose del abono, saldo anterior y saldo pendiente al registrar cobros o pagos, sin descargas locales ni recargas de pantalla.
+                      Abre directamente el chat de WhatsApp con el comprobante, PDF oficial y desglose detallado al registrar ventas POS, cobros de crédito, pedidos o entregas.
                     </p>
                   </div>
                   <input
@@ -1293,6 +1293,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       const checked = e.target.checked;
                       setAutoWhatsAppAbono(checked);
                       localStorage.setItem("nexora_auto_whatsapp_abono", String(checked));
+                      localStorage.setItem("nexora_auto_whatsapp_comprobante", String(checked));
                       window.dispatchEvent(new CustomEvent("nexora:config-changed"));
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
