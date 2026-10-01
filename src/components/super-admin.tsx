@@ -42,6 +42,8 @@ import {
   Search,
   FileSpreadsheet,
   RefreshCw,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import {
   descargarReporteSuscripcionesPdf,
@@ -206,6 +208,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
   const [confirmDeleteTenant, setConfirmDeleteTenant] = useState<{ id: string; name: string } | null>(null);
   const [deleteTenantLoading, setDeleteTenantLoading] = useState(false);
+
+  // Búsqueda y Modo de Vista de Empresas y Locales
+  const [searchTenant, setSearchTenant] = useState("");
+  const [viewModeTenants, setViewModeTenants] = useState<"grid" | "list">("grid");
 
   // Modales Detalle y Usuarios
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -946,243 +952,511 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       )}
 
       {/* VISTA 1: GESTIÓN DE EMPRESAS Y LOCALES */}
-      {activeMainTab === 'EMPRESAS' && (
-        <>
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 size={32} className="animate-spin text-[#0F172A]" />
-            </div>
-          ) : tenants.length === 0 ? (
-            <div className="text-center py-20 text-[var(--muted-foreground)]">
-              <Building2 size={48} className="mx-auto mb-4 opacity-30" />
-              <p className="text-lg font-semibold">No hay empresas o locales registrados</p>
-              <p className="text-sm">Crea la primera empresa o local para comenzar.</p>
-            </div>
-          ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {tenants.map((tenant) => {
-            const planBadge =
-              tenant.plan === "PLAN_BASICO"
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : tenant.plan === "PLAN_MAYORISTA"
-                ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                : "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      {activeMainTab === 'EMPRESAS' && (() => {
+        const tenantsFiltrados = tenants.filter((t) => {
+          if (!searchTenant.trim()) return true;
+          const q = searchTenant.toLowerCase().trim();
+          const matchName = (t.name || "").toLowerCase().includes(q);
+          const matchPlan = (t.plan || "").toLowerCase().includes(q);
+          const matchAdmin = (t.admins || []).some(
+            (a) => (a.nombre || "").toLowerCase().includes(q) || (a.email || "").toLowerCase().includes(q)
+          );
+          return matchName || matchPlan || matchAdmin;
+        });
 
-            const planName =
-              tenant.plan === "PLAN_BASICO"
-                ? "Plan Básico"
-                : tenant.plan === "PLAN_MAYORISTA"
-                ? "Plan Mayorista"
-                : "Plan Comercial";
+        return (
+          <div className="space-y-4">
+            {/* BARRA DE BÚSQUEDA Y VISTAS (CUADRÍCULA / LISTA) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--card)] border border-[var(--border)] p-3.5 rounded-2xl shadow-xs">
+              <div className="relative flex-1 max-w-md">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                <input
+                  type="text"
+                  placeholder="Buscar empresa por nombre, plan o administrador..."
+                  value={searchTenant}
+                  onChange={(e) => setSearchTenant(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-amber-500 transition-colors"
+                />
+                {searchTenant && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTenant("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-0.5 rounded-md cursor-pointer"
+                    title="Limpiar búsqueda"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
 
-            const isOverdue = tenant.diasRestantes !== undefined && tenant.diasRestantes < 0;
-            const isNearRenewal = tenant.diasRestantes !== undefined && tenant.diasRestantes >= 0 && tenant.diasRestantes <= 3;
+              <div className="flex items-center justify-between sm:justify-end gap-3">
+                <span className="text-[11px] text-[var(--muted-foreground)] font-semibold">
+                  {tenantsFiltrados.length} {tenantsFiltrados.length === 1 ? "empresa" : "empresas"}
+                  {searchTenant.trim() ? ` de ${tenants.length}` : ""}
+                </span>
 
-            return (
-              <div
-                key={tenant.id}
-                className={`bg-[var(--card)] border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all ${
-                  tenant.active ? "border-[var(--border)]" : "border-rose-500/30 opacity-70"
-                }`}
-              >
-                {/* Tenant header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm ${
-                        tenant.active
-                          ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
-                          : "bg-slate-500"
-                      }`}
-                    >
-                      {tenant.name.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-base">{tenant.name}</h3>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${planBadge}`}>
-                          {planName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                            tenant.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
-                          }`}
-                        >
-                          {tenant.active ? "ACTIVO" : "INACTIVO"}
-                        </span>
-                        {tenant.estadoSuscripcion === "EN_PRUEBA" && (
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            PRUEBA GRATIS
-                          </span>
-                        )}
-                        {isOverdue ? (
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse">
-                            VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d gracia)
-                          </span>
-                        ) : isNearRenewal ? (
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            Vence en {tenant.diasRestantes}d
-                          </span>
-                        ) : tenant.diasRestantes !== undefined ? (
-                          <span className="text-[9px] font-semibold text-slate-400">
-                            {tenant.diasRestantes}d restantes
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Acciones principales */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenSubscriptionModal(tenant)}
-                      className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
-                      title="Gestionar Suscripción y Facturación"
-                    >
-                      <CreditCard size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleViewDetail(tenant.id)}
-                      className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-                      title="Ver detalle y usuarios"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleOpenEditTenant(tenant)}
-                      className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors"
-                      title="Editar Tenant y Negocio"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() =>
-                        setConfirmToggle({
-                          id: tenant.id,
-                          name: tenant.name,
-                          active: tenant.active,
-                        })
-                      }
-                      className={`p-2 rounded-lg transition-colors ${
-                        tenant.active
-                          ? "hover:bg-rose-500/10 text-[var(--muted-foreground)] hover:text-rose-500"
-                          : "hover:bg-emerald-500/10 text-[var(--muted-foreground)] hover:text-emerald-500"
-                      }`}
-                      title={tenant.active ? "Desactivar" : "Reactivar"}
-                    >
-                      {tenant.active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
-                      className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors"
-                      title="Eliminar Tenant Definitivamente"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-4 gap-3 mb-4">
-                  <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                    <Users size={14} className="mx-auto text-amber-500 mb-1" />
-                    <div className="text-sm font-bold">{tenant.stats.users}</div>
-                    <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
-                  </div>
-                  <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                    <Package size={14} className="mx-auto text-emerald-500 mb-1" />
-                    <div className="text-sm font-bold">{tenant.stats.models}</div>
-                    <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
-                  </div>
-                  <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                    <UserCircle size={14} className="mx-auto text-amber-500 mb-1" />
-                    <div className="text-sm font-bold">{tenant.stats.clients}</div>
-                    <div className="text-[9px] text-[var(--muted-foreground)]">Clientes</div>
-                  </div>
-                  <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                    <ShoppingCart size={14} className="mx-auto text-amber-500 mb-1" />
-                    <div className="text-sm font-bold">{tenant.stats.orders}</div>
-                    <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
-                  </div>
-                </div>
-
-                {/* Admins list */}
-                <div className="border-t border-[var(--border)] pt-3">
-                  <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                    Administradores
-                  </div>
-                  {tenant.admins.length === 0 ? (
-                    <p className="text-xs text-[var(--muted-foreground)]">Sin administradores</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {tenant.admins.map((admin) => (
-                        <div key={admin.id} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold">
-                              {admin.nombre.slice(0, 1).toUpperCase()}
-                            </div>
-                            <div>
-                              <span className="font-medium">{admin.nombre}</span>
-                              <span className="text-[var(--muted-foreground)] ml-2">{admin.email}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setEditingUser({
-                                  id: admin.id,
-                                  nombre: admin.nombre,
-                                  email: admin.email,
-                                  rol: "ROL_ADMIN",
-                                  activo: admin.activo,
-                                  password: "",
-                                });
-                                setShowEditUserModal(true);
-                              }}
-                              className="p-1 rounded hover:bg-[var(--muted)] text-amber-500 transition-colors"
-                              title="Editar Administrador"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteUser({ id: admin.id, nombre: admin.nombre, email: admin.email })}
-                              className="p-1 rounded hover:bg-rose-500/10 text-rose-500 transition-colors"
-                              title="Eliminar Administrador"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                admin.activo ? "bg-emerald-500" : "bg-rose-500"
-                              }`}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
-                  <span>
-                    Creado: {new Date(tenant.createdAt).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "numeric" })}
-                  </span>
-                  {tenant.fechaVencimientoPlan && (
-                    <span className="font-mono">
-                      Vence: {new Date(tenant.fechaVencimientoPlan).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "numeric" })}
-                    </span>
-                  )}
+                <div className="flex bg-[var(--background)] p-1 rounded-xl border border-[var(--border)] gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewModeTenants("grid")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      viewModeTenants === "grid"
+                        ? "bg-[#0F172A] text-white shadow-xs"
+                        : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    }`}
+                    title="Vista en Cuadrícula"
+                  >
+                    <LayoutGrid size={14} />
+                    <span className="hidden md:inline">Cuadrícula</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewModeTenants("list")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      viewModeTenants === "list"
+                        ? "bg-[#0F172A] text-white shadow-xs"
+                        : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    }`}
+                    title="Vista en Lista"
+                  >
+                    <List size={14} />
+                    <span className="hidden md:inline">Lista</span>
+                  </button>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
-      </>
-      )}
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 size={32} className="animate-spin text-[#0F172A]" />
+              </div>
+            ) : tenants.length === 0 ? (
+              <div className="text-center py-20 text-[var(--muted-foreground)]">
+                <Building2 size={48} className="mx-auto mb-4 opacity-30" />
+                <p className="text-lg font-semibold">No hay empresas o locales registrados</p>
+                <p className="text-sm">Crea la primera empresa o local para comenzar.</p>
+              </div>
+            ) : tenantsFiltrados.length === 0 ? (
+              <div className="text-center py-16 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6">
+                <Search size={40} className="mx-auto mb-3 text-[var(--muted-foreground)] opacity-40" />
+                <p className="text-base font-bold text-[var(--foreground)]">No se encontraron empresas coincidentes</p>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">No hay resultados para la búsqueda "{searchTenant}"</p>
+                <button
+                  type="button"
+                  onClick={() => setSearchTenant("")}
+                  className="mt-4 px-4 py-2 bg-[#0F172A] text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Limpiar Búsqueda
+                </button>
+              </div>
+            ) : viewModeTenants === "grid" ? (
+              /* ── MODO CUADRÍCULA (GRID) ── */
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {tenantsFiltrados.map((tenant) => {
+                  const planBadge =
+                    tenant.plan === "PLAN_BASICO"
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : tenant.plan === "PLAN_MAYORISTA"
+                      ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                      : "bg-blue-500/10 text-blue-400 border-blue-500/20";
+
+                  const planName =
+                    tenant.plan === "PLAN_BASICO"
+                      ? "Plan Básico"
+                      : tenant.plan === "PLAN_MAYORISTA"
+                      ? "Plan Mayorista"
+                      : "Plan Comercial";
+
+                  const isOverdue = tenant.diasRestantes !== undefined && tenant.diasRestantes < 0;
+                  const isNearRenewal = tenant.diasRestantes !== undefined && tenant.diasRestantes >= 0 && tenant.diasRestantes <= 3;
+
+                  return (
+                    <div
+                      key={tenant.id}
+                      className={`bg-[var(--card)] border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all ${
+                        tenant.active ? "border-[var(--border)]" : "border-rose-500/30 opacity-70"
+                      }`}
+                    >
+                      {/* Tenant header */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm ${
+                              tenant.active
+                                ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
+                                : "bg-slate-500"
+                            }`}
+                          >
+                            {tenant.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-base">{tenant.name}</h3>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${planBadge}`}>
+                                {planName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                  tenant.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                }`}
+                              >
+                                {tenant.active ? "ACTIVO" : "INACTIVO"}
+                              </span>
+                              {tenant.estadoSuscripcion === "EN_PRUEBA" && (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                  PRUEBA GRATIS
+                                </span>
+                              )}
+                              {isOverdue ? (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse">
+                                  VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d gracia)
+                                </span>
+                              ) : isNearRenewal ? (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                  Vence en {tenant.diasRestantes}d
+                                </span>
+                              ) : tenant.diasRestantes !== undefined ? (
+                                <span className="text-[9px] font-semibold text-slate-400">
+                                  {tenant.diasRestantes}d restantes
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Acciones principales */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenSubscriptionModal(tenant)}
+                            className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
+                            title="Gestionar Suscripción y Facturación"
+                          >
+                            <CreditCard size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleViewDetail(tenant.id)}
+                            className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                            title="Ver detalle y usuarios"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditTenant(tenant)}
+                            className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors cursor-pointer"
+                            title="Editar Tenant y Negocio"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setConfirmToggle({
+                                id: tenant.id,
+                                name: tenant.name,
+                                active: tenant.active,
+                              })
+                            }
+                            className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                              tenant.active
+                                ? "hover:bg-rose-500/10 text-[var(--muted-foreground)] hover:text-rose-500"
+                                : "hover:bg-emerald-500/10 text-[var(--muted-foreground)] hover:text-emerald-500"
+                            }`}
+                            title={tenant.active ? "Desactivar" : "Reactivar"}
+                          >
+                            {tenant.active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
+                            className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Eliminar Tenant Definitivamente"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="grid grid-cols-4 gap-3 mb-4">
+                        <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                          <Users size={14} className="mx-auto text-amber-500 mb-1" />
+                          <div className="text-sm font-bold">{tenant.stats.users}</div>
+                          <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
+                        </div>
+                        <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                          <Package size={14} className="mx-auto text-emerald-500 mb-1" />
+                          <div className="text-sm font-bold">{tenant.stats.models}</div>
+                          <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
+                        </div>
+                        <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                          <UserCircle size={14} className="mx-auto text-amber-500 mb-1" />
+                          <div className="text-sm font-bold">{tenant.stats.clients}</div>
+                          <div className="text-[9px] text-[var(--muted-foreground)]">Clientes</div>
+                        </div>
+                        <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                          <ShoppingCart size={14} className="mx-auto text-amber-500 mb-1" />
+                          <div className="text-sm font-bold">{tenant.stats.orders}</div>
+                          <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
+                        </div>
+                      </div>
+
+                      {/* Admins list */}
+                      <div className="border-t border-[var(--border)] pt-3">
+                        <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                          Administradores
+                        </div>
+                        {tenant.admins.length === 0 ? (
+                          <p className="text-xs text-[var(--muted-foreground)]">Sin administradores</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {tenant.admins.map((admin) => (
+                              <div key={admin.id} className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold">
+                                    {admin.nombre.slice(0, 1).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">{admin.nombre}</span>
+                                    <span className="text-[var(--muted-foreground)] ml-2">{admin.email}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingUser({
+                                        id: admin.id,
+                                        nombre: admin.nombre,
+                                        email: admin.email,
+                                        rol: "ROL_ADMIN",
+                                        activo: admin.activo,
+                                        password: "",
+                                      });
+                                      setShowEditUserModal(true);
+                                    }}
+                                    className="p-1 rounded hover:bg-[var(--muted)] text-amber-500 transition-colors cursor-pointer"
+                                    title="Editar Administrador"
+                                  >
+                                    <Pencil size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteUser({ id: admin.id, nombre: admin.nombre, email: admin.email })}
+                                    className="p-1 rounded hover:bg-rose-500/10 text-rose-500 transition-colors cursor-pointer"
+                                    title="Eliminar Administrador"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                  <span
+                                    className={`w-2 h-2 rounded-full ${
+                                      admin.activo ? "bg-emerald-500" : "bg-rose-500"
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
+                        <span>
+                          Creado: {new Date(tenant.createdAt).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
+                        {tenant.fechaVencimientoPlan && (
+                          <span className="font-mono">
+                            Vence: {new Date(tenant.fechaVencimientoPlan).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* ── MODO LISTA (HORIZONTAL LIST) ── */
+              <div className="space-y-3">
+                {tenantsFiltrados.map((tenant) => {
+                  const planBadge =
+                    tenant.plan === "PLAN_BASICO"
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : tenant.plan === "PLAN_MAYORISTA"
+                      ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                      : "bg-blue-500/10 text-blue-400 border-blue-500/20";
+
+                  const planName =
+                    tenant.plan === "PLAN_BASICO"
+                      ? "Plan Básico"
+                      : tenant.plan === "PLAN_MAYORISTA"
+                      ? "Plan Mayorista"
+                      : "Plan Comercial";
+
+                  const isOverdue = tenant.diasRestantes !== undefined && tenant.diasRestantes < 0;
+                  const isNearRenewal = tenant.diasRestantes !== undefined && tenant.diasRestantes >= 0 && tenant.diasRestantes <= 3;
+
+                  return (
+                    <div
+                      key={tenant.id}
+                      className={`bg-[var(--card)] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-4 ${
+                        tenant.active ? "border-[var(--border)]" : "border-rose-500/30 opacity-70"
+                      }`}
+                    >
+                      {/* Info principal y Empresa */}
+                      <div className="flex items-center gap-3.5 min-w-[260px]">
+                        <div
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 ${
+                            tenant.active
+                              ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
+                              : "bg-slate-500"
+                          }`}
+                        >
+                          {tenant.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-bold text-sm text-[var(--foreground)]">{tenant.name}</h3>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${planBadge}`}>
+                              {planName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span
+                              className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                tenant.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                              }`}
+                            >
+                              {tenant.active ? "ACTIVO" : "INACTIVO"}
+                            </span>
+                            {tenant.estadoSuscripcion === "EN_PRUEBA" && (
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                PRUEBA GRATIS
+                              </span>
+                            )}
+                            {isOverdue ? (
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse">
+                                VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d gracia)
+                              </span>
+                            ) : isNearRenewal ? (
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                Vence en {tenant.diasRestantes}d
+                              </span>
+                            ) : tenant.diasRestantes !== undefined ? (
+                              <span className="text-[9px] font-semibold text-slate-400">
+                                {tenant.diasRestantes}d restantes
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Métricas rápidas (Píldoras) */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Usuarios">
+                          <Users size={13} className="text-amber-500" />
+                          <span className="font-bold text-[var(--foreground)]">{tenant.stats.users}</span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">Usr</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Modelos de Calzado">
+                          <Package size={13} className="text-emerald-500" />
+                          <span className="font-bold text-[var(--foreground)]">{tenant.stats.models}</span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">Mod</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Clientes Registrados">
+                          <UserCircle size={13} className="text-amber-500" />
+                          <span className="font-bold text-[var(--foreground)]">{tenant.stats.clients}</span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">Cli</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--muted)]/50 rounded-xl text-xs" title="Pedidos">
+                          <ShoppingCart size={13} className="text-amber-500" />
+                          <span className="font-bold text-[var(--foreground)]">{tenant.stats.orders}</span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">Ped</span>
+                        </div>
+                      </div>
+
+                      {/* Administrador Principal */}
+                      <div className="min-w-[180px] text-xs">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block mb-0.5">
+                          Administrador:
+                        </span>
+                        {tenant.admins.length > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold truncate max-w-[140px]">{tenant.admins[0].nombre}</span>
+                            <span className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[120px]">
+                              ({tenant.admins[0].email})
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-[var(--muted-foreground)]">Sin admin</span>
+                        )}
+                      </div>
+
+                      {/* Fechas de Registro y Vencimiento */}
+                      <div className="text-[10px] text-[var(--muted-foreground)] min-w-[130px] space-y-0.5">
+                        <div>
+                          Creado: <span className="font-semibold text-[var(--foreground)]">{new Date(tenant.createdAt).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "2-digit" })}</span>
+                        </div>
+                        {tenant.fechaVencimientoPlan && (
+                          <div>
+                            Vence: <span className="font-semibold text-[var(--foreground)]">{new Date(tenant.fechaVencimientoPlan).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "2-digit" })}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Acciones */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => handleOpenSubscriptionModal(tenant)}
+                          className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
+                          title="Gestionar Suscripción y Facturación"
+                        >
+                          <CreditCard size={15} />
+                        </button>
+                        <button
+                          onClick={() => handleViewDetail(tenant.id)}
+                          className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                          title="Ver detalle y usuarios"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditTenant(tenant)}
+                          className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors cursor-pointer"
+                          title="Editar Tenant y Negocio"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setConfirmToggle({
+                              id: tenant.id,
+                              name: tenant.name,
+                              active: tenant.active,
+                            })
+                          }
+                          className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                            tenant.active
+                              ? "hover:bg-rose-500/10 text-[var(--muted-foreground)] hover:text-rose-500"
+                              : "hover:bg-emerald-500/10 text-[var(--muted-foreground)] hover:text-emerald-500"
+                          }`}
+                          title={tenant.active ? "Desactivar" : "Reactivar"}
+                        >
+                          {tenant.active ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
+                          className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors cursor-pointer"
+                          title="Eliminar Tenant Definitivamente"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* VISTA 2: REPORTES DE SUSCRIPCIONES, PAGOS Y RECAUDACIÓN */}
       {activeMainTab === 'REPORTES_SUSCRIPCIONES' && (
