@@ -78,6 +78,7 @@ interface Tenant {
   plan?: string;
   estadoSuscripcion?: string;
   fechaVencimientoPlan?: string;
+  diasPruebaGratis?: number;
   diasRestantes?: number;
   precioMensualPlan?: number;
   logoUrl?: string | null;
@@ -106,6 +107,7 @@ interface TenantDetail {
   plan?: string;
   estadoSuscripcion?: string;
   fechaVencimientoPlan?: string;
+  diasPruebaGratis?: number;
   precioMensualPlan?: number;
   stats: TenantStats;
   users: TenantAdmin[];
@@ -165,7 +167,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     adminPassword: "",
     adminConfirmPassword: "",
     plan: "PLAN_COMERCIAL",
-    diasPruebaGratis: 15,
+    diasPruebaGratis: 365,
     precioMensualPlan: 29,
   });
   const [showPassTenant, setShowPassTenant] = useState(false);
@@ -175,10 +177,13 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [showPassEditUser, setShowPassEditUser] = useState(false);
   const [showPassEditUserConfirm, setShowPassEditUserConfirm] = useState(false);
 
-  // Modal Suscripción & Pagos
+  // Modal Suscripción & Pagos & Renovación de Prueba
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [subscribingTenant, setSubscribingTenant] = useState<Tenant | null>(null);
   const [subLoading, setSubLoading] = useState(false);
+  const [trialDaysInput, setTrialDaysInput] = useState<number>(365);
+  const [trialResetToday, setTrialResetToday] = useState<boolean>(false);
+  const [renewingTrial, setRenewingTrial] = useState<boolean>(false);
   const [subPayments, setSubPayments] = useState<SubscriptionPaymentItem[]>([]);
   const [newPayment, setNewPayment] = useState<{
     monto: number | string;
@@ -206,6 +211,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     plan: string;
     estadoSuscripcion: string;
     precioMensualPlan: number;
+    diasPruebaGratis?: number;
     ruc: string;
     direccion: string;
     telefono: string;
@@ -630,7 +636,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         adminPassword: "",
         adminConfirmPassword: "",
         plan: "PLAN_COMERCIAL",
-        diasPruebaGratis: 15,
+        diasPruebaGratis: 365,
         precioMensualPlan: 29,
       });
       await fetchTenants();
@@ -648,6 +654,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       plan: tenant.plan || "PLAN_COMERCIAL",
       estadoSuscripcion: tenant.estadoSuscripcion || "ACTIVA",
       precioMensualPlan: (tenant.precioMensualPlan !== undefined && tenant.precioMensualPlan !== null) ? tenant.precioMensualPlan : 29,
+      diasPruebaGratis: tenant.diasPruebaGratis !== undefined ? tenant.diasPruebaGratis : 365,
       ruc: "",
       direccion: "",
       telefono: "",
@@ -662,6 +669,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         plan: detail.plan || "PLAN_COMERCIAL",
         estadoSuscripcion: detail.estadoSuscripcion || "ACTIVA",
         precioMensualPlan: (detail.precioMensualPlan !== undefined && detail.precioMensualPlan !== null) ? detail.precioMensualPlan : 29,
+        diasPruebaGratis: detail.diasPruebaGratis !== undefined ? detail.diasPruebaGratis : 365,
         ruc: detail.businessConfig?.ruc || "",
         direccion: detail.businessConfig?.direccion || "",
         telefono: detail.businessConfig?.telefono || "",
@@ -681,6 +689,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         plan: editingTenant.plan,
         estadoSuscripcion: editingTenant.estadoSuscripcion,
         precioMensualPlan: Number(editingTenant.precioMensualPlan || 0),
+        diasPruebaGratis: Number(editingTenant.diasPruebaGratis || 365),
         businessConfig: {
           nombre: editingTenant.name,
           ruc: editingTenant.ruc,
@@ -704,6 +713,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
   const handleOpenSubscriptionModal = async (tenant: Tenant) => {
     setSubscribingTenant(tenant);
+    setTrialDaysInput(365);
+    setTrialResetToday(false);
     const configuredPrices = getStoredPlanPrices();
     const defaultMonto = (tenant.precioMensualPlan !== undefined && tenant.precioMensualPlan !== null)
       ? tenant.precioMensualPlan
@@ -726,6 +737,29 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       setSubPayments([]);
     } finally {
       setSubLoading(false);
+    }
+  };
+
+  const handleRenewTrial = async (dias: number = 365, resetToday: boolean = false) => {
+    if (!subscribingTenant) return;
+    setRenewingTrial(true);
+    setErrorMsg("");
+    try {
+      const res = await ApiService.post(`/tenants/${subscribingTenant.id}/renew-trial`, {
+        diasExtension: Number(dias || 365),
+        reiniciarDesdeHoy: resetToday,
+      });
+      setSuccessMsg(res.message || `Prueba gratuita renovada exitosamente por ${dias} días.`);
+      await fetchTenants();
+      const detail = await ApiService.get(`/tenants/${subscribingTenant.id}`);
+      setSubscribingTenant((prev) => (prev ? { ...prev, ...detail } : null));
+      if (activeMainTab === "REPORTES_SUSCRIPCIONES") {
+        fetchSubscriptionReport();
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al renovar la prueba gratuita");
+    } finally {
+      setRenewingTrial(false);
     }
   };
 
@@ -2188,34 +2222,62 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
                     Días de Prueba Gratis
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="90"
-                    value={newTenant.diasPruebaGratis === ("" as any) ? "" : newTenant.diasPruebaGratis}
-                    onChange={(e) => setNewTenant({ ...newTenant, diasPruebaGratis: e.target.value === "" ? ("" as any) : Number(e.target.value) })}
-                    placeholder="15"
-                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
-                  />
+                  <span className="text-[11px] font-bold text-amber-500">
+                    Hasta 365 días (1 año) con renovación
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Precio Mensual ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newTenant.precioMensualPlan === ("" as any) || newTenant.precioMensualPlan === 0 || (newTenant.precioMensualPlan as any) === "0" ? "" : newTenant.precioMensualPlan}
-                    onChange={(e) => setNewTenant({ ...newTenant, precioMensualPlan: e.target.value as any })}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="365"
+                      value={newTenant.diasPruebaGratis === ("" as any) ? "" : newTenant.diasPruebaGratis}
+                      onChange={(e) => setNewTenant({ ...newTenant, diasPruebaGratis: e.target.value === "" ? ("" as any) : Number(e.target.value) })}
+                      placeholder="365"
+                      className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newTenant.precioMensualPlan === ("" as any) || newTenant.precioMensualPlan === 0 || (newTenant.precioMensualPlan as any) === "0" ? "" : newTenant.precioMensualPlan}
+                      onChange={(e) => setNewTenant({ ...newTenant, precioMensualPlan: e.target.value as any })}
+                      placeholder="Precio Mensual ($)"
+                      className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                    />
+                  </div>
+                </div>
+                {/* Accesos rápidos de días de prueba */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[10px] text-slate-400 font-semibold mr-1">Preajustes:</span>
+                  {[
+                    { label: "15 Días", val: 15 },
+                    { label: "30 Días", val: 30 },
+                    { label: "90 Días (3m)", val: 90 },
+                    { label: "180 Días (6m)", val: 180 },
+                    { label: "365 Días (1 Año)", val: 365 },
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      type="button"
+                      onClick={() => setNewTenant({ ...newTenant, diasPruebaGratis: p.val })}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                        newTenant.diasPruebaGratis === p.val
+                          ? "bg-amber-500 text-slate-950 font-black shadow-2xs"
+                          : "bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -2420,19 +2482,35 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Precio Mensual ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={editingTenant.precioMensualPlan === ("" as any) || editingTenant.precioMensualPlan === 0 || (editingTenant.precioMensualPlan as any) === "0" ? "" : editingTenant.precioMensualPlan}
-                  onChange={(e) => setEditingTenant({ ...editingTenant, precioMensualPlan: e.target.value as any })}
-                  placeholder="0.00"
-                  className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Precio Mensual ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editingTenant.precioMensualPlan === ("" as any) || editingTenant.precioMensualPlan === 0 || (editingTenant.precioMensualPlan as any) === "0" ? "" : editingTenant.precioMensualPlan}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, precioMensualPlan: e.target.value as any })}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Días Prueba / Vigencia
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={editingTenant.diasPruebaGratis === ("" as any) ? "" : editingTenant.diasPruebaGratis}
+                    onChange={(e) => setEditingTenant({ ...editingTenant, diasPruebaGratis: e.target.value === "" ? ("" as any) : Number(e.target.value) })}
+                    placeholder="365"
+                    className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
               </div>
 
               <div>
@@ -2546,10 +2624,86 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
               </div>
 
-              {/* Formulario de Registro de Cobro / Renovación */}
+              {/* SECCIÓN 1: RENOVAR / EXTENDER PRUEBA GRATUITA */}
+              <div className="space-y-3 bg-gradient-to-br from-blue-950/30 via-slate-900/40 to-indigo-950/20 p-4 rounded-2xl border border-blue-500/30 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                    <Sparkles size={15} /> Renovar / Extender Prueba Gratuita
+                  </h4>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    Sin cobro obligatorio
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Otorga acceso de prueba por hasta 1 año (365 días) o el plazo que elijas. Al renovar, el local se reactiva automáticamente si estaba suspendido.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-semibold mr-1">Preajustes rápidos:</span>
+                  {[
+                    { label: "+15 Días", val: 15 },
+                    { label: "+30 Días", val: 30 },
+                    { label: "+90 Días (3m)", val: 90 },
+                    { label: "+180 Días (6m)", val: 180 },
+                    { label: "+365 Días (1 Año)", val: 365 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.val}
+                      type="button"
+                      onClick={() => setTrialDaysInput(preset.val)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        trialDaysInput === preset.val
+                          ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-400/50"
+                          : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                      Días a Extender
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={trialDaysInput}
+                      onChange={(e) => setTrialDaysInput(Number(e.target.value) || 1)}
+                      className="w-full px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm font-bold focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-6">
+                    <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={trialResetToday}
+                        onChange={(e) => setTrialResetToday(e.target.checked)}
+                        className="rounded accent-blue-600 cursor-pointer"
+                      />
+                      <span>Reiniciar conteo desde hoy (si ya venció)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={renewingTrial || !trialDaysInput || trialDaysInput < 1}
+                  onClick={() => handleRenewTrial(trialDaysInput, trialResetToday)}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {renewingTrial ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                  <span>Aplicar Renovación de Prueba Gratuita (+{trialDaysInput} Días)</span>
+                </button>
+              </div>
+
+              {/* SECCIÓN 2: FORMULARIO DE REGISTRO DE COBRO / PLAN PAGO */}
               <form onSubmit={handleRegisterSubscriptionPayment} className="space-y-4 bg-black/20 p-4 rounded-2xl border border-[var(--border)]">
                 <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                  <DollarSign size={15} /> Registrar Cobro & Renovar Suscripción
+                  <DollarSign size={15} /> Registrar Cobro & Renovar Suscripción Pagada
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
