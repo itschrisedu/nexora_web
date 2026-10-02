@@ -565,15 +565,18 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     }
   };
 
+  // Precarga simultánea al ingresar al módulo de Gestión de Empresas
+  useEffect(() => {
+    fetchTenants();
+    fetchSuperAdmins();
+  }, [fetchTenants, fetchSuperAdmins]);
+
+  // Si cambia a la pestaña de Super Admins, refrescar de fondo
   useEffect(() => {
     if (activeMainTab === 'SUPER_ADMINS') {
       fetchSuperAdmins();
     }
   }, [activeMainTab, fetchSuperAdmins]);
-
-  useEffect(() => {
-    fetchTenants();
-  }, [fetchTenants]);
 
   useEffect(() => {
     if (successMsg) {
@@ -1142,13 +1145,13 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   return (
                     <div
                       key={tenant.id}
-                      className={`bg-[var(--card)] border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all ${
+                      className={`bg-[var(--card)] border rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all overflow-hidden ${
                         tenant.active ? "border-[var(--border)]" : "border-rose-500/30 opacity-70"
                       }`}
                     >
-                      {/* Tenant header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
+                      {/* Tenant header responsive */}
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
                           <div
                             className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border ${
                               tenant.active
@@ -1166,36 +1169,36 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                               tenant.name.slice(0, 2).toUpperCase()
                             )}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-base">{tenant.name}</h3>
-                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${planBadge}`}>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <h3 className="font-bold text-base text-[var(--foreground)] break-words leading-tight">{tenant.name}</h3>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 ${planBadge}`}>
                                 {planName}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                               <span
-                                className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                                   tenant.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
                                 }`}
                               >
                                 {tenant.active ? "ACTIVO" : "INACTIVO"}
                               </span>
                               {tenant.estadoSuscripcion === "EN_PRUEBA" && (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
                                   PRUEBA GRATIS
                                 </span>
                               )}
                               {isOverdue ? (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse">
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse shrink-0">
                                   VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d gracia)
                                 </span>
                               ) : isNearRenewal ? (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
                                   Vence en {tenant.diasRestantes}d
                                 </span>
                               ) : tenant.diasRestantes !== undefined ? (
-                                <span className="text-[9px] font-semibold text-slate-400">
+                                <span className="text-[9px] font-semibold text-slate-400 shrink-0">
                                   {tenant.diasRestantes}d restantes
                                 </span>
                               ) : null}
@@ -1203,28 +1206,28 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                           </div>
                         </div>
 
-                        {/* Acciones principales */}
-                        <div className="flex items-center gap-1">
+                        {/* Acciones principales con contenedor adaptativo */}
+                        <div className="flex items-center gap-1 shrink-0 self-end sm:self-start bg-[var(--muted)]/40 sm:bg-transparent p-1 sm:p-0 rounded-xl border border-[var(--border)]/50 sm:border-transparent">
                           <button
                             onClick={() => handleOpenSubscriptionModal(tenant)}
                             className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
                             title="Gestionar Suscripción y Facturación"
                           >
-                            <CreditCard size={16} />
+                            <CreditCard size={15} />
                           </button>
                           <button
                             onClick={() => handleViewDetail(tenant.id)}
                             className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
                             title="Ver detalle y usuarios"
                           >
-                            <Eye size={16} />
+                            <Eye size={15} />
                           </button>
                           <button
                             onClick={() => handleOpenEditTenant(tenant)}
                             className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors cursor-pointer"
                             title="Editar Tenant y Negocio"
                           >
-                            <Pencil size={16} />
+                            <Pencil size={15} />
                           </button>
                           <button
                             onClick={() =>
@@ -1241,20 +1244,20 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                             }`}
                             title={tenant.active ? "Desactivar" : "Reactivar"}
                           >
-                            {tenant.active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                            {tenant.active ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
                           </button>
                           <button
                             onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
                             className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors cursor-pointer"
                             title="Eliminar Tenant Definitivamente"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={15} />
                           </button>
                         </div>
                       </div>
 
-                      {/* Stats */}
-                      <div className="grid grid-cols-4 gap-3 mb-4">
+                      {/* Stats Grid 2x2 en móvil / 4 columnas en desktop */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
                         <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
                           <Users size={14} className="mx-auto text-amber-500 mb-1" />
                           <div className="text-sm font-bold">{tenant.stats.users}</div>
@@ -1277,7 +1280,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                         </div>
                       </div>
 
-                      {/* Admins list */}
+                      {/* Admins list con truncate y flex responsive */}
                       <div className="border-t border-[var(--border)] pt-3">
                         <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
                           Administradores
@@ -1287,17 +1290,17 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                         ) : (
                           <div className="space-y-1.5">
                             {tenant.admins.map((admin) => (
-                              <div key={admin.id} className="flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold">
+                              <div key={admin.id} className="flex items-center justify-between gap-2 text-xs p-1 rounded-lg hover:bg-[var(--muted)]/30 transition-colors">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold shrink-0">
                                     {admin.nombre.slice(0, 1).toUpperCase()}
                                   </div>
-                                  <div>
-                                    <span className="font-medium">{admin.nombre}</span>
-                                    <span className="text-[var(--muted-foreground)] ml-2">{admin.email}</span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-[var(--foreground)] truncate">{admin.nombre}</div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)] truncate">{admin.email}</div>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 shrink-0">
                                   <button
                                     onClick={() => {
                                       setEditingUser({
@@ -1323,7 +1326,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                                     <Trash2 size={13} />
                                   </button>
                                   <span
-                                    className={`w-2 h-2 rounded-full ${
+                                    className={`w-2 h-2 rounded-full shrink-0 ${
                                       admin.activo ? "bg-emerald-500" : "bg-rose-500"
                                     }`}
                                   />

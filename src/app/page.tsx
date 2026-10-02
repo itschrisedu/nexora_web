@@ -565,7 +565,8 @@ function MainApp() {
         if (response.sessionConflict) {
           setConflictData({ email: username.trim(), password: password.trim() });
           setMaskedEmail(response.maskedEmail || username.trim());
-          setShowConflictModal(true);
+          setOtpMode('session-transfer');
+          setShowOtpModal(true);
           return;
         }
 
@@ -1548,38 +1549,77 @@ function MainApp() {
           <span className="text-[10px] mt-1 font-medium">Panel</span>
         </button>
 
-        <button
-          onClick={() => navigateToView('pos')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-            vistaActual === 'pos' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-          }`}
-          style={vistaActual === 'pos' ? { color: 'var(--primary)' } : {}}
-        >
-          <CreditCard size={19} />
-          <span className="text-[10px] mt-1 font-medium">Caja</span>
-        </button>
+        {user?.rol === 'ROL_SUPER_ADMIN' ? (
+          <>
+            <button
+              onClick={() => navigateToView('super-admin')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                vistaActual === 'super-admin' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+              style={vistaActual === 'super-admin' ? { color: 'var(--primary)' } : {}}
+            >
+              <Building2 size={19} />
+              <span className="text-[10px] mt-1 font-medium">Empresas</span>
+            </button>
 
-        <button
-          onClick={() => navigateToView('comercial')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-            vistaActual === 'comercial' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-          }`}
-          style={vistaActual === 'comercial' ? { color: 'var(--primary)' } : {}}
-        >
-          <Package size={19} />
-          <span className="text-[10px] mt-1 font-medium">Pedidos</span>
-        </button>
+            <button
+              onClick={() => navigateToView('auditoria')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                vistaActual === 'auditoria' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+              style={vistaActual === 'auditoria' ? { color: 'var(--primary)' } : {}}
+            >
+              <ShieldAlert size={19} />
+              <span className="text-[10px] mt-1 font-medium">Auditoría</span>
+            </button>
 
-        <button
-          onClick={() => navigateToView('clientes')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-            vistaActual === 'clientes' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-          }`}
-          style={vistaActual === 'clientes' ? { color: 'var(--primary)' } : {}}
-        >
-          <User size={19} />
-          <span className="text-[10px] mt-1 font-medium">Clientes</span>
-        </button>
+            <button
+              onClick={() => navigateToView('ubicaciones')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                vistaActual === 'ubicaciones' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+              style={vistaActual === 'ubicaciones' ? { color: 'var(--primary)' } : {}}
+            >
+              <MapPin size={19} />
+              <span className="text-[10px] mt-1 font-medium">GPS</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => navigateToView('pos')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                vistaActual === 'pos' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+              style={vistaActual === 'pos' ? { color: 'var(--primary)' } : {}}
+            >
+              <CreditCard size={19} />
+              <span className="text-[10px] mt-1 font-medium">Caja</span>
+            </button>
+
+            <button
+              onClick={() => navigateToView('comercial')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                vistaActual === 'comercial' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+              style={vistaActual === 'comercial' ? { color: 'var(--primary)' } : {}}
+            >
+              <Package size={19} />
+              <span className="text-[10px] mt-1 font-medium">Pedidos</span>
+            </button>
+
+            <button
+              onClick={() => navigateToView('clientes')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                vistaActual === 'clientes' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+              style={vistaActual === 'clientes' ? { color: 'var(--primary)' } : {}}
+            >
+              <User size={19} />
+              <span className="text-[10px] mt-1 font-medium">Clientes</span>
+            </button>
+          </>
+        )}
 
         <button
           onClick={() => setMobileMenuOpen(true)}
