@@ -195,7 +195,7 @@ export default function PosComponent() {
   const [cuponErrorPOS, setCuponErrorPOS] = useState("");
 
   // Tipo de Comprobante & Datos de Cliente
-  const [tipoComprobante, setTipoComprobante] = useState<"CONSUMIDOR_FINAL" | "FACTURA">("CONSUMIDOR_FINAL");
+  const [tipoComprobante, setTipoComprobante] = useState<"CONSUMIDOR_FINAL" | "FACTURA">("FACTURA");
   const [clienteFactura, setClienteFactura] = useState({
     id: "",
     cedula: "",
@@ -245,6 +245,7 @@ export default function PosComponent() {
   const [fechaFinFiltro, setFechaFinFiltro] = useState(() => new Date().toISOString().split("T")[0]);
   const [vendedorFiltro, setVendedorFiltro] = useState<string>("TODOS");
   const [metodoPagoFiltro, setMetodoPagoFiltro] = useState<string>("TODOS");
+  const [modeloFiltro, setModeloFiltro] = useState<string>("TODOS");
   const [busquedaVentas, setBusquedaVentas] = useState("");
   const [vendedoresLista, setVendedoresLista] = useState<{ id: string; nombre: string; email: string; rol: string }[]>([]);
   const [historialVentas, setHistorialVentas] = useState<VentaPOS[]>([]);
@@ -255,6 +256,29 @@ export default function PosComponent() {
 
   // Identificar si el usuario logueado es Administrador / Dueño
   const isAdmin = currentUser?.rol === "ROL_ADMIN" || currentUser?.rol === "ROL_SUPER_ADMIN" || !!currentUser?.esAdminGeneral;
+
+  // Modelos únicos activos disponibles en POS para filtrado
+  const modelosDisponibles = React.useMemo(() => {
+    const map = new Map<string, { modelName: string; totalStock: number; series: Set<string>; colores: Set<string> }>();
+    productos.forEach((p) => {
+      const stock = p.tallas.reduce((acc, t) => acc + (t.cantidad || 0), 0);
+      const key = p.modelName.trim();
+      if (!map.has(key)) {
+        map.set(key, {
+          modelName: key,
+          totalStock: stock,
+          series: new Set(p.serieNombre ? [p.serieNombre] : []),
+          colores: new Set(p.color ? [p.color] : []),
+        });
+      } else {
+        const item = map.get(key)!;
+        item.totalStock += stock;
+        if (p.serieNombre) item.series.add(p.serieNombre);
+        if (p.color) item.colores.add(p.color);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.modelName.localeCompare(b.modelName));
+  }, [productos]);
 
   // Manejador global de la tecla Escape para modales
   useEffect(() => {
@@ -312,7 +336,7 @@ export default function PosComponent() {
     if (tabActiva === "ventas") {
       cargarHistorialVentas();
     }
-  }, [tabActiva, periodoFiltro, fechaInicioFiltro, fechaFinFiltro, vendedorFiltro, metodoPagoFiltro]);
+  }, [tabActiva, periodoFiltro, fechaInicioFiltro, fechaFinFiltro, vendedorFiltro, metodoPagoFiltro, modeloFiltro]);
 
   const cargarNegocioInfo = async () => {
     try {
@@ -386,6 +410,9 @@ export default function PosComponent() {
       }
       if (metodoPagoFiltro && metodoPagoFiltro !== "TODOS") {
         params.append("metodoPago", metodoPagoFiltro);
+      }
+      if (modeloFiltro && modeloFiltro !== "TODOS") {
+        params.append("modelo", modeloFiltro);
       }
       if (busquedaVentas.trim()) {
         params.append("busqueda", busquedaVentas.trim());
@@ -1311,6 +1338,18 @@ export default function PosComponent() {
                         <div className="grid grid-cols-2 gap-1.5">
                           <button
                             type="button"
+                            onClick={() => setTipoComprobante("FACTURA")}
+                            className={`py-1.5 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all ${
+                              tipoComprobante === "FACTURA"
+                                ? "bg-emerald-600 text-white border-transparent shadow-xs"
+                                : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]"
+                            }`}
+                          >
+                            <FileText size={13} />
+                            Factura con datos
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => setTipoComprobante("CONSUMIDOR_FINAL")}
                             className={`py-1.5 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all ${
                               tipoComprobante === "CONSUMIDOR_FINAL"
@@ -1320,18 +1359,6 @@ export default function PosComponent() {
                           >
                             <User size={13} />
                             Consumidor Final
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setTipoComprobante("FACTURA")}
-                            className={`py-1.5 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition-all ${
-                              tipoComprobante === "FACTURA"
-                                ? "bg-emerald-600 text-white border-transparent shadow-xs"
-                                : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]"
-                            }`}
-                          >
-                            <FileText size={13} />
-                            Datos de Cliente
                           </button>
                         </div>
 
@@ -1686,8 +1713,38 @@ export default function PosComponent() {
                 </select>
               </div>
 
+              {/* Filtro de Modelo de Calzado Activo */}
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Package size={13} className="text-amber-500" />
+                    Modelo de Calzado:
+                  </span>
+                  {modeloFiltro !== "TODOS" && (
+                    <button
+                      onClick={() => setModeloFiltro("TODOS")}
+                      className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline font-bold"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </label>
+                <select
+                  value={modeloFiltro}
+                  onChange={(e) => setModeloFiltro(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] font-semibold focus:outline-none focus:border-amber-500"
+                >
+                  <option value="TODOS">Todos los Modelos Activos ({modelosDisponibles.length})</option>
+                  {modelosDisponibles.map((m) => (
+                    <option key={m.modelName} value={m.modelName}>
+                      {m.modelName} ({m.totalStock} pares en stock)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Buscador Textual */}
-              <div className="lg:col-span-2">
+              <div>
                 <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1">
                     <Search size={13} className="text-emerald-500" />
@@ -1703,7 +1760,7 @@ export default function PosComponent() {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Buscar por comprobante #, cliente, modelo de calzado o serie..."
+                    placeholder="Buscar por #, cliente, serie..."
                     value={busquedaVentas}
                     onChange={(e) => setBusquedaVentas(e.target.value)}
                     onKeyDown={(e) => {
@@ -1721,6 +1778,24 @@ export default function PosComponent() {
                 </div>
               </div>
             </div>
+
+            {/* Chip / Alerta de Modelo Filtrado Activo */}
+            {modeloFiltro !== "TODOS" && (
+              <div className="flex items-center justify-between p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-800 dark:text-amber-300 font-medium animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <Package size={14} className="text-amber-500 shrink-0" />
+                  <span>
+                    Filtrando ventas que contienen el modelo: <strong className="font-bold uppercase tracking-wide">{modeloFiltro}</strong>
+                  </span>
+                </div>
+                <button
+                  onClick={() => setModeloFiltro("TODOS")}
+                  className="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors"
+                >
+                  <X size={12} /> Quitar filtro de modelo
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── TARJETAS DE MÉTRICAS CLAVE (KPIS ANALÍTICOS) ── */}
