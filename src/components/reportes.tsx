@@ -50,6 +50,8 @@ import {
   generarReporteFinanzasMetodosPdf,
   generarReporteProyeccionMlPdf,
   generarReporteGeneralIntegralPdf,
+  generarReportePosPdf,
+  generarReporteRendimientoSucursalesPdf,
   ClienteDeudor,
   CampanaReporte,
   ModeloReporte,
@@ -58,7 +60,7 @@ import {
 import { jsPDF } from 'jspdf';
 
 type PeriodoTipo = 'HOY' | 'SEMANAL' | 'MENSUAL' | 'TRIMESTRAL' | 'ANUAL' | 'PERSONALIZADO';
-type TabReporte = 'resumen' | 'modelos' | 'vendedores' | 'finanzas' | 'cobranzas' | 'campanas' | 'proyeccion_ml';
+type TabReporte = 'resumen' | 'pos' | 'sucursales' | 'modelos' | 'vendedores' | 'finanzas' | 'cobranzas' | 'campanas' | 'proyeccion_ml';
 
 interface Vendedor {
   id: string;
@@ -71,10 +73,11 @@ interface Vendedor {
 export default function ReportesComponent() {
   const { showToast } = useToast();
 
-  // Estados de Filtros
+  // Estados de Filtros Globales
   const [periodo, setPeriodo] = useState<PeriodoTipo>('MENSUAL');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('TODAS');
   const [vendedorSeleccionado, setVendedorSeleccionado] = useState<string>('TODOS');
   const [canalSeleccionado, setCanalSeleccionado] = useState<string>('TODOS');
 
@@ -82,8 +85,25 @@ export default function ReportesComponent() {
   const [loading, setLoading] = useState(true);
   const [reporteData, setReporteData] = useState<any>(null);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [sucursales, setSucursales] = useState<any[]>([]);
   const [tabActiva, setTabActiva] = useState<TabReporte>('resumen');
   const [negocioInfo, setNegocioInfo] = useState<any>(null);
+
+  // Estados específicos para Reporte Punto de Venta (POS)
+  const [loadingPos, setLoadingPos] = useState(false);
+  const [posData, setPosData] = useState<any>(null);
+  const [filtroPosMetodo, setFiltroPosMetodo] = useState('TODOS');
+  const [filtroPosBusqueda, setFiltroPosBusqueda] = useState('');
+  const [filtroPosModelo, setFiltroPosModelo] = useState('TODOS');
+  const [generandoPosPdf, setGenerandoPosPdf] = useState(false);
+  const [ventaPosDetalle, setVentaPosDetalle] = useState<any | null>(null);
+
+  // Estados específicos para Reporte Rendimiento de Sucursales
+  const [loadingSucursales, setLoadingSucursales] = useState(false);
+  const [sucursalesReporteData, setSucursalesReporteData] = useState<any>(null);
+  const [filtroSucursalModeloTexto, setFiltroSucursalModeloTexto] = useState('');
+  const [filtroSucursalOrden, setFiltroSucursalOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PRECIO_DESC'>('VENTAS_DESC');
+  const [generandoSucursalPdf, setGenerandoSucursalPdf] = useState(false);
 
   // Filtros específicos para Productividad por Trabajador
   const [filtroTrabajadorTexto, setFiltroTrabajadorTexto] = useState('');
@@ -115,16 +135,26 @@ export default function ReportesComponent() {
   const [generandoGeneralPdf, setGenerandoGeneralPdf] = useState(false);
 
   useEffect(() => {
+    cargarSucursales();
     cargarVendedores();
     cargarNegocioInfo();
   }, []);
 
   useEffect(() => {
     cargarReporte();
-  }, [periodo, vendedorSeleccionado, canalSeleccionado]);
+    if (tabActiva === 'pos') {
+      cargarReportePos();
+    } else if (tabActiva === 'sucursales') {
+      cargarReporteSucursales();
+    }
+  }, [periodo, sucursalSeleccionada, vendedorSeleccionado, canalSeleccionado]);
 
   useEffect(() => {
-    if (tabActiva === 'cobranzas' && !cobranzasData) {
+    if (tabActiva === 'pos' && !posData) {
+      cargarReportePos();
+    } else if (tabActiva === 'sucursales' && !sucursalesReporteData) {
+      cargarReporteSucursales();
+    } else if (tabActiva === 'cobranzas' && !cobranzasData) {
       cargarCobranzas();
     } else if (tabActiva === 'campanas' && !campanasData) {
       cargarCampanas();
@@ -133,10 +163,23 @@ export default function ReportesComponent() {
     }
   }, [tabActiva]);
 
+  const cargarSucursales = async () => {
+    try {
+      const data = await ApiService.get('/configuracion/sucursales');
+      if (Array.isArray(data)) {
+        setSucursales(data);
+      }
+    } catch (err: any) {
+      console.warn('No se pudo cargar sucursales:', err?.message);
+    }
+  };
+
   const cargarNegocioInfo = async () => {
     try {
       const data = await ApiService.get('/configuracion/negocio');
-      if (data) setNegocioInfo(data);
+      if (data) {
+        setNegocioInfo(data);
+      }
     } catch (err: any) {
       console.warn('No se pudo cargar config negocio:', err?.message);
     }
@@ -162,6 +205,9 @@ export default function ReportesComponent() {
         if (fechaDesde) params.append('fechaDesde', fechaDesde);
         if (fechaHasta) params.append('fechaHasta', fechaHasta);
       }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
       if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
         params.append('vendedorId', vendedorSeleccionado);
       }
@@ -177,6 +223,64 @@ export default function ReportesComponent() {
       console.warn('Reportes: esperando backend o error de red:', err?.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cargarReportePos = async () => {
+    setLoadingPos(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
+        params.append('vendedorId', vendedorSeleccionado);
+      }
+      if (filtroPosMetodo && filtroPosMetodo !== 'TODOS') {
+        params.append('metodoPago', filtroPosMetodo);
+      }
+      if (filtroPosModelo && filtroPosModelo !== 'TODOS') {
+        params.append('modelo', filtroPosModelo);
+      }
+      if (filtroPosBusqueda && filtroPosBusqueda.trim()) {
+        params.append('busqueda', filtroPosBusqueda.trim());
+      }
+
+      const data = await ApiService.get(`/reportes/pos?${params.toString()}`);
+      setPosData(data);
+    } catch (err: any) {
+      console.error('Error al cargar reporte POS:', err);
+      showToast('Error al cargar reporte del Punto de Venta.', 'warning');
+    } finally {
+      setLoadingPos(false);
+    }
+  };
+
+  const cargarReporteSucursales = async () => {
+    setLoadingSucursales(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+
+      const data = await ApiService.get(`/reportes/rendimiento-sucursales?${params.toString()}`);
+      setSucursalesReporteData(data);
+    } catch (err: any) {
+      console.error('Error al cargar reporte de sucursales:', err);
+      showToast('Error al cargar reporte de rendimiento por sucursal.', 'warning');
+    } finally {
+      setLoadingSucursales(false);
     }
   };
 
@@ -485,6 +589,84 @@ export default function ReportesComponent() {
     }
   };
 
+  // 9. REPORTE DEL PUNTO DE VENTA (POS)
+  const handleReportePosPdf = (modo: 'preview' | 'download') => {
+    if (!posData) {
+      showToast('No hay datos del Punto de Venta disponibles.', 'warning');
+      return;
+    }
+    setGenerandoPosPdf(true);
+    try {
+      const sucursalNombre = sucursalSeleccionada === 'TODAS'
+        ? 'Todas las Sucursales'
+        : sucursales.find((s) => s.id === sucursalSeleccionada)?.name || 'Sucursal';
+
+      const doc = generarReportePosPdf({
+        negocio: obtenerNegocioPayload(),
+        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
+        sucursalNombre,
+        fechaGeneracion: new Date().toLocaleString('es-EC'),
+        metricas: posData.metricas,
+        ventas: posData.ventas,
+      });
+
+      const nombre = `reporte_pos_${periodo.toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo(`Reporte Punto de Venta — ${sucursalNombre}`);
+        setPreviewNombreArchivo(nombre);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombre);
+        showToast('Reporte POS descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando PDF POS:', err);
+      showToast('Error al generar PDF del Punto de Venta.', 'error');
+    } finally {
+      setGenerandoPosPdf(false);
+    }
+  };
+
+  // 10. REPORTE DE RENDIMIENTO DE SUCURSALES
+  const handleReporteSucursalPdf = (modo: 'preview' | 'download') => {
+    if (!sucursalesReporteData) {
+      showToast('No hay datos de sucursales disponibles.', 'warning');
+      return;
+    }
+    setGenerandoSucursalPdf(true);
+    try {
+      const doc = generarReporteRendimientoSucursalesPdf({
+        negocio: obtenerNegocioPayload(),
+        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
+        sucursalSeleccionada: sucursalesReporteData.sucursalSeleccionada,
+        fechaGeneracion: new Date().toLocaleString('es-EC'),
+        totalesEmpresa: sucursalesReporteData.totalesEmpresa,
+        totalesSucursalSeleccionada: sucursalesReporteData.totalesSucursalSeleccionada,
+        sucursales: sucursalesReporteData.sucursales,
+        modelosVendidos: sucursalesReporteData.modelosVendidos,
+      });
+
+      const nombre = `reporte_rendimiento_sucursal_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo(`Rendimiento Comercial — ${sucursalesReporteData.sucursalSeleccionada?.nombre}`);
+        setPreviewNombreArchivo(nombre);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombre);
+        showToast('Reporte de Sucursales descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando PDF Sucursal:', err);
+      showToast('Error al generar PDF de Sucursal.', 'error');
+    } finally {
+      setGenerandoSucursalPdf(false);
+    }
+  };
+
   const handleImprimirReporte = () => {
     window.print();
   };
@@ -570,11 +752,11 @@ export default function ReportesComponent() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* 1. Selector de Periodicidad */}
           <div>
             <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
-              1. Periodicidad / Rango Temporal
+              1. Periodicidad / Fecha
             </label>
             <div className="flex flex-wrap gap-1">
               {(['HOY', 'SEMANAL', 'MENSUAL', 'TRIMESTRAL', 'ANUAL', 'PERSONALIZADO'] as PeriodoTipo[]).map((p) => (
@@ -582,18 +764,18 @@ export default function ReportesComponent() {
                   key={p}
                   type="button"
                   onClick={() => setPeriodo(p)}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                     periodo === p
                       ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-2xs'
                       : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
                   }`}
                 >
                   {p === 'HOY' && 'Hoy'}
-                  {p === 'SEMANAL' && 'Semanal'}
-                  {p === 'MENSUAL' && 'Mensual'}
-                  {p === 'TRIMESTRAL' && 'Trimestral'}
-                  {p === 'ANUAL' && 'Anual'}
-                  {p === 'PERSONALIZADO' && 'Personalizado'}
+                  {p === 'SEMANAL' && 'Sem.'}
+                  {p === 'MENSUAL' && 'Mes'}
+                  {p === 'TRIMESTRAL' && 'Trim.'}
+                  {p === 'ANUAL' && 'Año'}
+                  {p === 'PERSONALIZADO' && 'Personal.'}
                 </button>
               ))}
             </div>
@@ -607,7 +789,7 @@ export default function ReportesComponent() {
                     type="date"
                     value={fechaDesde}
                     onChange={(e) => setFechaDesde(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    className="w-full px-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
                 <div>
@@ -616,17 +798,43 @@ export default function ReportesComponent() {
                     type="date"
                     value={fechaHasta}
                     onChange={(e) => setFechaHasta(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    className="w-full px-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                   />
                 </div>
               </div>
             )}
           </div>
 
-          {/* 2. Selector de Vendedor / Trabajador */}
+          {/* 2. Selector de Sucursal / Sede */}
           <div>
             <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
-              2. Alcance / Trabajador o Vendedor
+              2. Sucursal / Sede
+            </label>
+            <div className="relative">
+              <select
+                value={sucursalSeleccionada}
+                onChange={(e) => setSucursalSeleccionada(e.target.value)}
+                className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
+              >
+                <option value="TODOS">🏢 Todas las Sucursales (Consolidado)</option>
+                <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
+                {sucursales.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    📍 {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+            </div>
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+              Filtra por sucursal específica o visualiza la red completa.
+            </p>
+          </div>
+
+          {/* 3. Selector de Vendedor / Trabajador */}
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
+              3. Trabajador o Vendedor
             </label>
             <div className="relative">
               <select
@@ -634,7 +842,7 @@ export default function ReportesComponent() {
                 onChange={(e) => setVendedorSeleccionado(e.target.value)}
                 className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
               >
-                <option value="TODOS">🏢 Toda la Sucursal (Consolidado Global)</option>
+                <option value="TODOS">Todos los Trabajadores</option>
                 {vendedores.map((v) => (
                   <option key={v.id} value={v.id}>
                     👤 {v.nombre} ({v.rol.replace('ROL_', '')})
@@ -644,14 +852,14 @@ export default function ReportesComponent() {
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
             </div>
             <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              Filtra las métricas para evaluar la productividad individual o grupal.
+              Productividad individual o grupal del equipo.
             </p>
           </div>
 
-          {/* 3. Selector de Canal de Venta */}
+          {/* 4. Selector de Canal de Venta */}
           <div>
             <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase mb-1.5">
-              3. Canal de Venta
+              4. Canal de Venta
             </label>
             <div className="relative">
               <select
@@ -667,7 +875,7 @@ export default function ReportesComponent() {
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
             </div>
             <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              Compara el rendimiento entre venta en mostrador y mayoristas.
+              Compara mostrador, WhatsApp y catálogo digital.
             </p>
           </div>
         </div>
@@ -679,6 +887,8 @@ export default function ReportesComponent() {
       <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-2">
         {[
           { id: 'resumen' as TabReporte, label: 'Resumen Ejecutivo & KPIs', icon: <BarChart3 size={15} /> },
+          { id: 'pos' as TabReporte, label: 'Punto de Venta (POS)', icon: <Store size={15} /> },
+          { id: 'sucursales' as TabReporte, label: 'Rendimiento de Sucursales', icon: <Building2 size={15} /> },
           { id: 'modelos' as TabReporte, label: 'Rotación de Calzado & Modelos', icon: <ShoppingBag size={15} /> },
           { id: 'vendedores' as TabReporte, label: 'Productividad por Trabajador', icon: <Users size={15} /> },
           { id: 'cobranzas' as TabReporte, label: 'Cobranzas & Clientes Deudores', icon: <Receipt size={15} /> },
@@ -691,7 +901,11 @@ export default function ReportesComponent() {
             type="button"
             onClick={() => {
               setTabActiva(tab.id);
-              if (tab.id === 'proyeccion_ml' && !proyeccionMl) {
+              if (tab.id === 'pos' && !posData) {
+                cargarReportePos();
+              } else if (tab.id === 'sucursales' && !sucursalesReporteData) {
+                cargarReporteSucursales();
+              } else if (tab.id === 'proyeccion_ml' && !proyeccionMl) {
                 cargarProyeccionMl();
               } else if (tab.id === 'cobranzas' && !cobranzasData) {
                 cargarCobranzas();
@@ -967,6 +1181,790 @@ export default function ReportesComponent() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB POS: REPORTE DEL PUNTO DE VENTA (MOSTRADOR / CAJA)          */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'pos' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para POS */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl shadow-sm">
+                    <Store size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Reporte de Punto de Venta & Caja Mostrador
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Auditoría de ventas directas por par, recaudación en efectivo, tarjetas y transferencias por sucursal
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarReportePos}
+                    disabled={loadingPos}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={14} className={loadingPos ? 'animate-spin' : ''} />
+                    <span>Recargar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReportePosPdf('preview')}
+                    disabled={loadingPos || !posData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF POS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReportePosPdf('download')}
+                    disabled={loadingPos || !posData}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF POS</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingPos ? (
+                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={36} className="animate-spin text-emerald-600" />
+                  <span className="text-xs font-bold">Consolidando transacciones del Punto de Venta...</span>
+                </div>
+              ) : posData ? (
+                <div className="space-y-6">
+                  {/* KPIs del Punto de Venta */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Total Recaudado POS</span>
+                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                          <DollarSign size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                        ${posData.metricas?.totalRecaudado?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Cobros en mostrador del período
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Ventas Realizadas</span>
+                        <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+                          <Receipt size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-[var(--foreground)]">
+                        {posData.metricas?.cantidadVentas || 0}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Tickets emitidos en caja
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Pares Despachados</span>
+                        <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
+                          <ShoppingBag size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                        {posData.metricas?.cantidadPares || 0} pares
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Calzado entregado en tienda
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Ticket Promedio POS</span>
+                        <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                          <Tag size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-[var(--foreground)] font-mono">
+                        ${posData.metricas?.ticketPromedio?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Gasto promedio por cliente
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desglose de Métodos de Pago en POS */}
+                  <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                    <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                      <div>
+                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                          Desglose por Método de Recaudación en Caja
+                        </h4>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          Ingresos desglosados en Efectivo, Tarjetas (Débito/Crédito) y Transferencias bancarias
+                        </p>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-xl">
+                        Total: ${posData.metricas?.totalRecaudado?.toFixed(2) || '0.00'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Efectivo */}
+                      <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                            💵 Efectivo en Caja
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded-md">
+                            {posData.metricas?.desgloseMetodosPago?.efectivo?.cantidad || 0} pagos
+                          </span>
+                        </div>
+                        <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                          ${posData.metricas?.desgloseMetodosPago?.efectivo?.total?.toFixed(2) || '0.00'}
+                        </div>
+                        <div className="w-full bg-emerald-200/40 dark:bg-emerald-950/40 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            style={{
+                              width: `${
+                                posData.metricas?.totalRecaudado > 0
+                                  ? ((posData.metricas?.desgloseMetodosPago?.efectivo?.total || 0) / posData.metricas.totalRecaudado) * 100
+                                  : 0
+                              }%`,
+                            }}
+                            className="bg-emerald-600 h-full rounded-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Tarjeta */}
+                      <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                            <CreditCard size={14} />
+                            Tarjeta (Datafast / Voucher)
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-md">
+                            {posData.metricas?.desgloseMetodosPago?.tarjeta?.cantidad || 0} pagos
+                          </span>
+                        </div>
+                        <div className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">
+                          ${posData.metricas?.desgloseMetodosPago?.tarjeta?.total?.toFixed(2) || '0.00'}
+                        </div>
+                        <div className="w-full bg-blue-200/40 dark:bg-blue-950/40 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            style={{
+                              width: `${
+                                posData.metricas?.totalRecaudado > 0
+                                  ? ((posData.metricas?.desgloseMetodosPago?.tarjeta?.total || 0) / posData.metricas.totalRecaudado) * 100
+                                  : 0
+                              }%`,
+                            }}
+                            className="bg-blue-600 h-full rounded-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Transferencia */}
+                      <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                            🏦 Transferencia Bancaria
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-500/15 text-purple-700 dark:text-purple-300 rounded-md">
+                            {posData.metricas?.desgloseMetodosPago?.transferencia?.cantidad || 0} pagos
+                          </span>
+                        </div>
+                        <div className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
+                          ${posData.metricas?.desgloseMetodosPago?.transferencia?.total?.toFixed(2) || '0.00'}
+                        </div>
+                        <div className="w-full bg-purple-200/40 dark:bg-purple-950/40 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            style={{
+                              width: `${
+                                posData.metricas?.totalRecaudado > 0
+                                  ? ((posData.metricas?.desgloseMetodosPago?.transferencia?.total || 0) / posData.metricas.totalRecaudado) * 100
+                                  : 0
+                              }%`,
+                            }}
+                            className="bg-purple-600 h-full rounded-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabla y Buscador de Ventas Realizadas en POS */}
+                  <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+                      <div>
+                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                          Historial de Ventas y Comprobantes POS
+                        </h4>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          Registro detallado de transacciones, clientes, productos despachados y comprobantes
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Buscador */}
+                        <div className="relative w-64">
+                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                          <input
+                            type="text"
+                            placeholder="Buscar nota, cliente o modelo..."
+                            value={filtroPosBusqueda}
+                            onChange={(e) => setFiltroPosBusqueda(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                          />
+                        </div>
+
+                        {/* Filtro Método */}
+                        <select
+                          value={filtroPosMetodo}
+                          onChange={(e) => setFiltroPosMetodo(e.target.value)}
+                          className="px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        >
+                          <option value="TODOS">Todos los Métodos</option>
+                          <option value="EFECTIVO">💵 Efectivo</option>
+                          <option value="TARJETA">💳 Tarjeta</option>
+                          <option value="TRANSFERENCIA">🏦 Transferencia</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Tabla de ventas POS */}
+                    {posData.ventas?.length === 0 ? (
+                      <div className="p-12 text-center text-xs text-[var(--muted-foreground)] italic">
+                        No se encontraron ventas de mostrador con los filtros aplicados.
+                      </div>
+                    ) : (
+                      <div className="border border-[var(--border)] rounded-2xl overflow-hidden overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-[#0F172A] text-white uppercase text-[10px] tracking-wider">
+                            <tr>
+                              <th className="py-3 px-4 font-bold">Nota / Comprobante</th>
+                              <th className="py-3 px-4 font-bold">Fecha / Hora</th>
+                              <th className="py-3 px-4 font-bold">Sucursal</th>
+                              <th className="py-3 px-4 font-bold">Cliente</th>
+                              <th className="py-3 px-4 font-bold">Vendedor</th>
+                              <th className="py-3 px-4 font-bold">Artículos Vendidos</th>
+                              <th className="py-3 px-4 font-bold">Método de Pago</th>
+                              <th className="py-3 px-4 font-bold text-right">Total</th>
+                              <th className="py-3 px-4 font-bold text-center">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
+                            {posData.ventas?.map((v: any) => (
+                              <tr key={v.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                  {v.numeroNota}
+                                </td>
+                                <td className="py-3 px-4 text-[11px] text-[var(--muted-foreground)]">
+                                  {new Date(v.fecha).toLocaleString('es-EC', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </td>
+                                <td className="py-3 px-4 font-semibold text-[11px]">
+                                  {v.sucursalNombre || 'Sucursal'}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="font-bold">{v.cliente?.nombre || 'Consumidor Final'}</div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    {v.cliente?.cedula && v.cliente.cedula !== '9999999999' ? `CI: ${v.cliente.cedula}` : 'Consumidor Final'}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-[11px]">
+                                  {v.vendedor?.nombre || 'Vendedor'}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="space-y-1 max-w-xs">
+                                    {v.lineas?.map((l: any, idx: number) => (
+                                      <div key={idx} className="flex items-center gap-1.5 text-[11px]">
+                                        <span className="font-bold text-emerald-600">{l.cantidad}x</span>
+                                        <span className="font-medium truncate">{l.modelName || l.nombre}</span>
+                                        {l.talla && (
+                                          <span className="px-1.5 py-0.2 bg-[var(--muted)] text-[10px] rounded font-mono font-bold">
+                                            T{l.talla}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                      v.metodoPago === 'EFECTIVO'
+                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                        : v.metodoPago === 'TARJETA'
+                                        ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                                        : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
+                                    }`}
+                                  >
+                                    {v.metodoPago}
+                                  </span>
+                                  {v.detallePago && (
+                                    <div className="text-[9px] text-[var(--muted-foreground)] mt-0.5 truncate max-w-[140px]" title={v.detallePago}>
+                                      {v.detallePago}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-right font-mono font-black text-sm text-[var(--foreground)]">
+                                  ${Number(v.total).toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setVentaPosDetalle(v)}
+                                    className="p-1.5 hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg transition-colors cursor-pointer"
+                                    title="Ver comprobante de venta"
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB SUCURSALES: RENDIMIENTO DE SUCURSALES & VENTAS POR MODELO   */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'sucursales' && (
+            <div className="space-y-6">
+              {/* Encabezado y Acciones de PDF para Rendimiento de Sucursales */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
+                    <Building2 size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
+                      Rendimiento de Sucursales & Ventas por Modelo
+                    </h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      Desglose detallado del total de ventas de cada modelo de calzado en la sucursal seleccionada por el Admin General
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={cargarReporteSucursales}
+                    disabled={loadingSucursales}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RefreshCw size={14} className={loadingSucursales ? 'animate-spin' : ''} />
+                    <span>Actualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteSucursalPdf('preview')}
+                    disabled={loadingSucursales || !sucursalesReporteData}
+                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Eye size={14} />
+                    <span>Previsualizar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteSucursalPdf('download')}
+                    disabled={loadingSucursales || !sucursalesReporteData}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={14} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingSucursales ? (
+                <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={36} className="animate-spin text-blue-600" />
+                  <span className="text-xs font-bold">Analizando rendimiento y ventas por modelo de cada sucursal...</span>
+                </div>
+              ) : sucursalesReporteData ? (
+                <div className="space-y-6">
+                  {/* KPIs de la Sucursal Seleccionada */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Ventas Sucursal</span>
+                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                          <DollarSign size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                        ${sucursalesReporteData.totalesSucursalSeleccionada?.ingresos?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        {sucursalesReporteData.sucursalSeleccionada?.nombre}
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Pares Comercializados</span>
+                        <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
+                          <ShoppingBag size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-[var(--foreground)]">
+                        {sucursalesReporteData.totalesSucursalSeleccionada?.pares || 0} pares
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Volumen físico despachado
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Pedidos / Transacciones</span>
+                        <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
+                          <Receipt size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                        {sucursalesReporteData.totalesSucursalSeleccionada?.pedidos || 0}
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Operaciones comerciales cerradas
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                        <span className="text-[11px] font-bold uppercase">Modelos en Rotación</span>
+                        <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                          <Award size={16} />
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-[var(--foreground)]">
+                        {sucursalesReporteData.totalesSucursalSeleccionada?.totalModelosVendidos || 0} modelos
+                      </div>
+                      <div className="text-[11px] text-[var(--muted-foreground)]">
+                        Catálogo activo con ventas
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Comparativa Comercial de Todas las Sucursales de la Empresa */}
+                  {sucursalesReporteData.sucursales?.length > 1 && (
+                    <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                      <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                        <div>
+                          <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                            Comparativa Comercial entre Sucursales de la Empresa
+                          </h4>
+                          <p className="text-[11px] text-[var(--muted-foreground)]">
+                            Participación de cada punto de venta en la facturación consolidada
+                          </p>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-200 px-3 py-1 rounded-xl">
+                          Total Empresa: ${sucursalesReporteData.totalesEmpresa?.ingresos?.toFixed(2) || '0.00'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {sucursalesReporteData.sucursales?.map((suc: any) => {
+                          const esSeleccionada = sucursalSeleccionada === suc.sucursalId;
+                          return (
+                            <div
+                              key={suc.sucursalId}
+                              onClick={() => setSucursalSeleccionada(suc.sucursalId)}
+                              className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                                esSeleccionada
+                                  ? 'bg-blue-500/10 border-blue-500 shadow-xs'
+                                  : 'bg-[var(--background)] border-[var(--border)] hover:border-blue-400'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-black text-xs text-[var(--foreground)] flex items-center gap-1.5">
+                                  <Building2 size={13} className="text-blue-600" />
+                                  {suc.nombre}
+                                </span>
+                                <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-md text-[10px] font-black">
+                                  {suc.porcentajeEmpresa}% del total
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-baseline pt-1">
+                                <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                  ${suc.totalVentas?.toFixed(2)}
+                                </span>
+                                <span className="text-xs text-[var(--muted-foreground)] font-bold">
+                                  {suc.totalPares} pares · {suc.totalPedidos} pedidos
+                                </span>
+                              </div>
+                              <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
+                                <div style={{ width: `${suc.porcentajeEmpresa}%` }} className="bg-blue-600 h-full rounded-full" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SECCIÓN PRINCIPAL: Ventas de Cada Modelo en la Sucursal */}
+                  <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-5 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+                      <div>
+                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center gap-1.5">
+                          <Award size={15} className="text-amber-500" />
+                          <span>Total de Ventas por Modelo en {sucursalesReporteData.sucursalSeleccionada?.nombre}</span>
+                        </h4>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          Desglose de cada modelo de calzado comercializado en la sucursal con volumen de pares, ingresos y porcentaje
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Buscador de modelos */}
+                        <div className="relative w-56">
+                          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                          <input
+                            type="text"
+                            placeholder="Buscar modelo o color..."
+                            value={filtroSucursalModeloTexto}
+                            onChange={(e) => setFiltroSucursalModeloTexto(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                          />
+                        </div>
+
+                        {/* Orden */}
+                        <select
+                          value={filtroSucursalOrden}
+                          onChange={(e: any) => setFiltroSucursalOrden(e.target.value)}
+                          className="px-3 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        >
+                          <option value="VENTAS_DESC">Mayor Facturación ($)</option>
+                          <option value="PARES_DESC">Más Pares Vendidos</option>
+                          <option value="PRECIO_DESC">Mayor Precio Promedio</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Top 5 Modelos Destacados en Cards */}
+                    {sucursalesReporteData.top5Modelos?.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase">
+                          ⭐ Top 5 Modelos Estrella de la Sucursal
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                          {sucursalesReporteData.top5Modelos.map((m: any, idx: number) => {
+                            const medalColors = [
+                              'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+                              'bg-slate-300/30 text-slate-700 dark:text-slate-200 border-slate-400/30',
+                              'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
+                              'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
+                              'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
+                            ];
+                            return (
+                              <div
+                                key={`${m.modelId}_${m.color}`}
+                                className="p-3.5 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-2 relative overflow-hidden"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border ${medalColors[idx] || medalColors[4]}`}>
+                                    #{idx + 1}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                    {m.porcentajeSucursal}%
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 pt-1">
+                                  {m.imageUrl ? (
+                                    <img
+                                      src={m.imageUrl}
+                                      alt={m.modelName}
+                                      className="w-10 h-10 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[var(--muted-foreground)] shrink-0">
+                                      <ShoppingBag size={18} />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="font-extrabold text-xs text-[var(--foreground)] truncate uppercase">
+                                      {m.modelName}
+                                    </div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)] truncate">
+                                      {m.color} · {m.serieNombre}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex justify-between items-baseline pt-1 border-t border-[var(--border)] text-xs">
+                                  <span className="font-bold text-blue-600">{m.paresVendidos} pares</span>
+                                  <span className="font-mono font-black text-emerald-600">${m.montoTotal.toFixed(2)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tabla de Todos los Modelos Vendidos */}
+                    {(() => {
+                      let lista = sucursalesReporteData.modelosVendidos || [];
+                      if (filtroSucursalModeloTexto.trim()) {
+                        const q = filtroSucursalModeloTexto.toLowerCase().trim();
+                        lista = lista.filter(
+                          (m: any) =>
+                            m.modelName?.toLowerCase().includes(q) ||
+                            m.color?.toLowerCase().includes(q) ||
+                            m.serieNombre?.toLowerCase().includes(q) ||
+                            m.baseCode?.toLowerCase().includes(q)
+                        );
+                      }
+                      if (filtroSucursalOrden === 'PARES_DESC') {
+                        lista = [...lista].sort((a, b) => b.paresVendidos - a.paresVendidos);
+                      } else if (filtroSucursalOrden === 'PRECIO_DESC') {
+                        lista = [...lista].sort((a, b) => b.precioPromedio - a.precioPromedio);
+                      } else {
+                        lista = [...lista].sort((a, b) => b.montoTotal - a.montoTotal);
+                      }
+
+                      if (lista.length === 0) {
+                        return (
+                          <div className="p-12 text-center text-xs text-[var(--muted-foreground)] italic">
+                            No se encontraron modelos con los criterios de búsqueda.
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="border border-[var(--border)] rounded-2xl overflow-hidden overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-[#0F172A] text-white uppercase text-[10px] tracking-wider">
+                              <tr>
+                                <th className="py-3 px-4 font-bold text-center w-12">#</th>
+                                <th className="py-3 px-4 font-bold">Modelo de Calzado</th>
+                                <th className="py-3 px-4 font-bold">Variante / Serie</th>
+                                <th className="py-3 px-4 font-bold text-center">Pares Vendidos</th>
+                                <th className="py-3 px-4 font-bold text-right">Facturación ($)</th>
+                                <th className="py-3 px-4 font-bold text-right">Precio Prom.</th>
+                                <th className="py-3 px-4 font-bold text-center">Pedidos</th>
+                                <th className="py-3 px-4 font-bold">Contribución (%)</th>
+                                <th className="py-3 px-4 font-bold text-center">Stock Actual</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
+                              {lista.map((m: any, idx: number) => (
+                                <tr key={`${m.modelId}_${m.color}`} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                  <td className="py-3 px-4 text-center font-bold text-[var(--muted-foreground)]">
+                                    {m.ranking || idx + 1}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2.5">
+                                      {m.imageUrl ? (
+                                        <img
+                                          src={m.imageUrl}
+                                          alt={m.modelName}
+                                          className="w-10 h-10 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[var(--muted-foreground)] shrink-0">
+                                          <ShoppingBag size={18} />
+                                        </div>
+                                      )}
+                                      <div>
+                                        <div className="font-extrabold uppercase text-[var(--foreground)]">
+                                          {m.modelName}
+                                        </div>
+                                        {m.baseCode && (
+                                          <div className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                            Cód: {m.baseCode}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="font-semibold text-[11px]">{m.color}</div>
+                                    <div className="text-[10px] text-[var(--muted-foreground)]">
+                                      Serie: {m.serieNombre || 'General'}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <span className="px-2.5 py-1 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-lg font-black text-xs">
+                                      {m.paresVendidos} pares
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
+                                    ${m.montoTotal.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono text-[11px] text-[var(--muted-foreground)]">
+                                    ${m.precioPromedio.toFixed(2)} / par
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-bold text-[11px]">
+                                    {m.pedidosCount}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="space-y-1 w-32">
+                                      <div className="flex justify-between text-[10px] font-bold">
+                                        <span>{m.porcentajeSucursal}%</span>
+                                      </div>
+                                      <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
+                                        <div
+                                          style={{ width: `${Math.min(100, m.porcentajeSucursal)}%` }}
+                                          className="bg-emerald-600 h-full rounded-full"
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                        m.stockActual > 10
+                                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                          : m.stockActual > 0
+                                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                          : 'bg-red-500/15 text-red-700 dark:text-red-300'
+                                      }`}
+                                    >
+                                      {m.stockActual} pares
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -2061,6 +3059,97 @@ export default function ReportesComponent() {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal de Detalle de Venta POS / Ticket Térmico */}
+      {ventaPosDetalle && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-[var(--card)] text-[var(--foreground)] rounded-3xl max-w-md w-full border border-[var(--border)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 bg-[var(--muted)]/40 border-b border-[var(--border)] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Receipt size={16} className="text-emerald-600" />
+                <span className="font-extrabold text-xs uppercase tracking-wider">
+                  Detalle de Venta {ventaPosDetalle.numeroNota}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVentaPosDetalle(null)}
+                className="p-1 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-2xl space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Fecha:</span>
+                  <span className="font-bold">{new Date(ventaPosDetalle.fecha).toLocaleString('es-EC')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Sucursal:</span>
+                  <span className="font-bold">{ventaPosDetalle.sucursalNombre}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Cliente:</span>
+                  <span className="font-bold">{ventaPosDetalle.cliente?.nombre} ({ventaPosDetalle.cliente?.cedula})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Vendedor:</span>
+                  <span className="font-bold">{ventaPosDetalle.vendedor?.nombre}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted-foreground)]">Método de Pago:</span>
+                  <span className="font-bold text-emerald-600">{ventaPosDetalle.metodoPago}</span>
+                </div>
+                {ventaPosDetalle.detallePago && (
+                  <div className="flex justify-between text-[11px] pt-1 border-t border-[var(--border)]">
+                    <span className="text-[var(--muted-foreground)]">Ref/Voucher:</span>
+                    <span className="font-medium truncate max-w-[200px]">{ventaPosDetalle.detallePago}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <span className="font-extrabold uppercase text-[10px] tracking-wider text-[var(--muted-foreground)]">
+                  Líneas de Calzado Vendidas
+                </span>
+                <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden">
+                  {ventaPosDetalle.lineas?.map((l: any, i: number) => (
+                    <div key={i} className="p-2.5 flex items-center justify-between bg-[var(--card)] text-xs">
+                      <div>
+                        <div className="font-bold">{l.modelName || l.nombre}</div>
+                        <div className="text-[10px] text-[var(--muted-foreground)]">
+                          Talla: {l.talla} · {l.color} {l.serie ? `· Serie ${l.serie}` : ''}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{l.cantidad} par(es) x ${Number(l.precioUnitario).toFixed(2)}</div>
+                        <div className="font-mono font-black text-emerald-600">${Number(l.subtotal).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex justify-between items-center text-sm font-black">
+                <span>TOTAL VENTA:</span>
+                <span className="text-emerald-600 font-mono text-base">${Number(ventaPosDetalle.total).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[var(--muted)]/40 border-t border-[var(--border)] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setVentaPosDetalle(null)}
+                className="px-4 py-2 bg-[#0F172A] text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal Universal de Previsualización de PDF */}

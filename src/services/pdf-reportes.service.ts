@@ -181,6 +181,66 @@ export interface ReporteGeneralIntegralData {
   proyeccionMl?: ProyeccionMlData;
 }
 
+export interface ReportePosPdfData {
+  negocio: NegocioInfo;
+  periodo: string;
+  sucursalNombre?: string;
+  fechaGeneracion: string;
+  metricas: {
+    totalRecaudado: number;
+    cantidadVentas: number;
+    cantidadPares: number;
+    ticketPromedio: number;
+    desgloseMetodosPago: {
+      efectivo: { total: number; cantidad: number };
+      tarjeta: { total: number; cantidad: number };
+      transferencia: { total: number; cantidad: number };
+    };
+    desgloseVendedores: { userId: string; nombre: string; total: number; ventas: number; pares: number }[];
+    topModelos: { nombre: string; color: string; pares: number; total: number }[];
+  };
+  ventas: any[];
+}
+
+export interface ReporteRendimientoSucursalesPdfData {
+  negocio: NegocioInfo;
+  periodo: string;
+  sucursalSeleccionada: { id: string; nombre: string };
+  fechaGeneracion: string;
+  totalesEmpresa: { ingresos: number; pares: number; pedidos: number };
+  totalesSucursalSeleccionada: {
+    ingresos: number;
+    pares: number;
+    pedidos: number;
+    ticketPromedio: number;
+    totalModelosVendidos: number;
+  };
+  sucursales: {
+    sucursalId: string;
+    nombre: string;
+    direccion: string;
+    telefono: string;
+    totalVentas: number;
+    totalPares: number;
+    totalPedidos: number;
+    ticketPromedio: number;
+    porcentajeEmpresa: number;
+  }[];
+  modelosVendidos: {
+    modelId: string;
+    modelName: string;
+    baseCode: string;
+    color: string;
+    serieNombre: string;
+    paresVendidos: number;
+    montoTotal: number;
+    precioPromedio: number;
+    pedidosCount: number;
+    porcentajeSucursal: number;
+    ranking: number;
+  }[];
+}
+
 // ── Helper Encabezado Institucional ──
 function dibujarEncabezado(
   doc: jsPDF,
@@ -1353,5 +1413,288 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
   }
 
   dibujarPie(doc, 'Página 2 de 2 — Consolidado Institucional');
+  return doc;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 9. INFORME DEL PUNTO DE VENTA (POS / MOSTRADOR)
+// ══════════════════════════════════════════════════════════════
+export function generarReportePosPdf(data: ReportePosPdfData): jsPDF {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginLeft = 14;
+  const marginRight = 14;
+  const contentWidth = pageWidth - marginLeft - marginRight;
+
+  let y = dibujarEncabezado(
+    doc,
+    data.negocio,
+    `REPORTE PUNTO DE VENTA (${data.sucursalNombre || 'TODAS'})`,
+    data.periodo,
+    data.fechaGeneracion
+  );
+
+  // Tarjetas KPI
+  const kpis = [
+    { label: 'Total Recaudado POS', val: `$${data.metricas.totalRecaudado.toFixed(2)}`, sub: 'Caja mostrador' },
+    { label: 'Ventas Realizadas', val: `${data.metricas.cantidadVentas}`, sub: 'Transacciones' },
+    { label: 'Pares Despachados', val: `${data.metricas.cantidadPares}`, sub: 'Calzado vendido' },
+    { label: 'Ticket Promedio POS', val: `$${data.metricas.ticketPromedio.toFixed(2)}`, sub: 'Por ticket' },
+  ];
+  y = dibujarTarjetasKpi(doc, kpis, y);
+
+  // Métodos de Pago
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DESGLOSE DE MÉTODOS DE PAGO EN CAJA', marginLeft, y);
+  y += 4.5;
+
+  const metodos = [
+    { nombre: 'Efectivo', total: data.metricas.desgloseMetodosPago.efectivo.total, cant: data.metricas.desgloseMetodosPago.efectivo.cantidad },
+    { nombre: 'Tarjeta (Débito/Crédito)', total: data.metricas.desgloseMetodosPago.tarjeta.total, cant: data.metricas.desgloseMetodosPago.tarjeta.cantidad },
+    { nombre: 'Transferencia Bancaria', total: data.metricas.desgloseMetodosPago.transferencia.total, cant: data.metricas.desgloseMetodosPago.transferencia.cantidad },
+  ];
+
+  const colWMet = [70, 45, 67];
+  doc.setFillColor(15, 23, 42);
+  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6.5);
+
+  let xm = marginLeft + 2;
+  ['Método de Pago', 'Transacciones', 'Monto Total'].forEach((h, i) => {
+    doc.text(h, xm, y + 3.8);
+    xm += colWMet[i];
+  });
+  y += 5.5;
+
+  metodos.forEach((m, idx) => {
+    const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.rect(marginLeft, y, contentWidth, 6, 'F');
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(6.5);
+
+    xm = marginLeft + 2;
+    doc.setFont('helvetica', 'bold');
+    doc.text(m.nombre, xm, y + 4.2); xm += colWMet[0];
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${m.cant} cobros`, xm, y + 4.2); xm += colWMet[1];
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129);
+    doc.text(`$${m.total.toFixed(2)}`, xm, y + 4.2);
+    y += 6;
+  });
+
+  y += 6;
+
+  // Listado de Transacciones Recientes POS
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('REGISTRO DE VENTAS EN MOSTRADOR (ÚLTIMAS TRANSACCIONES)', marginLeft, y);
+  y += 4.5;
+
+  const colWVen = [18, 30, 42, 32, 28, 32];
+  const headVen = ['Nota', 'Fecha', 'Cliente', 'Vendedor', 'Método', 'Total ($)'];
+
+  doc.setFillColor(15, 23, 42);
+  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6.5);
+
+  let xv = marginLeft + 2;
+  headVen.forEach((h, i) => {
+    doc.text(h, xv, y + 3.8);
+    xv += colWVen[i];
+  });
+  y += 5.5;
+
+  const ventasList = data.ventas ? data.ventas.slice(0, 18) : [];
+  ventasList.forEach((v: any, idx: number) => {
+    if (y > 270) {
+      dibujarPie(doc, 'Página 1');
+      doc.addPage();
+      y = 15;
+      doc.setFillColor(15, 23, 42);
+      doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(6.5);
+      let xh = marginLeft + 2;
+      headVen.forEach((h, i) => {
+        doc.text(h, xh, y + 3.8);
+        xh += colWVen[i];
+      });
+      y += 5.5;
+    }
+
+    const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.rect(marginLeft, y, contentWidth, 6, 'F');
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(6.5);
+
+    xv = marginLeft + 2;
+    doc.setFont('helvetica', 'bold');
+    doc.text(v.numeroNota || '#POS', xv, y + 4.2); xv += colWVen[0];
+    doc.setFont('helvetica', 'normal');
+    doc.text(new Date(v.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: 'short' }), xv, y + 4.2); xv += colWVen[1];
+    doc.text((v.cliente?.nombre || 'Consumidor').substring(0, 22), xv, y + 4.2); xv += colWVen[2];
+    doc.text((v.vendedor?.nombre || 'Vendedor').substring(0, 16), xv, y + 4.2); xv += colWVen[3];
+    doc.text(v.metodoPago || 'EFECTIVO', xv, y + 4.2); xv += colWVen[4];
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129);
+    doc.text(`$${Number(v.total).toFixed(2)}`, xv, y + 4.2);
+
+    y += 6;
+  });
+
+  dibujarPie(doc, 'Informe Punto de Venta — NEXORA');
+  return doc;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 10. INFORME DE RENDIMIENTO POR SUCURSAL & VENTAS POR MODELO
+// ══════════════════════════════════════════════════════════════
+export function generarReporteRendimientoSucursalesPdf(data: ReporteRendimientoSucursalesPdfData): jsPDF {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginLeft = 14;
+  const marginRight = 14;
+  const contentWidth = pageWidth - marginLeft - marginRight;
+
+  let y = dibujarEncabezado(
+    doc,
+    data.negocio,
+    `RENDIMIENTO: ${data.sucursalSeleccionada.nombre.toUpperCase()}`,
+    data.periodo,
+    data.fechaGeneracion
+  );
+
+  // Tarjetas KPI
+  const kpis = [
+    { label: 'Ventas Sucursal', val: `$${data.totalesSucursalSeleccionada.ingresos.toFixed(2)}`, sub: 'Ingresos período' },
+    { label: 'Pares Comercializados', val: `${data.totalesSucursalSeleccionada.pares}`, sub: 'Volumen total' },
+    { label: 'Pedidos / Tickets', val: `${data.totalesSucursalSeleccionada.pedidos}`, sub: 'Transacciones' },
+    { label: 'Modelos en Rotación', val: `${data.totalesSucursalSeleccionada.totalModelosVendidos}`, sub: 'Catálogo activo' },
+  ];
+  y = dibujarTarjetasKpi(doc, kpis, y);
+
+  // Sección 1: Comparativa de Sucursales de la Empresa
+  if (data.sucursales && data.sucursales.length > 0) {
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('1. COMPARATIVA COMERCIAL ENTRE SUCURSALES', marginLeft, y);
+    y += 4.5;
+
+    const colWSuc = [55, 30, 25, 32, 40];
+    const headSuc = ['Sucursal', 'Ventas Totales ($)', 'Pares', 'Ticket Prom.', 'Aporte a Empresa'];
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6.5);
+
+    let xs = marginLeft + 2;
+    headSuc.forEach((h, i) => {
+      doc.text(h, xs, y + 3.8);
+      xs += colWSuc[i];
+    });
+    y += 5.5;
+
+    data.sucursales.forEach((s, idx) => {
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, 6, 'F');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(6.5);
+
+      xs = marginLeft + 2;
+      doc.setFont('helvetica', 'bold');
+      doc.text(s.nombre.substring(0, 30), xs, y + 4.2); xs += colWSuc[0];
+      doc.setTextColor(16, 185, 129);
+      doc.text(`$${s.totalVentas.toFixed(2)}`, xs, y + 4.2); xs += colWSuc[1];
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${s.totalPares} pares`, xs, y + 4.2); xs += colWSuc[2];
+      doc.text(`$${s.ticketPromedio.toFixed(2)}`, xs, y + 4.2); xs += colWSuc[3];
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(59, 130, 246);
+      doc.text(`${s.porcentajeEmpresa}%`, xs, y + 4.2);
+      y += 6;
+    });
+
+    y += 6;
+  }
+
+  // Sección 2: Ventas de Cada Modelo de Calzado de la Sucursal Seleccionada
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`2. TOTAL DE VENTAS POR MODELO EN ${data.sucursalSeleccionada.nombre.toUpperCase()}`, marginLeft, y);
+  y += 4.5;
+
+  const colWMod = [10, 48, 26, 22, 28, 24, 24];
+  const headMod = ['#', 'Modelo de Calzado', 'Color / Serie', 'Pares', 'Ventas ($)', 'Precio Prom.', '% Sucursal'];
+
+  doc.setFillColor(15, 23, 42);
+  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6.5);
+
+  let xm = marginLeft + 2;
+  headMod.forEach((h, i) => {
+    doc.text(h, xm, y + 3.8);
+    xm += colWMod[i];
+  });
+  y += 5.5;
+
+  const modelos = data.modelosVendidos || [];
+  modelos.forEach((m, idx) => {
+    if (y > 270) {
+      dibujarPie(doc, 'Página 1');
+      doc.addPage();
+      y = 15;
+      doc.setFillColor(15, 23, 42);
+      doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(6.5);
+      let xh = marginLeft + 2;
+      headMod.forEach((h, i) => {
+        doc.text(h, xh, y + 3.8);
+        xh += colWMod[i];
+      });
+      y += 5.5;
+    }
+
+    const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.rect(marginLeft, y, contentWidth, 6, 'F');
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(6.5);
+
+    xm = marginLeft + 2;
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${m.ranking || idx + 1}`, xm, y + 4.2); xm += colWMod[0];
+    doc.text(m.modelName.substring(0, 28), xm, y + 4.2); xm += colWMod[1];
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${m.color} · ${m.serieNombre || ''}`.substring(0, 18), xm, y + 4.2); xm += colWMod[2];
+    doc.text(`${m.paresVendidos}`, xm, y + 4.2); xm += colWMod[3];
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129);
+    doc.text(`$${m.montoTotal.toFixed(2)}`, xm, y + 4.2); xm += colWMod[4];
+    doc.setTextColor(30, 41, 59);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`$${m.precioPromedio.toFixed(2)}`, xm, y + 4.2); xm += colWMod[5];
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(59, 130, 246);
+    doc.text(`${m.porcentajeSucursal}%`, xm, y + 4.2);
+
+    y += 6;
+  });
+
+  dibujarPie(doc, 'Informe Rendimiento por Sucursal — NEXORA');
   return doc;
 }
