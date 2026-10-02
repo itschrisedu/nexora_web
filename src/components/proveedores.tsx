@@ -661,12 +661,17 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
   const handleCreateProveedor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ruc || !provNombres.trim() || !provApellidos.trim()) {
-      showToast('El RUC, Nombres y Apellidos del proveedor son obligatorios.', 'error');
+    if (!provNombres.trim() || !provApellidos.trim()) {
+      showToast('Los Nombres y Apellidos del proveedor son obligatorios.', 'error');
       return;
     }
 
-    if (!validarRuc(ruc)) {
+    if (!contacto.trim()) {
+      showToast('El número de teléfono / WhatsApp es obligatorio.', 'error');
+      return;
+    }
+
+    if (ruc && !validarRuc(ruc)) {
       showToast('El RUC o Cédula ingresado no es válido (debe tener 10 o 13 dígitos numéricos).', 'error');
       return;
     }
@@ -4267,13 +4272,15 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
             <form onSubmit={handleCreateProveedor} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  RUC del Proveedor / Cédula *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    RUC del Proveedor / Cédula
+                  </label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">(Opcional)</span>
+                </div>
                 <input
                   type="text"
-                  required
-                  placeholder="Ej. 1792348574001"
+                  placeholder="Ej. 1792348574001 (10 o 13 dígitos)"
                   value={ruc}
                   onChange={(e) => setRuc(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
@@ -4330,14 +4337,15 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Teléfono / WhatsApp de Contacto
+                  Teléfono / WhatsApp de Contacto *
                 </label>
                 <input
                   type="text"
+                  required
                   placeholder="Ej. 0998765432"
                   value={contacto}
                   onChange={(e) => setContacto(formatearTelefono(e.target.value))}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
                 />
               </div>
 

@@ -538,13 +538,18 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const handleQuickCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     setQsError("");
-    const rucClean = qsRuc.trim().replace(/\D/g, "");
-    if (!rucClean || !qsNombres.trim() || !qsApellidos.trim()) {
-      setQsError("Cédula/RUC, Nombres y Apellidos del proveedor son obligatorios.");
+    if (!qsNombres.trim() || !qsApellidos.trim()) {
+      setQsError("Nombres y Apellidos del proveedor son obligatorios.");
       return;
     }
 
-    if (!validarRuc(rucClean) && !validarCedula(rucClean)) {
+    if (!qsContacto.trim()) {
+      setQsError("El número de teléfono / WhatsApp es obligatorio.");
+      return;
+    }
+
+    const rucClean = qsRuc.trim().replace(/\D/g, "");
+    if (rucClean && !validarRuc(rucClean) && !validarCedula(rucClean)) {
       setQsError("El documento ingresado no es válido (debe tener 10 dígitos de cédula o 13 dígitos de RUC válidos en Ecuador).");
       return;
     }
@@ -562,12 +567,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setQsSaving(true);
     try {
       const res = await ApiService.post("/proveedores", {
-        ruc: rucClean,
+        ruc: rucClean || undefined,
         razonSocial: razonSocialFinal,
         nombreComercial: qsNombreComercial.trim() || undefined,
         nombres: qsNombres.trim(),
         apellidos: qsApellidos.trim(),
-        contacto: qsContacto ? formatearTelefono(qsContacto) : `${qsNombres.trim()} ${qsApellidos.trim()}`,
+        contacto: formatearTelefono(qsContacto),
         direccion: qsDireccion ? formatearDireccion(qsDireccion) : undefined,
         email: qsEmail ? formatearEmail(qsEmail) : undefined,
       });
@@ -3570,11 +3575,15 @@ export default function ModelosComponent({ online }: ModelosProps) {
               )}
 
               <div>
-                <Lbl t="Cédula / RUC del Proveedor" req />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    Cédula / RUC del Proveedor
+                  </label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">(Opcional)</span>
+                </div>
                 <input
                   type="text"
-                  required
-                  placeholder="Ej. 1804567890 o 1792348574001"
+                  placeholder="Ej. 1804567890 o 1792348574001 (10 o 13 dígitos)"
                   value={qsRuc}
                   onChange={e => {
                     setQsRuc(e.target.value.replace(/\D/g, '').slice(0, 13));
@@ -3583,7 +3592,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
                   className={INPUT}
                 />
                 <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  10 dígitos para cédula de persona natural o 13 dígitos para RUC.
+                  Opcional: 10 dígitos para cédula de persona natural o 13 dígitos para RUC.
                 </p>
               </div>
 
@@ -3613,8 +3622,8 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <Lbl t="Teléfono / WhatsApp" />
-                  <input type="text" placeholder="Ej. 0998765432" value={qsContacto} onChange={e => setQsContacto(formatearTelefono(e.target.value))} className={INPUT} />
+                  <Lbl t="Teléfono / WhatsApp" req />
+                  <input type="text" required placeholder="Ej. 0998765432" value={qsContacto} onChange={e => setQsContacto(formatearTelefono(e.target.value))} className={INPUT} />
                 </div>
                 <div>
                   <Lbl t="Correo Electrónico (Opcional)" />
