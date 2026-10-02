@@ -37,6 +37,7 @@ import {
   ShieldAlert,
   ChevronRight,
   UserCheck,
+  X,
 } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 import { useToast } from '@/components/ui/toast';

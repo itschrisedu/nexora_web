@@ -301,6 +301,49 @@ function dibujarPie(doc: jsPDF, textoResumen?: string) {
   }
 }
 
+// ── Helper Tarjetas KPI ──
+function dibujarTarjetasKpi(
+  doc: jsPDF,
+  kpis: { label: string; val: string; sub?: string }[],
+  yStart: number
+): number {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginLeft = 14;
+  const marginRight = 14;
+  const contentWidth = pageWidth - marginLeft - marginRight;
+  const count = kpis.length;
+  const gap = 3;
+  const cardW = (contentWidth - gap * (count - 1)) / count;
+  const cardH = 16;
+
+  kpis.forEach((kpi, i) => {
+    const x = marginLeft + i * (cardW + gap);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(x, yStart, cardW, cardH, 2, 2, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(x, yStart, cardW, cardH, 2, 2, 'S');
+
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.text(kpi.label.toUpperCase(), x + cardW / 2, yStart + 4.5, { align: 'center' });
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(9.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(kpi.val, x + cardW / 2, yStart + 10, { align: 'center' });
+
+    if (kpi.sub) {
+      doc.setTextColor(148, 163, 184);
+      doc.setFontSize(5.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(kpi.sub, x + cardW / 2, yStart + 14, { align: 'center' });
+    }
+  });
+
+  return yStart + cardH + 6;
+}
+
 // ══════════════════════════════════════════════════════════════
 // 1. REPORTE DE COBRANZAS — CLIENTES QUE DEBEN
 // ══════════════════════════════════════════════════════════════
