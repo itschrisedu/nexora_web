@@ -138,9 +138,11 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     nombre: '',
     email: '',
     password: '',
+    confirmPassword: '',
     activo: true,
   });
   const [showPassSuperAdmin, setShowPassSuperAdmin] = useState(false);
+  const [showPassSuperAdminConfirm, setShowPassSuperAdminConfirm] = useState(false);
   const [savingSuperAdmin, setSavingSuperAdmin] = useState(false);
   const [deletingSuperAdmin, setDeletingSuperAdmin] = useState(false);
 
@@ -161,13 +163,17 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     adminEmail: "",
     adminNombre: "",
     adminPassword: "",
+    adminConfirmPassword: "",
     plan: "PLAN_COMERCIAL",
     diasPruebaGratis: 15,
     precioMensualPlan: 29,
   });
   const [showPassTenant, setShowPassTenant] = useState(false);
+  const [showPassTenantConfirm, setShowPassTenantConfirm] = useState(false);
   const [showPassCreateUser, setShowPassCreateUser] = useState(false);
+  const [showPassCreateUserConfirm, setShowPassCreateUserConfirm] = useState(false);
   const [showPassEditUser, setShowPassEditUser] = useState(false);
+  const [showPassEditUserConfirm, setShowPassEditUserConfirm] = useState(false);
 
   // Modal Suscripción & Pagos
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -226,6 +232,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     email: "",
     nombre: "",
     password: "",
+    confirmPassword: "",
     rol: "ROL_ADMIN",
   });
 
@@ -238,6 +245,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     rol: string;
     activo: boolean;
     password: string;
+    confirmPassword?: string;
   } | null>(null);
 
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<{ id: string; nombre: string; email: string } | null>(null);
@@ -316,6 +324,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
             adminEmail: "",
             adminNombre: "",
             adminPassword: "",
+            adminConfirmPassword: "",
             plan: "PLAN_COMERCIAL",
             diasPruebaGratis: 15,
             precioMensualPlan: 29,
@@ -334,7 +343,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         isOpen: true,
         onDiscard: () => {
           setShowCreateUserModal(false);
-          setNewUser({ email: "", nombre: "", password: "", rol: "ROL_ADMIN" });
+          setNewUser({ email: "", nombre: "", password: "", confirmPassword: "", rol: "ROL_ADMIN" });
           setDiscardConfirm(null);
         },
       });
@@ -476,8 +485,16 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
   const handleCrearSuperAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!superAdminForm.nombre.trim() || !superAdminForm.email.trim() || !superAdminForm.password.trim()) {
+    if (!superAdminForm.nombre.trim() || !superAdminForm.email.trim() || !superAdminForm.password.trim() || !superAdminForm.confirmPassword.trim()) {
       setErrorMsg('Todos los campos son obligatorios.');
+      return;
+    }
+    if (superAdminForm.password.trim().length < 6) {
+      setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (superAdminForm.password.trim() !== superAdminForm.confirmPassword.trim()) {
+      setErrorMsg('Las contraseñas no coinciden. Verifíquelas nuevamente.');
       return;
     }
     setSavingSuperAdmin(true);
@@ -490,7 +507,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       });
       setSuccessMsg('¡Super Administrador creado exitosamente!');
       setShowCreateSuperAdminModal(false);
-      setSuperAdminForm({ nombre: '', email: '', password: '', activo: true });
+      setSuperAdminForm({ nombre: '', email: '', password: '', confirmPassword: '', activo: true });
       await fetchSuperAdmins();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al crear Super Administrador');
@@ -502,6 +519,16 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const handleActualizarSuperAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSuperAdmin) return;
+    if (superAdminForm.password.trim()) {
+      if (superAdminForm.password.trim().length < 6) {
+        setErrorMsg('La nueva contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+      if (superAdminForm.password.trim() !== (superAdminForm.confirmPassword || '').trim()) {
+        setErrorMsg('Las contraseñas no coinciden. Verifíquelas nuevamente.');
+        return;
+      }
+    }
     setSavingSuperAdmin(true);
     setErrorMsg('');
     try {
@@ -570,6 +597,18 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       setAdminEmailError(emailErr);
       return;
     }
+    if (!newTenant.adminPassword || !newTenant.adminConfirmPassword) {
+      setErrorMsg("Debe ingresar y confirmar la contraseña del administrador.");
+      return;
+    }
+    if (newTenant.adminPassword.length < 6) {
+      setErrorMsg("La contraseña del administrador debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (newTenant.adminPassword !== newTenant.adminConfirmPassword) {
+      setErrorMsg("Las contraseñas no coinciden. Verifíquelas nuevamente.");
+      return;
+    }
     setCreateLoading(true);
     setErrorMsg("");
     try {
@@ -586,6 +625,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         adminEmail: "",
         adminNombre: "",
         adminPassword: "",
+        adminConfirmPassword: "",
         plan: "PLAN_COMERCIAL",
         diasPruebaGratis: 15,
         precioMensualPlan: 29,
@@ -794,13 +834,30 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       setNewUserEmailError(emailErr);
       return;
     }
+    if (!newUser.password || !newUser.confirmPassword) {
+      setErrorMsg("Debe ingresar y confirmar la contraseña.");
+      return;
+    }
+    if (newUser.password.length < 6) {
+      setErrorMsg("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (newUser.password !== newUser.confirmPassword) {
+      setErrorMsg("Las contraseñas no coinciden. Verifíquelas nuevamente.");
+      return;
+    }
     setCreateUserLoading(true);
     try {
-      await ApiService.post(`/tenants/${selectedTenantDetail.id}/users`, newUser);
+      await ApiService.post(`/tenants/${selectedTenantDetail.id}/users`, {
+        nombre: newUser.nombre,
+        email: newUser.email,
+        password: newUser.password,
+        rol: newUser.rol,
+      });
       setSuccessMsg(`Usuario "${newUser.nombre}" creado exitosamente.`);
       setShowCreateUserModal(false);
       setNewUserEmailError("");
-      setNewUser({ email: "", nombre: "", password: "", rol: "ROL_ADMIN" });
+      setNewUser({ email: "", nombre: "", password: "", confirmPassword: "", rol: "ROL_ADMIN" });
       await handleViewDetail(selectedTenantDetail.id);
       await fetchTenants();
     } catch (err: any) {
@@ -817,6 +874,16 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     if (emailErr) {
       setEditUserEmailError(emailErr);
       return;
+    }
+    if (editingUser.password.trim()) {
+      if (editingUser.password.trim().length < 6) {
+        setErrorMsg("La nueva contraseña debe tener al menos 6 caracteres.");
+        return;
+      }
+      if (editingUser.password.trim() !== (editingUser.confirmPassword || "").trim()) {
+        setErrorMsg("Las contraseñas no coinciden. Verifíquelas nuevamente.");
+        return;
+      }
     }
     setEditUserLoading(true);
     try {
@@ -1919,7 +1986,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
             <button
               type="button"
               onClick={() => {
-                setSuperAdminForm({ nombre: '', email: '', password: '', activo: true });
+                setSuperAdminForm({ nombre: '', email: '', password: '', confirmPassword: '', activo: true });
                 setShowCreateSuperAdminModal(true);
               }}
               disabled={!online}
@@ -2024,6 +2091,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                                     nombre: sa.nombre,
                                     email: sa.email,
                                     password: '',
+                                    confirmPassword: '',
                                     activo: sa.activo,
                                   });
                                   setShowEditSuperAdminModal(true);
@@ -2199,9 +2267,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <input
                     type={showPassTenant ? "text" : "password"}
                     required
+                    minLength={6}
                     value={newTenant.adminPassword}
                     onChange={(e) => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
-                    placeholder="••••••••"
+                    placeholder="Mínimo 6 caracteres"
                     className="w-full px-3 py-2.5 pr-10 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                   />
                   <button
@@ -2215,6 +2284,46 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   </button>
                 </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Confirmar Contraseña *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassTenantConfirm ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={newTenant.adminConfirmPassword}
+                    onChange={(e) => setNewTenant({ ...newTenant, adminConfirmPassword: e.target.value })}
+                    placeholder="Repita la contraseña"
+                    className={`w-full px-3 py-2.5 pr-10 bg-[var(--muted)] border rounded-lg text-sm focus:outline-none transition-colors ${
+                      newTenant.adminConfirmPassword && newTenant.adminPassword !== newTenant.adminConfirmPassword
+                        ? "border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20"
+                        : newTenant.adminConfirmPassword && newTenant.adminPassword === newTenant.adminConfirmPassword
+                        ? "border-emerald-500 focus:border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20"
+                        : "border-[var(--border)] focus:border-[#0F172A]"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassTenantConfirm(!showPassTenantConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 cursor-pointer"
+                    tabIndex={-1}
+                    title={showPassTenantConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassTenantConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {newTenant.adminConfirmPassword && (
+                  <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                    newTenant.adminPassword === newTenant.adminConfirmPassword ? "text-emerald-500" : "text-rose-500"
+                  }`}>
+                    {newTenant.adminPassword === newTenant.adminConfirmPassword ? "✓ Las contraseñas coinciden" : "✗ Las contraseñas no coinciden"}
+                  </p>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -2225,7 +2334,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={createLoading}
+                  disabled={createLoading || !newTenant.adminPassword || !newTenant.adminConfirmPassword || newTenant.adminPassword !== newTenant.adminConfirmPassword || newTenant.adminPassword.length < 6}
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {createLoading && <Loader2 size={14} className="animate-spin" />}
@@ -2970,9 +3079,10 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   <input
                     type={showPassCreateUser ? "text" : "password"}
                     required
+                    minLength={6}
                     value={newUser.password}
                     onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    placeholder="••••••••"
+                    placeholder="Mínimo 6 caracteres"
                     className="w-full px-3 py-2.5 pr-10 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                   />
                   <button
@@ -2986,6 +3096,44 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   </button>
                 </div>
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Confirmar Contraseña *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassCreateUserConfirm ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={newUser.confirmPassword}
+                    onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
+                    placeholder="Repita la contraseña"
+                    className={`w-full px-3 py-2.5 pr-10 bg-[var(--muted)] border rounded-lg text-sm focus:outline-none transition-colors ${
+                      newUser.confirmPassword && newUser.password !== newUser.confirmPassword
+                        ? "border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20"
+                        : newUser.confirmPassword && newUser.password === newUser.confirmPassword
+                        ? "border-emerald-500 focus:border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20"
+                        : "border-[var(--border)] focus:border-[#0F172A]"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassCreateUserConfirm(!showPassCreateUserConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 cursor-pointer"
+                    tabIndex={-1}
+                    title={showPassCreateUserConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassCreateUserConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {newUser.confirmPassword && (
+                  <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                    newUser.password === newUser.confirmPassword ? "text-emerald-500" : "text-rose-500"
+                  }`}>
+                    {newUser.password === newUser.confirmPassword ? "✓ Las contraseñas coinciden" : "✗ Las contraseñas no coinciden"}
+                  </p>
+                )}
+              </div>
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -2996,7 +3144,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={createUserLoading}
+                  disabled={createUserLoading || !newUser.password || !newUser.confirmPassword || newUser.password !== newUser.confirmPassword || newUser.password.length < 6}
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {createUserLoading && <Loader2 size={14} className="animate-spin" />}
@@ -3121,6 +3269,44 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   </button>
                 </div>
               </div>
+              {editingUser.password && (
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Confirmar Nueva Contraseña *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassEditUserConfirm ? "text" : "password"}
+                      value={editingUser.confirmPassword || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, confirmPassword: e.target.value })}
+                      placeholder="Repita la nueva contraseña"
+                      className={`w-full px-3 py-2.5 pr-10 bg-[var(--muted)] border rounded-lg text-sm focus:outline-none transition-colors ${
+                        editingUser.confirmPassword && editingUser.password !== editingUser.confirmPassword
+                          ? "border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20"
+                          : editingUser.confirmPassword && editingUser.password === editingUser.confirmPassword
+                          ? "border-emerald-500 focus:border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20"
+                          : "border-[var(--border)] focus:border-[#0F172A]"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassEditUserConfirm(!showPassEditUserConfirm)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 cursor-pointer"
+                      tabIndex={-1}
+                      title={showPassEditUserConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showPassEditUserConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {editingUser.confirmPassword && (
+                    <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                      editingUser.password === editingUser.confirmPassword ? "text-emerald-500" : "text-rose-500"
+                    }`}>
+                      {editingUser.password === editingUser.confirmPassword ? "✓ Las contraseñas coinciden" : "✗ Las contraseñas no coinciden"}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -3131,7 +3317,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={editUserLoading}
+                  disabled={editUserLoading || (!!editingUser.password.trim() && (editingUser.password.trim().length < 6 || editingUser.password.trim() !== (editingUser.confirmPassword || "").trim()))}
                   className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
                 >
                   {editUserLoading && <Loader2 size={14} className="animate-spin" />}
@@ -3263,6 +3449,43 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Confirmar Contraseña *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassSuperAdminConfirm ? "text" : "password"}
+                    required
+                    minLength={6}
+                    placeholder="Repita la contraseña"
+                    value={superAdminForm.confirmPassword}
+                    onChange={(e) => setSuperAdminForm({ ...superAdminForm, confirmPassword: e.target.value })}
+                    className={`w-full px-3 py-2.5 bg-[var(--muted)] border rounded-xl text-sm focus:outline-none pr-10 transition-colors ${
+                      superAdminForm.confirmPassword && superAdminForm.password !== superAdminForm.confirmPassword
+                        ? "border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20"
+                        : superAdminForm.confirmPassword && superAdminForm.password === superAdminForm.confirmPassword
+                        ? "border-emerald-500 focus:border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20"
+                        : "border-[var(--border)] focus:border-[#0F172A]"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassSuperAdminConfirm(!showPassSuperAdminConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  >
+                    {showPassSuperAdminConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {superAdminForm.confirmPassword && (
+                  <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                    superAdminForm.password === superAdminForm.confirmPassword ? "text-emerald-500" : "text-rose-500"
+                  }`}>
+                    {superAdminForm.password === superAdminForm.confirmPassword ? "✓ Las contraseñas coinciden" : "✗ Las contraseñas no coinciden"}
+                  </p>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -3273,7 +3496,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={savingSuperAdmin}
+                  disabled={savingSuperAdmin || !superAdminForm.password || !superAdminForm.confirmPassword || superAdminForm.password !== superAdminForm.confirmPassword || superAdminForm.password.length < 6}
                   className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {savingSuperAdmin && <Loader2 size={14} className="animate-spin" />}
@@ -3360,6 +3583,43 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
               </div>
 
+              {superAdminForm.password && (
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Confirmar Nueva Contraseña *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassSuperAdminConfirm ? "text" : "password"}
+                      placeholder="Repita la nueva contraseña"
+                      value={superAdminForm.confirmPassword}
+                      onChange={(e) => setSuperAdminForm({ ...superAdminForm, confirmPassword: e.target.value })}
+                      className={`w-full px-3 py-2.5 bg-[var(--muted)] border rounded-xl text-sm focus:outline-none pr-10 transition-colors ${
+                        superAdminForm.confirmPassword && superAdminForm.password !== superAdminForm.confirmPassword
+                          ? "border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20"
+                          : superAdminForm.confirmPassword && superAdminForm.password === superAdminForm.confirmPassword
+                          ? "border-emerald-500 focus:border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20"
+                          : "border-[var(--border)] focus:border-[#0F172A]"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassSuperAdminConfirm(!showPassSuperAdminConfirm)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    >
+                      {showPassSuperAdminConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {superAdminForm.confirmPassword && (
+                    <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                      superAdminForm.password === superAdminForm.confirmPassword ? "text-emerald-500" : "text-rose-500"
+                    }`}>
+                      {superAdminForm.password === superAdminForm.confirmPassword ? "✓ Las contraseñas coinciden" : "✗ Las contraseñas no coinciden"}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Estado de la Cuenta
@@ -3384,7 +3644,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={savingSuperAdmin}
+                  disabled={savingSuperAdmin || (!!superAdminForm.password.trim() && (superAdminForm.password.trim().length < 6 || superAdminForm.password.trim() !== (superAdminForm.confirmPassword || "").trim()))}
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {savingSuperAdmin && <Loader2 size={14} className="animate-spin" />}

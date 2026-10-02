@@ -119,7 +119,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordAddUser, setShowPasswordAddUser] = useState(false);
+  const [showConfirmPasswordAddUser, setShowConfirmPasswordAddUser] = useState(false);
   const [rolOption, setRolOption] = useState<'ADMIN_GENERAL' | 'ADMIN_SUCURSAL' | 'ROL_VENDEDOR' | 'ROL_BODEGUERO'>('ROL_VENDEDOR');
   const [permiteCambiarPrecio, setPermiteCambiarPrecio] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -128,7 +130,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [resettingUser, setResettingUser] = useState<UserListItem | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [showConfirmPasswordReset, setShowConfirmPasswordReset] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
   // ─── STOCK INTER-SUCURSAL ───
@@ -174,18 +178,18 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   // === Snapshots al abrir modales ===
   useEffect(() => { if (showAddSucursalModal) sucursalFormSnapshotRef.current = JSON.stringify(newSucursal); }, [showAddSucursalModal]);
-  useEffect(() => { if (showAddModal) userFormSnapshotRef.current = JSON.stringify({ nombre, email, password, rolOption, permiteCambiarPrecio }); }, [showAddModal]);
+  useEffect(() => { if (showAddModal) userFormSnapshotRef.current = JSON.stringify({ nombre, email, password, confirmPassword, rolOption, permiteCambiarPrecio }); }, [showAddModal]);
   useEffect(() => { if (showEditModal && editingUser) editUserSnapshotRef.current = JSON.stringify({ nombre: editingUser.nombre, email: editingUser.email, rol: editingUser.rol, activo: editingUser.activo, permiteCambiarPrecio: editingUser.permiteCambiarPrecio }); }, [showEditModal, editingUser]);
   useEffect(() => { if (showEditSucursalModal) editSucursalSnapshotRef.current = JSON.stringify(editSucursalForm); }, [showEditSucursalModal]);
-  useEffect(() => { if (showResetPasswordModal) resetPwSnapshotRef.current = JSON.stringify({ newPassword }); }, [showResetPasswordModal]);
+  useEffect(() => { if (showResetPasswordModal) resetPwSnapshotRef.current = JSON.stringify({ newPassword, confirmNewPassword }); }, [showResetPasswordModal]);
   useEffect(() => { if (showTransferModal) transferSnapshotRef.current = JSON.stringify({ targetSucursalId }); }, [showTransferModal]);
 
   // === Dirty check helpers ===
   const isDirtySucursal = useCallback(() => showAddSucursalModal && JSON.stringify(newSucursal) !== sucursalFormSnapshotRef.current, [showAddSucursalModal, newSucursal]);
-  const isDirtyAddUser = useCallback(() => showAddModal && JSON.stringify({ nombre, email, password, rolOption, permiteCambiarPrecio }) !== userFormSnapshotRef.current, [showAddModal, nombre, email, password, rolOption, permiteCambiarPrecio]);
+  const isDirtyAddUser = useCallback(() => showAddModal && JSON.stringify({ nombre, email, password, confirmPassword, rolOption, permiteCambiarPrecio }) !== userFormSnapshotRef.current, [showAddModal, nombre, email, password, confirmPassword, rolOption, permiteCambiarPrecio]);
   const isDirtyEditUser = useCallback(() => showEditModal && editingUser ? JSON.stringify({ nombre: editingUser.nombre, email: editingUser.email, rol: editingUser.rol, activo: editingUser.activo, permiteCambiarPrecio: editingUser.permiteCambiarPrecio }) !== editUserSnapshotRef.current : false, [showEditModal, editingUser]);
   const isDirtyEditSucursal = useCallback(() => showEditSucursalModal && JSON.stringify(editSucursalForm) !== editSucursalSnapshotRef.current, [showEditSucursalModal, editSucursalForm]);
-  const isDirtyResetPw = useCallback(() => showResetPasswordModal && JSON.stringify({ newPassword }) !== resetPwSnapshotRef.current, [showResetPasswordModal, newPassword]);
+  const isDirtyResetPw = useCallback(() => showResetPasswordModal && JSON.stringify({ newPassword, confirmNewPassword }) !== resetPwSnapshotRef.current, [showResetPasswordModal, newPassword, confirmNewPassword]);
   const isDirtyTransfer = useCallback(() => showTransferModal && JSON.stringify({ targetSucursalId }) !== transferSnapshotRef.current, [showTransferModal, targetSucursalId]);
 
   // === Cierre seguro ===
@@ -334,8 +338,18 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!nombre || !email || !password || !rolOption) {
+    if (!nombre || !email || !password || !confirmPassword || !rolOption) {
       setErrorMsg('Todos los campos son obligatorios.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Las contraseñas no coinciden. Verifíquelas nuevamente.');
       return;
     }
 
@@ -366,6 +380,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setNombre('');
       setEmail('');
       setPassword('');
+      setConfirmPassword('');
       setRolOption('ROL_VENDEDOR');
       setPermiteCambiarPrecio(false);
       setSelectedTenantForNewUser('');
@@ -473,10 +488,25 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resettingUser) return;
-    setSavingPassword(true);
     setErrorMsg('');
     setSuccessMsg('');
 
+    if (!newPassword || !confirmNewPassword) {
+      setErrorMsg('Debe ingresar y confirmar la nueva contraseña.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setErrorMsg('Las contraseñas no coinciden. Verifíquelas nuevamente.');
+      return;
+    }
+
+    setSavingPassword(true);
     try {
       await ApiService.post(`/configuracion/personal/${resettingUser.id}/reset-password`, {
         password: newPassword,
@@ -486,6 +516,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setShowResetPasswordModal(false);
       setResettingUser(null);
       setNewPassword('');
+      setConfirmNewPassword('');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al restablecer contraseña.');
@@ -1586,6 +1617,43 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               </div>
 
               <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">Confirmar Contraseña *</label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPasswordAddUser ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repita la contraseña exactamente igual"
+                    className={`w-full px-3 py-2 pr-10 bg-[var(--muted)]/40 border rounded-xl text-xs focus:outline-none transition-colors ${
+                      confirmPassword && password !== confirmPassword
+                        ? 'border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20'
+                        : confirmPassword && password === confirmPassword
+                        ? 'border-emerald-500 focus:border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20'
+                        : 'border-[var(--border)] focus:border-[#0F172A]'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPasswordAddUser(!showConfirmPasswordAddUser)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+                    tabIndex={-1}
+                    title={showConfirmPasswordAddUser ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showConfirmPasswordAddUser ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {confirmPassword && (
+                  <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                    password === confirmPassword ? 'text-emerald-500' : 'text-rose-500'
+                  }`}>
+                    {password === confirmPassword ? '✓ Las contraseñas coinciden' : '✗ Las contraseñas no coinciden'}
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol en el Negocio *</label>
                 <select
                   value={rolOption}
@@ -1642,7 +1710,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || !password || !confirmPassword || password !== confirmPassword || password.length < 6}
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
                   {saving ? 'Guardando...' : 'Crear Colaborador'}
@@ -1823,6 +1891,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   setShowResetPasswordModal(false);
                   setResettingUser(null);
                   setNewPassword('');
+                  setConfirmNewPassword('');
                 }}
                 className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
@@ -1855,6 +1924,43 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Confirmar Nueva Contraseña *</label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPasswordReset ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    placeholder="Repita la nueva contraseña"
+                    className={`w-full px-3 py-2 pr-10 bg-[var(--muted)]/40 border rounded-xl text-xs focus:outline-none transition-colors ${
+                      confirmNewPassword && newPassword !== confirmNewPassword
+                        ? 'border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20'
+                        : confirmNewPassword && newPassword === confirmNewPassword
+                        ? 'border-emerald-500 focus:border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20'
+                        : 'border-[var(--border)] focus:border-[#0F172A]'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPasswordReset(!showConfirmPasswordReset)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+                    tabIndex={-1}
+                    title={showConfirmPasswordReset ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showConfirmPasswordReset ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {confirmNewPassword && (
+                  <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                    newPassword === confirmNewPassword ? 'text-emerald-500' : 'text-rose-500'
+                  }`}>
+                    {newPassword === confirmNewPassword ? '✓ Las contraseñas coinciden' : '✗ Las contraseñas no coinciden'}
+                  </p>
+                )}
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
@@ -1862,6 +1968,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     setShowResetPasswordModal(false);
                     setResettingUser(null);
                     setNewPassword('');
+                    setConfirmNewPassword('');
                   }}
                   className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                 >
@@ -1869,7 +1976,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={savingPassword}
+                  disabled={savingPassword || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword || newPassword.length < 6}
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
                   {savingPassword ? 'Guardando...' : 'Restablecer'}

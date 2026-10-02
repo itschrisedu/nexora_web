@@ -137,6 +137,9 @@ function MainApp() {
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [unlockEmail, setUnlockEmail] = useState('');
   const [unlockNewPassword, setUnlockNewPassword] = useState('');
+  const [unlockConfirmPassword, setUnlockConfirmPassword] = useState('');
+  const [showUnlockPass, setShowUnlockPass] = useState(false);
+  const [showUnlockConfirmPass, setShowUnlockConfirmPass] = useState(false);
   const [unlockLoading, setUnlockLoading] = useState(false);
   const [unlockError, setUnlockError] = useState('');
 
@@ -653,6 +656,16 @@ function MainApp() {
   const handleRequestUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unlockEmail.trim()) return;
+    if (unlockNewPassword.trim()) {
+      if (unlockNewPassword.trim().length < 6) {
+        setUnlockError('La nueva contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+      if (unlockNewPassword.trim() !== unlockConfirmPassword.trim()) {
+        setUnlockError('Las contraseñas no coinciden. Verifíquelas nuevamente.');
+        return;
+      }
+    }
     setUnlockLoading(true);
     setUnlockError('');
     try {
@@ -946,14 +959,63 @@ function MainApp() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Nueva Contraseña (Opcional)</label>
-                  <input
-                    type="password"
-                    placeholder="Dejar en blanco si solo desea desbloquear"
-                    value={unlockNewPassword}
-                    onChange={(e) => setUnlockNewPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-[#1c1f24] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showUnlockPass ? "text" : "password"}
+                      placeholder="Dejar en blanco si solo desea desbloquear"
+                      value={unlockNewPassword}
+                      onChange={(e) => setUnlockNewPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 pr-10 bg-[#1c1f24] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowUnlockPass(!showUnlockPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
+                      tabIndex={-1}
+                      title={showUnlockPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showUnlockPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
+
+                {unlockNewPassword.trim() && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Confirmar Nueva Contraseña *</label>
+                    <div className="relative">
+                      <input
+                        type={showUnlockConfirmPass ? "text" : "password"}
+                        required
+                        placeholder="Repita la nueva contraseña"
+                        value={unlockConfirmPassword}
+                        onChange={(e) => setUnlockConfirmPassword(e.target.value)}
+                        className={`w-full px-4 py-2.5 pr-10 bg-[#1c1f24] border rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none transition-colors ${
+                          unlockConfirmPassword && unlockNewPassword !== unlockConfirmPassword
+                            ? 'border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20'
+                            : unlockConfirmPassword && unlockNewPassword === unlockConfirmPassword
+                            ? 'border-emerald-500 focus:border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20'
+                            : 'border-white/10 focus:border-emerald-500'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowUnlockConfirmPass(!showUnlockConfirmPass)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
+                        tabIndex={-1}
+                        title={showUnlockConfirmPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      >
+                        {showUnlockConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {unlockConfirmPassword && (
+                      <p className={`text-[11px] font-semibold mt-1 flex items-center gap-1 ${
+                        unlockNewPassword === unlockConfirmPassword ? 'text-emerald-400' : 'text-rose-400'
+                      }`}>
+                        {unlockNewPassword === unlockConfirmPassword ? '✓ Las contraseñas coinciden' : '✗ Las contraseñas no coinciden'}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {unlockError && (
                   <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex items-center gap-2">
@@ -964,7 +1026,7 @@ function MainApp() {
 
                 <button
                   type="submit"
-                  disabled={unlockLoading || !unlockEmail.trim()}
+                  disabled={unlockLoading || !unlockEmail.trim() || (!!unlockNewPassword.trim() && (unlockNewPassword.trim().length < 6 || unlockNewPassword.trim() !== unlockConfirmPassword.trim()))}
                   className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {unlockLoading ? <Loader2 size={16} className="animate-spin" /> : 'Enviar Código de Desbloqueo'}
