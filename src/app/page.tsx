@@ -134,6 +134,7 @@ function MainApp() {
   const [otpMode, setOtpMode] = useState<'session-transfer' | 'account-unlock'>('session-transfer');
   const [maskedEmail, setMaskedEmail] = useState('');
   const [conflictData, setConflictData] = useState<{ email: string; password?: string } | null>(null);
+  const [otpDebugCode, setOtpDebugCode] = useState<string | undefined>(undefined);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [unlockEmail, setUnlockEmail] = useState('');
   const [unlockNewPassword, setUnlockNewPassword] = useState('');
@@ -566,6 +567,7 @@ function MainApp() {
           setConflictData({ email: username.trim(), password: password.trim() });
           setMaskedEmail(response.maskedEmail || username.trim());
           setOtpMode('session-transfer');
+          setOtpDebugCode(response.debugCode);
           setShowOtpModal(true);
           return;
         }
@@ -1054,6 +1056,7 @@ function MainApp() {
               onSuccessContinue={() => {
                 setShowOtpModal(false);
               }}
+              debugCode={otpDebugCode}
             />
           </div>
         )}

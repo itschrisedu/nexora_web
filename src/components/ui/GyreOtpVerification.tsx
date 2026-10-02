@@ -12,6 +12,7 @@ interface GyreOtpVerificationProps {
   onCancel?: () => void;
   onSuccessContinue?: () => void;
   cooldownSeconds?: number;
+  debugCode?: string;
 }
 
 const N = 4;
@@ -33,6 +34,7 @@ export const GyreOtpVerification: React.FC<GyreOtpVerificationProps> = ({
   onCancel,
   onSuccessContinue,
   cooldownSeconds = 30,
+  debugCode,
 }) => {
   const [digits, setDigits] = useState<string[]>(['', '', '', '']);
   const [state, setState] = useState<'idle' | 'filling' | 'checking' | 'ok' | 'error'>('idle');
@@ -663,6 +665,15 @@ export const GyreOtpVerification: React.FC<GyreOtpVerificationProps> = ({
           )}
         </p>
       </div>
+
+      {/* Banner de código debug para desarrollo */}
+      {debugCode && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col items-center gap-1">
+          <span className="text-[10px] font-bold tracking-widest uppercase text-amber-400">Modo Desarrollo — Código OTP</span>
+          <span className="text-2xl font-black font-mono tracking-[0.5em] text-amber-300 pl-4">{debugCode}</span>
+          <span className="text-[10px] text-amber-500/70">Este banner solo aparece cuando el correo no está configurado</span>
+        </div>
+      )}
 
       {/* Stage de animación y slots */}
       <div ref={wrapRef} className="relative my-8 select-none" style={{ minHeight: '84px' }}>
