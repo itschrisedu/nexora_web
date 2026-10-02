@@ -357,6 +357,18 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     onConfirm: () => {},
   });
 
+  const [resultModal, setResultModal] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'success',
+    title: "",
+    message: "",
+  });
+
   // Manejador global de la tecla Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -567,23 +579,102 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     setSuccess("");
     setError("");
 
+    const label = specificTabLabel || (
+      activeTab === "general" ? "Identidad & Negocio" :
+      activeTab === "credito" ? "Scoring & Crédito" :
+      activeTab === "operaciones" ? "Operaciones & Logística" :
+      activeTab === "fiscal" ? "Parámetros Fiscales" : "Sitio Web & Catálogo"
+    );
+
+    // ── Validación previa de campos requeridos ──
+    if (!config.nombre || !config.nombre.trim()) {
+      setSaving(false);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Nombre Requerido',
+        message: 'El nombre comercial o corporativo del establecimiento es obligatorio. Por favor, ingrésalo antes de guardar.',
+      });
+      return;
+    }
+
+    if (!config.ruc || !config.ruc.trim()) {
+      setSaving(false);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'RUC Requerido',
+        message: 'El número de RUC de la empresa es obligatorio. Debe tener 13 dígitos numéricos.',
+      });
+      return;
+    }
+
+    if (!config.direccion || !config.direccion.trim()) {
+      setSaving(false);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Dirección Requerida',
+        message: 'La dirección del establecimiento o matriz es obligatoria.',
+      });
+      return;
+    }
+
     try {
-      let finalConfig = { ...config };
-      delete (finalConfig as any).creditMontoMaximoInicial;
-      delete (finalConfig as any).creditPlazoMaximoDias;
-      delete (finalConfig as any).creditScoreMinimo;
-      delete (finalConfig as any).creditTasaMoraPct;
+      let finalLogoUrl = config.logoUrl || "";
 
       if (config.logoUrl && config.logoUrl.startsWith("data:image") && online) {
         const cloudUrl = await uploadToCloudinary(config.logoUrl, 'nexora_logos');
         if (cloudUrl) {
-          finalConfig.logoUrl = cloudUrl;
+          finalLogoUrl = cloudUrl;
           setConfig(prev => ({ ...prev, logoUrl: cloudUrl }));
         }
       }
 
+      // Payload sanitizado exclusivamente con campos aceptados por el backend
+      const cleanBusinessPayload: any = {
+        nombre: config.nombre.trim(),
+        ruc: config.ruc.trim(),
+        direccion: config.direccion.trim(),
+        telefono: config.telefono?.trim() || undefined,
+        email: config.email?.trim() || undefined,
+        logoUrl: finalLogoUrl || undefined,
+        primaryColor: config.primaryColor || "#0F172A",
+        horaInicioOperativa: config.horaInicioOperativa || "08:00",
+        horaFinOperativa: config.horaFinOperativa || "19:00",
+        duracionSesionHoras: Math.max(1, Math.round(Number(config.duracionSesionHoras) || 24)),
+        autoDespachoHabilitado: Boolean(config.autoDespachoHabilitado),
+        sriAmbiente: config.sriAmbiente || "1",
+        sriEstablecimiento: config.sriEstablecimiento || "001",
+        sriPuntoEmision: config.sriPuntoEmision || "001",
+        sriObligadoContabilidad: Boolean(config.sriObligadoContabilidad),
+        heroTitulo: config.heroTitulo,
+        heroSubtitulo: config.heroSubtitulo,
+        heroBannerUrl: config.heroBannerUrl || undefined,
+        heroBackgroundUrl: config.heroBackgroundUrl || undefined,
+        heroFraseCorta: config.heroFraseCorta,
+        cardTitulo: config.cardTitulo,
+        cardSubtitulo: config.cardSubtitulo,
+        cardEtiqueta: config.cardEtiqueta,
+        cardGarantia: config.cardGarantia,
+        sobreNosotros: config.sobreNosotros,
+        garantiaTaller: config.garantiaTaller,
+        caracteristicasCalidad: config.caracteristicasCalidad,
+        materialDestacado: config.materialDestacado,
+        materialDescripcion: config.materialDescripcion,
+        whatsappContacto: config.whatsappContacto || undefined,
+        facebookUrl: config.facebookUrl || undefined,
+        instagramUrl: config.instagramUrl || undefined,
+        tiktokUrl: config.tiktokUrl || undefined,
+        mostrarPreciosPublico: config.mostrarPreciosPublico ?? true,
+        mostrarStockPublico: config.mostrarStockPublico ?? true,
+        precioPlanBasico: Number(config.precioPlanBasico) || undefined,
+        precioPlanComercial: Number(config.precioPlanComercial) || undefined,
+        precioPlanMayorista: Number(config.precioPlanMayorista) || undefined,
+      };
+
       await Promise.all([
-        ApiService.put("/configuracion/negocio", finalConfig),
+        ApiService.put("/configuracion/negocio", cleanBusinessPayload),
         ApiService.put("/configuracion/niveles-credito", { niveles: nivelesCredito }),
       ]);
 
@@ -595,16 +686,18 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         });
       }
 
-      setInitialConfig({ ...finalConfig });
+      setInitialConfig({ ...config, logoUrl: finalLogoUrl });
       setInitialNiveles([...nivelesCredito]);
 
-      const label = specificTabLabel || (
-        activeTab === "general" ? "Identidad & Negocio" :
-        activeTab === "credito" ? "Scoring & Crédito" :
-        activeTab === "operaciones" ? "Operaciones & Logística" :
-        activeTab === "fiscal" ? "Parámetros Fiscales" : "Sitio Web & Catálogo"
-      );
-      setSuccess(`Cambios de "${label}" guardados correctamente.`);
+      const successMsg = `Los cambios en "${label}" se guardaron y sincronizaron correctamente.`;
+      setSuccess(successMsg);
+
+      setResultModal({
+        isOpen: true,
+        type: 'success',
+        title: '¡Configuración Guardada!',
+        message: successMsg,
+      });
 
       if (typeof document !== "undefined" && config.primaryColor) {
         document.documentElement.style.setProperty("--primary", config.primaryColor);
@@ -613,7 +706,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           detail: {
             primaryColor: config.primaryColor,
             nombre: config.nombre,
-            logoUrl: finalConfig.logoUrl || config.logoUrl,
+            logoUrl: finalLogoUrl,
           },
         }));
       }
@@ -630,7 +723,14 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
-      setError(err.message || "Error al guardar la configuración.");
+      const errorMsg = err.message || "Error al guardar la configuración.";
+      setError(errorMsg);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error al Guardar',
+        message: errorMsg,
+      });
     } finally {
       setSaving(false);
     }
@@ -2733,6 +2833,55 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           }
         }}
       />
+
+      {/* ═══ MODAL DE RESULTADO DE GUARDADO (ÉXITO / ERROR) ═══ */}
+      {resultModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                  resultModal.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                }`}
+              >
+                {resultModal.type === 'success' ? (
+                  <CheckCircle size={24} />
+                ) : (
+                  <AlertCircle size={24} />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-[var(--foreground)] truncate">
+                  {resultModal.title}
+                </h3>
+                <span className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+                  {resultModal.type === 'success' ? 'Operación completada' : 'Atención requerida'}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[var(--muted)]/40 border border-[var(--border)] text-xs text-[var(--foreground)] leading-relaxed">
+              {resultModal.message}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer ${
+                  resultModal.type === 'success'
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+                }`}
+              >
+                {resultModal.type === 'success' ? 'Aceptar' : 'Revisar y Corregir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

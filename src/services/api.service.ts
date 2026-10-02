@@ -14,13 +14,49 @@ const PUBLIC_PATHS = [
 ];
 
 /**
- * Traduce errores HTTP y de red a mensajes amigables para usuarios finales.
- * Los usuarios no son técnicos: nunca deben ver códigos de estado ni errores de fetch crudos.
+ * Traduce errores HTTP y de validación a mensajes específicos y amigables en español.
  */
-function mensajeAmigable(status: number | null, serverMessage?: string): string {
-  // Si el backend ya envía un mensaje claro, usarlo
-  if (serverMessage && !serverMessage.includes('fetch') && !serverMessage.includes('Error en la petición') && !serverMessage.includes('Internal') && serverMessage.length > 5) {
-    return serverMessage;
+function mensajeAmigable(status: number | null, serverMessage?: any): string {
+  // Si el mensaje es un array (errores de validación de NestJS / class-validator)
+  if (Array.isArray(serverMessage)) {
+    const traducciones: Record<string, string> = {
+      'nombre should not be empty': 'El nombre comercial o corporativo es obligatorio.',
+      'ruc should not be empty': 'El número de RUC es obligatorio.',
+      'direccion should not be empty': 'La dirección del establecimiento es obligatoria.',
+      'duracionSesionHoras must be an integer number': 'La duración de la sesión debe ser un número entero de horas.',
+      'duracionSesionHoras must not be less than': 'La duración mínima de sesión es de 1 hora.',
+      'creditScoreMinimo must be a number': 'El score mínimo de crédito debe ser un número válido.',
+      'precioPlanBasico must be a number': 'El precio del plan básico debe ser un valor numérico.',
+    };
+
+    const mensajesTraducidos = serverMessage.map((m: string) => {
+      for (const [key, val] of Object.entries(traducciones)) {
+        if (m.includes(key)) return val;
+      }
+      // Traducir patrones comunes
+      if (m.includes('should not be empty')) {
+        const campo = m.replace(' should not be empty', '');
+        return `El campo "${campo}" no puede estar vacío.`;
+      }
+      if (m.includes('must be an integer number')) {
+        const campo = m.replace(' must be an integer number', '');
+        return `El campo "${campo}" debe ser un número entero.`;
+      }
+      if (m.includes('must be a string')) {
+        const campo = m.replace(' must be a string', '');
+        return `El campo "${campo}" debe ser texto válido.`;
+      }
+      return m;
+    });
+
+    return mensajesTraducidos.join(' • ');
+  }
+
+  const msgStr = typeof serverMessage === 'string' ? serverMessage : '';
+
+  // Si el backend ya envía un mensaje claro en español, usarlo
+  if (msgStr && !msgStr.includes('fetch') && !msgStr.includes('Error en la petición') && !msgStr.includes('Internal') && msgStr.length > 5) {
+    return msgStr;
   }
 
   if (!status) {
@@ -28,18 +64,18 @@ function mensajeAmigable(status: number | null, serverMessage?: string): string 
   }
 
   switch (status) {
-    case 400: return serverMessage || 'Los datos enviados no son correctos. Revisa la información e intenta de nuevo.';
+    case 400: return msgStr || 'Los datos enviados no son válidos o están incompletos. Revisa los campos e intenta de nuevo.';
     case 401: return 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.';
-    case 403: return 'No tienes permisos para realizar esta acción. Contacta al administrador.';
-    case 404: return 'El recurso solicitado no fue encontrado. Es posible que haya sido eliminado o movido.';
-    case 409: return serverMessage || 'Ya existe un registro con esa información. Verifica los datos ingresados.';
-    case 422: return serverMessage || 'Algunos datos ingresados no son válidos. Revisa el formulario e intenta de nuevo.';
-    case 429: return 'Demasiadas solicitudes. Espera un momento antes de intentar de nuevo.';
-    case 500: return 'Ocurrió un error interno en el servidor. Intenta de nuevo en unos minutos.';
+    case 403: return 'No tienes permisos suficientes para realizar esta acción. Contacta al administrador.';
+    case 404: return 'El registro o recurso solicitado no fue encontrado.';
+    case 409: return msgStr || 'Ya existe un registro con esa información. Verifica los datos ingresados.';
+    case 422: return msgStr || 'Algunos datos ingresados no son válidos. Revisa el formulario e intenta de nuevo.';
+    case 429: return 'Demasiadas solicitudes en poco tiempo. Espera un momento antes de reintentar.';
+    case 500: return 'Ocurrió un error en el servidor al procesar la solicitud. Intenta de nuevo en unos minutos.';
     case 502:
     case 503:
     case 504: return 'El servidor no está disponible temporalmente. Intenta de nuevo en unos minutos.';
-    default: return serverMessage || 'Ocurrió un error inesperado. Por favor, intenta de nuevo.';
+    default: return msgStr || 'Ocurrió un error inesperado. Por favor, intenta de nuevo.';
   }
 }
 
