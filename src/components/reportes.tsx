@@ -723,18 +723,18 @@ export default function ReportesComponent() {
             title="Previsualizar el informe integral consolidado de toda la sucursal"
           >
             {generandoGeneralPdf ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
-            <span>Previsualizar Informe General</span>
+            <span>Previsualizar PDF</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleReporteGeneralIntegral('download')}
             disabled={generandoGeneralPdf || loading}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
             title="Descargar PDF consolidado con todas las áreas del negocio"
           >
             <Download size={14} />
-            <span>Descargar Informe General</span>
+            <span>Descargar PDF</span>
           </button>
         </div>
       </div>
@@ -942,7 +942,7 @@ export default function ReportesComponent() {
               {/* Encabezado y Acciones de PDF para Resumen */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
                     <BarChart3 size={22} />
                   </div>
                   <div>
@@ -970,7 +970,7 @@ export default function ReportesComponent() {
                     type="button"
                     onClick={() => handleReporteResumenPdf('download')}
                     disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
                     <span>Descargar PDF</span>
@@ -1193,7 +1193,7 @@ export default function ReportesComponent() {
               {/* Encabezado y Acciones de PDF para POS */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl shadow-sm">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
                     <Store size={22} />
                   </div>
                   <div>
@@ -1224,24 +1224,24 @@ export default function ReportesComponent() {
                     className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Eye size={14} />
-                    <span>Previsualizar PDF POS</span>
+                    <span>Previsualizar PDF</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleReportePosPdf('download')}
                     disabled={loadingPos || !posData}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
-                    <span>Descargar PDF POS</span>
+                    <span>Descargar PDF</span>
                   </button>
                 </div>
               </div>
 
               {loadingPos ? (
                 <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={36} className="animate-spin text-emerald-600" />
+                  <Loader2 size={36} className="animate-spin text-blue-600" />
                   <span className="text-xs font-bold">Consolidando transacciones del Punto de Venta...</span>
                 </div>
               ) : posData ? (
@@ -1562,7 +1562,7 @@ export default function ReportesComponent() {
               {/* Encabezado y Acciones de PDF para Rendimiento de Sucursales */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl shadow-sm">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
                     <Building2 size={22} />
                   </div>
                   <div>
@@ -1600,7 +1600,7 @@ export default function ReportesComponent() {
                     type="button"
                     onClick={() => handleReporteSucursalPdf('download')}
                     disabled={loadingSucursales || !sucursalesReporteData}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
                     <span>Descargar PDF</span>
@@ -1610,7 +1610,7 @@ export default function ReportesComponent() {
 
               {loadingSucursales ? (
                 <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={36} className="animate-spin text-emerald-600" />
+                  <Loader2 size={36} className="animate-spin text-blue-600" />
                   <span className="text-xs font-bold">Analizando rendimiento y ventas por modelo de cada sucursal...</span>
                 </div>
               ) : sucursalesReporteData ? (
@@ -1977,7 +1977,7 @@ export default function ReportesComponent() {
               {/* Encabezado y Acciones de PDF para Modelos */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
                     <ShoppingBag size={22} />
                   </div>
                   <div>
@@ -2005,7 +2005,7 @@ export default function ReportesComponent() {
                     type="button"
                     onClick={() => handleReporteModelosPdf('download')}
                     disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
                     <span>Descargar PDF</span>
@@ -2125,7 +2125,7 @@ export default function ReportesComponent() {
               {/* Encabezado y Acciones de PDF para Productividad */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
                     <Users size={22} />
                   </div>
                   <div>
@@ -2153,7 +2153,7 @@ export default function ReportesComponent() {
                     type="button"
                     onClick={() => handleReporteProductividadPdf('download')}
                     disabled={loading || !reporteData?.rankingVendedores?.length}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
                     <span>Descargar PDF</span>
@@ -2322,7 +2322,7 @@ export default function ReportesComponent() {
               {/* Encabezado y Acciones de PDF */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
                     <Receipt size={22} />
                   </div>
                   <div>
@@ -2360,7 +2360,7 @@ export default function ReportesComponent() {
                     type="button"
                     onClick={() => handleReporteCobranzasPdf('download')}
                     disabled={loadingCobranzas || !cobranzasData?.clientes?.length}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
                     <span>Descargar PDF</span>
@@ -2436,7 +2436,7 @@ export default function ReportesComponent() {
               <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
                 {loadingCobranzas ? (
                   <div className="p-14 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
-                    <Loader2 size={30} className="animate-spin text-red-600" />
+                    <Loader2 size={30} className="animate-spin text-blue-600" />
                     <span>Cargando estado de cartera y notas pendientes...</span>
                   </div>
                 ) : (
@@ -2595,7 +2595,7 @@ export default function ReportesComponent() {
               {/* Encabezado y Acciones de PDF */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
                     <Megaphone size={22} />
                   </div>
                   <div>
@@ -2633,7 +2633,7 @@ export default function ReportesComponent() {
                     type="button"
                     onClick={() => handleReporteCampanasPdf('download')}
                     disabled={loadingCampanas || !campanasData?.campanas?.length}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
                     <span>Descargar PDF</span>
@@ -2843,7 +2843,7 @@ export default function ReportesComponent() {
               {/* Encabezado y Acciones de PDF para Finanzas */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
                     <DollarSign size={22} />
                   </div>
                   <div>
@@ -2871,7 +2871,7 @@ export default function ReportesComponent() {
                     type="button"
                     onClick={() => handleReporteFinanzasPdf('download')}
                     disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
                     <span>Descargar PDF</span>
@@ -2948,7 +2948,7 @@ export default function ReportesComponent() {
             <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-5 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-600 rounded-2xl shadow-sm">
+                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl shadow-sm">
                     <BrainCircuit size={22} />
                   </div>
                   <div>
@@ -2968,7 +2968,7 @@ export default function ReportesComponent() {
                     disabled={loadingMl}
                     className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                   >
-                    <Sparkles size={14} className={loadingMl ? 'animate-spin text-emerald-600' : 'text-emerald-600'} />
+                    <Sparkles size={14} className={loadingMl ? 'animate-spin text-blue-600' : 'text-blue-600'} />
                     <span>{loadingMl ? 'Calculando...' : 'Recalcular Proyección'}</span>
                   </button>
 
@@ -2986,7 +2986,7 @@ export default function ReportesComponent() {
                     type="button"
                     onClick={() => handleReporteProyeccionMlPdf('download')}
                     disabled={loadingMl || !proyeccionMl}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Download size={14} />
                     <span>Descargar PDF</span>
@@ -2996,7 +2996,7 @@ export default function ReportesComponent() {
 
               {loadingMl ? (
                 <div className="p-12 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center justify-center gap-2">
-                  <Loader2 size={32} className="animate-spin text-emerald-600" />
+                  <Loader2 size={32} className="animate-spin text-blue-600" />
                   <span>Procesando serie temporal y curvas estacionales...</span>
                 </div>
               ) : proyeccionMl ? (
