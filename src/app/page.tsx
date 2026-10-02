@@ -1063,6 +1063,13 @@ function MainApp() {
 
   // ══════════════════════════════════════════
   // Helper para renderizar el contenido del sidebar (compartido entre escritorio y móvil)
+  const isSuperAdmin = Boolean(
+    user?.rol === 'ROL_SUPER_ADMIN' ||
+    user?.rol === 'SUPER_ADMIN' ||
+    user?.isSuperAdmin === true ||
+    user?.email === 'chrispaucar49@gmail.com'
+  );
+
   const renderSidebarContent = (isMobile: boolean = false) => {
     const SECTION_GROUPS: { label: string; ids: Vista[] }[] = [
       { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
@@ -1073,7 +1080,7 @@ function MainApp() {
 
     const filteredItems = NAV_ITEMS.filter((item) => {
       if (!user) return item.id !== 'super-admin';
-      if (user.rol === 'ROL_SUPER_ADMIN') {
+      if (isSuperAdmin) {
         return ['dashboard', 'super-admin', 'auditoria', 'ubicaciones'].includes(item.id);
       }
       if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin';
@@ -1092,7 +1099,7 @@ function MainApp() {
           {/* Logo + Toggle tema + Botón Cerrar (en móvil) */}
           <div className="shrink-0 p-4 sm:p-5 border-b border-[var(--border)] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              {user?.rol === 'ROL_SUPER_ADMIN' ? (
+              {isSuperAdmin ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src="/logo.png"
@@ -1119,13 +1126,13 @@ function MainApp() {
                   className="text-xs sm:text-sm font-black tracking-tight block leading-tight break-words font-sans"
                   style={{ color: 'var(--foreground)' }}
                 >
-                  {user?.rol === 'ROL_SUPER_ADMIN' ? 'NEXORA GLOBAL' : ((businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA')}
+                  {isSuperAdmin ? 'NEXORA GLOBAL' : ((businessNombre && businessNombre.trim()) || (user?.tenantName && user.tenantName.trim()) || 'NEXORA')}
                 </span>
                 <span 
                   className="text-[9.5px] font-extrabold uppercase tracking-wider block mt-0.5"
                   style={{ color: 'var(--muted-foreground)' }}
                 >
-                  {user?.rol === 'ROL_SUPER_ADMIN' ? 'Control Central de la Plataforma' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
+                  {isSuperAdmin ? 'Control Central de la Plataforma' : (user?.tenantSector || 'Sistema de Gestión Comercial')}
                 </span>
               </div>
             </div>
@@ -1258,7 +1265,7 @@ function MainApp() {
             <div className="min-w-0">
               <div className="text-xs font-semibold truncate max-w-[110px]">{user?.nombre || 'Usuario'}</div>
               <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[110px]">
-                {user?.rol === 'ROL_SUPER_ADMIN' ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? (isGlobalAdmin ? 'Admin General' : 'Admin de Sucursal') : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
+                {isSuperAdmin ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? (isGlobalAdmin ? 'Admin General' : 'Admin de Sucursal') : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
               </div>
             </div>
           </div>
@@ -1549,7 +1556,7 @@ function MainApp() {
           <span className="text-[10px] mt-1 font-medium">Panel</span>
         </button>
 
-        {user?.rol === 'ROL_SUPER_ADMIN' ? (
+        {isSuperAdmin ? (
           <>
             <button
               onClick={() => navigateToView('super-admin')}
@@ -1583,6 +1590,17 @@ function MainApp() {
               <MapPin size={19} />
               <span className="text-[10px] mt-1 font-medium">GPS</span>
             </button>
+
+            <button
+              onClick={() => navigateToView('personalizacion')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                vistaActual === 'personalizacion' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+              style={vistaActual === 'personalizacion' ? { color: 'var(--primary)' } : {}}
+            >
+              <Settings size={19} />
+              <span className="text-[10px] mt-1 font-medium">Ajustes</span>
+            </button>
           </>
         ) : (
           <>
@@ -1609,6 +1627,17 @@ function MainApp() {
             </button>
 
             <button
+              onClick={() => navigateToView('inventario')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+                vistaActual === 'inventario' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+              }`}
+              style={vistaActual === 'inventario' ? { color: 'var(--primary)' } : {}}
+            >
+              <ShoppingBag size={19} />
+              <span className="text-[10px] mt-1 font-medium">Stock</span>
+            </button>
+
+            <button
               onClick={() => navigateToView('clientes')}
               className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
                 vistaActual === 'clientes' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
@@ -1620,14 +1649,6 @@ function MainApp() {
             </button>
           </>
         )}
-
-        <button
-          onClick={() => setMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center flex-1 py-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
-        >
-          <Menu size={19} />
-          <span className="text-[10px] mt-1 font-medium">Menú</span>
-        </button>
       </nav>
 
       {/* ─── MODAL DE NOTIFICACIONES & COBRANZA ─── */}
