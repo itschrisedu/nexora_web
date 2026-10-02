@@ -9,6 +9,7 @@ interface GyreOtpVerificationProps {
   maskedContact?: string;
   onVerify: (code: string) => Promise<{ success: boolean; error?: string }>;
   onResend?: () => Promise<void>;
+  onForceDirect?: () => Promise<void>;
   onCancel?: () => void;
   onSuccessContinue?: () => void;
   cooldownSeconds?: number;
@@ -31,6 +32,7 @@ export const GyreOtpVerification: React.FC<GyreOtpVerificationProps> = ({
   maskedContact = "tu correo registrado",
   onVerify,
   onResend,
+  onForceDirect,
   onCancel,
   onSuccessContinue,
   cooldownSeconds = 30,
@@ -815,21 +817,34 @@ export const GyreOtpVerification: React.FC<GyreOtpVerificationProps> = ({
       {/* Pie: Reenviar y Acciones */}
       <div className="pt-2 border-t border-white/5 flex flex-col items-center gap-3">
         {state !== 'ok' ? (
-          <div className="flex items-center justify-between w-full text-xs text-slate-400">
-            <span>¿No recibiste el código?</span>
-            <button
-              type="button"
-              disabled={cooldown > 0 || isResending}
-              onClick={handleResendCode}
-              className="font-bold text-emerald-400 hover:text-emerald-300 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors cursor-pointer"
-            >
-              {isResending
-                ? 'Enviando...'
-                : cooldown > 0
-                ? `Reenviar en ${cooldown}s`
-                : 'Reenviar código'}
-            </button>
-          </div>
+          <>
+            <div className="flex items-center justify-between w-full text-xs text-slate-400">
+              <span>¿No recibiste el código?</span>
+              <button
+                type="button"
+                disabled={cooldown > 0 || isResending}
+                onClick={handleResendCode}
+                className="font-bold text-emerald-400 hover:text-emerald-300 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                {isResending
+                  ? 'Enviando...'
+                  : cooldown > 0
+                  ? `Reenviar en ${cooldown}s`
+                  : 'Reenviar código'}
+              </button>
+            </div>
+
+            {onForceDirect && (
+              <button
+                type="button"
+                onClick={onForceDirect}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 hover:border-emerald-500/50 text-slate-200 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm mt-1"
+              >
+                <ShieldCheck size={15} className="text-emerald-400" />
+                <span>Cerrar otra sesión y acceder directamente</span>
+              </button>
+            )}
+          </>
         ) : (
           <button
             type="button"

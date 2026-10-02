@@ -1052,6 +1052,7 @@ function MainApp() {
               maskedContact={maskedEmail}
               onVerify={handleVerifyOtp}
               onResend={handleResendOtp}
+              onForceDirect={otpMode === 'session-transfer' ? handleConfirmTransfer : undefined}
               onCancel={() => setShowOtpModal(false)}
               onSuccessContinue={() => {
                 setShowOtpModal(false);
