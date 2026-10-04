@@ -70,6 +70,19 @@ interface TenantAdmin {
   activo: boolean;
 }
 
+interface SucursalItem {
+  id: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+  logoUrl?: string | null;
+  direccion?: string;
+  telefono?: string;
+  email?: string;
+  stats: TenantStats;
+  admins: TenantAdmin[];
+}
+
 interface Tenant {
   id: string;
   name: string;
@@ -80,10 +93,13 @@ interface Tenant {
   fechaVencimientoPlan?: string;
   diasPruebaGratis?: number;
   diasRestantes?: number;
+  maxSucursales?: number;
+  maxUsuarios?: number;
   precioMensualPlan?: number;
   logoUrl?: string | null;
   stats: TenantStats;
   admins: TenantAdmin[];
+  sucursales?: SucursalItem[];
 }
 
 interface SubscriptionPaymentItem {
@@ -108,9 +124,26 @@ interface TenantDetail {
   estadoSuscripcion?: string;
   fechaVencimientoPlan?: string;
   diasPruebaGratis?: number;
+  maxSucursales?: number;
+  maxUsuarios?: number;
   precioMensualPlan?: number;
   stats: TenantStats;
   users: TenantAdmin[];
+  sucursales?: {
+    id: string;
+    name: string;
+    active: boolean;
+    createdAt: string;
+    businessConfig?: {
+      nombre: string;
+      ruc: string;
+      direccion: string;
+      telefono?: string;
+      email?: string;
+    } | null;
+    stats: TenantStats;
+    users: TenantAdmin[];
+  }[];
   businessConfig?: {
     nombre: string;
     ruc: string;
@@ -1067,7 +1100,12 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
           const matchAdmin = (t.admins || []).some(
             (a) => (a.nombre || "").toLowerCase().includes(q) || (a.email || "").toLowerCase().includes(q)
           );
-          return matchName || matchPlan || matchAdmin;
+          const matchSucursal = (t.sucursales || []).some(
+            (s) =>
+              (s.name || "").toLowerCase().includes(q) ||
+              (s.admins || []).some((a) => (a.nombre || "").toLowerCase().includes(q) || (a.email || "").toLowerCase().includes(q))
+          );
+          return matchName || matchPlan || matchAdmin || matchSucursal;
         });
 
         return (
@@ -1078,7 +1116,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
                 <input
                   type="text"
-                  placeholder="Buscar empresa por nombre, plan o administrador..."
+                  placeholder="Buscar empresa por nombre, plan, admin o sucursal..."
                   value={searchTenant}
                   onChange={(e) => setSearchTenant(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-amber-500 transition-colors"
@@ -1175,204 +1213,296 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
 
                   const isOverdue = tenant.diasRestantes !== undefined && tenant.diasRestantes < 0;
                   const isNearRenewal = tenant.diasRestantes !== undefined && tenant.diasRestantes >= 0 && tenant.diasRestantes <= 3;
+                  const numSucursales = tenant.sucursales?.length || 0;
 
                   return (
                     <div
                       key={tenant.id}
-                      className={`bg-[var(--card)] border rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all overflow-hidden ${
+                      className={`bg-[var(--card)] border rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col justify-between ${
                         tenant.active ? "border-[var(--border)]" : "border-rose-500/30 opacity-70"
                       }`}
                     >
-                      {/* Tenant header responsive */}
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
-                        <div className="flex items-start gap-3 min-w-0 flex-1">
-                          <div
-                            className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border ${
-                              tenant.active
-                                ? "bg-gradient-to-br from-slate-900 to-slate-800 border-amber-500/30 text-amber-400 shadow-xs"
-                                : "bg-slate-500 border-slate-600 text-white"
-                            }`}
-                          >
-                            {tenant.logoUrl ? (
-                              <img
-                                src={tenant.logoUrl}
-                                alt={tenant.name}
-                                className="w-full h-full object-contain p-0.5 bg-white rounded-xl"
-                              />
-                            ) : (
-                              tenant.name.slice(0, 2).toUpperCase()
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <h3 className="font-bold text-base text-[var(--foreground)] break-words leading-tight">{tenant.name}</h3>
-                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 ${planBadge}`}>
-                                {planName}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                              <span
-                                className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                                  tenant.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
-                                }`}
-                              >
-                                {tenant.active ? "ACTIVO" : "INACTIVO"}
-                              </span>
-                              {tenant.estadoSuscripcion === "EN_PRUEBA" && (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
-                                  PRUEBA GRATIS
-                                </span>
+                      <div>
+                        {/* Tenant header responsive */}
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <div
+                              className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border ${
+                                tenant.active
+                                  ? "bg-gradient-to-br from-slate-900 to-slate-800 border-amber-500/30 text-amber-400 shadow-xs"
+                                  : "bg-slate-500 border-slate-600 text-white"
+                              }`}
+                            >
+                              {tenant.logoUrl ? (
+                                <img
+                                  src={tenant.logoUrl}
+                                  alt={tenant.name}
+                                  className="w-full h-full object-contain p-0.5 bg-white rounded-xl"
+                                />
+                              ) : (
+                                tenant.name.slice(0, 2).toUpperCase()
                               )}
-                              {isOverdue ? (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse shrink-0">
-                                  VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d gracia)
-                                </span>
-                              ) : isNearRenewal ? (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
-                                  Vence en {tenant.diasRestantes}d
-                                </span>
-                              ) : tenant.diasRestantes !== undefined ? (
-                                <span className="text-[9px] font-semibold text-slate-400 shrink-0">
-                                  {tenant.diasRestantes}d restantes
-                                </span>
-                              ) : null}
                             </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <h3 className="font-bold text-base text-[var(--foreground)] break-words leading-tight">{tenant.name}</h3>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 ${planBadge}`}>
+                                  {planName}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                <span
+                                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                    tenant.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                  }`}
+                                >
+                                  {tenant.active ? "ACTIVO" : "INACTIVO"}
+                                </span>
+                                {tenant.estadoSuscripcion === "EN_PRUEBA" && (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                                    PRUEBA GRATIS
+                                  </span>
+                                )}
+                                {numSucursales > 0 ? (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                                    1 Matriz + {numSucursales} {numSucursales === 1 ? 'Sucursal' : 'Sucursales'}
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] shrink-0">
+                                    Matriz Principal (0 Sucursales)
+                                  </span>
+                                )}
+                                {isOverdue ? (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse shrink-0">
+                                    VENCIDO ({Math.abs(tenant.diasRestantes || 0)}d gracia)
+                                  </span>
+                                ) : isNearRenewal ? (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                                    Vence en {tenant.diasRestantes}d
+                                  </span>
+                                ) : tenant.diasRestantes !== undefined ? (
+                                  <span className="text-[9px] font-semibold text-slate-400 shrink-0">
+                                    {tenant.diasRestantes}d restantes
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Acciones principales con contenedor adaptativo */}
+                          <div className="flex items-center gap-1 shrink-0 self-end sm:self-start bg-[var(--muted)]/40 sm:bg-transparent p-1 sm:p-0 rounded-xl border border-[var(--border)]/50 sm:border-transparent">
+                            <button
+                              onClick={() => handleOpenSubscriptionModal(tenant)}
+                              className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
+                              title="Gestionar Suscripción y Facturación"
+                            >
+                              <CreditCard size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleViewDetail(tenant.id)}
+                              className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                              title="Ver detalle y usuarios"
+                            >
+                              <Eye size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditTenant(tenant)}
+                              className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors cursor-pointer"
+                              title="Editar Tenant y Negocio"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() =>
+                                setConfirmToggle({
+                                  id: tenant.id,
+                                  name: tenant.name,
+                                  active: tenant.active,
+                                })
+                              }
+                              className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                                tenant.active
+                                  ? "hover:bg-rose-500/10 text-[var(--muted-foreground)] hover:text-rose-500"
+                                  : "hover:bg-emerald-500/10 text-[var(--muted-foreground)] hover:text-emerald-500"
+                              }`}
+                              title={tenant.active ? "Desactivar" : "Reactivar"}
+                            >
+                              {tenant.active ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
+                              className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors cursor-pointer"
+                              title="Eliminar Tenant Definitivamente"
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           </div>
                         </div>
 
-                        {/* Acciones principales con contenedor adaptativo */}
-                        <div className="flex items-center gap-1 shrink-0 self-end sm:self-start bg-[var(--muted)]/40 sm:bg-transparent p-1 sm:p-0 rounded-xl border border-[var(--border)]/50 sm:border-transparent">
-                          <button
-                            onClick={() => handleOpenSubscriptionModal(tenant)}
-                            className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
-                            title="Gestionar Suscripción y Facturación"
-                          >
-                            <CreditCard size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleViewDetail(tenant.id)}
-                            className="p-2 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
-                            title="Ver detalle y usuarios"
-                          >
-                            <Eye size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleOpenEditTenant(tenant)}
-                            className="p-2 rounded-lg hover:bg-amber-500/10 text-[var(--muted-foreground)] hover:text-amber-500 transition-colors cursor-pointer"
-                            title="Editar Tenant y Negocio"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button
-                            onClick={() =>
-                              setConfirmToggle({
-                                id: tenant.id,
-                                name: tenant.name,
-                                active: tenant.active,
-                              })
-                            }
-                            className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                              tenant.active
-                                ? "hover:bg-rose-500/10 text-[var(--muted-foreground)] hover:text-rose-500"
-                                : "hover:bg-emerald-500/10 text-[var(--muted-foreground)] hover:text-emerald-500"
-                            }`}
-                            title={tenant.active ? "Desactivar" : "Reactivar"}
-                          >
-                            {tenant.active ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteTenant({ id: tenant.id, name: tenant.name })}
-                            className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-600 transition-colors cursor-pointer"
-                            title="Eliminar Tenant Definitivamente"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                        {/* Stats Grid 2x2 en móvil / 4 columnas en desktop */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                          <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                            <Users size={14} className="mx-auto text-amber-500 mb-1" />
+                            <div className="text-sm font-bold">{tenant.stats.users}</div>
+                            <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
+                          </div>
+                          <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                            <Package size={14} className="mx-auto text-emerald-500 mb-1" />
+                            <div className="text-sm font-bold">{tenant.stats.models}</div>
+                            <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
+                          </div>
+                          <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                            <UserCircle size={14} className="mx-auto text-amber-500 mb-1" />
+                            <div className="text-sm font-bold">{tenant.stats.clients}</div>
+                            <div className="text-[9px] text-[var(--muted-foreground)]">Clientes</div>
+                          </div>
+                          <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
+                            <ShoppingCart size={14} className="mx-auto text-amber-500 mb-1" />
+                            <div className="text-sm font-bold">{tenant.stats.orders}</div>
+                            <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Stats Grid 2x2 en móvil / 4 columnas en desktop */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
-                        <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                          <Users size={14} className="mx-auto text-amber-500 mb-1" />
-                          <div className="text-sm font-bold">{tenant.stats.users}</div>
-                          <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
-                        </div>
-                        <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                          <Package size={14} className="mx-auto text-emerald-500 mb-1" />
-                          <div className="text-sm font-bold">{tenant.stats.models}</div>
-                          <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
-                        </div>
-                        <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                          <UserCircle size={14} className="mx-auto text-amber-500 mb-1" />
-                          <div className="text-sm font-bold">{tenant.stats.clients}</div>
-                          <div className="text-[9px] text-[var(--muted-foreground)]">Clientes</div>
-                        </div>
-                        <div className="text-center p-2 bg-[var(--muted)]/50 rounded-lg">
-                          <ShoppingCart size={14} className="mx-auto text-amber-500 mb-1" />
-                          <div className="text-sm font-bold">{tenant.stats.orders}</div>
-                          <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
-                        </div>
-                      </div>
-
-                      {/* Admins list con truncate y flex responsive */}
-                      <div className="border-t border-[var(--border)] pt-3">
-                        <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                          Administradores
-                        </div>
-                        {tenant.admins.length === 0 ? (
-                          <p className="text-xs text-[var(--muted-foreground)]">Sin administradores</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {tenant.admins.map((admin) => (
-                              <div key={admin.id} className="flex items-center justify-between gap-2 text-xs p-1 rounded-lg hover:bg-[var(--muted)]/30 transition-colors">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold shrink-0">
-                                    {admin.nombre.slice(0, 1).toUpperCase()}
+                        {/* Admins list con truncate y flex responsive */}
+                        <div className="border-t border-[var(--border)] pt-3">
+                          <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
+                            Administradores de la Empresa
+                          </div>
+                          {tenant.admins.length === 0 ? (
+                            <p className="text-xs text-[var(--muted-foreground)]">Sin administradores</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {tenant.admins.map((admin) => (
+                                <div key={admin.id} className="flex items-center justify-between gap-2 text-xs p-1 rounded-lg hover:bg-[var(--muted)]/30 transition-colors">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-amber-400 text-[10px] font-bold shrink-0">
+                                      {admin.nombre.slice(0, 1).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-medium text-[var(--foreground)] truncate">{admin.nombre}</div>
+                                      <div className="text-[10px] text-[var(--muted-foreground)] truncate">{admin.email}</div>
+                                    </div>
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-medium text-[var(--foreground)] truncate">{admin.nombre}</div>
-                                    <div className="text-[10px] text-[var(--muted-foreground)] truncate">{admin.email}</div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      onClick={() => {
+                                        setEditingUser({
+                                          id: admin.id,
+                                          nombre: admin.nombre,
+                                          email: admin.email,
+                                          rol: "ROL_ADMIN",
+                                          activo: admin.activo,
+                                          password: "",
+                                        });
+                                        setShowEditUserModal(true);
+                                      }}
+                                      className="p-1 rounded hover:bg-[var(--muted)] text-amber-500 transition-colors cursor-pointer"
+                                      title="Editar Administrador"
+                                    >
+                                      <Pencil size={13} />
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDeleteUser({ id: admin.id, nombre: admin.nombre, email: admin.email })}
+                                      className="p-1 rounded hover:bg-rose-500/10 text-rose-500 transition-colors cursor-pointer"
+                                      title="Eliminar Administrador"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                    <span
+                                      className={`w-2 h-2 rounded-full shrink-0 ${
+                                        admin.activo ? "bg-emerald-500" : "bg-rose-500"
+                                      }`}
+                                    />
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <button
-                                    onClick={() => {
-                                      setEditingUser({
-                                        id: admin.id,
-                                        nombre: admin.nombre,
-                                        email: admin.email,
-                                        rol: "ROL_ADMIN",
-                                        activo: admin.activo,
-                                        password: "",
-                                      });
-                                      setShowEditUserModal(true);
-                                    }}
-                                    className="p-1 rounded hover:bg-[var(--muted)] text-amber-500 transition-colors cursor-pointer"
-                                    title="Editar Administrador"
-                                  >
-                                    <Pencil size={13} />
-                                  </button>
-                                  <button
-                                    onClick={() => setConfirmDeleteUser({ id: admin.id, nombre: admin.nombre, email: admin.email })}
-                                    className="p-1 rounded hover:bg-rose-500/10 text-rose-500 transition-colors cursor-pointer"
-                                    title="Eliminar Administrador"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                  <span
-                                    className={`w-2 h-2 rounded-full shrink-0 ${
-                                      admin.activo ? "bg-emerald-500" : "bg-rose-500"
-                                    }`}
-                                  />
-                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Sucursales asociadas a esta Empresa */}
+                        {tenant.sucursales && tenant.sucursales.length > 0 && (
+                          <div className="border-t border-[var(--border)] pt-3 mt-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1.5">
+                                <Building2 size={13} className="text-emerald-500" />
+                                <span>Sucursales Asociadas ({tenant.sucursales.length})</span>
                               </div>
-                            ))}
+                            </div>
+                            <div className="space-y-2">
+                              {tenant.sucursales.map((suc) => (
+                                <div
+                                  key={suc.id}
+                                  className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs shadow-2xs"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
+                                      {suc.name.slice(0, 1).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-bold text-[var(--foreground)] truncate flex items-center gap-1.5">
+                                        <span className="truncate">{suc.name}</span>
+                                        <span
+                                          className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
+                                            suc.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                          }`}
+                                        >
+                                          {suc.active ? "ACTIVA" : "INACTIVA"}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5 truncate mt-0.5">
+                                        <span>{suc.stats.users} usr</span>
+                                        <span>•</span>
+                                        <span>{suc.stats.orders} ped</span>
+                                        <span>•</span>
+                                        <span>{suc.stats.models} mod</span>
+                                        {suc.admins.length > 0 && (
+                                          <>
+                                            <span>•</span>
+                                            <span className="truncate text-slate-400">Encargado: {suc.admins[0].nombre}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewDetail(suc.id)}
+                                      className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                                      title="Ver detalle de sucursal"
+                                    >
+                                      <Eye size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setConfirmToggle({
+                                          id: suc.id,
+                                          name: suc.name,
+                                          active: suc.active,
+                                        })
+                                      }
+                                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                        suc.active
+                                          ? "hover:bg-rose-500/10 text-[var(--muted-foreground)] hover:text-rose-500"
+                                          : "hover:bg-emerald-500/10 text-[var(--muted-foreground)] hover:text-emerald-500"
+                                      }`}
+                                      title={suc.active ? "Desactivar sucursal" : "Reactivar sucursal"}
+                                    >
+                                      {suc.active ? <ToggleRight size={13} /> : <ToggleLeft size={13} />}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
 
                       {/* Footer */}
-                      <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
+                      <div className="mt-4 pt-3 border-t border-[var(--border)] flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
                         <span>
                           Creado: {new Date(tenant.createdAt).toLocaleDateString("es-EC", { day: "numeric", month: "short", year: "numeric" })}
                         </span>
@@ -3143,6 +3273,67 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                       </table>
                     </div>
                   </div>
+
+                  {/* Sucursales asociadas en el Detalle */}
+                  {selectedTenantDetail.sucursales && selectedTenantDetail.sucursales.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                        <Building2 size={14} className="text-emerald-500" />
+                        <span>Sucursales de la Empresa ({selectedTenantDetail.sucursales.length})</span>
+                      </h3>
+
+                      <div className="space-y-3">
+                        {selectedTenantDetail.sucursales.map((suc) => (
+                          <div
+                            key={suc.id}
+                            className="p-4 bg-[var(--muted)]/30 rounded-xl border border-[var(--border)] space-y-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+                                  {suc.name.slice(0, 1).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-sm text-[var(--foreground)]">{suc.name}</div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    {suc.businessConfig?.direccion || 'Sin dirección'}
+                                    {suc.businessConfig?.telefono ? ` • Tel: ${suc.businessConfig.telefono}` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  suc.active ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                }`}
+                              >
+                                {suc.active ? "ACTIVA" : "INACTIVA"}
+                              </span>
+                            </div>
+
+                            {/* Mini stats de la sucursal */}
+                            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                              <div className="p-2 bg-[var(--background)] rounded-lg border border-[var(--border)]">
+                                <div className="font-bold text-[var(--foreground)]">{suc.stats.users}</div>
+                                <div className="text-[9px] text-[var(--muted-foreground)]">Usuarios</div>
+                              </div>
+                              <div className="p-2 bg-[var(--background)] rounded-lg border border-[var(--border)]">
+                                <div className="font-bold text-[var(--foreground)]">{suc.stats.models}</div>
+                                <div className="text-[9px] text-[var(--muted-foreground)]">Modelos</div>
+                              </div>
+                              <div className="p-2 bg-[var(--background)] rounded-lg border border-[var(--border)]">
+                                <div className="font-bold text-[var(--foreground)]">{suc.stats.orders}</div>
+                                <div className="text-[9px] text-[var(--muted-foreground)]">Pedidos</div>
+                              </div>
+                              <div className="p-2 bg-[var(--background)] rounded-lg border border-[var(--border)]">
+                                <div className="font-bold text-[var(--foreground)]">{suc.stats.clients}</div>
+                                <div className="text-[9px] text-[var(--muted-foreground)]">Clientes</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             ) : null}
