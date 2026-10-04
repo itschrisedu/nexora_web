@@ -794,81 +794,225 @@ function MainApp() {
   // ══════════════════════════════════════════
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-4 relative overflow-hidden">
-        <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold glass text-white shadow-lg">
-          {online
-            ? <><Wifi size={14} className="text-emerald-400 animate-pulse" /><span>Online</span></>
-            : <><WifiOff size={14} className="text-rose-400 animate-bounce" /><span>Offline</span></>}
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-10 relative overflow-hidden bg-slate-950 font-sans selection:bg-amber-500 selection:text-slate-950">
+        {/* Fotografía de alta definición del taller artesanal de calzado de cuero */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
+          style={{ backgroundImage: "url('/login-bg.jpg')" }}
+        />
+        {/* Capas oscuras de contraste y desenfoque cinematográfico */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/95 via-slate-950/85 to-slate-900/75 backdrop-blur-[2px]" />
+        
+        {/* Luces volumétricas ambientales */}
+        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-amber-500/20 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-emerald-500/15 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute top-10 right-1/3 w-72 h-72 bg-amber-600/10 rounded-full blur-[100px] pointer-events-none" />
+
+        {/* Badge superior de estado online/offline */}
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold backdrop-blur-xl bg-white/10 border border-white/15 text-white shadow-2xl">
+          {online ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <Wifi size={14} className="text-emerald-400" />
+              <span>Servidor Online</span>
+            </>
+          ) : (
+            <>
+              <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+              <WifiOff size={14} className="text-rose-400" />
+              <span>Modo Offline</span>
+            </>
+          )}
         </div>
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-amber-500/15 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
 
-        <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl z-10">
-          <div className="text-center mb-8 flex flex-col items-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png"
-              alt="NEXORA"
-              className="w-16 h-16 object-contain mb-3 rounded-2xl p-1 bg-white shadow-xl ring-1 ring-white/10"
-            />
-            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-amber-300 bg-clip-text text-transparent">
-              NEXORA
-            </h1>
-            <p className="text-xs text-slate-400 mt-2">Sistema integral de gestión para negocios de calzado</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Usuario</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><User size={16} /></span>
-                <input type="text" required placeholder="Ingrese su usuario" value={username} onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/50 border border-slate-700/60 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
+        {/* Contenedor principal Glassmorphism (Responsive: 2 columnas en Desktop, 1 columna fluida en Mobile/Tablet) */}
+        <div className="w-full max-w-5xl z-10 grid grid-cols-1 lg:grid-cols-12 overflow-hidden rounded-3xl border border-white/15 backdrop-blur-2xl bg-slate-900/45 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] animate-in fade-in zoom-in-95 duration-300">
+          
+          {/* Columna Izquierda: Identidad y Calzado de Cuero (Visible en LG/XL, resumida arriba en móvil) */}
+          <div className="lg:col-span-6 p-7 sm:p-10 lg:p-12 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 bg-gradient-to-b from-white/[0.08] via-white/[0.02] to-transparent relative">
+            <div className="space-y-6">
+              {/* Logo con badge premium */}
+              <div className="flex items-center gap-3.5">
+                <div className="relative p-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-xl ring-1 ring-white/30 shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/logo.png"
+                    alt="NEXORA"
+                    className="w-12 h-12 object-contain drop-shadow-md"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                      NEXORA
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-amber-500/20 border border-amber-400/40 text-amber-300">
+                      SaaS Calzado
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs font-medium text-slate-300 tracking-wide mt-0.5">
+                    Ecosistema Digital de Comercialización y Crédito
+                  </p>
+                </div>
+              </div>
+
+              {/* Mensaje de valor y características */}
+              <div className="space-y-2.5 pt-1">
+                <h3 className="text-base sm:text-lg lg:text-xl font-bold text-slate-100 leading-snug">
+                  Gestión integral por curvas de tallas, series y scoring crediticio progresivo
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                  Plataforma especializada para locales comerciales y talleres de calzado de cuero del cantón Cevallos. Diseñada para operar con rapidez en ventas unitarias y pedidos por lotes.
+                </p>
+              </div>
+
+              {/* Píldoras de valor con Glassmorphism */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5 pt-1">
+                <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.05] border border-white/10 backdrop-blur-md hover:bg-white/[0.08] transition-colors">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                    <Store size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">Control por Modelos & Series</h4>
+                    <p className="text-[10.5px] text-slate-300">Curvas de tallas, docenas y stock sincronizado</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.05] border border-white/10 backdrop-blur-md hover:bg-white/[0.08] transition-colors">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">Scoring Crediticio Progresivo</h4>
+                    <p className="text-[10.5px] text-slate-300">Aumento escalonado de cupo por historial real</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Contraseña</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><Lock size={16} /></span>
-                <input type={showPassword ? 'text' : 'password'} required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-950/50 border border-slate-700/60 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors" />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-            {loginError && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-lg flex items-center gap-2">
-                <AlertTriangle size={14} className="shrink-0" /><span>{loginError}</span>
-              </div>
-            )}
-            <button type="submit" disabled={loading}
-              className="w-full py-3 bg-linear-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white font-semibold text-sm rounded-lg shadow-lg hover:shadow-amber-500/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50 border border-amber-500/20 cursor-pointer">
-              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </button>
-          </form>
 
-          {/* Enlace de recuperación y desbloqueo universal */}
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setUnlockEmail(username.trim());
-                setUnlockError('');
-                setShowUnlockModal(true);
-              }}
-              className="text-xs text-amber-400/90 hover:text-amber-300 font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <KeyRound size={13} />
-              <span>¿Cuenta bloqueada o clave olvidada? Desbloquear por correo</span>
-            </button>
+            {/* Footer institucional de la columna izquierda */}
+            <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Building2 size={14} className="text-amber-400 shrink-0" />
+                Cantón Cevallos · Tungurahua
+              </span>
+              <span className="text-[10.5px] text-slate-400 font-semibold">100% Cuero Vacuno</span>
+            </div>
           </div>
 
-          <div className="mt-5 text-center text-[10px] text-slate-500">
-            {online ? 'Conectado al servidor' : 'Sin conexión: use admin@nexora.com / Admin123!'}
+          {/* Columna Derecha: Formulario Glassmorphism */}
+          <div className="lg:col-span-6 p-7 sm:p-10 lg:p-12 flex flex-col justify-center bg-slate-950/60 backdrop-blur-xl relative">
+            <div className="mb-6">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-300 mb-3">
+                <Lock size={12} /> Acceso Seguro al Sistema
+              </span>
+              <h3 className="text-2xl font-black text-white tracking-tight">Iniciar Sesión</h3>
+              <p className="text-xs text-slate-300 mt-1">
+                Ingresa tus credenciales para acceder a tu panel de control.
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-200 uppercase tracking-wider mb-1.5">
+                  Usuario o Correo
+                </label>
+                <div className="relative group">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within:text-amber-400 transition-colors">
+                    <User size={16} />
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ej. admin@nexora.com"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-black/40 border border-white/15 rounded-2xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 backdrop-blur-md transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-200 uppercase tracking-wider mb-1.5">
+                  Contraseña
+                </label>
+                <div className="relative group">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within:text-amber-400 transition-colors">
+                    <Lock size={16} />
+                  </span>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-11 py-3 bg-black/40 border border-white/15 rounded-2xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 backdrop-blur-md transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {loginError && (
+                <div className="p-3.5 bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs rounded-2xl flex items-start gap-2.5 animate-in fade-in duration-200">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+                  <span className="font-semibold leading-tight">{loginError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 mt-2 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-slate-950 font-black text-sm rounded-2xl shadow-xl shadow-amber-500/25 hover:shadow-amber-500/40 transition-all flex items-center justify-center gap-2 disabled:opacity-50 border border-amber-400/30 cursor-pointer active:scale-[0.99]"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin text-slate-950" />
+                    <span>Autenticando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Ingresar al Sistema</span>
+                    <ChevronRight size={16} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Enlace de recuperación y desbloqueo universal */}
+            <div className="mt-5 pt-4 border-t border-white/10 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setUnlockEmail(username.trim());
+                  setUnlockError('');
+                  setShowUnlockModal(true);
+                }}
+                className="text-xs text-amber-300/90 hover:text-amber-200 font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer hover:underline"
+              >
+                <KeyRound size={13} className="text-amber-400" />
+                <span>¿Cuenta bloqueada o clave olvidada? Desbloquear por correo</span>
+              </button>
+            </div>
+
+            <div className="mt-4 text-center text-[11px] text-slate-400">
+              {online ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  Conexión segura SSL / Cifrado AES-256
+                </span>
+              ) : (
+                <span className="text-amber-300">
+                  Sin conexión: autenticación local activa
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
