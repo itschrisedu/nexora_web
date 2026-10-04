@@ -302,7 +302,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
     setCreatingSucursal(true);
     try {
-      await ApiService.post('/configuracion/sucursales', {
+      const updatedList = await ApiService.post('/configuracion/sucursales', {
         name: cleanName,
         ruc: cleanRucToSend || undefined,
         direccion: newSucursal.direccion.trim(),
@@ -323,7 +323,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         adminEmail: '',
         adminPassword: '',
       });
-      await loadSucursales();
+      // El backend devuelve la lista actualizada directamente
+      if (Array.isArray(updatedList)) {
+        setSucursales(updatedList);
+      } else {
+        await loadSucursales();
+      }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('nexora:sucursales-changed'));
       }
