@@ -7,7 +7,7 @@ import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary
 import {
   Plus, Search, Loader2, ImageIcon, Package, Edit2, Edit3, Trash2, AlertTriangle,
   DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette,
-  Layers, Boxes, Truck
+  Layers, Boxes, Truck, Sparkles, Copy, Building2
 } from "lucide-react";
 import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
 import {
@@ -83,6 +83,20 @@ interface ModeloAgrupado {
   alternateSupplierIds?: string[];
   suppliers?: SupplierInfo[];
   products: Producto[];
+}
+
+interface ModeloMatriz {
+  id: string;
+  baseCode: string;
+  name: string;
+  brand: string;
+  material?: string;
+  yaImportado: boolean;
+  colores: { color: string; fotoUrl: string | null }[];
+  series: { id: string; nombre: string; tallas: number[]; costPrice: number; salePrice: number }[];
+  precioCostoReferencial: number;
+  precioVentaReferencial: number;
+  fotoPrincipal: string | null;
 }
 
 interface ColorInput {
@@ -282,6 +296,11 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const [material, setMaterial] = useState("");
   const [colors, setColors] = useState<ColorInput[]>([{ color: "", foto: null }]);
   const [serieIds, setSerieIds] = useState<string[]>([]);
+  // Soporte para modelos heredables de la Matriz (Sucursales)
+  const [isMatrizTenant, setIsMatrizTenant] = useState(true);
+  const [matrizNombre, setMatrizNombre] = useState("Matriz Principal");
+  const [modelosMatrizDisponibles, setModelosMatrizDisponibles] = useState<ModeloMatriz[]>([]);
+  const [selectedMatrizModelId, setSelectedMatrizModelId] = useState<string>("");
   // Precios individuales por serie: { [serieId]: { costPrice: string, salePrice: string } }
   const [seriesPrices, setSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [stockInicial, setStockInicial] = useState("1"); // 1 por defecto
@@ -495,7 +514,12 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
       if (online) {
         try {
-          const srs = await ApiService.get("/configuracion/series");
+          const [srs, provs, matrizRes] = await Promise.all([
+            ApiService.get("/configuracion/series").catch(() => []),
+            ApiService.get("/proveedores").catch(() => []),
+            ApiService.get("/inventario/modelos/matriz").catch(() => null),
+          ]);
+
           if (Array.isArray(srs)) {
             const filtradasYOrdenadas = srs
               .filter((s: any) => s.nombre !== "NINO_PEQUENO_B")
@@ -508,8 +532,18 @@ export default function ModelosComponent({ online }: ModelosProps) {
               });
             setSeries(filtradasYOrdenadas);
           }
-          const provs = await ApiService.get("/proveedores");
-          if (Array.isArray(provs)) setListaProveedores(provs);
+
+          if (Array.isArray(provs)) {
+            setListaProveedores(provs);
+          }
+
+          if (matrizRes) {
+            setIsMatrizTenant(Boolean(matrizRes.isMatriz));
+            setMatrizNombre(matrizRes.matrizName || "Matriz Principal");
+            setModelosMatrizDisponibles(
+              Array.isArray(matrizRes.modelosMatriz) ? matrizRes.modelosMatriz : []
+            );
+          }
         } catch {}
       }
     } catch (e: any) {
@@ -520,6 +554,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
   };
 
   const resetForm = () => {
+    setSelectedMatrizModelId("");
     setBaseCode("");
     setName("");
     setBrand("");
@@ -532,6 +567,65 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setCustomTallas({});
     setStockInicial("1");
     setError("");
+  };
+
+  const handleSelectMatrizModel = (matrizId: string) => {
+    setSelectedMatrizModelId(matrizId);
+    if (!matrizId) return;
+
+    const mm = modelosMatrizDisponibles.find((m) => m.id === matrizId);
+    if (!mm) return;
+
+    // Rellenar datos base del modelo
+    setBaseCode(mm.baseCode);
+    setName(mm.name);
+    setBrand(mm.brand);
+    setMaterial(mm.material || "");
+
+    // Rellenar colores reutilizando URLs de Cloudinary existentes (sin duplicar subidas)
+    if (mm.colores && mm.colores.length > 0) {
+      setColors(
+        mm.colores.map((c) => ({
+          color: c.color,
+          foto: c.fotoUrl, // URL existente de Cloudinary
+        }))
+      );
+    }
+
+    // Activar series correspondientes y configurar precios de referencia sugeridos
+    const activeSeriesIds: string[] = [];
+    const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+    const initialCustomTallas: Record<string, string[]> = {};
+
+    mm.series.forEach((ms) => {
+      const sObj = series.find((s) => s.id === ms.id || s.nombre === ms.nombre);
+      if (sObj) {
+        activeSeriesIds.push(sObj.id);
+        initialPrices[sObj.id] = {
+          costPrice: ms.costPrice > 0 ? String(ms.costPrice) : "",
+          salePrice: ms.salePrice > 0 ? String(ms.salePrice) : "",
+        };
+        if (sObj.tallas) {
+          const curva = getCurvaDocena(sObj.nombre, "DOCENA");
+          if (Object.keys(curva).length > 0) {
+            initialCustomTallas[sObj.id] = buildTallaIdsFromCurva(sObj, curva);
+          } else {
+            const ids: string[] = [];
+            sObj.tallas.forEach((t) => {
+              ids.push(t.id);
+              ids.push(t.id);
+            });
+            initialCustomTallas[sObj.id] = ids;
+          }
+        }
+      }
+    });
+
+    if (activeSeriesIds.length > 0) {
+      setSerieIds(activeSeriesIds);
+      setSeriesPrices(initialPrices);
+      setCustomTallas(initialCustomTallas);
+    }
   };
 
   // ── Crear proveedor rápido desde modal catálogo ──
@@ -1127,10 +1221,16 @@ export default function ModelosComponent({ online }: ModelosProps) {
     setSaving(true);
     try {
       const colorsWithImages = await Promise.all(
-        filteredColors.map(async c => {
+        filteredColors.map(async (c) => {
           let imgUrl = c.foto || undefined;
           if (c.foto && online) {
-            imgUrl = await uploadToCloudinary(c.foto, 'nexora_modelos');
+            // Solo subir a Cloudinary si es una imagen nueva (Base64/Blob);
+            // Si ya es una URL existente de Cloudinary (de la matriz), reutilizarla directamente.
+            if (c.foto.startsWith("data:image") || c.foto.startsWith("blob:")) {
+              imgUrl = await uploadToCloudinary(c.foto, "nexora_modelos");
+            } else {
+              imgUrl = c.foto;
+            }
           }
           return {
             color: c.color,
@@ -1941,6 +2041,46 @@ export default function ModelosComponent({ online }: ModelosProps) {
             </div>
             <form onSubmit={handleCreate} className="p-5 space-y-5 max-h-[80vh] overflow-y-auto">
               
+              {/* Opción para Sucursales: Adoptar Modelo Base de la Matriz */}
+              {!isMatrizTenant && modelosMatrizDisponibles.length > 0 && (
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={16} className="text-emerald-500 shrink-0" />
+                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                        Adoptar Modelo de la Matriz ({matrizNombre})
+                      </span>
+                    </div>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">
+                      Opcional
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                    Si este modelo ya existe en la matriz, selecciónalo aquí para auto-completar sus datos y reutilizar sus fotografías (ahorrando espacio de almacenamiento). Podrás asignarle tu propio proveedor local y ajustar los precios de tu sucursal.
+                  </p>
+                  <div>
+                    <select
+                      value={selectedMatrizModelId}
+                      onChange={(e) => handleSelectMatrizModel(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-emerald-500/40 rounded-xl text-xs text-[var(--foreground)] font-medium focus:outline-none focus:border-emerald-500 transition-colors"
+                    >
+                      <option value="">-- Crear modelo nuevo desde cero --</option>
+                      {modelosMatrizDisponibles.map((mm) => (
+                        <option key={mm.id} value={mm.id}>
+                          {mm.name} ({mm.brand}) — {mm.colores.length} colores {mm.yaImportado ? '✓ (Ya registrado en esta sucursal)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedMatrizModelId && (
+                    <div className="flex items-center gap-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/15 p-2 rounded-lg">
+                      <CheckCircle size={13} className="shrink-0" />
+                      <span>Datos y fotografías importados desde la Matriz. Puedes modificar el proveedor local, precios o colores libremente sin afectar a la Matriz.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Sección 1: Datos Base */}
               <div className="space-y-4">
                 <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">1. Información del Modelo</h5>
