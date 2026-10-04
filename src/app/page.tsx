@@ -129,7 +129,6 @@ function MainApp() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // ── Estados para Sesión Única, Transferencia y Desbloqueo con OTP Gyre ──
-  const [showConflictModal, setShowConflictModal] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpMode, setOtpMode] = useState<'session-transfer' | 'account-unlock'>('session-transfer');
   const [maskedEmail, setMaskedEmail] = useState('');
@@ -545,7 +544,6 @@ function MainApp() {
     checkLegalAndGpsConsent(response.user);
     setIsLoggedIn(true);
     setShowOtpModal(false);
-    setShowConflictModal(false);
     setShowUnlockModal(false);
     fetchStats();
     fetchSucursales();
@@ -598,25 +596,18 @@ function MainApp() {
     }
   };
 
-  const handleConfirmTransfer = async () => {
-    if (!conflictData) return;
-    setLoading(true);
-    setLoginError('');
-    try {
-      const response = await ApiService.post('/auth/login', {
-        email: conflictData.email,
-        password: conflictData.password,
-        forceTransfer: true,
-      });
-      setShowConflictModal(false);
-      finalizeLogin(response);
-    } catch (err: any) {
-      setLoginError(err.message || 'Error al transferir la sesión.');
-      setShowConflictModal(false);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!isLoggedIn || !online) return;
+
+    // Latido inicial al iniciar sesión
+    ApiService.post('/auth/heartbeat', {}).catch(() => null);
+
+    const interval = setInterval(() => {
+      ApiService.post('/auth/heartbeat', {}).catch(() => null);
+    }, 30000); // Latido periódico cada 30 segundos
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn, online]);
 
   const handleVerifyOtp = async (code: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -881,48 +872,7 @@ function MainApp() {
           </div>
         </div>
 
-        {/* ═══ MODAL 1: CONFLICTO DE SESIÓN ACTIVA ═══ */}
-        {showConflictModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-            <div className="w-full max-w-md bg-[#14161a] border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center mx-auto text-amber-400 shadow-lg shadow-amber-500/10">
-                <ShieldAlert size={28} />
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-xl font-black text-white tracking-tight">
-                  Sesión Activa Detectada
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Existe una sesión activa previa para <b className="text-amber-400">{username}</b>.
-                </p>
-                <div className="p-3.5 rounded-2xl bg-[#1c1f24] border border-white/5 text-xs text-slate-400 mt-3 text-left leading-relaxed">
-                  Por políticas de seguridad, <b>solo se permite una terminal activa simultánea</b>. ¿Deseas cerrar la sesión previa y continuar en esta ventana?
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowConflictModal(false)}
-                  className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmTransfer}
-                  disabled={loading}
-                  className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : 'Cerrar Previa e Ingresar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ MODAL 2: SOLICITUD DE DESBLOQUEO / RECUPERACIÓN UNIVERSAL ═══ */}
+        {/* ═══ MODAL: SOLICITUD DE DESBLOQUEO / RECUPERACIÓN UNIVERSAL ═══ */}
         {showUnlockModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
             <div className="w-full max-w-md bg-[#14161a] border border-emerald-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 text-center relative">
@@ -1052,7 +1002,6 @@ function MainApp() {
               maskedContact={maskedEmail}
               onVerify={handleVerifyOtp}
               onResend={handleResendOtp}
-              onForceDirect={otpMode === 'session-transfer' ? handleConfirmTransfer : undefined}
               onCancel={() => setShowOtpModal(false)}
               onSuccessContinue={() => {
                 setShowOtpModal(false);
