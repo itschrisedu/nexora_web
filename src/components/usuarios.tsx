@@ -73,6 +73,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [showAddSucursalModal, setShowAddSucursalModal] = useState(false);
   const [showCustomRucNew, setShowCustomRucNew] = useState(false);
   const [creatingSucursal, setCreatingSucursal] = useState(false);
+  const [sucursalModalError, setSucursalModalError] = useState('');
   const [newSucursal, setNewSucursal] = useState({
     name: '',
     ruc: '',
@@ -263,12 +264,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   const handleCreateSucursal = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
+    setSucursalModalError('');
     setSuccessMsg('');
 
     const cleanName = newSucursal.name.trim();
     if (!cleanName) {
-      setErrorMsg('El nombre de la sucursal es obligatorio.');
+      setSucursalModalError('El nombre de la sucursal es obligatorio.');
       return;
     }
 
@@ -276,7 +277,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     if (showCustomRucNew && newSucursal.ruc.trim()) {
       const cleanDigits = newSucursal.ruc.replace(/\D/g, '').trim();
       if (cleanDigits.length !== 13) {
-        setErrorMsg('El RUC propio de la sucursal debe contener exactamente 13 dígitos numéricos (ej. 1801234567001).');
+        setSucursalModalError('El RUC propio de la sucursal debe contener exactamente 13 dígitos numéricos (ej. 1801234567001).');
         return;
       }
       cleanRucToSend = cleanDigits;
@@ -285,7 +286,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     const cleanTel = newSucursal.telefono.replace(/\D/g, '').trim();
     if (cleanTel) {
       if (cleanTel.length !== 10) {
-        setErrorMsg('El teléfono debe tener exactamente 10 dígitos numéricos (ej. 0991234567).');
+        setSucursalModalError('El teléfono debe tener exactamente 10 dígitos numéricos (ej. 0991234567).');
         return;
       }
     }
@@ -294,7 +295,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     if (cleanEmail) {
       const atCount = (cleanEmail.match(/@/g) || []).length;
       if (atCount !== 1 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-        setErrorMsg('El correo electrónico no es válido. Debe contener un solo "@" y un dominio válido (ej. sucursal@ejemplo.com).');
+        setSucursalModalError('El correo electrónico no es válido. Debe contener un solo "@" y un dominio válido (ej. sucursal@ejemplo.com).');
         return;
       }
     }
@@ -308,8 +309,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         telefono: cleanTel,
         email: cleanEmail,
       });
-      setSuccessMsg(`Sucursal "${cleanName}" creada exitosamente.`);
       setShowAddSucursalModal(false);
+      setSucursalModalError('');
+      setSuccessMsg(`Sucursal "${cleanName}" creada exitosamente.`);
       setShowCustomRucNew(false);
       setNewSucursal({
         name: '',
@@ -327,7 +329,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       }
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al crear la sucursal.');
+      setSucursalModalError(err.message || 'Error al crear la sucursal.');
     } finally {
       setCreatingSucursal(false);
     }
@@ -842,7 +844,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <UserPlus size={16} /> Registrar Colaborador
               </button>
               <button
-                onClick={() => setShowAddSucursalModal(true)}
+                onClick={() => {
+                  setSucursalModalError('');
+                  setNewSucursal({ name: '', ruc: '', direccion: '', telefono: '', email: '', adminNombre: '', adminEmail: '', adminPassword: '' });
+                  setShowCustomRucNew(false);
+                  setShowAddSucursalModal(true);
+                }}
                 className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
               >
                 <Plus size={15} /> Nueva Sucursal
@@ -1504,20 +1511,28 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </div>
               </div>
 
+              {/* ── Error de validación dentro del modal ── */}
+              {sucursalModalError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl flex items-start gap-2.5 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                  <span>{sucursalModalError}</span>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal())}
+                  onClick={() => safeDismiss(() => { setShowAddSucursalModal(false); setSucursalModalError(''); }, isDirtySucursal())}
                   className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={creatingSucursal}
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
-                  {saving ? 'Guardando...' : 'Crear Sucursal'}
+                  {creatingSucursal ? 'Creando...' : 'Crear Sucursal'}
                 </button>
               </div>
             </form>
