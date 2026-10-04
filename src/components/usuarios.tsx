@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ApiService } from '../services/api.service';
 import {
   User, UserPlus, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
-  RefreshCw, CheckCircle, AlertCircle, Building2, Store,
+  RefreshCw, CheckCircle, AlertCircle, AlertTriangle, Building2, Store,
   Users, KeyRound, Search, Share2, Edit2, MapPin, X,
   Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2, Eye, EyeOff, Lock, Unlock
 } from 'lucide-react';
@@ -96,6 +96,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [editingSucursal, setEditingSucursal] = useState<SucursalItem | null>(null);
   const [editSucursalForm, setEditSucursalForm] = useState({ name: '', ruc: '', direccion: '', telefono: '', email: '', active: true });
   const [savingSucursal, setSavingSucursal] = useState(false);
+  const [editSucursalModalError, setEditSucursalModalError] = useState('');
 
   // ─── ELIMINAR SUCURSAL ───
   const [showDeleteSucursalModal, setShowDeleteSucursalModal] = useState(false);
@@ -270,6 +271,14 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     const cleanName = newSucursal.name.trim();
     if (!cleanName) {
       setSucursalModalError('El nombre de la sucursal es obligatorio.');
+      return;
+    }
+
+    const nameExists = sucursales.some(
+      (s) => s.name.trim().toLowerCase() === cleanName.toLowerCase()
+    );
+    if (nameExists) {
+      setSucursalModalError(`Ya existe una sucursal con el nombre "${cleanName}".`);
       return;
     }
 
@@ -572,12 +581,20 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const handleSaveEditSucursal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSucursal) return;
-    setErrorMsg('');
+    setEditSucursalModalError('');
     setSuccessMsg('');
 
     const cleanName = (editSucursalForm.name || '').trim();
     if (!cleanName) {
-      setErrorMsg('El nombre de la sucursal es obligatorio.');
+      setEditSucursalModalError('El nombre de la sucursal es obligatorio.');
+      return;
+    }
+
+    const nameExists = sucursales.some(
+      (s) => s.id !== editingSucursal.id && s.name.trim().toLowerCase() === cleanName.toLowerCase()
+    );
+    if (nameExists) {
+      setEditSucursalModalError(`Ya existe otra sucursal registrada con el nombre "${cleanName}".`);
       return;
     }
 
@@ -586,7 +603,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       const cleanDigits = (editSucursalForm.ruc || '').replace(/\D/g, '').trim();
       if (cleanDigits) {
         if (cleanDigits.length !== 13) {
-          setErrorMsg('El RUC propio debe contener exactamente 13 dígitos numéricos (ej. 1801234567001).');
+          setEditSucursalModalError('El RUC propio debe contener exactamente 13 dígitos numéricos (ej. 1801234567001).');
           return;
         }
         cleanRucToSend = cleanDigits;
@@ -600,7 +617,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     const cleanTel = (editSucursalForm.telefono || '').replace(/\D/g, '').trim();
     if (cleanTel) {
       if (cleanTel.length !== 10) {
-        setErrorMsg('El teléfono debe tener exactamente 10 dígitos numéricos (ej. 0991234567).');
+        setEditSucursalModalError('El teléfono debe tener exactamente 10 dígitos numéricos (ej. 0991234567).');
         return;
       }
     }
@@ -609,7 +626,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     if (cleanEmail) {
       const atCount = (cleanEmail.match(/@/g) || []).length;
       if (atCount !== 1 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-        setErrorMsg('El correo electrónico no es válido. Debe contener un solo "@" y un dominio válido (ej. sucursal@ejemplo.com).');
+        setEditSucursalModalError('El correo electrónico no es válido. Debe contener un solo "@" y un dominio válido (ej. sucursal@ejemplo.com).');
         return;
       }
     }
@@ -629,11 +646,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         window.dispatchEvent(new CustomEvent('nexora:sucursales-changed'));
       }
       setSuccessMsg(`Sucursal "${cleanName}" actualizada.`);
+      setEditSucursalModalError('');
       setShowEditSucursalModal(false);
       setEditingSucursal(null);
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al actualizar sucursal.');
+      setEditSucursalModalError(err.message || 'Error al actualizar sucursal.');
     } finally {
       setSavingSucursal(false);
     }
@@ -2160,6 +2178,14 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   <option value="INACTIVA">Inactiva</option>
                 </select>
               </div>
+
+              {/* ── Error de validación dentro del modal ── */}
+              {editSucursalModalError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-600 rounded-xl flex items-start gap-2.5 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200 shadow-sm">
+                  <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-500" />
+                  <span>{editSucursalModalError}</span>
+                </div>
+              )}
 
               <div className="flex gap-2 pt-2">
                 {!editingSucursal.isMatriz && (

@@ -209,6 +209,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const [showPassCreateUserConfirm, setShowPassCreateUserConfirm] = useState(false);
   const [showPassEditUser, setShowPassEditUser] = useState(false);
   const [showPassEditUserConfirm, setShowPassEditUserConfirm] = useState(false);
+  const [createModalError, setCreateModalError] = useState("");
+  const [editModalError, setEditModalError] = useState("");
 
   // Modal Suscripción & Pagos & Renovación de Prueba
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -634,25 +636,39 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   // ═══ HANDLERS TENANT ═══
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCreateModalError("");
+    const cleanTenantName = (newTenant.name || "").trim();
+    if (!cleanTenantName) {
+      setCreateModalError("El nombre del negocio es obligatorio.");
+      return;
+    }
+    const tenantExists = tenants.some(
+      (t) => t.name.trim().toLowerCase() === cleanTenantName.toLowerCase()
+    );
+    if (tenantExists) {
+      setCreateModalError(`Ya existe un negocio registrado con el nombre "${cleanTenantName}".`);
+      return;
+    }
+
     const emailErr = validateEmail(newTenant.adminEmail);
     if (emailErr) {
       setAdminEmailError(emailErr);
       return;
     }
     if (!newTenant.adminPassword || !newTenant.adminConfirmPassword) {
-      setErrorMsg("Debe ingresar y confirmar la contraseña del administrador.");
+      setCreateModalError("Debe ingresar y confirmar la contraseña del administrador.");
       return;
     }
     if (newTenant.adminPassword.length < 6) {
-      setErrorMsg("La contraseña del administrador debe tener al menos 6 caracteres.");
+      setCreateModalError("La contraseña del administrador debe tener al menos 6 caracteres.");
       return;
     }
     if (newTenant.adminPassword !== newTenant.adminConfirmPassword) {
-      setErrorMsg("Las contraseñas no coinciden. Verifíquelas nuevamente.");
+      setCreateModalError("Las contraseñas no coinciden. Verifíquelas nuevamente.");
       return;
     }
     setCreateLoading(true);
-    setErrorMsg("");
+    setCreateModalError("");
     try {
       await ApiService.post("/tenants", {
         ...newTenant,
@@ -661,6 +677,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       });
       setSuccessMsg(`Tenant "${newTenant.name}" creado con ${newTenant.plan} y ${newTenant.diasPruebaGratis} días de prueba.`);
       setShowCreateModal(false);
+      setCreateModalError("");
       setAdminEmailError("");
       setNewTenant({
         name: "",
@@ -674,7 +691,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       });
       await fetchTenants();
     } catch (err: any) {
-      setErrorMsg(err.message || "Error al crear el tenant");
+      setCreateModalError(err.message || "Error al crear el tenant");
     } finally {
       setCreateLoading(false);
     }
@@ -715,10 +732,25 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
   const handleUpdateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTenant) return;
+    setEditModalError("");
+
+    const cleanTenantName = (editingTenant.name || "").trim();
+    if (!cleanTenantName) {
+      setEditModalError("El nombre del negocio es obligatorio.");
+      return;
+    }
+    const tenantExists = tenants.some(
+      (t) => t.id !== editingTenant.id && t.name.trim().toLowerCase() === cleanTenantName.toLowerCase()
+    );
+    if (tenantExists) {
+      setEditModalError(`Ya existe otro negocio registrado con el nombre "${cleanTenantName}".`);
+      return;
+    }
+
     setEditTenantLoading(true);
     try {
       const updated = await ApiService.patch(`/tenants/${editingTenant.id}`, {
-        name: editingTenant.name,
+        name: cleanTenantName,
         plan: editingTenant.plan,
         estadoSuscripcion: editingTenant.estadoSuscripcion,
         precioMensualPlan: Number(editingTenant.precioMensualPlan || 0),
@@ -731,6 +763,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         },
       });
       setSuccessMsg(`Tenant "${editingTenant.name}" actualizado correctamente.`);
+      setEditModalError("");
       setShowEditTenantModal(false);
       setEditingTenant(null);
       await fetchTenants();
@@ -738,7 +771,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         setSelectedTenantDetail(updated);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Error al actualizar el tenant");
+      setEditModalError(err.message || "Error al actualizar el tenant");
     } finally {
       setEditTenantLoading(false);
     }
@@ -2519,6 +2552,14 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 )}
               </div>
 
+              {/* ── Error de validación dentro del modal ── */}
+              {createModalError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-600 rounded-xl flex items-start gap-2.5 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200 shadow-sm">
+                  <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-500" />
+                  <span>{createModalError}</span>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -2679,6 +2720,15 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
                 />
               </div>
+
+              {/* ── Error de validación dentro del modal ── */}
+              {editModalError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-600 rounded-xl flex items-start gap-2.5 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200 shadow-sm">
+                  <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-500" />
+                  <span>{editModalError}</span>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
