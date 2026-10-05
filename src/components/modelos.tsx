@@ -297,11 +297,9 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
   const handleNameChange = (val: string) => {
     setName(val);
-    if (!baseCodeManual || !baseCode.trim()) {
-      const existingCodes = modelos.map((m) => m.baseCode);
-      const autoCode = generarCodigoBaseModelo(val, existingCodes);
-      setBaseCode(autoCode);
-    }
+    const existingCodes = modelos.map((m) => m.baseCode);
+    const autoCode = generarCodigoBaseModelo(val, existingCodes);
+    setBaseCode(autoCode);
   };
   const [brand, setBrand] = useState("");
   const [material, setMaterial] = useState("");
@@ -2099,34 +2097,6 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <Lbl t="Código Base" req />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const existingCodes = modelos.map((m) => m.baseCode);
-                          const autoCode = generarCodigoBaseModelo(name, existingCodes);
-                          setBaseCode(autoCode);
-                          setBaseCodeManual(false);
-                        }}
-                        className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer"
-                        title="Generar código base automáticamente a partir del nombre"
-                      >
-                        <Sparkles size={11} /> Auto (3 letras + -01)
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={baseCode}
-                      onChange={(e) => {
-                        setBaseCode(e.target.value.toUpperCase());
-                        setBaseCodeManual(true);
-                      }}
-                      placeholder="Ej. VHL-01"
-                      className={INPUT}
-                    />
-                  </div>
-                  <div>
                     <Lbl t="Nombre del calzado" req />
                     <input
                       type="text"
@@ -2134,6 +2104,19 @@ export default function ModelosComponent({ online }: ModelosProps) {
                       onChange={(e) => handleNameChange(e.target.value)}
                       placeholder="Ej. Botín Hombre Londres"
                       className={INPUT}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <Lbl t="Código Base" req />
+                    </div>
+                    <input
+                      type="text"
+                      value={baseCode}
+                      readOnly
+                      disabled
+                      placeholder="Ej. VHL-01 (Automático)"
+                      className={`${INPUT} bg-[var(--muted)]/40 text-[var(--muted-foreground)] cursor-not-allowed select-none font-mono font-bold`}
                     />
                   </div>
                 </div>
