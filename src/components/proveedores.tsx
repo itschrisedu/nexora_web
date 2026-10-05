@@ -763,12 +763,31 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
     setSaving(true);
     try {
+      const updatedContacto = editContacto.trim() ? (formatearTelefono(editContacto) || editContacto.trim()) : '';
+      const updatedDireccion = editDireccion.trim() ? formatearDireccion(editDireccion) : '';
+      const updatedEmail = editEmail.trim() ? formatearEmail(editEmail) : '';
+
       await ApiService.put(`/proveedores/${editingSupplier.id}`, {
         razonSocial: editRazonSocial.trim(),
-        contacto: editContacto.trim() ? (formatearTelefono(editContacto) || editContacto.trim()) : '',
-        direccion: editDireccion.trim() ? formatearDireccion(editDireccion) : '',
-        email: editEmail.trim() ? formatearEmail(editEmail) : '',
+        contacto: updatedContacto,
+        direccion: updatedDireccion,
+        email: updatedEmail,
       });
+
+      setProveedores((prev) =>
+        prev.map((item) =>
+          item.id === editingSupplier.id
+            ? {
+                ...item,
+                razonSocial: editRazonSocial.trim(),
+                nombre: editRazonSocial.trim(),
+                contacto: updatedContacto,
+                direccion: updatedDireccion,
+                email: updatedEmail,
+              }
+            : item
+        )
+      );
 
       showToast('Proveedor actualizado correctamente.', 'success');
       setShowEditSupplierModal(false);
