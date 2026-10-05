@@ -434,6 +434,16 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [direccion, setDireccion] = useState('');
   const [email, setEmail] = useState('');
 
+  // Saldo anterior / Deuda inicial al crear proveedor
+  const [tieneDeudaAnterior, setTieneDeudaAnterior] = useState(false);
+  const [deudaAnteriorMonto, setDeudaAnteriorMonto] = useState('');
+  const [deudaAnteriorConcepto, setDeudaAnteriorConcepto] = useState('Saldo anterior pendiente');
+  const [deudaAnteriorFechaEmision, setDeudaAnteriorFechaEmision] = useState(new Date().toISOString().split('T')[0]);
+  const [deudaAnteriorFechaVencimiento, setDeudaAnteriorFechaVencimiento] = useState(
+    new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+  );
+  const [deudaAnteriorNotas, setDeudaAnteriorNotas] = useState('');
+
   // Form: Editar Proveedor
   const [showEditSupplierModal, setShowEditSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Proveedor | null>(null);
@@ -688,16 +698,32 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
     setSaving(true);
     try {
-      await ApiService.post('/proveedores', {
+      const res = await ApiService.post('/proveedores', {
         ruc: ruc.trim(),
         razonSocial: razonSocialFinal,
         nombreComercial: nombreComercial.trim() || undefined,
         nombres: provNombres.trim(),
         apellidos: provApellidos.trim(),
-        contacto: contacto ? formatearTelefono(contacto) : `${provNombres.trim()} ${provApellidos.trim()}`,
-        direccion: direccion ? formatearDireccion(direccion) : undefined,
-        email: email ? formatearEmail(email) : undefined,
+        contacto: contacto.trim() ? (formatearTelefono(contacto) || contacto.trim()) : `${provNombres.trim()} ${provApellidos.trim()}`,
+        direccion: direccion.trim() ? formatearDireccion(direccion) : undefined,
+        email: email.trim() ? formatearEmail(email) : undefined,
       });
+
+      const montoNum = parseFloat(deudaAnteriorMonto);
+      if (tieneDeudaAnterior && res?.id && !isNaN(montoNum) && montoNum > 0) {
+        try {
+          await ApiService.post('/proveedores/deuda-manual', {
+            supplierId: res.id,
+            monto: montoNum,
+            concepto: deudaAnteriorConcepto.trim() || 'Saldo anterior pendiente',
+            fechaEmision: deudaAnteriorFechaEmision || new Date().toISOString().split('T')[0],
+            fechaVencimiento: deudaAnteriorFechaVencimiento || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+            notas: deudaAnteriorNotas.trim() || undefined,
+          });
+        } catch (errDeuda: any) {
+          console.error("Error al registrar saldo inicial del proveedor:", errDeuda);
+        }
+      }
 
       showToast('Proveedor registrado correctamente.', 'success');
       setShowSupplierModal(false);
@@ -727,7 +753,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       return;
     }
 
-    if (editEmail) {
+    if (editEmail && editEmail.trim() !== '') {
       const emailVal = validarEmailEstricto(editEmail);
       if (!emailVal.valido) {
         showToast(emailVal.mensaje || 'El correo electrónico no es válido.', 'error');
@@ -739,9 +765,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     try {
       await ApiService.put(`/proveedores/${editingSupplier.id}`, {
         razonSocial: editRazonSocial.trim(),
-        contacto: editContacto ? formatearTelefono(editContacto) : undefined,
-        direccion: editDireccion ? formatearDireccion(editDireccion) : undefined,
-        email: editEmail ? formatearEmail(editEmail) : undefined,
+        contacto: editContacto.trim() ? (formatearTelefono(editContacto) || editContacto.trim()) : '',
+        direccion: editDireccion.trim() ? formatearDireccion(editDireccion) : '',
+        email: editEmail.trim() ? formatearEmail(editEmail) : '',
       });
 
       showToast('Proveedor actualizado correctamente.', 'success');
@@ -763,6 +789,12 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     setContacto('');
     setDireccion('');
     setEmail('');
+    setTieneDeudaAnterior(false);
+    setDeudaAnteriorMonto('');
+    setDeudaAnteriorConcepto('Saldo anterior pendiente');
+    setDeudaAnteriorFechaEmision(new Date().toISOString().split('T')[0]);
+    setDeudaAnteriorFechaVencimiento(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+    setDeudaAnteriorNotas('');
   };
 
   const handleVerDetalleOrden = async (orderId: string) => {
@@ -4373,6 +4405,125 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   onChange={(e) => setDireccion(formatearDireccion(e.target.value))}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
+              </div>
+
+              {/* Sección Opcional: Saldo Anterior / Deuda Previa al crear proveedor */}
+              <div className="pt-2 border-t border-[var(--border)]">
+                <div className="bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={tieneDeudaAnterior}
+                        onChange={(e) => setTieneDeudaAnterior(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                      />
+                      <span className="flex items-center gap-1.5">
+                        <DollarSign size={14} className="text-amber-600" />
+                        ¿Tiene saldo o deuda anterior pendiente con este proveedor?
+                      </span>
+                    </label>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 rounded-full border border-amber-500/20">
+                      Opcional
+                    </span>
+                  </div>
+
+                  {tieneDeudaAnterior && (
+                    <div className="space-y-3 pt-2 border-t border-amber-500/15 animate-in fade-in duration-150">
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                          Monto del Saldo / Deuda ($ USD) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700 dark:text-amber-400">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="0.00"
+                            value={deudaAnteriorMonto}
+                            onChange={(e) => setDeudaAnteriorMonto(e.target.value)}
+                            className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-bold focus:outline-none focus:border-amber-600 transition-colors"
+                            required={tieneDeudaAnterior}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                          Concepto / Especificación del Saldo <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Saldo anterior pendiente, Lote de calzado previo..."
+                          value={deudaAnteriorConcepto}
+                          onChange={(e) => setDeudaAnteriorConcepto(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600 transition-colors"
+                          required={tieneDeudaAnterior}
+                        />
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {[
+                            'Saldo anterior pendiente',
+                            'Arrastre de libreta de taller',
+                            'Entrega previa sin liquidar',
+                            'Cheque / pagaré comercial',
+                          ].map((sug) => (
+                            <button
+                              key={sug}
+                              type="button"
+                              onClick={() => setDeudaAnteriorConcepto(sug)}
+                              className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-white/70 dark:bg-slate-800/80 border border-amber-500/20 text-amber-900 dark:text-amber-200 hover:bg-amber-500/20 transition-all cursor-pointer"
+                            >
+                              + {sug}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                            Fecha Origen
+                          </label>
+                          <input
+                            type="date"
+                            value={deudaAnteriorFechaEmision}
+                            onChange={(e) => setDeudaAnteriorFechaEmision(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                            Fecha Vencimiento
+                          </label>
+                          <input
+                            type="date"
+                            value={deudaAnteriorFechaVencimiento}
+                            onChange={(e) => setDeudaAnteriorFechaVencimiento(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
+                          Observación / Respaldo (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Anotación en nota de entrega #104"
+                          value={deudaAnteriorNotas}
+                          onChange={(e) => setDeudaAnteriorNotas(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
+                        />
+                      </div>
+
+                      <p className="text-[10px] text-amber-800 dark:text-amber-300/80 leading-tight">
+                        💡 Al registrar al proveedor, este saldo se ingresará automáticamente a su <strong>Cuenta Corriente y Cuentas por Pagar</strong> para control y abonos.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="pt-2 flex gap-2">

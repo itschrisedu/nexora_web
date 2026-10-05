@@ -12,6 +12,7 @@ import {
 import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
 import {
   generarSiglaProveedor,
+  generarCodigoBaseModelo,
   formatearNombres,
   formatearApellidos,
   formatearEmail,
@@ -291,7 +292,17 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
   // Formulario de creación masiva
   const [baseCode, setBaseCode] = useState("");
+  const [baseCodeManual, setBaseCodeManual] = useState(false);
   const [name, setName] = useState("");
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!baseCodeManual || !baseCode.trim()) {
+      const existingCodes = modelos.map((m) => m.baseCode);
+      const autoCode = generarCodigoBaseModelo(val, existingCodes);
+      setBaseCode(autoCode);
+    }
+  };
   const [brand, setBrand] = useState("");
   const [material, setMaterial] = useState("");
   const [colors, setColors] = useState<ColorInput[]>([{ color: "", foto: null }]);
@@ -556,6 +567,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
   const resetForm = () => {
     setSelectedMatrizModelId("");
     setBaseCode("");
+    setBaseCodeManual(false);
     setName("");
     setBrand("");
     setMaterial("");
@@ -2086,8 +2098,44 @@ export default function ModelosComponent({ online }: ModelosProps) {
                 <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">1. Información del Modelo</h5>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div><Lbl t="Código Base" req /><input type="text" value={baseCode} onChange={e => setBaseCode(e.target.value)} placeholder="Ej. NK-AIR" className={INPUT} /></div>
-                  <div><Lbl t="Nombre del calzado" req /><input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Air Max 90" className={INPUT} /></div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <Lbl t="Código Base" req />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const existingCodes = modelos.map((m) => m.baseCode);
+                          const autoCode = generarCodigoBaseModelo(name, existingCodes);
+                          setBaseCode(autoCode);
+                          setBaseCodeManual(false);
+                        }}
+                        className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer"
+                        title="Generar código base automáticamente a partir del nombre"
+                      >
+                        <Sparkles size={11} /> Auto (3 letras + -01)
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={baseCode}
+                      onChange={(e) => {
+                        setBaseCode(e.target.value.toUpperCase());
+                        setBaseCodeManual(true);
+                      }}
+                      placeholder="Ej. VHL-01"
+                      className={INPUT}
+                    />
+                  </div>
+                  <div>
+                    <Lbl t="Nombre del calzado" req />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      placeholder="Ej. Botín Hombre Londres"
+                      className={INPUT}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
