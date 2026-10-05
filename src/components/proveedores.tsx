@@ -4322,8 +4322,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
          ══════════════════════════════════════════ */}
       {showSupplierModal && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowSupplierModal(false); resetSupplierForm(); }, isDirtySupplier()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
                   <Truck size={20} />
@@ -4344,7 +4344,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               </button>
             </div>
 
-            <form onSubmit={handleCreateProveedor} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateProveedor} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
@@ -4601,8 +4601,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
          ══════════════════════════════════════════ */}
       {showEditSupplierModal && editingSupplier && (
         <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowEditSupplierModal(false); setEditingSupplier(null); } }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
                   <Edit3 size={20} />
@@ -4622,7 +4622,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               </button>
             </div>
 
-            <form onSubmit={handleUpdateProveedor} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleUpdateProveedor} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   RUC del Proveedor
