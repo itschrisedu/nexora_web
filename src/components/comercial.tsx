@@ -2472,6 +2472,21 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                               </div>
                             )}
                           </div>
+
+                          {/* Sugerencia de Venta al Contado por Historial de Mora */}
+                          {(repSel.tipo === 'MOROSO' || repSel.tipo === 'RIESGO' || (clienteSeleccionado.atrasoConsecutivo ?? 0) > 0) && (
+                            <div className="p-2.5 bg-rose-500/10 border border-rose-500/25 rounded-lg flex items-start gap-2 text-xs text-rose-900 dark:text-rose-200 animate-in fade-in duration-150">
+                              <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
+                              <div className="space-y-0.5">
+                                <span className="font-black block text-rose-700 dark:text-rose-300">
+                                  💡 Sugerencia del Sistema: Venta de Contado
+                                </span>
+                                <span className="text-[11px] opacity-90 leading-tight block">
+                                  El cliente registra antecedentes de atraso o morosidad en compras previas. Se sugiere realizar la venta de <strong>CONTADO</strong> o solicitar anticipo. (La opción de crédito sigue habilitada si usted decide autorizarla).
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })() : (
