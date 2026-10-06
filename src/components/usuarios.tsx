@@ -855,6 +855,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               <button
                 type="button"
                 onClick={() => {
+                  // Limpiar formulario antes de abrir
+                  setNombre('');
+                  setEmail('');
+                  setPassword('');
+                  setConfirmPassword('');
+                  setRolOption('ROL_VENDEDOR');
+                  setPermiteCambiarPrecio(false);
+                  setAddUserEmailError('');
+                  setShowPasswordAddUser(false);
+                  setShowConfirmPasswordAddUser(false);
                   if (selectedSucursalId) {
                     setSelectedTenantForNewUser(selectedSucursalId);
                   } else if (sucursales.length > 0 && !selectedTenantForNewUser) {
@@ -1027,6 +1037,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   <button
                     type="button"
                     onClick={() => {
+                      // Limpiar formulario antes de abrir
+                      setNombre('');
+                      setEmail('');
+                      setPassword('');
+                      setConfirmPassword('');
+                      setRolOption('ROL_VENDEDOR');
+                      setPermiteCambiarPrecio(false);
+                      setAddUserEmailError('');
+                      setShowPasswordAddUser(false);
+                      setShowConfirmPasswordAddUser(false);
                       setSelectedTenantForNewUser(selectedSucursalId);
                       setShowAddModal(true);
                     }}
@@ -1190,7 +1210,19 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <RefreshCw size={15} />
               </button>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => {
+                  // Limpiar formulario antes de abrir
+                  setNombre('');
+                  setEmail('');
+                  setPassword('');
+                  setConfirmPassword('');
+                  setRolOption('ROL_VENDEDOR');
+                  setPermiteCambiarPrecio(false);
+                  setAddUserEmailError('');
+                  setShowPasswordAddUser(false);
+                  setShowConfirmPasswordAddUser(false);
+                  setShowAddModal(true);
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all shrink-0"
               >
                 <Plus size={15} /> Nuevo Colaborador
