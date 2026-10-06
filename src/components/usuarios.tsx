@@ -5,7 +5,7 @@ import { ApiService } from '../services/api.service';
 import {
   User, UserPlus, Plus, Loader2, ShieldCheck, UserCheck, UserMinus,
   RefreshCw, CheckCircle, AlertCircle, AlertTriangle, Building2, Store,
-  Users, KeyRound, Search, Share2, Edit2, MapPin, X,
+  Users, KeyRound, Search, Share2, Edit2, MapPin, X, Crown,
   Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2, Eye, EyeOff, Lock, Unlock
 } from 'lucide-react';
 import UnsavedChangesModal from './ui/unsaved-changes-modal';
@@ -393,6 +393,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     try {
       const isGlobal = rolOption === 'ADMIN_GENERAL';
       const actualRol = (rolOption === 'ADMIN_GENERAL' || rolOption === 'ADMIN_SUCURSAL') ? 'ROL_ADMIN' : rolOption;
+      const matrizTenant = sucursales.find(s => s.isMatriz);
+      const assignedTenant = isGlobal ? (matrizTenant?.id || sucursales[0]?.id || selectedTenantForNewUser) : selectedTenantForNewUser;
 
       await ApiService.post('/auth/usuarios', {
         nombre,
@@ -400,8 +402,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
         password,
         rol: actualRol,
         esAdminGeneral: isGlobal,
-        permiteCambiarPrecio,
-        tenantId: selectedTenantForNewUser || undefined,
+        permiteCambiarPrecio: isGlobal ? true : permiteCambiarPrecio,
+        tenantId: assignedTenant || undefined,
       });
 
       setSuccessMsg('Colaborador registrado con éxito.');
@@ -440,14 +442,18 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     setSuccessMsg('');
 
     try {
+      const isGlobal = editingUser.esAdminGeneral || false;
+      const matrizTenant = sucursales.find(s => s.isMatriz);
+      const assignedTenant = isGlobal ? (matrizTenant?.id || editingUser.tenantId) : editingUser.tenantId;
+
       await ApiService.put(`/configuracion/personal/${editingUser.id}`, {
         nombre: editingUser.nombre,
         email: editingUser.email,
         rol: editingUser.rol,
-        esAdminGeneral: editingUser.esAdminGeneral,
+        esAdminGeneral: isGlobal,
         activo: editingUser.activo,
-        permiteCambiarPrecio: editingUser.permiteCambiarPrecio,
-        tenantId: editingUser.tenantId,
+        permiteCambiarPrecio: isGlobal ? true : (editingUser.permiteCambiarPrecio ?? false),
+        tenantId: assignedTenant,
       });
 
       setSuccessMsg(`Colaborador "${editingUser.nombre}" actualizado.`);
@@ -1772,32 +1778,48 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada *</label>
-                <select
-                  value={selectedTenantForNewUser || (sucursales[0]?.id || '')}
-                  onChange={(e) => setSelectedTenantForNewUser(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                >
-                  {sucursales.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {rolOption === 'ADMIN_GENERAL' ? (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs flex items-center gap-3 animate-in fade-in duration-200">
+                  <div className="p-2 bg-amber-500/20 rounded-xl text-amber-500 shrink-0">
+                    <Crown size={20} />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-amber-900 dark:text-amber-200 text-xs">Acceso Total y Global</p>
+                    <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 leading-tight mt-0.5">
+                      Como Administrador General (Dueño), tendrá permisos absolutos para gestionar todas las sucursales, precios, inventarios y configuraciones del negocio.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada *</label>
+                    <select
+                      value={selectedTenantForNewUser || (sucursales[0]?.id || '')}
+                      onChange={(e) => setSelectedTenantForNewUser(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    >
+                      {sucursales.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="pt-1">
-                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permiteCambiarPrecio}
-                    onChange={(e) => setPermiteCambiarPrecio(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#0F172A]"
-                  />
-                  Permitir modificar precios de venta
-                </label>
-              </div>
+                  <div className="pt-1">
+                    <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={permiteCambiarPrecio}
+                        onChange={(e) => setPermiteCambiarPrecio(e.target.checked)}
+                        className="w-4 h-4 rounded text-[#0F172A]"
+                      />
+                      Permitir modificar precios de venta
+                    </label>
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-2 pt-2">
                 <button
@@ -1923,32 +1945,48 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada</label>
-                <select
-                  value={editingUser.tenantId || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, tenantId: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                >
-                  {sucursales.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {editingUser.esAdminGeneral ? (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs flex items-center gap-3 animate-in fade-in duration-200">
+                  <div className="p-2 bg-amber-500/20 rounded-xl text-amber-500 shrink-0">
+                    <Crown size={20} />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-amber-900 dark:text-amber-200 text-xs">Acceso Total y Global</p>
+                    <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 leading-tight mt-0.5">
+                      Administrador General (Dueño) con control absoluto en todas las sucursales del negocio.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada</label>
+                    <select
+                      value={editingUser.tenantId || ''}
+                      onChange={(e) => setEditingUser({ ...editingUser, tenantId: e.target.value })}
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    >
+                      {sucursales.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="pt-1">
-                <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={editingUser.permiteCambiarPrecio || false}
-                    onChange={(e) => setEditingUser({ ...editingUser, permiteCambiarPrecio: e.target.checked })}
-                    className="w-4 h-4 rounded text-[#0F172A]"
-                  />
-                  Permitir modificar precios de venta
-                </label>
-              </div>
+                  <div className="pt-1">
+                    <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingUser.permiteCambiarPrecio || false}
+                        onChange={(e) => setEditingUser({ ...editingUser, permiteCambiarPrecio: e.target.checked })}
+                        className="w-4 h-4 rounded text-[#0F172A]"
+                      />
+                      Permitir modificar precios de venta
+                    </label>
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-2 pt-2">
                 <button
