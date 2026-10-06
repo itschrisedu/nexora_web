@@ -163,6 +163,20 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [editSucursalEmailError, setEditSucursalEmailError] = useState('');
 
   useEffect(() => {
+    if (showAddModal) {
+      setNombre('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setRolOption('ROL_VENDEDOR');
+      setPermiteCambiarPrecio(false);
+      setAddUserEmailError('');
+      setShowPasswordAddUser(false);
+      setShowConfirmPasswordAddUser(false);
+    }
+  }, [showAddModal]);
+
+  useEffect(() => {
     if (online) {
       loadAll();
     }
@@ -1617,11 +1631,17 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateUser} autoComplete="off" className="p-6 space-y-4 text-xs">
+              {/* Dummy fields to absorb aggressive browser autofill / password managers */}
+              <input type="text" name="fake_username_prevent_autofill" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
+              <input type="password" name="fake_password_prevent_autofill" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
+
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre Completo</label>
                 <input
                   type="text"
+                  name="colaborador_nuevo_nombre"
+                  autoComplete="off"
                   required
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
@@ -1634,6 +1654,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico</label>
                 <input
                   type="email"
+                  name="colaborador_nuevo_email_noautofill"
+                  autoComplete="off"
+                  data-lpignore="true"
                   required
                   value={email}
                   onKeyDown={handleEmailKeyDown}
@@ -1667,6 +1690,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <div className="relative">
                   <input
                     type={showPasswordAddUser ? "text" : "password"}
+                    name="colaborador_nuevo_password_field"
+                    autoComplete="new-password"
+                    data-lpignore="true"
                     required
                     minLength={6}
                     value={password}
@@ -1691,6 +1717,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <div className="relative">
                   <input
                     type={showConfirmPasswordAddUser ? "text" : "password"}
+                    name="colaborador_nuevo_confirm_password_field"
+                    autoComplete="new-password"
+                    data-lpignore="true"
                     required
                     minLength={6}
                     value={confirmPassword}
