@@ -1208,7 +1208,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                               user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                               'bg-amber-500/10 text-amber-600 border-amber-500/20'
                             }`}>
-                              {user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'Admin General' : 'Admin Sucursal') : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
+                              {user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'Admin General' : 'Admin de Sucursal') : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
                             </span>
                           </td>
                           <td className="p-3 text-center">
@@ -1399,7 +1399,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                         user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                         'bg-amber-500/10 text-amber-600 border-amber-500/20'
                       }`}>
-                        {user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'Admin General' : 'Admin Sucursal') : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
+                        {user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'Admin General' : 'Admin de Sucursal') : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
                       </span>
                     </td>
                     <td className="p-3.5 text-center">

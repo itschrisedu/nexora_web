@@ -264,7 +264,24 @@ function MainApp() {
     }
 
     const savedSucursal = localStorage.getItem('activeSucursalId');
-    if (savedSucursal) setActiveSucursalId(savedSucursal);
+    const storedUserInitial = localStorage.getItem('user');
+    let isUserInitialGlobal = true;
+    if (storedUserInitial) {
+      try {
+        const u = JSON.parse(storedUserInitial);
+        isUserInitialGlobal = u?.rol === 'ROL_SUPER_ADMIN' || (u?.rol === 'ROL_ADMIN' && u?.esAdminGeneral === true);
+        if (!isUserInitialGlobal && u?.tenantId) {
+          setActiveSucursalId(u.tenantId);
+          localStorage.setItem('activeSucursalId', u.tenantId);
+        } else if (savedSucursal) {
+          setActiveSucursalId(savedSucursal);
+        }
+      } catch (_) {
+        if (savedSucursal) setActiveSucursalId(savedSucursal);
+      }
+    } else if (savedSucursal) {
+      setActiveSucursalId(savedSucursal);
+    }
 
     const handleThemeChange = (e: any) => {
       if (e.detail?.primaryColor) {
@@ -402,7 +419,7 @@ function MainApp() {
     }
   };
 
-  const isGlobalAdmin = user?.rol === 'ROL_SUPER_ADMIN' || (user?.rol === 'ROL_ADMIN' && (user?.esAdminGeneral === true || (!user?.parentId && user?.esAdminGeneral !== false)));
+  const isGlobalAdmin = user?.rol === 'ROL_SUPER_ADMIN' || (user?.rol === 'ROL_ADMIN' && user?.esAdminGeneral === true);
   const isBranchRestricted = !!(user?.rol && !isGlobalAdmin);
 
   const fetchSucursales = async () => {
@@ -413,7 +430,7 @@ function MainApp() {
         const storedUser = localStorage.getItem('user');
         const parsed = storedUser ? JSON.parse(storedUser) : null;
         if (parsed?.tenantId) {
-          const isUserGlobal = parsed?.rol === 'ROL_SUPER_ADMIN' || (parsed?.rol === 'ROL_ADMIN' && (parsed?.esAdminGeneral === true || (!parsed?.parentId && parsed?.esAdminGeneral !== false)));
+          const isUserGlobal = parsed?.rol === 'ROL_SUPER_ADMIN' || (parsed?.rol === 'ROL_ADMIN' && parsed?.esAdminGeneral === true);
           if (!isUserGlobal) {
             setActiveSucursalId(parsed.tenantId);
             localStorage.setItem('activeSucursalId', parsed.tenantId);
@@ -537,6 +554,14 @@ function MainApp() {
     localStorage.setItem('user', JSON.stringify(response.user));
     if (response.user?.tenantId) {
       localStorage.setItem('tenantId', response.user.tenantId);
+    }
+    const isLoginGlobal = response.user?.rol === 'ROL_SUPER_ADMIN' || (response.user?.rol === 'ROL_ADMIN' && response.user?.esAdminGeneral === true);
+    if (!isLoginGlobal && response.user?.tenantId) {
+      setActiveSucursalId(response.user.tenantId);
+      localStorage.setItem('activeSucursalId', response.user.tenantId);
+    } else if (isLoginGlobal && !localStorage.getItem('activeSucursalId')) {
+      setActiveSucursalId('TODAS');
+      localStorage.setItem('activeSucursalId', 'TODAS');
     }
     localStorage.setItem('nexora_active_view', 'dashboard');
     setVistaActual('dashboard');
