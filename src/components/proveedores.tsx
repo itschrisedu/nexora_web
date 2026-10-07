@@ -1479,7 +1479,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const handleAbrirModalPago = (supplierId: string, orderId?: string, sugeridoMonto?: number) => {
     setPaymentSupplierId(supplierId);
     setPaymentOrderId(orderId || '');
-    setMontoPago(sugeridoMonto ? String(sugeridoMonto) : '');
+    setMontoPago(sugeridoMonto && sugeridoMonto > 0 ? String(sugeridoMonto) : '');
     setMetodoPago('TRANSFERENCIA');
     setBancoPago('');
     setComprobantePago('');
@@ -1957,16 +1957,18 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       <History size={13} />
                       <span>Estado de Cuenta</span>
                     </button>
-                    {tieneDeuda && (
-                      <button
-                        onClick={() => handleAbrirModalPago(p.id, undefined, deuda)}
-                        className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
-                        title="Registrar Abono o Pago"
-                      >
-                        <DollarSign size={13} />
-                        <span>Abonar</span>
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleAbrirModalPago(p.id, undefined, deuda > 0 ? deuda : undefined)}
+                      className={`py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1 shadow-sm cursor-pointer ${
+                        tieneDeuda
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                      }`}
+                      title={tieneDeuda ? 'Registrar Abono o Pago' : 'Registrar Adelanto / Anticipo'}
+                    >
+                      <DollarSign size={13} />
+                      <span>{tieneDeuda ? 'Abonar' : 'Adelanto'}</span>
+                    </button>
                   </div>
                 </div>
               );
@@ -2775,11 +2777,19 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
          ══════════════════════════════════════════ */}
       {!loading && activeTab === 'pagos' && (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm space-y-4 p-5">
-          <div className="flex justify-between items-center">
-            <h3 className="font-extrabold text-sm flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h3 className="font-extrabold text-sm flex items-center gap-2 text-[var(--foreground)]">
               <DollarSign size={16} className="text-emerald-500" />
               <span>Bitácora de Pagos & Abonos a Proveedores</span>
             </h3>
+            <button
+              type="button"
+              onClick={() => handleAbrirModalPago(proveedores[0]?.id || '')}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer self-start sm:self-auto"
+            >
+              <Plus size={14} />
+              <span>+ Registrar Pago / Adelanto</span>
+            </button>
           </div>
 
           {pagos.length === 0 ? (
@@ -3813,7 +3823,26 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             <form onSubmit={handleGuardarPago} className="p-6 space-y-4 text-xs">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Monto a Pagar ($ USD) *
+                  Proveedor / Fabricante Receptor *
+                </label>
+                <select
+                  value={paymentSupplierId}
+                  onChange={(e) => setPaymentSupplierId(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
+                  required
+                >
+                  <option value="">-- Seleccionar Proveedor --</option>
+                  {proveedores.map((pr) => (
+                    <option key={pr.id} value={pr.id}>
+                      {pr.razonSocial || pr.nombre} (RUC: {pr.ruc}) {pr.saldoPendiente && pr.saldoPendiente > 0 ? `• Debe $${pr.saldoPendiente.toFixed(2)}` : '• Al Día'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Monto a Pagar / Adelantar ($ USD) *
                 </label>
                 <input
                   type="number"
