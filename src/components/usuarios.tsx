@@ -1174,7 +1174,11 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                   <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[var(--border)] text-center text-xs">
                     <div className="p-2 bg-[var(--muted)]/30 rounded-xl">
                       <div className="text-[10px] text-[var(--muted-foreground)]">Colaboradores</div>
-                      <div className="font-bold text-sm font-mono">{sucursal.stats.usuarios}</div>
+                      <div className="font-bold text-sm font-mono">
+                        {users.length > 0
+                          ? users.filter(u => u.tenantId === sucursal.id && !u.esAdminGeneral).length
+                          : sucursal.stats.usuarios}
+                      </div>
                     </div>
                     <div className="p-2 bg-[var(--muted)]/30 rounded-xl">
                       <div className="text-[10px] text-[var(--muted-foreground)]">Modelos</div>
@@ -1191,72 +1195,74 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
           )}
 
           {/* ─── PANEL MASTER-DETAIL: Personal de la Sucursal seleccionada ─── */}
-          {selectedSucursalId && (
-            <div className="mt-6 p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="text-[#0F172A]" />
-                  <h3 className="font-bold text-sm text-[var(--foreground)]">
-                    Personal de: {sucursales.find(s => s.id === selectedSucursalId)?.name || 'Sucursal'}
-                  </h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-full">
-                    {personalSucursal.length} colaboradores
-                  </span>
+          {selectedSucursalId && (() => {
+            const colaboradoresLocales = personalSucursal.filter((u) => !u.esAdminGeneral);
+            return (
+              <div className="mt-6 p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Users size={16} className="text-[#0F172A]" />
+                    <h3 className="font-bold text-sm text-[var(--foreground)]">
+                      Personal de: {sucursales.find(s => s.id === selectedSucursalId)?.name || 'Sucursal'}
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-full">
+                      {colaboradoresLocales.length} colaboradores
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Limpiar formulario antes de abrir
+                        setNombre('');
+                        setEmail('');
+                        setPassword('');
+                        setConfirmPassword('');
+                        setRolOption('ROL_VENDEDOR');
+                        setPermiteCambiarPrecio(false);
+                        setAddUserEmailError('');
+                        setShowPasswordAddUser(false);
+                        setShowConfirmPasswordAddUser(false);
+                        setSelectedTenantForNewUser(selectedSucursalId);
+                        setShowAddModal(true);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm"
+                    >
+                      <Plus size={13} /> Nuevo Colaborador en esta Sucursal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedSucursalId(null); setPersonalSucursal([]); }}
+                      className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors"
+                      title="Cerrar panel"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Limpiar formulario antes de abrir
-                      setNombre('');
-                      setEmail('');
-                      setPassword('');
-                      setConfirmPassword('');
-                      setRolOption('ROL_VENDEDOR');
-                      setPermiteCambiarPrecio(false);
-                      setAddUserEmailError('');
-                      setShowPasswordAddUser(false);
-                      setShowConfirmPasswordAddUser(false);
-                      setSelectedTenantForNewUser(selectedSucursalId);
-                      setShowAddModal(true);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm"
-                  >
-                    <Plus size={13} /> Nuevo Colaborador en esta Sucursal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedSucursalId(null); setPersonalSucursal([]); }}
-                    className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors"
-                    title="Cerrar panel"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
 
-              {loadingPersonalSuc ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="animate-spin text-[#0F172A]" size={24} />
-                </div>
-              ) : personalSucursal.length === 0 ? (
-                <div className="p-6 text-center text-xs text-[var(--muted-foreground)] bg-[var(--muted)]/20 rounded-xl border border-dashed border-[var(--border)]">
-                  Esta sucursal no tiene colaboradores asignados.
-                </div>
-              ) : (
-                <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                      <tr>
-                        <th className="p-3">Colaborador</th>
-                        <th className="p-3">Rol</th>
-                        <th className="p-3 text-center">Estado</th>
-                        <th className="p-3 text-center">Modificar Precios</th>
-                        <th className="p-3 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border)]">
-                      {personalSucursal.map((user) => (
+                {loadingPersonalSuc ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="animate-spin text-[#0F172A]" size={24} />
+                  </div>
+                ) : colaboradoresLocales.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-[var(--muted-foreground)] bg-[var(--muted)]/20 rounded-xl border border-dashed border-[var(--border)]">
+                    Esta sucursal no tiene colaboradores operativos asignados.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                        <tr>
+                          <th className="p-3">Colaborador</th>
+                          <th className="p-3">Rol</th>
+                          <th className="p-3 text-center">Estado</th>
+                          <th className="p-3 text-center">Modificar Precios</th>
+                          <th className="p-3 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {colaboradoresLocales.map((user) => (
                         <tr key={user.id} className="hover:bg-[var(--muted)]/20 transition-colors">
                           <td className="p-3">
                             <div className="font-bold text-sm text-[var(--foreground)]">{user.nombre}</div>
@@ -1264,11 +1270,11 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                           </td>
                           <td className="p-3">
                             <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                              user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20') :
+                              user.rol === 'ROL_ADMIN' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
                               user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                               'bg-amber-500/10 text-amber-600 border-amber-500/20'
                             }`}>
-                              {user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'Admin General' : 'Admin de Sucursal') : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
+                              {user.rol === 'ROL_ADMIN' ? 'Admin de Sucursal' : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
                             </span>
                           </td>
                           <td className="p-3 text-center">
@@ -1375,217 +1381,343 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                             )}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
       {/* ═══ TAB 2: PERSONAL Y PERMISOS ═══ */}
-      {tabActiva === 'personal' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-base font-bold text-[var(--foreground)]">Colaboradores y Permisos</h2>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Gestiona roles, accesos y reseteo de claves del personal del local comercial.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1 sm:w-64">
-                <Search size={15} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
-                <input
-                  type="text"
-                  value={searchPersonalQuery}
-                  onChange={(e) => setSearchPersonalQuery(e.target.value)}
-                  placeholder="Buscar por nombre, cedula o correo..."
-                  className="w-full pl-9 pr-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                />
-              </div>
-              <button
-                onClick={loadUsers}
-                className="p-2 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors shrink-0"
-                title="Refrescar Lista"
-              >
-                <RefreshCw size={15} />
-              </button>
-              <button
-                onClick={() => {
-                  // Limpiar formulario antes de abrir
-                  setNombre('');
-                  setEmail('');
-                  setPassword('');
-                  setConfirmPassword('');
-                  setRolOption('ROL_VENDEDOR');
-                  setPermiteCambiarPrecio(false);
-                  setAddUserEmailError('');
-                  setShowPasswordAddUser(false);
-                  setShowConfirmPasswordAddUser(false);
-                  setShowPasswordMeter(false);
-                  if (!isGlobalAdmin) {
-                    setSelectedTenantForNewUser(loggedUser?.tenantId || (sucursales[0]?.id || ''));
-                  } else if (sucursales.length > 0 && !selectedTenantForNewUser) {
-                    setSelectedTenantForNewUser(sucursales[0].id);
-                  }
-                  setShowAddModal(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all shrink-0"
-              >
-                <Plus size={15} /> Nuevo Colaborador
-              </button>
-            </div>
-          </div>
+      {tabActiva === 'personal' && (() => {
+        const adminGenerales = users.filter((u) => u.esAdminGeneral);
+        const colaboradoresOperativos = users.filter((u) => !u.esAdminGeneral);
+        const filtradosOperativos = colaboradoresOperativos.filter((user) => {
+          if (!searchPersonalQuery.trim()) return true;
+          const q = searchPersonalQuery.toLowerCase().trim();
+          return (
+            user.nombre.toLowerCase().includes(q) ||
+            user.email.toLowerCase().includes(q)
+          );
+        });
 
-          <div className="overflow-x-auto border border-[var(--border)] rounded-2xl bg-[var(--card)] shadow-sm">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                <tr>
-                  <th className="p-3.5">Colaborador</th>
-                  <th className="p-3.5">Sucursal Asignada</th>
-                  <th className="p-3.5">Rol Asignado</th>
-                  <th className="p-3.5 text-center">Estado</th>
-                  <th className="p-3.5 text-center">Modificar Precios</th>
-                  <th className="p-3.5 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {users
-                  .filter((user) => {
-                    if (!searchPersonalQuery.trim()) return true;
-                    const q = searchPersonalQuery.toLowerCase().trim();
-                    return (
-                      user.nombre.toLowerCase().includes(q) ||
-                      user.email.toLowerCase().includes(q)
-                    );
-                  })
-                  .map((user) => (
-                  <tr key={user.id} className="hover:bg-[var(--muted)]/20 transition-colors">
-                    <td className="p-3.5">
-                      <div className="font-bold text-sm text-[var(--foreground)]">{user.nombre}</div>
-                      <div className="text-[11px] text-[var(--muted-foreground)]">{user.email}</div>
-                    </td>
-                    <td className="p-3.5">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-500/10 text-[var(--foreground)] border border-slate-500/20">
-                        <Building2 size={12} className="text-amber-500" />
-                        {sucursales.find(s => s.id === user.tenantId)?.name || 'Matriz Principal'}
+        return (
+          <div className="space-y-6">
+            {/* 👑 SECCIÓN EJECUTIVA: ADMINISTRADORES GENERALES DEL NEGOCIO */}
+            <div className="p-5 bg-[var(--card)] border border-amber-500/20 bg-gradient-to-br from-amber-500/5 via-transparent to-transparent rounded-2xl shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-xl shrink-0">
+                    <Crown size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-black uppercase tracking-wider text-[var(--foreground)]">
+                        Administradores Generales del Negocio
+                      </h2>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 rounded-full">
+                        {adminGenerales.length} {adminGenerales.length === 1 ? 'administrador' : 'administradores'}
                       </span>
-                      {user.rol === 'ROL_ADMIN' && (
-                        <span className="block text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
-                          {user.esAdminGeneral ? '👑 Administrador General' : '🏢 Admin de Sucursal'}
-                        </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">
+                      Propietarios y dirección corporativa con control total sobre todas las sucursales, finanzas e inventarios del negocio.
+                    </p>
+                  </div>
+                </div>
+
+                {isGlobalAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNombre('');
+                      setEmail('');
+                      setPassword('');
+                      setConfirmPassword('');
+                      setRolOption('ADMIN_GENERAL');
+                      setPermiteCambiarPrecio(true);
+                      setAddUserEmailError('');
+                      setShowPasswordAddUser(false);
+                      setShowConfirmPasswordAddUser(false);
+                      setShowPasswordMeter(false);
+                      setSelectedTenantForNewUser(sucursales[0]?.id || loggedUser?.tenantId || '');
+                      setShowAddModal(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all shrink-0 cursor-pointer"
+                  >
+                    <Crown size={14} /> + Nuevo Administrador General
+                  </button>
+                )}
+              </div>
+
+              {adminGenerales.length === 0 ? (
+                <div className="p-4 text-center text-xs text-[var(--muted-foreground)] bg-[var(--muted)]/20 rounded-xl border border-dashed border-[var(--border)]">
+                  No se registran administradores generales en este momento.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {adminGenerales.map((admin) => (
+                    <div
+                      key={admin.id}
+                      className="p-4 bg-[var(--card)] border border-[var(--border)] hover:border-amber-500/40 rounded-xl shadow-xs flex items-center justify-between gap-3 transition-all"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-black text-sm flex items-center justify-center shrink-0">
+                          {admin.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-bold text-xs text-[var(--foreground)] truncate flex items-center gap-1.5">
+                            <span>{admin.nombre}</span>
+                            {admin.id === loggedUser?.id && (
+                              <span className="text-[9px] px-1.5 py-0.2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded font-semibold">Tú</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[var(--muted-foreground)] truncate">{admin.email}</div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="inline-flex items-center gap-1 text-[9.5px] font-extrabold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                              <Crown size={10} /> Acceso Global
+                            </span>
+                            <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-md ${
+                              admin.activo ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                            }`}>
+                              {admin.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {canManageTargetUser(admin) && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUser(admin);
+                              setShowEditModal(true);
+                            }}
+                            className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
+                            title="Editar Administrador General"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setResettingUser(admin);
+                              setShowResetPasswordModal(true);
+                            }}
+                            className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors"
+                            title="Resetear Contraseña"
+                          >
+                            <KeyRound size={13} />
+                          </button>
+                        </div>
                       )}
-                    </td>
-                    <td className="p-3.5">
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                        user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20') :
-                        user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
-                        'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                      }`}>
-                        {user.rol === 'ROL_ADMIN' ? (user.esAdminGeneral ? 'Admin General' : 'Admin de Sucursal') : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-center">
-                      {canManageTargetUser(user) ? (
-                        <button
-                          onClick={() => handleToggleActive(user)}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
-                            user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
-                          }`}
-                        >
-                          {user.activo ? 'Activo' : 'Inactivo'}
-                        </button>
-                      ) : (
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                          user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                        }`}>
-                          {user.activo ? 'Activo' : 'Inactivo'}
-                        </span>
-                      )}
-                      {isUserLocked(user) && (
-                        <span className="inline-flex items-center gap-1 ml-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-red-500/15 text-red-600 border border-red-500/25">
-                          <Lock size={10} /> Bloqueada
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3.5 text-center">
-                      {canManageTargetUser(user) ? (
-                        <button
-                          onClick={() => handleTogglePermisoPrecio(user)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
-                            user.permiteCambiarPrecio ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                          }`}
-                        >
-                          {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
-                        </button>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-slate-500/10 text-slate-400 border-slate-500/20">
-                          {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3.5 text-right space-x-2">
-                      {canManageTargetUser(user) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingUser(user);
-                            setShowEditModal(true);
-                          }}
-                          className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
-                          title="Editar Colaborador"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                      )}
-                      {canManageTargetUser(user) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setResettingUser(user);
-                            setShowResetPasswordModal(true);
-                          }}
-                          className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors"
-                          title="Resetear Contraseña"
-                        >
-                          <KeyRound size={14} />
-                        </button>
-                      )}
-                      {canManageTargetUser(user) && !user.esAdminGeneral && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUserToDelete(user);
-                            setDeleteUserError('');
-                            setShowDeleteUserModal(true);
-                          }}
-                          className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 transition-colors"
-                          title="Eliminar Colaborador"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                      {canManageTargetUser(user) && isUserLocked(user) && (
-                        <button
-                          type="button"
-                          onClick={() => handleUnlockUser(user)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-600 text-[10px] font-bold transition-colors"
-                          title="Desbloquear Cuenta"
-                        >
-                          <Unlock size={12} /> Desbloquear
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 🏢 SECCIÓN OPERATIVA: PERSONAL POR SUCURSAL */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-bold text-[var(--foreground)]">Personal Operativo por Sucursal</h2>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Gestiona roles locales, asignación a puntos de venta y permisos de precios para administradores de sucursal, vendedores y bodegueros.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search size={15} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
+                    <input
+                      type="text"
+                      value={searchPersonalQuery}
+                      onChange={(e) => setSearchPersonalQuery(e.target.value)}
+                      placeholder="Buscar por nombre o correo..."
+                      className="w-full pl-9 pr-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    />
+                  </div>
+                  <button
+                    onClick={loadUsers}
+                    className="p-2 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors shrink-0 cursor-pointer"
+                    title="Refrescar Lista"
+                  >
+                    <RefreshCw size={15} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNombre('');
+                      setEmail('');
+                      setPassword('');
+                      setConfirmPassword('');
+                      setRolOption('ROL_VENDEDOR');
+                      setPermiteCambiarPrecio(false);
+                      setAddUserEmailError('');
+                      setShowPasswordAddUser(false);
+                      setShowConfirmPasswordAddUser(false);
+                      setShowPasswordMeter(false);
+                      if (!isGlobalAdmin) {
+                        setSelectedTenantForNewUser(loggedUser?.tenantId || (sucursales[0]?.id || ''));
+                      } else if (sucursales.length > 0 && !selectedTenantForNewUser) {
+                        setSelectedTenantForNewUser(sucursales[0].id);
+                      }
+                      setShowAddModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all shrink-0 cursor-pointer"
+                  >
+                    <Plus size={15} /> Nuevo Colaborador
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto border border-[var(--border)] rounded-2xl bg-[var(--card)] shadow-sm">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    <tr>
+                      <th className="p-3.5">Colaborador</th>
+                      <th className="p-3.5">Sucursal Asignada</th>
+                      <th className="p-3.5">Rol Asignado</th>
+                      <th className="p-3.5 text-center">Estado</th>
+                      <th className="p-3.5 text-center">Modificar Precios</th>
+                      <th className="p-3.5 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {filtradosOperativos.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-xs text-[var(--muted-foreground)]">
+                          {searchPersonalQuery.trim()
+                            ? 'No se encontraron colaboradores que coincidan con la búsqueda.'
+                            : 'No hay colaboradores operativos registrados.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filtradosOperativos.map((user) => (
+                        <tr key={user.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                          <td className="p-3.5">
+                            <div className="font-bold text-sm text-[var(--foreground)]">{user.nombre}</div>
+                            <div className="text-[11px] text-[var(--muted-foreground)]">{user.email}</div>
+                          </td>
+                          <td className="p-3.5">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-500/10 text-[var(--foreground)] border border-slate-500/20">
+                              <Building2 size={12} className="text-amber-500" />
+                              {sucursales.find((s) => s.id === user.tenantId)?.name || 'Matriz Principal'}
+                            </span>
+                          </td>
+                          <td className="p-3.5">
+                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                              user.rol === 'ROL_ADMIN' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                              user.rol === 'ROL_VENDEDOR' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                              'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                            }`}>
+                              {user.rol === 'ROL_ADMIN' ? 'Admin de Sucursal' : user.rol === 'ROL_VENDEDOR' ? 'Vendedor' : 'Bodeguero'}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-center">
+                            {canManageTargetUser(user) ? (
+                              <button
+                                onClick={() => handleToggleActive(user)}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                                  user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
+                                }`}
+                              >
+                                {user.activo ? 'Activo' : 'Inactivo'}
+                              </button>
+                            ) : (
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                              }`}>
+                                {user.activo ? 'Activo' : 'Inactivo'}
+                              </span>
+                            )}
+                            {isUserLocked(user) && (
+                              <span className="inline-flex items-center gap-1 ml-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-red-500/15 text-red-600 border border-red-500/25">
+                                <Lock size={10} /> Bloqueada
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-center">
+                            {canManageTargetUser(user) ? (
+                              <button
+                                onClick={() => handleTogglePermisoPrecio(user)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                                  user.permiteCambiarPrecio ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                }`}
+                              >
+                                {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
+                              </button>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-slate-500/10 text-slate-400 border-slate-500/20">
+                                {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-right space-x-2">
+                            {canManageTargetUser(user) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingUser(user);
+                                  setShowEditModal(true);
+                                }}
+                                className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer"
+                                title="Editar Colaborador"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                            )}
+                            {canManageTargetUser(user) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setResettingUser(user);
+                                  setShowResetPasswordModal(true);
+                                }}
+                                className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors cursor-pointer"
+                                title="Resetear Contraseña"
+                              >
+                                <KeyRound size={14} />
+                              </button>
+                            )}
+                            {canManageTargetUser(user) && !user.esAdminGeneral && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUserToDelete(user);
+                                  setDeleteUserError('');
+                                  setShowDeleteUserModal(true);
+                                }}
+                                className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 transition-colors cursor-pointer"
+                                title="Eliminar Colaborador"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                            {canManageTargetUser(user) && isUserLocked(user) && (
+                              <button
+                                type="button"
+                                onClick={() => handleUnlockUser(user)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-600 text-[10px] font-bold transition-colors cursor-pointer"
+                                title="Desbloquear Cuenta"
+                              >
+                                <Unlock size={12} /> Desbloquear
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ═══ TAB 3: STOCK INTER-SUCURSAL ═══ */}
       {tabActiva === 'stock-inter' && (
