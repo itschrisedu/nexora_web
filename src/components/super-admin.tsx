@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { ApiService } from "@/services/api.service";
 import { formatearEmail, validarEmailEstricto, handleEmailKeyDown } from "@/utils/text-formatters";
+import { useWindowFocusRefresh } from "@/hooks/useWindowFocusRefresh";
 import { getStoredPlanPrices } from "@/utils/saas-plans";
 import {
   Building2,
@@ -611,6 +612,12 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     fetchTenants();
     fetchSuperAdmins();
   }, [fetchTenants, fetchSuperAdmins]);
+
+  // Revalidar datos automáticamente al volver a la pestaña + polling suave cada 60s
+  useWindowFocusRefresh(
+    useCallback(() => { fetchTenants(); fetchSuperAdmins(); }, [fetchTenants, fetchSuperAdmins]),
+    { enabled: online, pollingIntervalMs: 60000 },
+  );
 
   // Si cambia a la pestaña de Super Admins, refrescar de fondo
   useEffect(() => {

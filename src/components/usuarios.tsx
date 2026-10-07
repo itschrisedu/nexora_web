@@ -11,6 +11,7 @@ import {
 import UnsavedChangesModal from './ui/unsaved-changes-modal';
 import { formatearEmail, validarEmailEstricto, handleEmailKeyDown } from '@/utils/text-formatters';
 import VaultPasswordMeter from './ui/VaultPasswordMeter';
+import { useWindowFocusRefresh } from '@/hooks/useWindowFocusRefresh';
 
 interface UsuariosProps {
   online: boolean;
@@ -319,6 +320,17 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       console.error('Error al cargar personal:', err);
     }
   };
+
+  // Revalidar usuarios y sucursales automáticamente al volver a la pestaña + sondeo cada 60s
+  useWindowFocusRefresh(
+    useCallback(() => {
+      if (online) {
+        loadUsers();
+        loadSucursales();
+      }
+    }, [online]),
+    { enabled: online, pollingIntervalMs: 60000 },
+  );
 
   const handleCreateSucursal = async (e: React.FormEvent) => {
     e.preventDefault();
