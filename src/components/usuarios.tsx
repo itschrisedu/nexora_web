@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import UnsavedChangesModal from './ui/unsaved-changes-modal';
 import { formatearEmail, validarEmailEstricto, handleEmailKeyDown } from '@/utils/text-formatters';
+import VaultPasswordMeter from './ui/VaultPasswordMeter';
 
 interface UsuariosProps {
   online: boolean;
@@ -119,6 +120,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
   // Formulario Nuevo Colaborador
   const [nombre, setNombre] = useState('');
+  const [nombreError, setNombreError] = useState('');
+  const [nombreTouched, setNombreTouched] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -127,6 +130,44 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [rolOption, setRolOption] = useState<'ADMIN_GENERAL' | 'ADMIN_SUCURSAL' | 'ROL_VENDEDOR' | 'ROL_BODEGUERO'>('ROL_VENDEDOR');
   const [permiteCambiarPrecio, setPermiteCambiarPrecio] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Formateador: Primera letra de cada palabra en mayúscula, el resto en minúscula
+  const formatNombreColaborador = (val: string) => {
+    return val
+      .split(' ')
+      .map((palabra) => {
+        if (!palabra) return '';
+        return palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase();
+      })
+      .join(' ');
+  };
+
+  // Validador de nombre: Mínimo 2 y máximo 5 palabras
+  const validateNombreColaborador = (val: string): string => {
+    const trimmed = val.trim();
+    if (!trimmed) return 'El nombre completo debe tener entre 2 y 5 palabras';
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length < 2 || words.length > 5) {
+      return 'El nombre completo debe tener entre 2 y 5 palabras';
+    }
+    return '';
+  };
+
+  const handleNombreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+    const words = raw.trim().split(/\s+/).filter(Boolean);
+
+    // No permitir escribir más de 5 palabras
+    if (words.length > 5) {
+      return;
+    }
+
+    const formatted = formatNombreColaborador(raw);
+    setNombre(formatted);
+    if (nombreTouched) {
+      setNombreError(validateNombreColaborador(formatted));
+    }
+  };
 
   // Modal Reset Password
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
@@ -165,6 +206,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   useEffect(() => {
     if (showAddModal) {
       setNombre('');
+      setNombreError('');
+      setNombreTouched(false);
       setEmail('');
       setPassword('');
       setConfirmPassword('');
@@ -373,6 +416,14 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       return;
     }
 
+    const nErr = validateNombreColaborador(nombre);
+    if (nErr) {
+      setNombreTouched(true);
+      setNombreError(nErr);
+      setErrorMsg(nErr);
+      return;
+    }
+
     if (password.length < 6) {
       setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
       return;
@@ -397,8 +448,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       const assignedTenant = isGlobal ? (matrizTenant?.id || sucursales[0]?.id || selectedTenantForNewUser) : selectedTenantForNewUser;
 
       await ApiService.post('/auth/usuarios', {
-        nombre,
-        email,
+        nombre: nombre.trim().toLowerCase(),
+        email: email.trim().toLowerCase(),
         password,
         rol: actualRol,
         esAdminGeneral: isGlobal,
@@ -410,6 +461,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setShowAddModal(false);
       setAddUserEmailError('');
       setNombre('');
+      setNombreError('');
+      setNombreTouched(false);
       setEmail('');
       setPassword('');
       setConfirmPassword('');
@@ -1618,8 +1671,8 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       {/* ═══ MODAL CREAR COLABORADOR ═══ */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddModal(false), isDirtyAddUser()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+            <div className="p-5 sm:p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
                   <UserPlus size={20} />
@@ -1637,27 +1690,43 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateUser} autoComplete="off" className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateUser} autoComplete="off" className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 custom-scrollbar">
               {/* Dummy fields to absorb aggressive browser autofill / password managers */}
               <input type="text" name="fake_username_prevent_autofill" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
               <input type="password" name="fake_password_prevent_autofill" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
 
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre Completo</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Nombre Completo *</label>
+                  <span className="text-[10px] text-[var(--muted-foreground)]">2 a 5 palabras</span>
+                </div>
                 <input
                   type="text"
                   name="colaborador_nuevo_nombre"
                   autoComplete="off"
                   required
                   value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Ej: Carlos Gómez"
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  onChange={handleNombreChange}
+                  onBlur={() => {
+                    setNombreTouched(true);
+                    setNombreError(validateNombreColaborador(nombre));
+                  }}
+                  placeholder="Ej: Carlos Alberto Gómez Paredes"
+                  className={`w-full px-3 py-2 bg-[var(--muted)]/40 border rounded-xl text-xs focus:outline-none transition-colors ${
+                    nombreTouched && nombreError 
+                      ? 'border-red-500 focus:border-red-500 bg-red-500/5 ring-1 ring-red-500/20 text-red-600 dark:text-red-400' 
+                      : 'border-[var(--border)] focus:border-[#0F172A]'
+                  }`}
                 />
+                {nombreTouched && nombreError && (
+                  <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1.5 animate-fadeIn">
+                    <AlertCircle size={13} className="shrink-0 text-red-500" /> {nombreError}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico</label>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Correo Electrónico *</label>
                 <input
                   type="email"
                   name="colaborador_nuevo_email_noautofill"
@@ -1703,7 +1772,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Ingresa la contraseña para evaluar su seguridad"
                     className="w-full px-3 py-2 pr-10 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   />
                   <button
@@ -1716,6 +1785,14 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     {showPasswordAddUser ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+              </div>
+
+              {/* Evaluador de Fortaleza Acorazada (Bóveda / Vault) */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  Evaluador de Fortaleza Acorazada (Bóveda / Vault)
+                </label>
+                <VaultPasswordMeter password={password} showRequirements={true} />
               </div>
 
               <div>
@@ -1831,7 +1908,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving || !password || !confirmPassword || password !== confirmPassword || password.length < 6}
+                  disabled={saving || !password || !confirmPassword || password !== confirmPassword || password.length < 6 || (nombreTouched && !!nombreError)}
                   className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
                 >
                   {saving ? 'Guardando...' : 'Crear Colaborador'}
