@@ -68,6 +68,7 @@ interface TenantAdmin {
   email: string;
   nombre: string;
   rol: string;
+  esAdminGeneral?: boolean;
   activo: boolean;
 }
 
@@ -276,6 +277,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     password: "",
     confirmPassword: "",
     rol: "ROL_ADMIN",
+    esAdminGeneral: true,
   });
 
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -285,6 +287,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     nombre: string;
     email: string;
     rol: string;
+    esAdminGeneral?: boolean;
     activo: boolean;
     password: string;
     confirmPassword?: string;
@@ -385,7 +388,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         isOpen: true,
         onDiscard: () => {
           setShowCreateUserModal(false);
-          setNewUser({ email: "", nombre: "", password: "", confirmPassword: "", rol: "ROL_ADMIN" });
+          setNewUser({ email: "", nombre: "", password: "", confirmPassword: "", rol: "ROL_ADMIN", esAdminGeneral: true });
           setDiscardConfirm(null);
         },
       });
@@ -963,11 +966,12 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         email: newUser.email,
         password: newUser.password,
         rol: newUser.rol,
+        esAdminGeneral: newUser.rol === 'ROL_ADMIN' ? newUser.esAdminGeneral : false,
       });
       setSuccessMsg(`Usuario "${newUser.nombre}" creado exitosamente.`);
       setShowCreateUserModal(false);
       setNewUserEmailError("");
-      setNewUser({ email: "", nombre: "", password: "", confirmPassword: "", rol: "ROL_ADMIN" });
+      setNewUser({ email: "", nombre: "", password: "", confirmPassword: "", rol: "ROL_ADMIN", esAdminGeneral: true });
       await handleViewDetail(selectedTenantDetail.id);
       await fetchTenants();
     } catch (err: any) {
@@ -1002,6 +1006,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
         email: editingUser.email,
         rol: editingUser.rol,
         activo: editingUser.activo,
+        esAdminGeneral: editingUser.rol === 'ROL_ADMIN' ? (editingUser.esAdminGeneral ?? true) : false,
       };
       if (editingUser.password.trim()) {
         payload.password = editingUser.password.trim();
@@ -1040,20 +1045,20 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
     }
   };
 
-  const getRolLabel = (rol: string) => {
+  const getRolLabel = (rol: string, esAdminGeneral?: boolean) => {
     switch (rol) {
       case "ROL_SUPER_ADMIN": return "Super Admin";
-      case "ROL_ADMIN": return "Administrador";
+      case "ROL_ADMIN": return esAdminGeneral ? "Admin General" : "Admin de Sucursal";
       case "ROL_VENDEDOR": return "Vendedor";
       case "ROL_BODEGUERO": return "Bodeguero";
       default: return rol;
     }
   };
 
-  const getRolColor = (rol: string) => {
+  const getRolColor = (rol: string, esAdminGeneral?: boolean) => {
     switch (rol) {
       case "ROL_SUPER_ADMIN": return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-      case "ROL_ADMIN": return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+      case "ROL_ADMIN": return esAdminGeneral ? "bg-indigo-500/10 text-indigo-600 border-indigo-500/20" : "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "ROL_VENDEDOR": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
       case "ROL_BODEGUERO": return "bg-amber-500/10 text-amber-500 border-amber-500/20";
       default: return "bg-slate-500/10 text-slate-500 border-slate-500/20";
@@ -3276,8 +3281,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                               <td className="px-4 py-2.5 font-medium">{user.nombre}</td>
                               <td className="px-4 py-2.5 text-[var(--muted-foreground)]">{user.email}</td>
                               <td className="px-4 py-2.5">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getRolColor(user.rol)}`}>
-                                  {getRolLabel(user.rol)}
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getRolColor(user.rol, user.esAdminGeneral)}`}>
+                                  {getRolLabel(user.rol, user.esAdminGeneral)}
                                 </span>
                               </td>
                               <td className="px-4 py-2.5 text-center">
@@ -3297,6 +3302,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                                         nombre: user.nombre,
                                         email: user.email,
                                         rol: user.rol,
+                                        esAdminGeneral: user.esAdminGeneral,
                                         activo: user.activo,
                                         password: "",
                                       };
@@ -3467,11 +3473,21 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   Rol del Usuario
                 </label>
                 <select
-                  value={newUser.rol}
-                  onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}
+                  value={newUser.rol === 'ROL_ADMIN' ? (newUser.esAdminGeneral ? 'ADMIN_GENERAL' : 'ADMIN_SUCURSAL') : newUser.rol}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'ADMIN_GENERAL') {
+                      setNewUser({ ...newUser, rol: 'ROL_ADMIN', esAdminGeneral: true });
+                    } else if (val === 'ADMIN_SUCURSAL') {
+                      setNewUser({ ...newUser, rol: 'ROL_ADMIN', esAdminGeneral: false });
+                    } else {
+                      setNewUser({ ...newUser, rol: val, esAdminGeneral: false });
+                    }
+                  }}
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 >
-                  <option value="ROL_ADMIN">Administrador de Tenant</option>
+                  <option value="ADMIN_GENERAL">Admin General (todas las sucursales)</option>
+                  <option value="ADMIN_SUCURSAL">Admin de Sucursal (solo sucursal asignada)</option>
                   <option value="ROL_VENDEDOR">Vendedor</option>
                   <option value="ROL_BODEGUERO">Bodeguero</option>
                 </select>
@@ -3628,11 +3644,21 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   Rol
                 </label>
                 <select
-                  value={editingUser.rol}
-                  onChange={(e) => setEditingUser({ ...editingUser, rol: e.target.value })}
+                  value={editingUser.rol === 'ROL_ADMIN' ? (editingUser.esAdminGeneral ? 'ADMIN_GENERAL' : 'ADMIN_SUCURSAL') : editingUser.rol}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'ADMIN_GENERAL') {
+                      setEditingUser({ ...editingUser, rol: 'ROL_ADMIN', esAdminGeneral: true });
+                    } else if (val === 'ADMIN_SUCURSAL') {
+                      setEditingUser({ ...editingUser, rol: 'ROL_ADMIN', esAdminGeneral: false });
+                    } else {
+                      setEditingUser({ ...editingUser, rol: val, esAdminGeneral: false });
+                    }
+                  }}
                   className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[#0F172A]"
                 >
-                  <option value="ROL_ADMIN">Administrador</option>
+                  <option value="ADMIN_GENERAL">Admin General (todas las sucursales)</option>
+                  <option value="ADMIN_SUCURSAL">Admin de Sucursal (solo sucursal asignada)</option>
                   <option value="ROL_VENDEDOR">Vendedor</option>
                   <option value="ROL_BODEGUERO">Bodeguero</option>
                   <option value="ROL_SUPER_ADMIN">Super Admin</option>
