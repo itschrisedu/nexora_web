@@ -38,6 +38,7 @@ export default function UserAvatar({
   const [imgError, setImgError] = useState(false);
 
   const cleanName = (nombre || "").trim();
+  const cleanEmail = (email || "").trim().toLowerCase();
   const initials = cleanName
     ? cleanName
         .split(" ")
@@ -45,18 +46,21 @@ export default function UserAvatar({
         .slice(0, 2)
         .map((n) => n[0].toUpperCase())
         .join("") || cleanName.slice(0, 2).toUpperCase()
-    : (email ? email.slice(0, 2).toUpperCase() : "US");
+    : (cleanEmail ? cleanEmail.slice(0, 2).toUpperCase() : "US");
 
-  const colorScheme = AVATAR_GRADIENTS[getGradientIndex(cleanName || email || "NEXORA")];
+  const colorScheme = AVATAR_GRADIENTS[getGradientIndex(cleanName || cleanEmail || "NEXORA")];
+
+  // Si no se pasó un avatarUrl explícito pero sí un email válido, consultar servicio universal de avatar (Gravatar/Google/etc.)
+  const effectiveAvatarUrl = avatarUrl || (cleanEmail && cleanEmail.includes("@") ? `https://unavatar.io/${encodeURIComponent(cleanEmail)}?fallback=false` : undefined);
 
   return (
     <div
       className={`${sizeClassName} rounded-xl bg-gradient-to-br ${colorScheme} border flex items-center justify-center shadow-xs shrink-0 overflow-hidden relative select-none`}
     >
-      {avatarUrl && !imgError ? (
+      {effectiveAvatarUrl && !imgError ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={avatarUrl}
+          src={effectiveAvatarUrl}
           alt={cleanName}
           className="w-full h-full object-cover rounded-xl"
           onError={() => setImgError(true)}

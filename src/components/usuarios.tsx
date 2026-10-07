@@ -119,6 +119,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
 
+  // ─── ELIMINAR COLABORADOR ───
+  const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserListItem | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [deleteUserError, setDeleteUserError] = useState('');
+
   // Formulario Nuevo Colaborador
   const [nombre, setNombre] = useState('');
   const [nombreError, setNombreError] = useState('');
@@ -623,6 +629,25 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setErrorMsg(err.message || 'Error al restablecer contraseña.');
     } finally {
       setSavingPassword(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    setDeleteUserError('');
+    try {
+      await ApiService.delete(`/configuracion/personal/${userToDelete.id}`);
+      setSuccessMsg(`Colaborador "${userToDelete.nombre}" eliminado exitosamente.`);
+      setShowDeleteUserModal(false);
+      setUserToDelete(null);
+      loadUsers();
+      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setDeleteUserError(err.message || 'No se pudo eliminar el colaborador.');
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -1244,6 +1269,20 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                             >
                               <ArrowRightLeft size={12} /> Transferir
                             </button>
+                            {!user.esAdminGeneral && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUserToDelete(user);
+                                  setDeleteUserError('');
+                                  setShowDeleteUserModal(true);
+                                }}
+                                className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 transition-colors"
+                                title="Eliminar Colaborador"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                             {isUserLocked(user) && (
                               <button
                                 type="button"
@@ -1411,6 +1450,20 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                       >
                         <KeyRound size={14} />
                       </button>
+                      {!user.esAdminGeneral && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserToDelete(user);
+                            setDeleteUserError('');
+                            setShowDeleteUserModal(true);
+                          }}
+                          className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 transition-colors"
+                          title="Eliminar Colaborador"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                       {isUserLocked(user) && (
                         <button
                           type="button"
@@ -2522,6 +2575,71 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
           </div>
         </div>
       )}
+      {/* ═══ MODAL CONFIRMAR ELIMINAR COLABORADOR ═══ */}
+      {showDeleteUserModal && userToDelete && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-[var(--card)] border border-rose-500/30 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 border-b border-[var(--border)] bg-rose-500/10 text-rose-700 dark:text-rose-400">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500/20 rounded-2xl text-rose-600 font-bold">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-rose-700 dark:text-rose-400">¿Eliminar Colaborador?</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">Acción permanente</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4 text-xs">
+              <p className="text-[var(--foreground)] leading-relaxed">
+                ¿Estás seguro de que deseas eliminar permanentemente a <strong>"{userToDelete.nombre}"</strong> (<span className="text-[var(--muted-foreground)] font-mono">{userToDelete.email}</span>)?
+              </p>
+
+              {deleteUserError ? (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/25 rounded-2xl text-rose-700 dark:text-rose-300 text-xs space-y-1.5">
+                  <div className="flex items-start gap-2 font-bold">
+                    <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-600" />
+                    <span>No se puede eliminar este colaborador</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed pl-6">
+                    {deleteUserError}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-xl text-[11px] leading-tight">
+                  Nota: Solo se pueden eliminar colaboradores que <strong>no registren operaciones comerciales</strong> (ventas, cobros, cierres de caja o movimientos de stock). Si ya registra actividad, debes cambiar su estado a <strong>"Inactivo"</strong>.
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteUserModal(false);
+                    setUserToDelete(null);
+                    setDeleteUserError('');
+                  }}
+                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                >
+                  {deleteUserError ? 'Cerrar' : 'Cancelar'}
+                </button>
+                {!deleteUserError && (
+                  <button
+                    type="button"
+                    disabled={deletingUser}
+                    onClick={handleDeleteUser}
+                    className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {deletingUser ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    {deletingUser ? 'Eliminando...' : 'Eliminar'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <UnsavedChangesModal
         isOpen={showDiscardModal}
         detail={{ hasChanges: true, sectionName: 'el formulario actual' }}

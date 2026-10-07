@@ -1163,8 +1163,7 @@ function MainApp() {
   const isSuperAdmin = Boolean(
     user?.rol === 'ROL_SUPER_ADMIN' ||
     user?.rol === 'SUPER_ADMIN' ||
-    user?.isSuperAdmin === true ||
-    user?.email === 'chrispaucar49@gmail.com'
+    user?.isSuperAdmin === true
   );
 
   const renderSidebarContent = (isMobile: boolean = false) => {
