@@ -175,12 +175,14 @@ interface VaultPasswordMeterProps {
   password: string;
   showRequirements?: boolean;
   className?: string;
+  compact?: boolean;
 }
 
 export default function VaultPasswordMeter({
   password,
   showRequirements = true,
   className = "",
+  compact = false,
 }: VaultPasswordMeterProps) {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -244,16 +246,18 @@ export default function VaultPasswordMeter({
   const rotationAngle = (password.length * 45) % 360;
 
   return (
-    <div className={`space-y-3 font-sans ${className}`}>
+    <div className={`${compact ? "space-y-2" : "space-y-3"} font-sans ${className}`}>
       {/* ─── EXACT REPRODUCTION OF VAULT CARD FROM SCREENSHOT ─── */}
       <div
-        className={`relative overflow-hidden p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border ${analysis.borderColor} bg-[#0A0F14] transition-all duration-300 shadow-xl flex items-center gap-3.5 sm:gap-4`}
+        className={`relative overflow-hidden ${
+          compact ? "p-2.5 rounded-xl gap-2.5" : "p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl gap-3.5 sm:gap-4"
+        } border ${analysis.borderColor} bg-[#0A0F14] transition-all duration-300 shadow-md flex items-center`}
         style={{
-          boxShadow: `0 0 25px ${analysis.glowColor}`,
+          boxShadow: `0 0 ${compact ? "12px" : "25px"} ${analysis.glowColor}`,
         }}
       >
         {/* ─── 3D Realistic Vault Door SVG ─── */}
-        <div className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+        <div className={`relative shrink-0 ${compact ? "w-10 h-10" : "w-16 h-16 sm:w-20 sm:h-20"} flex items-center justify-center`}>
           <svg
             className="w-full h-full drop-shadow-md"
             viewBox="0 0 100 100"
@@ -355,30 +359,30 @@ export default function VaultPasswordMeter({
         </div>
 
         {/* ─── Right Details: 4 Segment Progress Bars + Headings + Entropy ─── */}
-        <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
+        <div className={`flex-1 min-w-0 ${compact ? "space-y-1" : "space-y-1.5 sm:space-y-2"}`}>
           {/* 4 Segment Colored Progress Bars */}
-          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+          <div className={`grid grid-cols-4 ${compact ? "gap-1" : "gap-1.5 sm:gap-2"}`}>
             {/* Segment 1: Red */}
             <div
-              className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${
+              className={`${compact ? "h-1" : "h-1.5 sm:h-2"} rounded-full transition-all duration-300 ${
                 analysis.score >= 1 ? "bg-[#EF4444] shadow-xs shadow-red-500/50" : "bg-slate-800/80 border border-slate-700/40"
               }`}
             />
             {/* Segment 2: Orange */}
             <div
-              className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${
+              className={`${compact ? "h-1" : "h-1.5 sm:h-2"} rounded-full transition-all duration-300 ${
                 analysis.score >= 2 ? "bg-[#F97316] shadow-xs shadow-orange-500/50" : "bg-slate-800/80 border border-slate-700/40"
               }`}
             />
             {/* Segment 3: Yellow */}
             <div
-              className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${
+              className={`${compact ? "h-1" : "h-1.5 sm:h-2"} rounded-full transition-all duration-300 ${
                 analysis.score >= 3 ? "bg-[#FACC15] shadow-xs shadow-yellow-500/50" : "bg-slate-800/80 border border-slate-700/40"
               }`}
             />
             {/* Segment 4: Emerald Green */}
             <div
-              className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${
+              className={`${compact ? "h-1" : "h-1.5 sm:h-2"} rounded-full transition-all duration-300 ${
                 analysis.score >= 4 ? "bg-[#10B981] shadow-xs shadow-emerald-500/50" : "bg-slate-800/80 border border-slate-700/40"
               }`}
             />
@@ -386,7 +390,7 @@ export default function VaultPasswordMeter({
 
           {/* Level Title (e.g. "A bank vault") */}
           <div className="flex items-center justify-between gap-2">
-            <h4 className={`text-sm sm:text-base font-extrabold tracking-tight ${analysis.color}`}>
+            <h4 className={`${compact ? "text-xs font-bold" : "text-sm sm:text-base font-extrabold"} tracking-tight ${analysis.color}`}>
               {analysis.label}
             </h4>
 
@@ -394,19 +398,19 @@ export default function VaultPasswordMeter({
             <button
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-1.5 rounded-lg text-xs transition-colors shrink-0 ${
+              className={`${compact ? "p-1 text-[11px]" : "p-1.5 text-xs"} rounded-lg transition-colors shrink-0 ${
                 soundEnabled
                   ? "bg-slate-800 text-emerald-400 border border-emerald-500/30"
                   : "bg-slate-900/60 text-slate-500 hover:text-slate-300 border border-slate-800"
               }`}
               title={soundEnabled ? "Efectos sonoros activados" : "Activar sonido mecánico"}
             >
-              {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+              {soundEnabled ? <Volume2 size={compact ? 11 : 13} /> : <VolumeX size={compact ? 11 : 13} />}
             </button>
           </div>
 
           {/* Subtitle: Estado en lenguaje claro */}
-          <p className="text-xs sm:text-sm text-slate-200 font-medium leading-tight">
+          <p className={`${compact ? "text-[10px]" : "text-xs sm:text-sm"} text-slate-200 font-medium leading-tight`}>
             {analysis.crackTime}
           </p>
         </div>
@@ -414,9 +418,9 @@ export default function VaultPasswordMeter({
 
       {/* ─── Detailed Requirements Checklist ─── */}
       {showRequirements && (
-        <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2 text-xs">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-            <span>Requisitos de Seguridad NEXORA</span>
+        <div className={`${compact ? "p-2 rounded-xl space-y-1.5 text-[11px]" : "p-3.5 rounded-2xl space-y-2 text-xs"} bg-slate-900/70 border border-slate-800`}>
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+            <span>Requisitos de Seguridad</span>
             <span className="text-emerald-400 font-bold">
               {
                 [
@@ -431,22 +435,22 @@ export default function VaultPasswordMeter({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${compact ? "gap-1 text-[10.5px]" : "gap-1.5 text-xs"}`}>
             <div
-              className={`flex items-center gap-2 font-medium ${
+              className={`flex items-center gap-1.5 font-medium ${
                 analysis.hasMinLength ? "text-emerald-400" : "text-slate-400"
               }`}
             >
-              {analysis.hasMinLength ? <Check size={14} className="shrink-0" /> : <X size={14} className="text-slate-600 shrink-0" />}
+              {analysis.hasMinLength ? <Check size={compact ? 12 : 14} className="shrink-0" /> : <X size={compact ? 12 : 14} className="text-slate-600 shrink-0" />}
               <span>Mínimo 8 caracteres</span>
             </div>
 
             <div
-              className={`flex items-center gap-2 font-medium ${
+              className={`flex items-center gap-1.5 font-medium ${
                 analysis.hasUpperCase ? "text-emerald-400" : "text-slate-400"
               }`}
             >
-              {analysis.hasUpperCase ? <Check size={14} className="shrink-0" /> : <X size={14} className="text-slate-600 shrink-0" />}
+              {analysis.hasUpperCase ? <Check size={compact ? 12 : 14} className="shrink-0" /> : <X size={compact ? 12 : 14} className="text-slate-600 shrink-0" />}
               <span>Una mayúscula (A-Z)</span>
             </div>
 
@@ -455,7 +459,7 @@ export default function VaultPasswordMeter({
                 analysis.hasLowerCase ? "text-emerald-400" : "text-slate-400"
               }`}
             >
-              {analysis.hasLowerCase ? <Check size={14} className="shrink-0" /> : <X size={14} className="text-slate-600 shrink-0" />}
+              {analysis.hasLowerCase ? <Check size={compact ? 12 : 14} className="shrink-0" /> : <X size={compact ? 12 : 14} className="text-slate-600 shrink-0" />}
               <span>Una minúscula (a-z)</span>
             </div>
 
@@ -464,7 +468,7 @@ export default function VaultPasswordMeter({
                 analysis.hasNumber ? "text-emerald-400" : "text-slate-400"
               }`}
             >
-              {analysis.hasNumber ? <Check size={14} className="shrink-0" /> : <X size={14} className="text-slate-600 shrink-0" />}
+              {analysis.hasNumber ? <Check size={compact ? 12 : 14} className="shrink-0" /> : <X size={compact ? 12 : 14} className="text-slate-600 shrink-0" />}
               <span>Un número (0-9)</span>
             </div>
 
@@ -473,7 +477,7 @@ export default function VaultPasswordMeter({
                 analysis.hasSpecialChar ? "text-emerald-400" : "text-slate-400"
               }`}
             >
-              {analysis.hasSpecialChar ? <Check size={14} className="shrink-0" /> : <X size={14} className="text-slate-600 shrink-0" />}
+              {analysis.hasSpecialChar ? <Check size={compact ? 12 : 14} className="shrink-0" /> : <X size={compact ? 12 : 14} className="text-slate-600 shrink-0" />}
               <span>Carácter especial (@, $, !, %, *, #, ?, &, ., -, _)</span>
             </div>
           </div>

@@ -15,6 +15,7 @@ import { useWindowFocusRefresh } from '@/hooks/useWindowFocusRefresh';
 
 interface UsuariosProps {
   online: boolean;
+  currentUser?: any;
 }
 
 interface SucursalItem {
@@ -63,7 +64,10 @@ interface StockInterItem {
   tallasDisponibles: { talla: number; cantidad: number }[];
 }
 
-export default function UsuariosComponent({ online }: UsuariosProps) {
+export default function UsuariosComponent({ online, currentUser }: UsuariosProps) {
+  const loggedUser = currentUser || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : null);
+  const isGlobalAdmin = loggedUser?.rol === 'ROL_SUPER_ADMIN' || loggedUser?.esAdminGeneral === true;
+
   const [tabActiva, setTabActiva] = useState<'sucursales' | 'personal' | 'stock-inter'>('sucursales');
 
   const [loading, setLoading] = useState(false);
@@ -134,6 +138,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordAddUser, setShowPasswordAddUser] = useState(false);
   const [showConfirmPasswordAddUser, setShowConfirmPasswordAddUser] = useState(false);
+  const [showPasswordMeter, setShowPasswordMeter] = useState(false);
   const [rolOption, setRolOption] = useState<'ADMIN_GENERAL' | 'ADMIN_SUCURSAL' | 'ROL_VENDEDOR' | 'ROL_BODEGUERO'>('ROL_VENDEDOR');
   const [permiteCambiarPrecio, setPermiteCambiarPrecio] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -223,6 +228,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setAddUserEmailError('');
       setShowPasswordAddUser(false);
       setShowConfirmPasswordAddUser(false);
+      setShowPasswordMeter(false);
     }
   }, [showAddModal]);
 
@@ -306,7 +312,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
     try {
       const data = await ApiService.get('/configuracion/sucursales');
       if (Array.isArray(data)) {
-        setSucursales(data);
+        if (!isGlobalAdmin && loggedUser?.tenantId) {
+          const filtered = data.filter((s: SucursalItem) => s.id === loggedUser.tenantId);
+          const finalBranches = filtered.length > 0 ? filtered : data;
+          setSucursales(finalBranches);
+          if (finalBranches.length > 0 && !selectedSucursalId) {
+            handleSelectSucursal(finalBranches[0].id);
+          }
+        } else {
+          setSucursales(data);
+        }
       }
     } catch (err) {
       console.error('Error cargando sucursales:', err);
@@ -316,12 +331,17 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
   const loadUsers = async () => {
     try {
       const data = await ApiService.get('/configuracion/personal');
+      let userList: UserListItem[] = [];
       if (Array.isArray(data)) {
-        setUsers(data);
+        userList = data;
       } else {
         const fallback = await ApiService.get('/auth/usuarios');
-        setUsers(Array.isArray(fallback) ? fallback : []);
+        userList = Array.isArray(fallback) ? fallback : [];
       }
+      if (!isGlobalAdmin && loggedUser?.tenantId) {
+        userList = userList.filter((u) => u.tenantId === loggedUser.tenantId);
+      }
+      setUsers(userList);
     } catch (err) {
       console.error('Error al cargar personal:', err);
     }
@@ -460,10 +480,14 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
 
     setSaving(true);
     try {
-      const isGlobal = rolOption === 'ADMIN_GENERAL';
-      const actualRol = (rolOption === 'ADMIN_GENERAL' || rolOption === 'ADMIN_SUCURSAL') ? 'ROL_ADMIN' : rolOption;
+      const isGlobal = isGlobalAdmin && rolOption === 'ADMIN_GENERAL';
+      const actualRol = (!isGlobalAdmin || (rolOption !== 'ADMIN_GENERAL' && rolOption !== 'ADMIN_SUCURSAL')) 
+        ? rolOption 
+        : 'ROL_ADMIN';
       const matrizTenant = sucursales.find(s => s.isMatriz);
-      const assignedTenant = isGlobal ? (matrizTenant?.id || sucursales[0]?.id || selectedTenantForNewUser) : selectedTenantForNewUser;
+      const assignedTenant = isGlobal 
+        ? (matrizTenant?.id || sucursales[0]?.id || selectedTenantForNewUser) 
+        : (isGlobalAdmin ? (selectedTenantForNewUser || sucursales[0]?.id) : (loggedUser?.tenantId || selectedTenantForNewUser));
 
       await ApiService.post('/auth/usuarios', {
         nombre: nombre.trim().toLowerCase(),
@@ -484,6 +508,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
       setEmail('');
       setPassword('');
       setConfirmPassword('');
+      setShowPasswordMeter(false);
       setRolOption('ROL_VENDEDOR');
       setPermiteCambiarPrecio(false);
       setSelectedTenantForNewUser('');
@@ -975,7 +1000,9 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   setAddUserEmailError('');
                   setShowPasswordAddUser(false);
                   setShowConfirmPasswordAddUser(false);
-                  if (selectedSucursalId) {
+                  if (!isGlobalAdmin) {
+                    setSelectedTenantForNewUser(loggedUser?.tenantId || (sucursales[0]?.id || ''));
+                  } else if (selectedSucursalId) {
                     setSelectedTenantForNewUser(selectedSucursalId);
                   } else if (sucursales.length > 0 && !selectedTenantForNewUser) {
                     setSelectedTenantForNewUser(sucursales[0].id);
@@ -986,17 +1013,19 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
               >
                 <UserPlus size={16} /> Registrar Colaborador
               </button>
-              <button
-                onClick={() => {
-                  setSucursalModalError('');
-                  setNewSucursal({ name: '', ruc: '', direccion: '', telefono: '', email: '', adminNombre: '', adminEmail: '', adminPassword: '' });
-                  setShowCustomRucNew(false);
-                  setShowAddSucursalModal(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
-              >
-                <Plus size={15} /> Nueva Sucursal
-              </button>
+              {isGlobalAdmin && (
+                <button
+                  onClick={() => {
+                    setSucursalModalError('');
+                    setNewSucursal({ name: '', ruc: '', direccion: '', telefono: '', email: '', adminNombre: '', adminEmail: '', adminPassword: '' });
+                    setShowCustomRucNew(false);
+                    setShowAddSucursalModal(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+                >
+                  <Plus size={15} /> Nueva Sucursal
+                </button>
+              )}
             </div>
           </div>
 
@@ -1065,7 +1094,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                       >
                         <Edit2 size={14} />
                       </button>
-                      {!sucursal.isMatriz && (
+                      {isGlobalAdmin && !sucursal.isMatriz && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1261,14 +1290,16 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                             >
                               <KeyRound size={14} />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenTransfer(user)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 text-[10px] font-bold transition-colors"
-                              title="Transferir a otra sucursal"
-                            >
-                              <ArrowRightLeft size={12} /> Transferir
-                            </button>
+                            {isGlobalAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenTransfer(user)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 text-[10px] font-bold transition-colors"
+                                title="Transferir a otra sucursal"
+                              >
+                                <ArrowRightLeft size={12} /> Transferir
+                              </button>
+                            )}
                             {!user.esAdminGeneral && (
                               <button
                                 type="button"
@@ -1345,6 +1376,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   setAddUserEmailError('');
                   setShowPasswordAddUser(false);
                   setShowConfirmPasswordAddUser(false);
+                  setShowPasswordMeter(false);
+                  if (!isGlobalAdmin) {
+                    setSelectedTenantForNewUser(loggedUser?.tenantId || (sucursales[0]?.id || ''));
+                  } else if (sucursales.length > 0 && !selectedTenantForNewUser) {
+                    setSelectedTenantForNewUser(sucursales[0].id);
+                  }
                   setShowAddModal(true);
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all shrink-0"
@@ -1836,12 +1873,15 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                     required
                     minLength={6}
                     value={password}
+                    onFocus={() => setShowPasswordMeter(true)}
+                    onBlur={() => setShowPasswordMeter(false)}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Ingresa la contraseña para evaluar su seguridad"
                     className="w-full px-3 py-2 pr-10 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   />
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setShowPasswordAddUser(!showPasswordAddUser)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
                     tabIndex={-1}
@@ -1852,13 +1892,15 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 </div>
               </div>
 
-              {/* Evaluador de Fortaleza Acorazada (Bóveda / Vault) */}
-              <div className="space-y-1.5 pt-1">
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                  Evaluador de Fortaleza Acorazada (Bóveda / Vault)
-                </label>
-                <VaultPasswordMeter password={password} showRequirements={true} />
-              </div>
+              {/* Evaluador de Fortaleza Acorazada (Bóveda / Vault) - Visible exclusivamente al tener foco */}
+              {showPasswordMeter && (
+                <div className="space-y-1 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    Evaluador de Fortaleza Acorazada (Bóveda / Vault)
+                  </label>
+                  <VaultPasswordMeter password={password} showRequirements={true} compact={true} />
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">Confirmar Contraseña *</label>
@@ -1883,6 +1925,7 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   />
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setShowConfirmPasswordAddUser(!showConfirmPasswordAddUser)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
                     tabIndex={-1}
@@ -1909,8 +1952,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 >
                   <option value="ROL_VENDEDOR">💼 Vendedor</option>
                   <option value="ROL_BODEGUERO">📦 Bodeguero</option>
-                  <option value="ADMIN_SUCURSAL">🏢 Administrador de Sucursal (Solo este local)</option>
-                  <option value="ADMIN_GENERAL">👑 Administrador General (Dueño / Todas las sucursales)</option>
+                  {isGlobalAdmin && (
+                    <>
+                      <option value="ADMIN_SUCURSAL">🏢 Administrador de Sucursal (Solo este local)</option>
+                      <option value="ADMIN_GENERAL">👑 Administrador General (Dueño / Todas las sucursales)</option>
+                    </>
+                  )}
                 </select>
                 <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
                   {rolOption === 'ADMIN_GENERAL' && '👑 Podrá ver y alternar entre todas las sucursales del negocio.'}
@@ -1936,17 +1983,24 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada *</label>
-                    <select
-                      value={selectedTenantForNewUser || (sucursales[0]?.id || '')}
-                      onChange={(e) => setSelectedTenantForNewUser(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                    >
-                      {sucursales.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                    {isGlobalAdmin ? (
+                      <select
+                        value={selectedTenantForNewUser || (sucursales[0]?.id || '')}
+                        onChange={(e) => setSelectedTenantForNewUser(e.target.value)}
+                        className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                      >
+                        {sucursales.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--foreground)] flex items-center gap-2">
+                        <Building2 size={14} className="text-amber-500 shrink-0" />
+                        <span>{sucursales.find(s => s.id === (loggedUser?.tenantId || currentUser?.tenantId))?.name || sucursales[0]?.name || 'Este local asignado'}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-1">
@@ -2069,8 +2123,12 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                   >
                     <option value="ROL_VENDEDOR">💼 Vendedor</option>
                     <option value="ROL_BODEGUERO">📦 Bodeguero</option>
-                    <option value="ADMIN_SUCURSAL">🏢 Administrador de Sucursal (Solo este local)</option>
-                    <option value="ADMIN_GENERAL">👑 Administrador General (Todas las sucursales)</option>
+                    {isGlobalAdmin && (
+                      <>
+                        <option value="ADMIN_SUCURSAL">🏢 Administrador de Sucursal (Solo este local)</option>
+                        <option value="ADMIN_GENERAL">👑 Administrador General (Todas las sucursales)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -2103,17 +2161,24 @@ export default function UsuariosComponent({ online }: UsuariosProps) {
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Asignada</label>
-                    <select
-                      value={editingUser.tenantId || ''}
-                      onChange={(e) => setEditingUser({ ...editingUser, tenantId: e.target.value })}
-                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                    >
-                      {sucursales.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                    {isGlobalAdmin ? (
+                      <select
+                        value={editingUser.tenantId || ''}
+                        onChange={(e) => setEditingUser({ ...editingUser, tenantId: e.target.value })}
+                        className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                      >
+                        {sucursales.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} {s.isMatriz ? '(Matriz Principal)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--foreground)] flex items-center gap-2">
+                        <Building2 size={14} className="text-amber-500 shrink-0" />
+                        <span>{sucursales.find(s => s.id === editingUser.tenantId)?.name || 'Este local asignado'}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-1">

@@ -1649,7 +1649,7 @@ function MainApp() {
             />
           )}
           {vistaActual === 'proveedores' && <ProveedoresComponent online={online} userRole={user?.rol} />}
-          {vistaActual === 'usuarios' && <UsuariosComponent online={online} />}
+          {vistaActual === 'usuarios' && <UsuariosComponent online={online} currentUser={user} />}
           {vistaActual === 'super-admin' && <SuperAdminComponent online={online} />}
           {vistaActual === 'sri' && <SriComponent />}
           {vistaActual === 'personalizacion' && <PersonalizacionComponent online={online} />}
