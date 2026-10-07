@@ -66,7 +66,13 @@ interface StockInterItem {
 
 export default function UsuariosComponent({ online, currentUser }: UsuariosProps) {
   const loggedUser = currentUser || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : null);
-  const isGlobalAdmin = loggedUser?.rol === 'ROL_SUPER_ADMIN' || loggedUser?.esAdminGeneral === true;
+  const isGlobalAdmin = loggedUser?.rol === 'ROL_SUPER_ADMIN' || Boolean(loggedUser?.esAdminGeneral);
+
+  const canManageTargetUser = (targetUser: UserListItem | null): boolean => {
+    if (!targetUser) return false;
+    if (isGlobalAdmin) return true;
+    return !targetUser.esAdminGeneral && (targetUser.rol as string) !== 'ROL_SUPER_ADMIN';
+  };
 
   const [tabActiva, setTabActiva] = useState<'sucursales' | 'personal' | 'stock-inter'>('sucursales');
 
@@ -495,7 +501,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
         password,
         rol: actualRol,
         esAdminGeneral: isGlobal,
-        permiteCambiarPrecio: isGlobal ? true : permiteCambiarPrecio,
+        permiteCambiarPrecio: (actualRol === 'ROL_ADMIN' || isGlobal) ? true : permiteCambiarPrecio,
         tenantId: assignedTenant || undefined,
       });
 
@@ -527,6 +533,11 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
     e.preventDefault();
     if (!editingUser) return;
 
+    if (!canManageTargetUser(editingUser)) {
+      setErrorMsg('No tienes permisos para editar a un Administrador General.');
+      return;
+    }
+
     const emailErr = validateEmail(editingUser.email);
     if (emailErr) {
       setEditUserEmailError(emailErr);
@@ -548,7 +559,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
         rol: editingUser.rol,
         esAdminGeneral: isGlobal,
         activo: editingUser.activo,
-        permiteCambiarPrecio: isGlobal ? true : (editingUser.permiteCambiarPrecio ?? false),
+        permiteCambiarPrecio: (editingUser.rol === 'ROL_ADMIN' || isGlobal) ? true : (editingUser.permiteCambiarPrecio ?? false),
         tenantId: assignedTenant,
       });
 
@@ -567,6 +578,10 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
   };
 
   const handleToggleActive = async (user: UserListItem) => {
+    if (!canManageTargetUser(user)) {
+      setErrorMsg('No tienes permisos para modificar a un Administrador General.');
+      return;
+    }
     setErrorMsg('');
     try {
       await ApiService.put(`/configuracion/personal/${user.id}`, {
@@ -584,6 +599,10 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
   };
 
   const handleTogglePermisoPrecio = async (user: UserListItem) => {
+    if (!canManageTargetUser(user)) {
+      setErrorMsg('No tienes permisos para modificar a un Administrador General.');
+      return;
+    }
     setErrorMsg('');
     try {
       await ApiService.put(`/configuracion/personal/${user.id}`, {
@@ -606,6 +625,10 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
   };
 
   const handleUnlockUser = async (user: UserListItem) => {
+    if (!canManageTargetUser(user)) {
+      setErrorMsg('No tienes permisos para desbloquear a un Administrador General.');
+      return;
+    }
     setErrorMsg('');
     try {
       await ApiService.patch(`/auth/usuarios/${user.id}/unlock`, {});
@@ -620,6 +643,10 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resettingUser) return;
+    if (!canManageTargetUser(resettingUser)) {
+      setErrorMsg('No tienes permisos para restablecer la contraseña de un Administrador General.');
+      return;
+    }
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -659,6 +686,10 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
+    if (!canManageTargetUser(userToDelete)) {
+      setDeleteUserError('No tienes permisos para eliminar a un Administrador General.');
+      return;
+    }
     setDeletingUser(true);
     setDeleteUserError('');
     try {
@@ -1241,15 +1272,23 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                             </span>
                           </td>
                           <td className="p-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleActive(user)}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
-                                user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
-                              }`}
-                            >
-                              {user.activo ? 'Activo' : 'Inactivo'}
-                            </button>
+                            {canManageTargetUser(user) ? (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleActive(user)}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                                  user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
+                                }`}
+                              >
+                                {user.activo ? 'Activo' : 'Inactivo'}
+                              </button>
+                            ) : (
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                              }`}>
+                                {user.activo ? 'Activo' : 'Inactivo'}
+                              </span>
+                            )}
                             {isUserLocked(user) && (
                               <span className="inline-flex items-center gap-1 ml-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-red-500/15 text-red-600 border border-red-500/25">
                                 <Lock size={10} /> Bloqueada
@@ -1257,39 +1296,49 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                             )}
                           </td>
                           <td className="p-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePermisoPrecio(user)}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
-                                user.permiteCambiarPrecio ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                              }`}
-                            >
-                              {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
-                            </button>
+                            {canManageTargetUser(user) ? (
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePermisoPrecio(user)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                                  user.permiteCambiarPrecio ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                }`}
+                              >
+                                {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
+                              </button>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-slate-500/10 text-slate-400 border-slate-500/20">
+                                {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
+                              </span>
+                            )}
                           </td>
                           <td className="p-3 text-right space-x-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingUser(user);
-                                setShowEditModal(true);
-                              }}
-                              className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
-                              title="Editar Colaborador"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setResettingUser(user);
-                                setShowResetPasswordModal(true);
-                              }}
-                              className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors"
-                              title="Resetear Contraseña"
-                            >
-                              <KeyRound size={14} />
-                            </button>
+                            {canManageTargetUser(user) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingUser(user);
+                                  setShowEditModal(true);
+                                }}
+                                className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
+                                title="Editar Colaborador"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                            )}
+                            {canManageTargetUser(user) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setResettingUser(user);
+                                  setShowResetPasswordModal(true);
+                                }}
+                                className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors"
+                                title="Resetear Contraseña"
+                              >
+                                <KeyRound size={14} />
+                              </button>
+                            )}
                             {isGlobalAdmin && (
                               <button
                                 type="button"
@@ -1300,7 +1349,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                                 <ArrowRightLeft size={12} /> Transferir
                               </button>
                             )}
-                            {!user.esAdminGeneral && (
+                            {canManageTargetUser(user) && !user.esAdminGeneral && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1314,7 +1363,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                                 <Trash2 size={14} />
                               </button>
                             )}
-                            {isUserLocked(user) && (
+                            {canManageTargetUser(user) && isUserLocked(user) && (
                               <button
                                 type="button"
                                 onClick={() => handleUnlockUser(user)}
@@ -1440,14 +1489,22 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                       </span>
                     </td>
                     <td className="p-3.5 text-center">
-                      <button
-                        onClick={() => handleToggleActive(user)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
-                          user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
-                        }`}
-                      >
-                        {user.activo ? 'Activo' : 'Inactivo'}
-                      </button>
+                      {canManageTargetUser(user) ? (
+                        <button
+                          onClick={() => handleToggleActive(user)}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                            user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20 hover:bg-rose-500/20'
+                          }`}
+                        >
+                          {user.activo ? 'Activo' : 'Inactivo'}
+                        </button>
+                      ) : (
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                          user.activo ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                        }`}>
+                          {user.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      )}
                       {isUserLocked(user) && (
                         <span className="inline-flex items-center gap-1 ml-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-red-500/15 text-red-600 border border-red-500/25">
                           <Lock size={10} /> Bloqueada
@@ -1455,39 +1512,49 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                       )}
                     </td>
                     <td className="p-3.5 text-center">
-                      <button
-                        onClick={() => handleTogglePermisoPrecio(user)}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
-                          user.permiteCambiarPrecio ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                        }`}
-                      >
-                        {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
-                      </button>
+                      {canManageTargetUser(user) ? (
+                        <button
+                          onClick={() => handleTogglePermisoPrecio(user)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                            user.permiteCambiarPrecio ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                          }`}
+                        >
+                          {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
+                        </button>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold border bg-slate-500/10 text-slate-400 border-slate-500/20">
+                          {user.permiteCambiarPrecio ? 'Permitido' : 'Bloqueado'}
+                        </span>
+                      )}
                     </td>
                     <td className="p-3.5 text-right space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingUser(user);
-                          setShowEditModal(true);
-                        }}
-                        className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
-                        title="Editar Colaborador"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setResettingUser(user);
-                          setShowResetPasswordModal(true);
-                        }}
-                        className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors"
-                        title="Resetear Contraseña"
-                      >
-                        <KeyRound size={14} />
-                      </button>
-                      {!user.esAdminGeneral && (
+                      {canManageTargetUser(user) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingUser(user);
+                            setShowEditModal(true);
+                          }}
+                          className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors"
+                          title="Editar Colaborador"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                      )}
+                      {canManageTargetUser(user) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResettingUser(user);
+                            setShowResetPasswordModal(true);
+                          }}
+                          className="p-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 transition-colors"
+                          title="Resetear Contraseña"
+                        >
+                          <KeyRound size={14} />
+                        </button>
+                      )}
+                      {canManageTargetUser(user) && !user.esAdminGeneral && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1501,7 +1568,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                           <Trash2 size={14} />
                         </button>
                       )}
-                      {isUserLocked(user) && (
+                      {canManageTargetUser(user) && isUserLocked(user) && (
                         <button
                           type="button"
                           onClick={() => handleUnlockUser(user)}

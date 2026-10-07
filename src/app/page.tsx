@@ -269,7 +269,7 @@ function MainApp() {
     if (storedUserInitial) {
       try {
         const u = JSON.parse(storedUserInitial);
-        isUserInitialGlobal = u?.rol === 'ROL_SUPER_ADMIN' || (u?.rol === 'ROL_ADMIN' && u?.esAdminGeneral === true);
+        isUserInitialGlobal = u?.rol === 'ROL_SUPER_ADMIN' || (u?.rol === 'ROL_ADMIN' && Boolean(u?.esAdminGeneral));
         if (!isUserInitialGlobal && u?.tenantId) {
           setActiveSucursalId(u.tenantId);
           localStorage.setItem('activeSucursalId', u.tenantId);
@@ -419,7 +419,7 @@ function MainApp() {
     }
   };
 
-  const isGlobalAdmin = user?.rol === 'ROL_SUPER_ADMIN' || (user?.rol === 'ROL_ADMIN' && user?.esAdminGeneral === true);
+  const isGlobalAdmin = user?.rol === 'ROL_SUPER_ADMIN' || (user?.rol === 'ROL_ADMIN' && Boolean(user?.esAdminGeneral));
   const isBranchRestricted = !!(user?.rol && !isGlobalAdmin);
 
   const fetchSucursales = async () => {
@@ -428,7 +428,7 @@ function MainApp() {
       if (Array.isArray(data) && data.length > 0) {
         const storedUser = localStorage.getItem('user');
         const parsed = storedUser ? JSON.parse(storedUser) : null;
-        const isUserGlobal = parsed?.rol === 'ROL_SUPER_ADMIN' || (parsed?.rol === 'ROL_ADMIN' && parsed?.esAdminGeneral === true);
+        const isUserGlobal = parsed?.rol === 'ROL_SUPER_ADMIN' || (parsed?.rol === 'ROL_ADMIN' && Boolean(parsed?.esAdminGeneral));
         if (!isUserGlobal && parsed?.tenantId) {
           const scoped = data.filter((s: any) => s.id === parsed.tenantId);
           setSucursales(scoped.length > 0 ? scoped : data);
@@ -556,11 +556,11 @@ function MainApp() {
     if (response.user?.tenantId) {
       localStorage.setItem('tenantId', response.user.tenantId);
     }
-    const isLoginGlobal = response.user?.rol === 'ROL_SUPER_ADMIN' || (response.user?.rol === 'ROL_ADMIN' && response.user?.esAdminGeneral === true);
+    const isLoginGlobal = response.user?.rol === 'ROL_SUPER_ADMIN' || (response.user?.rol === 'ROL_ADMIN' && Boolean(response.user?.esAdminGeneral));
     if (!isLoginGlobal && response.user?.tenantId) {
       setActiveSucursalId(response.user.tenantId);
       localStorage.setItem('activeSucursalId', response.user.tenantId);
-    } else if (isLoginGlobal && !localStorage.getItem('activeSucursalId')) {
+    } else if (isLoginGlobal && (!localStorage.getItem('activeSucursalId') || localStorage.getItem('activeSucursalId') === response.user?.tenantId)) {
       setActiveSucursalId('TODAS');
       localStorage.setItem('activeSucursalId', 'TODAS');
     }
