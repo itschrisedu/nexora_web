@@ -426,15 +426,16 @@ function MainApp() {
     try {
       const data = await ApiService.get('/configuracion/sucursales').catch(() => null);
       if (Array.isArray(data) && data.length > 0) {
-        setSucursales(data);
         const storedUser = localStorage.getItem('user');
         const parsed = storedUser ? JSON.parse(storedUser) : null;
-        if (parsed?.tenantId) {
-          const isUserGlobal = parsed?.rol === 'ROL_SUPER_ADMIN' || (parsed?.rol === 'ROL_ADMIN' && parsed?.esAdminGeneral === true);
-          if (!isUserGlobal) {
-            setActiveSucursalId(parsed.tenantId);
-            localStorage.setItem('activeSucursalId', parsed.tenantId);
-          }
+        const isUserGlobal = parsed?.rol === 'ROL_SUPER_ADMIN' || (parsed?.rol === 'ROL_ADMIN' && parsed?.esAdminGeneral === true);
+        if (!isUserGlobal && parsed?.tenantId) {
+          const scoped = data.filter((s: any) => s.id === parsed.tenantId);
+          setSucursales(scoped.length > 0 ? scoped : data);
+          setActiveSucursalId(parsed.tenantId);
+          localStorage.setItem('activeSucursalId', parsed.tenantId);
+        } else {
+          setSucursales(data);
         }
       } else {
         const storedUser = localStorage.getItem('user');
