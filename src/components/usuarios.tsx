@@ -1250,8 +1250,8 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                     Esta sucursal no tiene colaboradores operativos asignados.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto border border-[var(--border)] rounded-xl">
-                    <table className="w-full text-left text-xs">
+                  <div className="overflow-x-auto border border-[var(--border)] rounded-xl scrollbar-thin">
+                    <table className="w-full text-left text-xs min-w-[700px]">
                       <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
                         <tr>
                           <th className="p-3">Colaborador</th>
@@ -1574,8 +1574,8 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                 </div>
               </div>
 
-              <div className="overflow-x-auto border border-[var(--border)] rounded-2xl bg-[var(--card)] shadow-sm">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto scrollbar-thin border border-[var(--border)] rounded-2xl bg-[var(--card)] shadow-sm">
+                <table className="w-full text-left text-xs min-w-[850px]">
                   <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
                     <tr>
                       <th className="p-3.5">Colaborador</th>

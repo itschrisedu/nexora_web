@@ -1038,8 +1038,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
             {/* Vista Tabla (Tablets y Desktop con overflow controlado) */}
             <div className="hidden md:block bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full text-sm min-w-[900px]">
                   <thead>
                     <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30">
                       <th className="text-left px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Cliente</th>
@@ -1145,7 +1145,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 {filtered.length} cliente{filtered.length !== 1 ? "s" : ""} {search ? "encontrado" : "en total"}{search ? `s para "${search}"` : ""}
               </div>
             </div>
-            )}
+          </>
+        )}
           </div>
 
           {/* Panel Lateral de Detalle */}
@@ -1334,8 +1335,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 <p className="text-sm font-semibold">Selecciona un cliente</p>
                 <p className="text-xs mt-1">Haz clic en cualquier fila para ver el perfil crediticio.</p>
               </div>
-            </>
-          )}
+            )}
           </div>
         </div>
       )}
@@ -1705,8 +1705,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
             </div>
           ) : (
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full text-sm text-left min-w-[800px]">
                   <thead className="bg-[var(--muted)]/40 text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
                     <tr>
                       <th className="px-5 py-4">Cliente Deudor / Contacto</th>

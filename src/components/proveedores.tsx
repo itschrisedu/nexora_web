@@ -2083,8 +2083,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             </div>
           ) : (
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full text-xs text-left min-w-[780px]">
                   <thead className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
                     <tr>
                       <th className="px-5 py-3.5">N° Orden</th>
@@ -2823,8 +2823,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               No hay pagos registrados aún en el sistema.
             </div>
           ) : (
-            <div className="overflow-x-auto -mx-5">
-              <table className="w-full text-xs text-left">
+            <div className="overflow-x-auto scrollbar-thin -mx-5">
+              <table className="w-full text-xs text-left min-w-[780px]">
                 <thead className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
                   <tr>
                     <th className="px-5 py-3">Fecha</th>
@@ -3070,8 +3070,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 No hay devoluciones a proveedores procesadas aún.
               </div>
             ) : (
-              <div className="overflow-x-auto -mx-5">
-                <table className="w-full text-xs text-left">
+              <div className="overflow-x-auto scrollbar-thin -mx-5">
+                <table className="w-full text-xs text-left min-w-[780px]">
                   <thead className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
                     <tr>
                       <th className="px-5 py-3">Constancia</th>
