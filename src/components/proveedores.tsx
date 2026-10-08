@@ -84,6 +84,8 @@ interface Proveedor {
   totalCompras?: number;
   totalPagado?: number;
   saldoPendiente?: number;
+  saldoAFavor?: number;
+  cruzadoConMercaderia?: number;
   ordenesPendientes?: number;
   totalOrdenes?: number;
   totalEntregas?: number;
@@ -521,8 +523,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   }, [showOrderModal, orderLines.length, orderSupplierId, orderObservaciones]);
 
   const isDirtyPayment = useCallback(() => {
-    return showPaymentModal && (montoPago.trim() !== '' || comprobantePago.trim() !== '' || notasPago.trim() !== '' || bancoPago.trim() !== '');
-  }, [showPaymentModal, montoPago, comprobantePago, notasPago, bancoPago]);
+    return showPaymentModal && (montoPago.trim() !== '' || (metodoPago !== 'EFECTIVO' && (comprobantePago.trim() !== '' || bancoPago.trim() !== '')) || notasPago.trim() !== '');
+  }, [showPaymentModal, montoPago, metodoPago, comprobantePago, notasPago, bancoPago]);
 
   const isDirtyDevolucion = useCallback(() => {
     return showDevolucionModal && (devSupplierId !== '' || devMotivo.trim() !== '' || devLines.length > 0);
@@ -1500,8 +1502,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       await ApiService.post(`/proveedores/${paymentSupplierId}/pagos`, {
         monto: montoNum,
         metodo: metodoPago,
-        banco: bancoPago || undefined,
-        comprobante: comprobantePago || undefined,
+        banco: metodoPago !== 'EFECTIVO' ? (bancoPago || undefined) : undefined,
+        comprobante: metodoPago !== 'EFECTIVO' ? (comprobantePago || undefined) : undefined,
         notas: notasPago || undefined,
         supplierOrderId: paymentOrderId || undefined,
       });
@@ -1880,6 +1882,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             {proveedoresFiltrados.map((p) => {
               const deuda = p.saldoPendiente || 0;
               const tieneDeuda = deuda > 0.01;
+              const totalCompras = p.totalCompras || 0;
+              const totalPagado = p.totalPagado || 0;
+              const saldoAFavor = p.saldoAFavor !== undefined ? p.saldoAFavor : Math.max(0, totalPagado - totalCompras);
+              const tieneSaldoAFavor = saldoAFavor > 0.01;
+              const cruzado = p.cruzadoConMercaderia !== undefined ? p.cruzadoConMercaderia : Math.min(totalCompras, totalPagado);
 
               return (
                 <div
@@ -1902,9 +1909,15 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold font-mono border ${
                         tieneDeuda
                           ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                          : tieneSaldoAFavor
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                       }`}>
-                        {tieneDeuda ? `Debe $${deuda.toFixed(2)}` : 'Al Día'}
+                        {tieneDeuda
+                          ? `Debe $${deuda.toFixed(2)}`
+                          : tieneSaldoAFavor
+                            ? `Adelanto a Favor: $${saldoAFavor.toFixed(2)}`
+                            : 'Al Día $0.00'}
                       </span>
                     </div>
 
@@ -1929,15 +1942,28 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       )}
                     </div>
 
+                    {/* Desglose Financiero: Facturado, Abonado/Adelantado, Cruce y Adelanto Disponible */}
                     <div className="grid grid-cols-2 gap-2 bg-[var(--muted)]/40 p-2.5 rounded-xl text-xs border border-[var(--border)]">
                       <div>
                         <span className="text-[10px] text-[var(--muted-foreground)] block">Total Facturado</span>
-                        <span className="font-bold text-[var(--foreground)] font-mono">${(p.totalCompras || 0).toFixed(2)}</span>
+                        <span className="font-bold text-[var(--foreground)] font-mono">${totalCompras.toFixed(2)}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-[var(--muted-foreground)] block">Total Abonado</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">${(p.totalPagado || 0).toFixed(2)}</span>
+                        <span className="text-[10px] text-[var(--muted-foreground)] block">Total Abonado / Adelanto</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">${totalPagado.toFixed(2)}</span>
                       </div>
+                      {cruzado > 0 && (
+                        <div className="col-span-2 pt-1.5 border-t border-[var(--border)] flex items-center justify-between text-[11px]">
+                          <span className="text-[10px] text-[var(--muted-foreground)]">Cruzado con Mercancía:</span>
+                          <span className="font-bold text-indigo-600 dark:text-indigo-400 font-mono">${cruzado.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {tieneSaldoAFavor && (
+                        <div className="col-span-2 pt-1 border-t border-blue-500/20 flex items-center justify-between text-[11px] bg-blue-500/5 -mx-2.5 -mb-2.5 p-2 rounded-b-xl">
+                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">Adelanto Disponible:</span>
+                          <span className="font-black text-blue-700 dark:text-blue-300 font-mono">${saldoAFavor.toFixed(2)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -3638,39 +3664,232 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 <Loader2 size={28} className="animate-spin text-[#0F172A] dark:text-amber-400" />
                 <span className="text-xs">Cargando balance...</span>
               </div>
-            ) : cuentaCorrienteData ? (
+            ) : cuentaCorrienteData ? (() => {
+              /* ── Calcular desglose detallado de adelantos vs pagos contra deuda ── */
+              const resumen = cuentaCorrienteData.resumen;
+              const movs = cuentaCorrienteData.movimientos || [];
+              const totalFacturado = resumen.totalFacturado || 0;
+              const totalPagado = resumen.totalPagado || 0;
+              const totalDevoluciones = resumen.totalDevoluciones || 0;
+              const cruzado = resumen.cruzadoConMercaderia || Math.min(totalFacturado, totalPagado + totalDevoluciones);
+              const saldoAFavor = resumen.saldoAFavor || 0;
+              const saldoPendiente = resumen.saldoPendiente || 0;
+
+              /* Desglose: cuánto del total pagado cubrió deuda vs cuánto es adelanto puro */
+              const pagadoQueCobrioDeuda = Math.min(totalPagado, totalFacturado - totalDevoluciones);
+              const adelantoPuro = Math.max(0, totalPagado - Math.max(0, totalFacturado - totalDevoluciones));
+
+              /* Running balance: ordenar cronológicamente ASC y calcular saldo acumulado */
+              const movsOrdenadosAsc = [...movs].sort((a: any, b: any) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+              let saldoAcumulado = 0;
+              const runningBalanceMap = new Map<string, number>();
+              movsOrdenadosAsc.forEach((mov: any) => {
+                const isIngreso = mov.tipo === 'ENTREGA_MERCANCIA';
+                const isDescuento = mov.tipo === 'PAGO_PROVEEDOR' || mov.tipo === 'DEVOLUCION_PROVEEDOR';
+                if (isIngreso) {
+                  saldoAcumulado += Number(mov.monto);
+                } else if (isDescuento) {
+                  saldoAcumulado -= Number(mov.monto);
+                }
+                runningBalanceMap.set(`${mov.id}-${mov.fecha}`, saldoAcumulado);
+              });
+
+              /* Clasificar cada pago: fue adelanto o abono a deuda */
+              let deudaAcumAlMomentoDelPago = 0;
+              const clasificacionPagos = new Map<string, 'ADELANTO' | 'ABONO' | 'MIXTO'>();
+              movsOrdenadosAsc.forEach((mov: any) => {
+                if (mov.tipo === 'ENTREGA_MERCANCIA') {
+                  deudaAcumAlMomentoDelPago += Number(mov.monto);
+                } else if (mov.tipo === 'DEVOLUCION_PROVEEDOR') {
+                  deudaAcumAlMomentoDelPago -= Number(mov.monto);
+                } else if (mov.tipo === 'PAGO_PROVEEDOR') {
+                  const montoP = Number(mov.monto);
+                  if (deudaAcumAlMomentoDelPago <= 0.01) {
+                    clasificacionPagos.set(mov.id, 'ADELANTO');
+                  } else if (montoP > deudaAcumAlMomentoDelPago + 0.01) {
+                    clasificacionPagos.set(mov.id, 'MIXTO');
+                  } else {
+                    clasificacionPagos.set(mov.id, 'ABONO');
+                  }
+                  deudaAcumAlMomentoDelPago -= montoP;
+                }
+              });
+
+              /* Contar entregas que fueron cruzadas con adelantos previos */
+              let adelantoDisponiblePrevio = 0;
+              const crucesPorEntrega = new Map<string, number>();
+              movsOrdenadosAsc.forEach((mov: any) => {
+                if (mov.tipo === 'PAGO_PROVEEDOR') {
+                  adelantoDisponiblePrevio += Number(mov.monto);
+                } else if (mov.tipo === 'DEVOLUCION_PROVEEDOR') {
+                  adelantoDisponiblePrevio += Number(mov.monto);
+                } else if (mov.tipo === 'ENTREGA_MERCANCIA') {
+                  const montoEntrega = Number(mov.monto);
+                  if (adelantoDisponiblePrevio > 0.01) {
+                    const cruzadoEnEsta = Math.min(adelantoDisponiblePrevio, montoEntrega);
+                    crucesPorEntrega.set(mov.id, cruzadoEnEsta);
+                  }
+                  adelantoDisponiblePrevio -= montoEntrega;
+                }
+              });
+
+              return (
               <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+                {/* ── PANEL RESUMEN GENERAL (4 tarjetas) ── */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 space-y-1">
                     <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Total Facturado</span>
                     <span className="text-base font-black text-[var(--foreground)] font-mono">
-                      ${cuentaCorrienteData.resumen.totalFacturado.toFixed(2)}
+                      ${totalFacturado.toFixed(2)}
+                    </span>
+                    <span className="text-[9px] text-[var(--muted-foreground)] block">
+                      {resumen.totalEntregas || 0} entrega(s) de mercaderia
                     </span>
                   </div>
                   <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 space-y-1">
-                    <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Total Abonado</span>
+                    <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Total Pagado</span>
                     <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                      ${cuentaCorrienteData.resumen.totalPagado.toFixed(2)}
+                      ${totalPagado.toFixed(2)}
+                    </span>
+                    <span className="text-[9px] text-[var(--muted-foreground)] block">
+                      {resumen.totalPagos || 0} pago(s) registrado(s)
                     </span>
                   </div>
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 space-y-1">
-                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider block">Devoluciones</span>
-                    <span className="text-base font-black text-amber-700 dark:text-amber-400 font-mono">
-                      ${(cuentaCorrienteData.resumen.totalDevoluciones || 0).toFixed(2)}
+                  <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider block">Cruzado con Mercancia</span>
+                    <span className="text-base font-black text-indigo-700 dark:text-indigo-400 font-mono">
+                      ${cruzado.toFixed(2)}
+                    </span>
+                    <span className="text-[9px] text-indigo-600 dark:text-indigo-300 block">
+                      Pagos aplicados a entregas
                     </span>
                   </div>
-                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3.5 space-y-1">
-                    <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider block">Saldo Pendiente</span>
-                    <span className="text-base font-black text-rose-600 dark:text-rose-400 font-mono">
-                      ${cuentaCorrienteData.resumen.saldoPendiente.toFixed(2)}
+                  <div className={`border rounded-2xl p-3.5 space-y-1 ${
+                    saldoPendiente > 0.01
+                      ? 'bg-rose-500/10 border-rose-500/20'
+                      : saldoAFavor > 0.01
+                        ? 'bg-blue-500/10 border-blue-500/20'
+                        : 'bg-emerald-500/10 border-emerald-500/20'
+                  }`}>
+                    <span className="text-[10px] font-bold uppercase tracking-wider block">
+                      {saldoPendiente > 0.01
+                        ? 'Saldo Pendiente (Deuda)'
+                        : saldoAFavor > 0.01
+                          ? 'Adelanto Disponible (A Favor)'
+                          : 'Estado de Cuenta'}
+                    </span>
+                    <span className={`text-base font-black font-mono ${
+                      saldoPendiente > 0.01
+                        ? 'text-rose-600 dark:text-rose-400'
+                        : saldoAFavor > 0.01
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                    }`}>
+                      {saldoPendiente > 0.01
+                        ? `$${saldoPendiente.toFixed(2)}`
+                        : saldoAFavor > 0.01
+                          ? `$${saldoAFavor.toFixed(2)}`
+                          : 'Al Dia ($0.00)'}
                     </span>
                   </div>
                 </div>
 
+                {/* ── DESGLOSE DETALLADO: Adelantos vs Abonos a Deuda ── */}
+                {(totalPagado > 0 || totalDevoluciones > 0) && (
+                  <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 dark:from-slate-800/40 dark:to-blue-900/20 border border-[var(--border)] rounded-2xl p-4 space-y-3">
+                    <h4 className="font-extrabold text-[11px] uppercase tracking-wider text-[var(--foreground)] flex items-center gap-2">
+                      <Receipt size={14} className="text-blue-500" />
+                      Desglose Detallado de Pagos y Adelantos
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Pagos que cubrieron deuda */}
+                      <div className="bg-white/70 dark:bg-slate-800/60 rounded-xl p-3 border border-emerald-200/50 dark:border-emerald-700/30">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Abonos a Deuda</span>
+                        </div>
+                        <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono block">
+                          ${Math.max(0, pagadoQueCobrioDeuda).toFixed(2)}
+                        </span>
+                        <span className="text-[9px] text-[var(--muted-foreground)]">
+                          Pagos que cubrieron mercaderia recibida
+                        </span>
+                      </div>
+
+                      {/* Adelantos puros */}
+                      <div className="bg-white/70 dark:bg-slate-800/60 rounded-xl p-3 border border-blue-200/50 dark:border-blue-700/30">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Adelantos Puros</span>
+                        </div>
+                        <span className="text-lg font-black text-blue-600 dark:text-blue-400 font-mono block">
+                          ${adelantoPuro.toFixed(2)}
+                        </span>
+                        <span className="text-[9px] text-[var(--muted-foreground)]">
+                          Anticipos sin mercaderia pendiente
+                        </span>
+                      </div>
+
+                      {/* Devoluciones */}
+                      {totalDevoluciones > 0 && (
+                        <div className="bg-white/70 dark:bg-slate-800/60 rounded-xl p-3 border border-rose-200/50 dark:border-rose-700/30">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                            <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Devoluciones</span>
+                          </div>
+                          <span className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono block">
+                            ${totalDevoluciones.toFixed(2)}
+                          </span>
+                          <span className="text-[9px] text-[var(--muted-foreground)]">
+                            Descontado de deuda por garantia
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Barra visual proporcional */}
+                    {totalPagado > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[9px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider">
+                          <span>Composicion de pagos</span>
+                          <span>Total: ${totalPagado.toFixed(2)}</span>
+                        </div>
+                        <div className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex">
+                          {pagadoQueCobrioDeuda > 0 && (
+                            <div
+                              className="h-full bg-emerald-500 transition-all duration-500"
+                              style={{ width: `${Math.min(100, (Math.max(0, pagadoQueCobrioDeuda) / totalPagado) * 100)}%` }}
+                              title={`Abonos a deuda: $${Math.max(0, pagadoQueCobrioDeuda).toFixed(2)}`}
+                            />
+                          )}
+                          {adelantoPuro > 0 && (
+                            <div
+                              className="h-full bg-blue-500 transition-all duration-500"
+                              style={{ width: `${Math.min(100, (adelantoPuro / totalPagado) * 100)}%` }}
+                              title={`Adelantos puros: $${adelantoPuro.toFixed(2)}`}
+                            />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 text-[9px]">
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="text-[var(--muted-foreground)]">Abonos ({totalPagado > 0 ? Math.round((Math.max(0, pagadoQueCobrioDeuda) / totalPagado) * 100) : 0}%)</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                            <span className="text-[var(--muted-foreground)]">Adelantos ({totalPagado > 0 ? Math.round((adelantoPuro / totalPagado) * 100) : 0}%)</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── TITULO LINEA DE TIEMPO ── */}
                 <div className="flex justify-between items-center">
                   <h4 className="font-extrabold text-sm flex items-center gap-2 text-[var(--foreground)]">
                     <History size={16} />
-                    <span>Línea de Tiempo de Movimientos</span>
+                    <span>Linea de Tiempo de Movimientos</span>
                   </h4>
                   <button
                     onClick={() => handleAbrirModalPago(selectedSupplierId!, undefined, cuentaCorrienteData.resumen.saldoPendiente)}
@@ -3681,19 +3900,23 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   </button>
                 </div>
 
+                {/* ── MOVIMIENTOS CON SALDO ACUMULADO ── */}
                 <div className="space-y-3">
-                  {cuentaCorrienteData.movimientos.length === 0 ? (
+                  {movs.length === 0 ? (
                     <p className="text-center text-[var(--muted-foreground)] py-8">No hay movimientos registrados para este proveedor.</p>
                   ) : (
-                    cuentaCorrienteData.movimientos.map((mov: any, idx: number) => {
+                    movs.map((mov: any, idx: number) => {
                       const isEntrega = mov.tipo === 'ENTREGA_MERCANCIA';
                       const isPago = mov.tipo === 'PAGO_PROVEEDOR';
                       const isDevolucion = mov.tipo === 'DEVOLUCION_PROVEEDOR';
+                      const saldoEnEstePunto = runningBalanceMap.get(`${mov.id}-${mov.fecha}`) ?? 0;
+                      const tipoPago = isPago ? clasificacionPagos.get(mov.id) : null;
+                      const cruceEntrega = isEntrega ? (crucesPorEntrega.get(mov.id) || 0) : 0;
 
                       return (
                         <div
                           key={idx}
-                          className={`p-4 rounded-2xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors ${
+                          className={`p-4 rounded-2xl border flex flex-col gap-3 transition-colors ${
                             isPago
                               ? 'bg-emerald-500/5 border-emerald-500/20'
                               : isDevolucion
@@ -3703,84 +3926,126 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               : 'bg-[var(--card)] border-[var(--border)]'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-xl text-white font-bold shrink-0 ${
-                              isPago ? 'bg-emerald-600' : isDevolucion ? 'bg-rose-600' : isEntrega ? 'bg-blue-600' : 'bg-slate-700'
-                            }`}>
-                              {isPago ? <DollarSign size={14} /> : isDevolucion ? <RotateCcw size={14} /> : isEntrega ? <Package size={14} /> : <FileText size={14} />}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h5 className="font-bold text-xs text-[var(--foreground)]">{mov.titulo}</h5>
-                                {mov.numeroCodigo && (
-                                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                    isDevolucion ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
-                                  }`}>
-                                    {mov.numeroCodigo}
-                                  </span>
-                                )}
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-xl text-white font-bold shrink-0 ${
+                                isPago ? 'bg-emerald-600' : isDevolucion ? 'bg-rose-600' : isEntrega ? 'bg-blue-600' : 'bg-slate-700'
+                              }`}>
+                                {isPago ? <DollarSign size={14} /> : isDevolucion ? <RotateCcw size={14} /> : isEntrega ? <Package size={14} /> : <FileText size={14} />}
                               </div>
-                              <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
-                                {mov.descripcion}
-                              </p>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h5 className="font-bold text-xs text-[var(--foreground)]">{mov.titulo}</h5>
+                                  {mov.numeroCodigo && (
+                                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                      isDevolucion ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                                    }`}>
+                                      {mov.numeroCodigo}
+                                    </span>
+                                  )}
+                                  {/* Badge de tipo de pago */}
+                                  {tipoPago === 'ADELANTO' && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/25">
+                                      ADELANTO
+                                    </span>
+                                  )}
+                                  {tipoPago === 'ABONO' && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                                      ABONO A DEUDA
+                                    </span>
+                                  )}
+                                  {tipoPago === 'MIXTO' && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                                      ABONO + ADELANTO
+                                    </span>
+                                  )}
+                                  {/* Badge de cruce en entrega */}
+                                  {isEntrega && cruceEntrega > 0.01 && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
+                                      CRUZADO: ${cruceEntrega.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                                  {mov.descripcion}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 self-end sm:self-center">
+                              <div className="text-right">
+                                <span className={`font-black font-mono text-sm ${
+                                  isPago
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : isDevolucion
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : 'text-[#0F172A] dark:text-amber-400'
+                                }`}>
+                                  {isPago || isDevolucion ? `-$${Number(mov.monto).toFixed(2)}` : `+$${Number(mov.monto).toFixed(2)}`}
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)] block font-mono">
+                                  {new Date(mov.fecha).toLocaleDateString('es-EC')}
+                                </span>
+                              </div>
+
+                              {isPago && (
+                                <button
+                                  onClick={() => handleEnviarPagoWhatsApp({
+                                    id: mov.id,
+                                    supplierId: selectedSupplierId!,
+                                    monto: mov.monto,
+                                    metodo: mov.metodo || 'TRANSFERENCIA',
+                                    banco: mov.banco,
+                                    comprobante: mov.comprobante,
+                                    notas: mov.descripcion,
+                                    createdAt: mov.fecha,
+                                    supplier: cuentaCorrienteData.supplier,
+                                  })}
+                                  className="p-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors cursor-pointer"
+                                  title="Enviar Comprobante por WhatsApp"
+                                >
+                                  <MessageCircle size={14} />
+                                </button>
+                              )}
+
+                              {isDevolucion && (
+                                <button
+                                  onClick={() => handleEnviarDevolucionWhatsApp({
+                                    id: mov.id,
+                                    numeroCodigo: mov.numeroCodigo,
+                                    supplierId: selectedSupplierId!,
+                                    motivo: mov.descripcion,
+                                    totalDevuelto: mov.monto,
+                                    deudaDescontada: mov.detalles?.deudaDescontada || mov.monto,
+                                    lines: mov.detalles?.lines || [],
+                                    createdAt: mov.fecha,
+                                    supplier: cuentaCorrienteData.supplier,
+                                  })}
+                                  className="p-1.5 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors cursor-pointer"
+                                  title="Enviar Constancia de Devolucion por WhatsApp"
+                                >
+                                  <MessageCircle size={14} />
+                                </button>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3 self-end sm:self-center">
-                            <div className="text-right">
-                              <span className={`font-black font-mono text-sm ${
-                                isPago
-                                  ? 'text-emerald-600 dark:text-emerald-400'
-                                  : isDevolucion
-                                  ? 'text-rose-600 dark:text-rose-400'
-                                  : 'text-[#0F172A] dark:text-amber-400'
-                              }`}>
-                                {isPago || isDevolucion ? `-$${Number(mov.monto).toFixed(2)}` : `+$${Number(mov.monto).toFixed(2)}`}
-                              </span>
-                              <span className="text-[10px] text-[var(--muted-foreground)] block font-mono">
-                                {new Date(mov.fecha).toLocaleDateString('es-EC')}
-                              </span>
-                            </div>
-
-                            {isPago && (
-                              <button
-                                onClick={() => handleEnviarPagoWhatsApp({
-                                  id: mov.id,
-                                  supplierId: selectedSupplierId!,
-                                  monto: mov.monto,
-                                  metodo: mov.metodo || 'TRANSFERENCIA',
-                                  banco: mov.banco,
-                                  comprobante: mov.comprobante,
-                                  notas: mov.descripcion,
-                                  createdAt: mov.fecha,
-                                  supplier: cuentaCorrienteData.supplier,
-                                })}
-                                className="p-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors cursor-pointer"
-                                title="Enviar Comprobante por WhatsApp"
-                              >
-                                <MessageCircle size={14} />
-                              </button>
-                            )}
-
-                            {isDevolucion && (
-                              <button
-                                onClick={() => handleEnviarDevolucionWhatsApp({
-                                  id: mov.id,
-                                  numeroCodigo: mov.numeroCodigo,
-                                  supplierId: selectedSupplierId!,
-                                  motivo: mov.descripcion,
-                                  totalDevuelto: mov.monto,
-                                  deudaDescontada: mov.detalles?.deudaDescontada || mov.monto,
-                                  lines: mov.detalles?.lines || [],
-                                  createdAt: mov.fecha,
-                                  supplier: cuentaCorrienteData.supplier,
-                                })}
-                                className="p-1.5 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors cursor-pointer"
-                                title="Enviar Constancia de Devolución por WhatsApp"
-                              >
-                                <MessageCircle size={14} />
-                              </button>
-                            )}
+                          {/* ── Saldo acumulado al momento de este movimiento ── */}
+                          <div className="flex items-center justify-end gap-2 border-t border-dashed border-[var(--border)] pt-2 -mb-1">
+                            <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Saldo tras este movimiento:</span>
+                            <span className={`text-[11px] font-black font-mono ${
+                              saldoEnEstePunto > 0.01
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : saldoEnEstePunto < -0.01
+                                  ? 'text-blue-600 dark:text-blue-400'
+                                  : 'text-emerald-600 dark:text-emerald-400'
+                            }`}>
+                              {saldoEnEstePunto > 0.01
+                                ? `Deuda: $${saldoEnEstePunto.toFixed(2)}`
+                                : saldoEnEstePunto < -0.01
+                                  ? `Adelanto: $${Math.abs(saldoEnEstePunto).toFixed(2)}`
+                                  : 'Al dia: $0.00'}
+                            </span>
                           </div>
                         </div>
                       );
@@ -3788,7 +4053,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   )}
                 </div>
               </div>
-            ) : null}
+              );
+            })() : null}
           </div>
         </div>
       )}
@@ -3856,48 +4122,58 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Método de Pago *
-                  </label>
-                  <select
-                    value={metodoPago}
-                    onChange={(e) => setMetodoPago(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="TRANSFERENCIA">Transferencia</option>
-                    <option value="EFECTIVO">Efectivo</option>
-                    <option value="CHEQUE">Cheque</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Banco Emisor
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Pichincha / Guayaquil"
-                    value={bancoPago}
-                    onChange={(e) => setBancoPago(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  N° Comprobante / Referencia
+                  Método de Pago / Anticipo *
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ej. TRANS-98234 o N° Cheque"
-                  value={comprobantePago}
-                  onChange={(e) => setComprobantePago(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
-                />
+                <select
+                  value={metodoPago}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setMetodoPago(val);
+                    if (val === 'EFECTIVO') {
+                      setBancoPago('');
+                      setComprobantePago('');
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="TRANSFERENCIA">Transferencia Bancaria</option>
+                  <option value="DEPOSITO">Depósito Bancario</option>
+                  <option value="EFECTIVO">Efectivo</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
               </div>
+
+              {metodoPago !== 'EFECTIVO' && (
+                <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-150">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                      Banco Emisor {metodoPago === 'CHEQUE' ? 'del Cheque' : ''}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Pichincha / Guayaquil"
+                      value={bancoPago}
+                      onChange={(e) => setBancoPago(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                      N° Comprobante / Referencia
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={metodoPago === 'CHEQUE' ? 'Ej. N° Cheque 00482' : 'Ej. TRANS-98234 o Depósito'}
+                      value={comprobantePago}
+                      onChange={(e) => setComprobantePago(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">

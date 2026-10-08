@@ -209,15 +209,23 @@ export function validarTelefonoEstricto(telefono: string): { valido: boolean; me
 
 /**
  * Formatea una dirección:
- * - Primera letra en mayúscula y el resto en minúscula o formato título respetando números y caracteres especiales.
- * - Permite caracteres especiales (#, -, ., ,, /, °) y números.
+ * - Capitaliza la primera letra no vacía y preserva todos los espacios para permitir una escritura fluida de la dirección completa.
+ * - Permite caracteres especiales (#, -, ., ,, /, °), números y palabras compuestas.
  */
 export function formatearDireccion(direccion: string): string {
   if (!direccion) return '';
-  const limpia = direccion.trim();
-  if (!limpia) return '';
-  // Capitalizar la primera letra y mantener el resto preservando números y símbolos
-  return limpia.charAt(0).toUpperCase() + limpia.slice(1);
+  // Buscar el primer carácter que no sea espacio en blanco
+  const primerIndiceNoEspacio = direccion.search(/\S/);
+  if (primerIndiceNoEspacio === -1) {
+    // Si solo hay espacios, mantenerlos para que el usuario pueda escribir sin trabas
+    return direccion;
+  }
+  // Capitalizar el primer carácter no vacío y preservar el resto exactamente como se escribe (incluyendo espacios intermedios y finales)
+  return (
+    direccion.slice(0, primerIndiceNoEspacio) +
+    direccion.charAt(primerIndiceNoEspacio).toUpperCase() +
+    direccion.slice(primerIndiceNoEspacio + 1)
+  );
 }
 
 /**
