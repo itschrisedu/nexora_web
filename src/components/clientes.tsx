@@ -118,6 +118,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   // Estado Directorio
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [selected, setSelected] = useState<Cliente | null>(null);
+  const [showMobileDetailModal, setShowMobileDetailModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -466,6 +467,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               fechaEmision: deudaAnteriorFechaEmision || new Date().toISOString().split('T')[0],
               fechaVencimiento: deudaAnteriorFechaVencimiento || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
               notas: deudaAnteriorNotas.trim() || undefined,
+              sucursalId: (activeSucursalId && activeSucursalId !== 'TODAS') ? activeSucursalId : undefined,
             });
             setSuccess(`Cliente registrado exitosamente con saldo anterior de $${montoNum.toFixed(2)}.`);
           } catch (errDeuda: any) {
@@ -920,7 +922,123 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 <p className="text-xs mt-1">Haz clic en "Nuevo Cliente" para registrar el primero.</p>
               </div>
             ) : (
-              <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+              <>
+                {/* Vista Móvil (Tarjetas 100% ancho adaptable) */}
+                <div className="md:hidden space-y-3">
+              {filtered.map(c => {
+                const rep = getClienteReputacion(c);
+                const limite = Number(c.limiteCredito ?? 0);
+                const utilizado = Number(c.creditoUtilizado ?? 0);
+                const disponible = Number(c.creditoDisponible ?? c.cupoDisponible ?? Math.max(0, limite - utilizado));
+                const scoreVal = Number(c.score ?? c.scoringCredito ?? 100);
+
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => { setSelected(c); setShowMobileDetailModal(true); }}
+                    className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-xs space-y-3 transition-all cursor-pointer hover:border-[#0F172A]/40 active:scale-[0.99] ${
+                      selected?.id === c.id ? "ring-2 ring-emerald-500/50 bg-[#0F172A]/5" : ""
+                    }`}
+                  >
+                    {/* Cabecera del Cliente */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-2xl bg-[#0F172A]/10 text-[#0F172A] flex items-center justify-center text-sm font-black shrink-0">
+                          {(c.nombre || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-extrabold text-sm text-[var(--foreground)] truncate">
+                            {c.nombre} {c.apellido || ""}
+                          </h4>
+                          <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)] flex-wrap">
+                            {(c.cedula || c.ruc) && (
+                              <span className="font-mono">C.I: {c.cedula || c.ruc}</span>
+                            )}
+                            {c.telefono && (
+                              <span>• {c.telefono}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {activeSucursalId === 'TODAS' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                          <Building size={10} />
+                          <span>{c.sucursalNombre || "Matriz"}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Badges de Scoring & Reputación */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black border ${scoreColor(scoreVal)} bg-[var(--muted)]/50`}>
+                        <span>Score: {scoreVal}</span>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${nivelColor(c.nivelCredito || "SIN_CREDITO")}`}>
+                        {(c.nivelCredito || "SIN_CREDITO").replace("_", " ")}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] border ${rep.badgeClass}`}>
+                        <span>{rep.icon}</span>
+                        <span>{rep.label}</span>
+                      </span>
+                      {Number(c.saldoAFavor || 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                          <Wallet size={10} />
+                          ${Number(c.saldoAFavor).toFixed(2)} a favor
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Resumen Financiero: Cupo y Límite */}
+                    <div className="grid grid-cols-2 gap-2 bg-[var(--muted)]/30 p-2.5 rounded-xl text-xs border border-[var(--border)]">
+                      <div>
+                        <span className="text-[10px] text-[var(--muted-foreground)] block">Cupo Disponible:</span>
+                        <span className="font-black text-emerald-600 font-mono text-sm">${disponible.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[var(--muted-foreground)] block">Límite Crédito:</span>
+                        <span className="font-bold text-[var(--foreground)] font-mono text-sm">${limite.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    {/* Acciones Rápidas */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelected(c);
+                          openEdit(c);
+                        }}
+                        className="flex-1 py-2 px-3 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        <Edit2 size={13} />
+                        <span>Editar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelected(c);
+                          setShowMobileDetailModal(true);
+                        }}
+                        className="flex-1 py-2 px-3 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <CreditCard size={13} />
+                        <span>Scoring & Crédito</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="px-3 py-2 text-xs text-[var(--muted-foreground)] text-center">
+                {filtered.length} cliente{filtered.length !== 1 ? "s" : ""} {search ? "encontrado" : "en total"}{search ? `s para "${search}"` : ""}
+              </div>
+            </div>
+
+            {/* Vista Tabla (Tablets y Desktop con overflow controlado) */}
+            <div className="hidden md:block bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30">
@@ -928,7 +1046,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                       {activeSucursalId === 'TODAS' && (
                         <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Sucursal</th>
                       )}
-                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider hidden md:table-cell">Cédula / RUC</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Cédula / RUC</th>
                       <th className="text-left px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider hidden lg:table-cell">Contacto</th>
                       <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Score</th>
                       <th className="text-center px-4 py-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Nivel</th>
@@ -943,7 +1061,12 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                       return (
                         <tr
                           key={c.id}
-                          onClick={() => setSelected(c)}
+                          onClick={() => {
+                            setSelected(c);
+                            if (typeof window !== 'undefined' && window.innerWidth < 1280) {
+                              setShowMobileDetailModal(true);
+                            }
+                          }}
                           className={`hover:bg-[var(--muted)]/20 cursor-pointer transition-colors ${selected?.id === c.id ? "bg-[#0F172A]/5" : ""}`}
                         >
                           <td className="px-4 py-3">
@@ -973,7 +1096,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                               </span>
                             </td>
                           )}
-                          <td className="px-4 py-3 hidden md:table-cell">
+                          <td className="px-4 py-3">
                             <span className="text-xs font-mono text-[var(--muted-foreground)]">{c.cedula || c.ruc || "—"}</span>
                           </td>
                           <td className="px-4 py-3 hidden lg:table-cell">
@@ -995,23 +1118,33 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <button
-                              onClick={e => { e.stopPropagation(); setSelected(c); openEdit(c); }}
-                              className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[#0F172A] hover:bg-[#0F172A]/10 transition-colors"
-                              title="Editar cliente"
-                            >
-                              <Edit2 size={14} />
-                            </button>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={e => { e.stopPropagation(); setSelected(c); setShowMobileDetailModal(true); }}
+                                className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[#0F172A] hover:bg-[#0F172A]/10 transition-colors xl:hidden"
+                                title="Ver Perfil y Scoring"
+                              >
+                                <CreditCard size={14} />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setSelected(c); openEdit(c); }}
+                                className="p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[#0F172A] hover:bg-[#0F172A]/10 transition-colors"
+                                title="Editar cliente"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-                <div className="px-4 py-3 border-t border-[var(--border)] text-xs text-[var(--muted-foreground)]">
-                  {filtered.length} cliente{filtered.length !== 1 ? "s" : ""} {search ? "encontrado" : "en total"}{search ? `s para "${search}"` : ""}
-                </div>
               </div>
+              <div className="px-4 py-3 border-t border-[var(--border)] text-xs text-[var(--muted-foreground)]">
+                {filtered.length} cliente{filtered.length !== 1 ? "s" : ""} {search ? "encontrado" : "en total"}{search ? `s para "${search}"` : ""}
+              </div>
+            </div>
             )}
           </div>
 
@@ -1201,7 +1334,273 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 <p className="text-sm font-semibold">Selecciona un cliente</p>
                 <p className="text-xs mt-1">Haz clic en cualquier fila para ver el perfil crediticio.</p>
               </div>
-            )}
+            </>
+          )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* MODAL MÓVIL: PERFIL, SCORING Y AUTORIZACIÓN DE CRÉDITO        */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {showMobileDetailModal && selected && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150 xl:hidden"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowMobileDetailModal(false); }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
+            {/* Header del Modal Móvil */}
+            <div className="p-4 sm:p-5 pr-14 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/10 text-emerald-400 flex items-center justify-center text-sm font-black shrink-0 border border-white/10">
+                {(selected.nombre || "?").charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-extrabold text-sm text-white truncate">
+                  {selected.nombre} {selected.apellido || ""}
+                </h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>
+                    {selected.nivelCredito?.replace("_", " ")}
+                  </span>
+                  {selected.sucursalNombre && (
+                    <span className="text-[10px] text-slate-300 font-medium">
+                      • {selected.sucursalNombre}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Botón Cerrar (X) */}
+              <button
+                type="button"
+                onClick={() => setShowMobileDetailModal(false)}
+                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Contenido con scroll */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Insignia de Perfil y Reputación */}
+              {(() => {
+                const rep = getClienteReputacion(selected);
+                return (
+                  <div className={`p-3 rounded-xl border flex items-start gap-2.5 ${rep.badgeClass}`}>
+                    <span className="text-xl shrink-0 mt-0.5">{rep.icon}</span>
+                    <div>
+                      <div className="text-xs font-black">{rep.label}</div>
+                      <div className="text-[10px] opacity-90 mt-0.5 leading-tight">{rep.descripcion}</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tarjeta de Score Crediticio */}
+              {(() => {
+                const limite = Number(selected.limiteCredito ?? 0);
+                const utilizado = Number(selected.creditoUtilizado ?? 0);
+                const disponible = Number(selected.creditoDisponible ?? selected.cupoDisponible ?? Math.max(0, limite - utilizado));
+                const scoreVal = Number(selected.score ?? selected.scoringCredito ?? 100);
+
+                return (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-[var(--muted)]/30 rounded-2xl border border-[var(--border)] flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider">Score Crediticio</div>
+                        <div className={`text-3xl font-black mt-1 ${scoreColor(scoreVal)}`}>
+                          {scoreVal}<span className="text-xs text-[var(--muted-foreground)] font-normal ml-1">/ 100</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold">Evaluación</span>
+                        <span className="text-xs font-black text-[var(--foreground)]">{scoreVal >= 80 ? "Bajo Riesgo" : scoreVal >= 50 ? "Riesgo Moderado" : "Alto Riesgo"}</span>
+                      </div>
+                    </div>
+
+                    {Number(selected.saldoAFavor ?? 0) > 0 && (
+                      <div className="p-3.5 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 dark:border-emerald-800/60 rounded-xl space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <Wallet size={13} className="text-emerald-600 dark:text-emerald-400" /> Saldo a Favor
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                            Disponible
+                          </span>
+                        </div>
+                        <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                          ${Number(selected.saldoAFavor).toFixed(2)}
+                        </div>
+                        <div className="text-[10px] text-emerald-700/90 dark:text-emerald-300/90 leading-tight">
+                          Crédito a favor para aplicar a nuevas compras o compensación.
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 bg-[var(--muted)]/20 p-3 rounded-xl border border-[var(--border)]">
+                      <div>
+                        <span className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1 block">
+                          <DollarSign size={12} /> Cupo Disponible:
+                        </span>
+                        <span className="font-black text-emerald-600 font-mono text-base">${disponible.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1 block">
+                          <ShieldAlert size={12} /> Límite Crédito:
+                        </span>
+                        <span className="font-bold text-[var(--foreground)] font-mono text-base">${limite.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Control Administrativo de Crédito */}
+              <div className="p-4 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)] flex items-center gap-1.5">
+                    <CreditCard size={14} className="text-emerald-600" /> Opciones de Scoring & Nivel de Crédito
+                  </span>
+                  {updatingLevel && <Loader2 size={13} className="animate-spin text-[#0F172A]" />}
+                </div>
+                <p className="text-[10px] text-[var(--muted-foreground)]">
+                  Selecciona el nivel autorizado para ajustar el cupo máximo de crédito del cliente:
+                </p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={updatingLevel}
+                    onClick={() => handleAjustarNivel(selected.id, "SIN_CREDITO")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      selected.nivelCredito === "SIN_CREDITO"
+                        ? "bg-red-500 text-white border-red-500 shadow-sm"
+                        : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-red-500/10 hover:text-red-500"
+                    }`}
+                  >
+                    Sin Crédito ($0)
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={updatingLevel}
+                    onClick={() => handleAjustarNivel(selected.id, "NIVEL_1")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      selected.nivelCredito === "NIVEL_1"
+                        ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                        : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-blue-500/10 hover:text-blue-600"
+                    }`}
+                  >
+                    Nivel 1 ($200)
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={updatingLevel}
+                    onClick={() => handleAjustarNivel(selected.id, "NIVEL_2")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      selected.nivelCredito === "NIVEL_2"
+                        ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                        : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-amber-500/10 hover:text-amber-600"
+                    }`}
+                  >
+                    Nivel 2 ($500)
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={updatingLevel}
+                    onClick={() => handleAjustarNivel(selected.id, "NIVEL_3")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      selected.nivelCredito === "NIVEL_3"
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-purple-500/10 hover:text-purple-600"
+                    }`}
+                  >
+                    Nivel 3 ($1,000)
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={updatingLevel}
+                    onClick={() => handleAjustarNivel(selected.id, "NIVEL_4")}
+                    className={`col-span-2 py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      selected.nivelCredito === "NIVEL_4"
+                        ? "bg-yellow-600 text-white border-yellow-600 shadow-sm"
+                        : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-yellow-500/10 hover:text-yellow-600"
+                    }`}
+                  >
+                    Nivel 4 (Oro / VIP - $2,500+)
+                  </button>
+                </div>
+              </div>
+
+              {/* Datos de Contacto */}
+              <div className="p-3.5 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-2 text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                  Información de Contacto
+                </span>
+                {selected.telefono && (
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[var(--muted-foreground)]"><Phone size={13} /> Teléfono:</span>
+                    <span className="font-semibold text-[var(--foreground)]">{selected.telefono}</span>
+                  </div>
+                )}
+                {selected.email && (
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[var(--muted-foreground)]"><Mail size={13} /> Email:</span>
+                    <span className="font-semibold text-[var(--foreground)] truncate max-w-[180px]">{selected.email}</span>
+                  </div>
+                )}
+                {selected.cedula && (
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[var(--muted-foreground)]"><User size={13} /> Cédula:</span>
+                    <span className="font-mono font-semibold text-[var(--foreground)]">{selected.cedula}</span>
+                  </div>
+                )}
+                {selected.ruc && (
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[var(--muted-foreground)]"><FileText size={13} /> RUC:</span>
+                    <span className="font-mono font-semibold text-[var(--foreground)]">{selected.ruc}</span>
+                  </div>
+                )}
+                {selected.direccion && (
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-[var(--muted-foreground)] shrink-0"><MapPin size={13} /> Dirección:</span>
+                    <span className="text-right text-[var(--foreground)]">{selected.direccion}</span>
+                  </div>
+                )}
+                {selected.notas && (
+                  <div className="pt-2 border-t border-[var(--border)] text-[var(--muted-foreground)]">
+                    <span className="font-semibold block mb-0.5">Notas:</span>
+                    <p>{selected.notas}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer de Acciones del Modal */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/30 flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileDetailModal(false);
+                  openEdit(selected);
+                }}
+                className="flex-1 py-2.5 px-4 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Edit2 size={14} />
+                <span>Editar Cliente</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMobileDetailModal(false)}
+                className="py-2.5 px-4 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
