@@ -1936,24 +1936,35 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
             setMetodoPagoContado('EFECTIVO');
             setReferenciaComprobante('');
             setErrorMsg('');
+            setSelectedOrderSucursalId(selectedSucursalPedidoId || (activeSucursalId !== 'TODAS' ? activeSucursalId : sucursales?.[0]?.id) || '');
             setShowModal(true);
           }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm shrink-0"
         >
           <Plus size={16} />
           <span>Nuevo Pedido</span>
+          {(() => {
+            const sucActiva = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
+            const esOtraSucursal = sucActiva && sucActiva.id !== activeSucursalId;
+            return sucActiva ? (
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${esOtraSucursal ? 'bg-amber-400/30 text-amber-200' : 'bg-emerald-500/30 text-emerald-300'}`}>
+                {esOtraSucursal ? '📍 ' : ''}{sucActiva.name}
+              </span>
+            ) : null;
+          })()}
         </button>
       </div>
 
       {/* Pestañas Dinámicas de Sucursal & Filtros de Estado */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         {/* Pestañas de Sucursal Dinámicas por Nombre */}
-        {listaSucursalesDisponibles.length > 1 && (
+        {listaSucursalesDisponibles.length >= 1 && (
           <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
             {listaSucursalesDisponibles.map((suc) => {
               const isSelected = selectedSucursalPedidoId === suc.id;
               const isMiLocal = activeSucursalId === suc.id;
               const countPedidos = pedidos.filter((p) => (p as any).tenantId === suc.id || (!(p as any).tenantId && suc.isMatriz)).length;
+              const esOtra = !isMiLocal;
 
               return (
                 <button
@@ -1962,20 +1973,25 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                   onClick={() => setSelectedSucursalPedidoId(suc.id)}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-[#0F172A] text-white shadow-sm font-black'
+                      ? (esOtra ? 'bg-amber-600 text-white shadow-sm font-black' : 'bg-[#0F172A] text-white shadow-sm font-black')
                       : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
                   }`}
                 >
-                  <Building size={13} className={isSelected ? 'text-emerald-400' : 'text-slate-400'} />
+                  <Building size={13} className={isSelected ? (esOtra ? 'text-amber-200' : 'text-emerald-400') : 'text-slate-400'} />
                   <span>{suc.name}</span>
                   {isMiLocal && (
-                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
                       isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                     }`}>
                       Mi Local
                     </span>
                   )}
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  {esOtra && isSelected && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-amber-400/30 text-amber-100">
+                      Otra Sucursal
+                    </span>
+                  )}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
                     isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
                   }`}>
                     {countPedidos}
@@ -2039,9 +2055,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 <tr>
                   <th className="px-6 py-4 flex items-center gap-1"><ArrowUpDown size={12} />N° Pedido</th>
                   <th className="px-6 py-4">Cliente</th>
-                  {activeSucursalId === 'TODAS' && (
-                    <th className="px-6 py-4 text-center">Sucursal</th>
-                  )}
+                  <th className="px-6 py-4 text-center">Sucursal / Origen</th>
                   <th className="px-6 py-4 text-center">Estado</th>
                   <th className="px-6 py-4">Tipo Pago</th>
                   <th className="px-6 py-4 text-right">Total</th>
@@ -2106,14 +2120,24 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                             );
                           })()}
                         </td>
-                        {activeSucursalId === 'TODAS' && (
-                          <td className="px-6 py-4 text-center">
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex flex-col items-center gap-1">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shadow-2xs">
                               <Building size={12} className="shrink-0" />
-                              <span>{p.sucursalNombre || 'Matriz'}</span>
+                              <span>{p.sucursalNombre || listaSucursalesDisponibles.find((s) => s.id === (p as any).tenantId)?.name || 'Matriz'}</span>
                             </span>
-                          </td>
-                        )}
+                            {(p as any).creadoPorSucursalNombre && (p as any).creadoPorSucursalId !== (p as any).tenantId && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/15">
+                                ↩ Creado desde: {(p as any).creadoPorSucursalNombre}
+                              </span>
+                            )}
+                            {p.vendedorNombre && (p as any).tenantId !== activeSucursalId && (
+                              <span className="text-[9px] text-[var(--muted-foreground)] font-medium">
+                                por {p.vendedorNombre}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-center">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>
                             {cfg.icon}{cfg.label}

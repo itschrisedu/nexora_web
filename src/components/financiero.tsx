@@ -1963,12 +1963,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         </div>
 
         {/* Pestañas de Sucursal Dinámicas por Nombre */}
-        {listaSucursalesDisponibles.length > 1 && (
+        {listaSucursalesDisponibles.length >= 1 && (
           <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
             {listaSucursalesDisponibles.map((suc) => {
               const isSelected = selectedSucursalCobroId === suc.id;
               const isMiLocal = activeSucursalId === suc.id;
               const countDeudas = cobros.filter((c) => c.tenantId === suc.id || (!c.tenantId && suc.isMatriz)).length;
+              const esOtra = !isMiLocal;
 
               return (
                 <button
@@ -1977,20 +1978,25 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   onClick={() => setSelectedSucursalCobroId(suc.id)}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-[#0F172A] text-white shadow-sm font-black'
+                      ? (esOtra ? 'bg-amber-600 text-white shadow-sm font-black' : 'bg-[#0F172A] text-white shadow-sm font-black')
                       : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
                   }`}
                 >
-                  <Building size={13} className={isSelected ? 'text-emerald-400' : 'text-slate-400'} />
+                  <Building size={13} className={isSelected ? (esOtra ? 'text-amber-200' : 'text-emerald-400') : 'text-slate-400'} />
                   <span>{suc.name}</span>
                   {isMiLocal && (
-                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
                       isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                     }`}>
                       Mi Local
                     </span>
                   )}
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  {esOtra && isSelected && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-amber-400/30 text-amber-100">
+                      Otra Sucursal
+                    </span>
+                  )}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
                     isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
                   }`}>
                     {countDeudas}
