@@ -50,6 +50,7 @@ import {
   MessageCircle,
   RotateCcw,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import ConfirmModal from './ui/confirm-modal';
 import { useToast } from './ui/toast';
@@ -446,6 +447,60 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   );
   const [deudaAnteriorNotas, setDeudaAnteriorNotas] = useState('');
 
+  // Proveedores Globales de la Empresa (para adopción inter-sucursales)
+  const [globalSuppliers, setGlobalSuppliers] = useState<any[]>([]);
+  const [loadingGlobalSuppliers, setLoadingGlobalSuppliers] = useState(false);
+
+  const loadGlobalSuppliers = useCallback(async () => {
+    setLoadingGlobalSuppliers(true);
+    try {
+      const res = await ApiService.get('/proveedores/buscar-global');
+      if (Array.isArray(res)) {
+        setGlobalSuppliers(res);
+      }
+    } catch (e) {
+      console.warn('Error cargando catálogo global de proveedores:', e);
+    } finally {
+      setLoadingGlobalSuppliers(false);
+    }
+  }, []);
+
+  const sugerenciasGlobales = useMemo(() => {
+    if (!showSupplierModal) return [];
+    const rucQuery = (ruc || '').trim().toLowerCase();
+    const nomQuery = `${provNombres} ${provApellidos} ${nombreComercial}`.trim().toLowerCase();
+    if (rucQuery.length < 3 && nomQuery.length < 3) return [];
+
+    return globalSuppliers.filter((s) => {
+      if (s.estaEnEstaSucursal) return false;
+      const rucS = (s.ruc || '').toLowerCase();
+      const razonS = (s.razonSocial || s.nombre || '').toLowerCase();
+      const contactoS = (s.contacto || '').toLowerCase();
+      const rucMatch = rucQuery.length >= 3 && rucS.includes(rucQuery);
+      const nomMatch = nomQuery.length >= 3 && (razonS.includes(nomQuery) || contactoS.includes(nomQuery));
+      return rucMatch || nomMatch;
+    });
+  }, [showSupplierModal, ruc, provNombres, provApellidos, nombreComercial, globalSuppliers]);
+
+  const adoptarProveedorGlobal = (prov: any) => {
+    if (prov.ruc) setRuc(prov.ruc);
+    if (prov.razonSocial) {
+      setNombreComercial(prov.razonSocial);
+      const partes = prov.razonSocial.trim().split(/\s+/);
+      if (partes.length >= 2) {
+        setProvNombres(partes[0]);
+        setProvApellidos(partes.slice(1).join(' '));
+      } else {
+        setProvNombres(prov.razonSocial);
+        setProvApellidos('');
+      }
+    }
+    if (prov.contacto) setContacto(prov.contacto);
+    if (prov.direccion) setDireccion(prov.direccion);
+    if (prov.email) setEmail(prov.email);
+    showToast(`Datos del proveedor "${prov.razonSocial}" autocompletados desde ${prov.sucursalOrigenNombre || 'otra sucursal'}.`, 'info');
+  };
+
   // Form: Editar Proveedor
   const [showEditSupplierModal, setShowEditSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Proveedor | null>(null);
@@ -500,6 +555,12 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       diferencia: number;
     }>;
   }>>([]);
+
+  useEffect(() => {
+    if (showSupplierModal) {
+      loadGlobalSuppliers();
+    }
+  }, [showSupplierModal, loadGlobalSuppliers]);
 
   // Control de descartes y cierre seguro de modales
   const [showDiscardModal, setShowDiscardModal] = useState(false);
@@ -4650,6 +4711,49 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             </div>
 
             <form onSubmit={handleCreateProveedor} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              {/* Sugerencias de Proveedores Existentes en la Empresa (Inter-Sucursal) */}
+              {sugerenciasGlobales.length > 0 && (
+                <div className="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl space-y-2.5 animate-in fade-in shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                      <Building2 size={14} className="text-blue-500" /> Proveedor detectado en otra sucursal:
+                    </span>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold bg-blue-500/15 px-2 py-0.5 rounded-full">
+                      {sugerenciasGlobales.length} {sugerenciasGlobales.length === 1 ? 'coincidencia' : 'coincidencias'}
+                    </span>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {sugerenciasGlobales.slice(0, 3).map((prov) => (
+                      <div
+                        key={prov.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-[var(--card)] p-3 rounded-xl border border-blue-500/20 shadow-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-black text-xs text-[var(--foreground)] truncate flex items-center gap-1.5">
+                            <span>{prov.razonSocial || prov.nombre}</span>
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                              {prov.sucursalOrigenNombre || 'Matriz'}
+                            </span>
+                          </div>
+                          <div className="text-[10.5px] text-[var(--muted-foreground)] font-mono flex items-center gap-2 mt-0.5">
+                            <span>RUC: {prov.ruc || 'Sin RUC'}</span>
+                            {prov.contacto && <span>• Tel: {prov.contacto}</span>}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => adoptarProveedorGlobal(prov)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <Sparkles size={13} className="text-amber-300" />
+                          <span>Usar estos datos</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
