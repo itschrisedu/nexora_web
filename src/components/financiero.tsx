@@ -693,7 +693,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     try {
       if (online) {
         const [dataCobros, dataClientes, dataCatalogo] = await Promise.all([
-          ApiService.get('/financiero/cobros'),
+          ApiService.get('/financiero/cobros?incluirOtrasSucursales=true'),
           ApiService.get('/clientes'),
           ApiService.get('/catalogo/productos'),
         ]);
