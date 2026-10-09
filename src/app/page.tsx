@@ -1342,7 +1342,7 @@ function MainApp() {
               <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 <MapPin size={12} /> Sucursal Activa
               </div>
-              {!isBranchRestricted && user?.rol === 'ROL_ADMIN' ? (
+              {(user?.rol === 'ROL_ADMIN' && user?.isBranchRestricted !== true) && sucursales.length > 0 ? (
                 <select
                   value={activeSucursalId}
                   onChange={(e) => {
@@ -1364,8 +1364,7 @@ function MainApp() {
               ) : (
                 <div className="text-xs font-bold text-[var(--foreground)] py-1 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  <span>{sucursales.find((s) => s.id === (user?.tenantId || activeSucursalId))?.name || 'Sucursal Asignada'}</span>
-                  {user?.rol === 'ROL_ADMIN' && <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">(Admin Local)</span>}
+                  <span>{sucursales.find((s) => s.id === (user?.tenantId || activeSucursalId))?.name || user?.tenantName || 'Sucursal Asignada'}</span>
                 </div>
               )}
             </div>
@@ -1553,7 +1552,7 @@ function MainApp() {
                 }}
               >
                 <MapPin size={14} className="shrink-0" style={{ color: 'var(--primary-foreground)' }} />
-                {sucursales.length > 0 ? (
+                {(user?.rol === 'ROL_ADMIN' && user?.isBranchRestricted !== true) && sucursales.length > 0 ? (
                   <select
                     value={activeSucursalId}
                     onChange={(e) => {
@@ -1564,7 +1563,7 @@ function MainApp() {
                     }}
                     className="bg-transparent font-bold focus:outline-none cursor-pointer text-xs"
                     style={{ color: 'var(--primary-foreground)' }}
-                    title="Navegar entre sucursales con 1 clic"
+                    title="Navegar entre sucursales"
                   >
                     <option value="TODAS" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">🏢 Todas las Sucursales (Consolidado)</option>
                     {sucursales.map((s) => (
@@ -1574,8 +1573,8 @@ function MainApp() {
                     ))}
                   </select>
                 ) : (
-                  <span className="font-bold text-xs truncate max-w-[200px] flex items-center gap-1.5" style={{ color: 'var(--primary-foreground)' }}>
-                    <span>📍 {sucursales.find((s) => s.id === (user?.tenantId || activeSucursalId))?.name || 'Sucursal Asignada'}</span>
+                  <span className="font-bold text-xs truncate max-w-[220px] flex items-center gap-1.5" style={{ color: 'var(--primary-foreground)' }}>
+                    <span>{sucursales.find((s) => s.id === (user?.tenantId || activeSucursalId))?.name || user?.tenantName || 'Matriz'}</span>
                   </span>
                 )}
               </div>
