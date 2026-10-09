@@ -1342,7 +1342,7 @@ function MainApp() {
               <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 <MapPin size={12} /> Sucursal Activa
               </div>
-              {(user?.rol === 'ROL_ADMIN' && user?.isBranchRestricted !== true) && sucursales.length > 0 ? (
+              {isGlobalAdmin && sucursales.length > 0 ? (
                 <select
                   value={activeSucursalId}
                   onChange={(e) => {
@@ -1552,7 +1552,7 @@ function MainApp() {
                 }}
               >
                 <MapPin size={14} className="shrink-0" style={{ color: 'var(--primary-foreground)' }} />
-                {(user?.rol === 'ROL_ADMIN' && user?.isBranchRestricted !== true) && sucursales.length > 0 ? (
+                {isGlobalAdmin && sucursales.length > 0 ? (
                   <select
                     value={activeSucursalId}
                     onChange={(e) => {
