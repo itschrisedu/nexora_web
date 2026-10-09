@@ -231,6 +231,9 @@ const compressImageToWebP = (base64Str: string, maxWidth = 800, maxHeight = 800,
         return;
       }
 
+      // Pintar fondo blanco puro para evitar que imágenes transparentes sin fondo queden con fondo oscuro
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
       const webpBase64 = canvas.toDataURL("image/webp", quality);
       resolve(webpBase64);

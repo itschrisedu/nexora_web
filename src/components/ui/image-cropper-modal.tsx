@@ -115,8 +115,8 @@ export default function ImageCropperModal({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Fill background
-    ctx.fillStyle = "#000000";
+    // Fill background with white to preserve clean background for transparent images
+    ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, targetWidth, targetHeight);
 
     // Calculate scaling factor between preview frame and high-res export canvas

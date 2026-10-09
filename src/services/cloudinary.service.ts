@@ -28,9 +28,12 @@ async function stripExifAndSanitize(fileOrBase64: File | string): Promise<string
             resolve(img.src);
             return;
           }
+          // Rellenar fondo blanco puro para evitar que imágenes transparentes (PNG de Canva, etc.) se conviertan en negro al rasterizar
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
           // toDataURL genera una nueva imagen limpia sin metadatos EXIF, sin GPS y sin fecha
-          const cleanBase64 = canvas.toDataURL('image/jpeg', 0.9);
+          const cleanBase64 = canvas.toDataURL('image/jpeg', 0.92);
           resolve(cleanBase64);
         } catch {
           resolve(img.src);

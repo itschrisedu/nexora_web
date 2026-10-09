@@ -41,6 +41,10 @@ export function optimizeImageToWebp(file: File): Promise<string> {
           return;
         }
 
+        // Pintar fondo blanco puro para evitar que imágenes transparentes sin fondo queden con fondo negro
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+
         // Dibujar y comprimir
         ctx.drawImage(img, 0, 0, width, height);
         const webpDataUrl = canvas.toDataURL('image/webp', 0.8);
