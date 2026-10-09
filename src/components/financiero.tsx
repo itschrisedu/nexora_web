@@ -114,6 +114,8 @@ interface Abono {
   usuarioNombre?: string;
   usuarioEmail?: string;
   usuarioRol?: string;
+  usuarioSucursal?: string;
+  esCobroOtraSucursal?: boolean;
 }
 
 interface Cobro {
@@ -2811,9 +2813,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                               {new Date(a.createdAt).toLocaleDateString('es-EC')}
                             </span>
                             {a.usuarioNombre && (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                              <span className="inline-flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
                                 <User size={10} />
                                 <span>Cobrado por: {a.usuarioNombre}</span>
+                                {a.esCobroOtraSucursal && a.usuarioSucursal && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                    📍 Sucursal: {a.usuarioSucursal}
+                                  </span>
+                                )}
                               </span>
                             )}
                           </div>

@@ -4749,7 +4749,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   type="text"
                   placeholder="Ej. Parque Industrial / Av. Principal"
                   value={direccion}
-                  onChange={(e) => setDireccion(formatearDireccion(e.target.value))}
+                  onChange={(e) => setDireccion(e.target.value)}
+                  onBlur={() => setDireccion(formatearDireccion(direccion))}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -4989,7 +4990,8 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   type="text"
                   placeholder="Ej. Parque Industrial / Av. Principal"
                   value={editDireccion}
-                  onChange={(e) => setEditDireccion(formatearDireccion(e.target.value))}
+                  onChange={(e) => setEditDireccion(e.target.value)}
+                  onBlur={() => setEditDireccion(formatearDireccion(editDireccion))}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>

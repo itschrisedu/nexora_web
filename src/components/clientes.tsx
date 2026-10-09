@@ -2502,7 +2502,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 <input
                   type="text"
                   value={direccion}
-                  onChange={(e) => setDireccion(formatearDireccion(e.target.value))}
+                  onChange={(e) => setDireccion(e.target.value)}
+                  onBlur={() => setDireccion(formatearDireccion(direccion))}
                   placeholder="Ej. Av. Principal 123 y Rocafuerte"
                   className={INPUT}
                 />

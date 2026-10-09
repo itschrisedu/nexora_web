@@ -3804,7 +3804,7 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
               <div>
                 <Lbl t="Dirección de Taller / Fábrica (Opcional)" />
-                <input type="text" placeholder="Ej. Parque Industrial / Av. Principal" value={qsDireccion} onChange={e => setQsDireccion(formatearDireccion(e.target.value))} className={INPUT} />
+                <input type="text" placeholder="Ej. Parque Industrial / Av. Principal" value={qsDireccion} onChange={e => setQsDireccion(e.target.value)} onBlur={() => setQsDireccion(formatearDireccion(qsDireccion))} className={INPUT} />
               </div>
 
               <div className="pt-2 flex gap-2">
