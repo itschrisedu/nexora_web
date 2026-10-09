@@ -570,8 +570,8 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                         {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
                       </span>
                       {isAdmin && activeProduct && (
-                        <span className="text-[10px] text-[var(--muted-foreground)] block">
-                          Costo: ${Number(activeProduct.precioCosto).toFixed(2)}
+                        <span className="text-[10px] text-slate-900 dark:text-[var(--muted-foreground)] font-medium block">
+                          Costo: <strong className="text-black dark:text-slate-200 font-mono font-bold">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
                         </span>
                       )}
                     </div>
@@ -658,8 +658,8 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                                   </span>
                                   {/* COSTO VISIBLE EXCLUSIVAMENTE PARA ADMINISTRADOR */}
                                   {isAdmin && (
-                                    <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
-                                      Costo: <strong className="text-[var(--foreground)]">${Number(p.precioCosto).toFixed(2)}</strong>
+                                    <div className="text-[10px] text-slate-900 dark:text-[var(--muted-foreground)] font-medium mt-0.5">
+                                      Costo: <strong className="text-black dark:text-slate-200 font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
                                     </div>
                                   )}
                                 </div>

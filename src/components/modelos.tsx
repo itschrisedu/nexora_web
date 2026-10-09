@@ -2051,9 +2051,14 @@ export default function ModelosComponent({
                       <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
                         <div className="text-left md:text-right">
                           <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precios Variantes</span>
-                          <span className="text-sm font-extrabold text-[#0F172A]">
+                          <span className="text-sm font-extrabold text-[#0F172A] dark:text-white block">
                             {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
                           </span>
+                          {isAdmin && activeProduct && (
+                            <span className="text-[10px] text-slate-900 dark:text-[var(--muted-foreground)] font-medium block">
+                              Costo: <strong className="text-black dark:text-slate-200 font-mono font-bold">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -2193,8 +2198,8 @@ export default function ModelosComponent({
                                       <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin taller asignado</span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-[var(--muted-foreground)]">
-                                    Costo: <strong className="text-slate-800 dark:text-slate-200 font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
+                                  <div className="text-[10px] text-slate-900 dark:text-[var(--muted-foreground)] font-medium">
+                                    Costo: <strong className="text-black dark:text-slate-200 font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
                                   </div>
                                 </div>
 
@@ -2590,7 +2595,7 @@ export default function ModelosComponent({
 
                       <div className="text-right text-xs">
                         <div className="font-bold text-[var(--foreground)]">${Number(v.salePrice).toFixed(2)}</div>
-                        <div className="text-[10px] text-[var(--muted-foreground)]">Costo: ${Number(v.costPrice).toFixed(2)}</div>
+                        <div className="text-[10px] text-slate-900 dark:text-[var(--muted-foreground)] font-medium">Costo: <strong className="text-black dark:text-slate-200 font-mono font-bold">${Number(v.costPrice).toFixed(2)}</strong></div>
                       </div>
                     </label>
                   );
