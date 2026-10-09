@@ -973,7 +973,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
         <button
           type="button"
           onClick={() => setTabActiva('sucursales')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
             tabActiva === 'sucursales'
               ? 'bg-[#0F172A] text-white shadow-sm'
               : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
@@ -985,7 +985,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
         <button
           type="button"
           onClick={() => setTabActiva('personal')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
             tabActiva === 'personal'
               ? 'bg-[#0F172A] text-white shadow-sm'
               : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
@@ -997,7 +997,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
         <button
           type="button"
           onClick={() => setTabActiva('stock-inter')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
             tabActiva === 'stock-inter'
               ? 'bg-[#0F172A] text-white shadow-sm'
               : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
@@ -1010,14 +1010,14 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       {/* ═══ TAB 1: SUCURSALES ═══ */}
       {tabActiva === 'sucursales' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-[var(--foreground)]">Sucursales del Negocio</h2>
               <p className="text-xs text-[var(--muted-foreground)]">
                 Organiza tus puntos de venta. Los inventarios y colaboradores están aislados por sucursal.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -1040,7 +1040,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                   }
                   setShowAddModal(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm shrink-0 cursor-pointer"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
               >
                 <UserPlus size={16} /> Registrar Colaborador
               </button>
@@ -1052,7 +1052,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                     setShowCustomRucNew(false);
                     setShowAddSucursalModal(true);
                   }}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer whitespace-nowrap"
                 >
                   <Plus size={15} /> Nueva Sucursal
                 </button>
@@ -1523,54 +1523,58 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
 
             {/* 🏢 SECCIÓN OPERATIVA: PERSONAL POR SUCURSAL */}
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base font-bold text-[var(--foreground)]">Personal Operativo por Sucursal</h2>
                   <p className="text-xs text-[var(--muted-foreground)]">
                     Gestiona roles locales, asignación a puntos de venta y permisos de precios para administradores de sucursal, vendedores y bodegueros.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1 sm:w-64">
-                    <Search size={15} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                  <div className="relative w-full sm:w-64">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
                     <input
                       type="text"
                       value={searchPersonalQuery}
                       onChange={(e) => setSearchPersonalQuery(e.target.value)}
                       placeholder="Buscar por nombre o correo..."
-                      className="w-full pl-9 pr-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                      className="w-full pl-9 pr-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10 transition-all shadow-2xs"
                     />
                   </div>
-                  <button
-                    onClick={loadUsers}
-                    className="p-2 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors shrink-0 cursor-pointer"
-                    title="Refrescar Lista"
-                  >
-                    <RefreshCw size={15} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setNombre('');
-                      setEmail('');
-                      setPassword('');
-                      setConfirmPassword('');
-                      setRolOption('ROL_VENDEDOR');
-                      setPermiteCambiarPrecio(false);
-                      setAddUserEmailError('');
-                      setShowPasswordAddUser(false);
-                      setShowConfirmPasswordAddUser(false);
-                      setShowPasswordMeter(false);
-                      if (!isGlobalAdmin) {
-                        setSelectedTenantForNewUser(loggedUser?.tenantId || (sucursales[0]?.id || ''));
-                      } else if (sucursales.length > 0 && !selectedTenantForNewUser) {
-                        setSelectedTenantForNewUser(sucursales[0].id);
-                      }
-                      setShowAddModal(true);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all shrink-0 cursor-pointer"
-                  >
-                    <Plus size={15} /> Nuevo Colaborador
-                  </button>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={loadUsers}
+                      className="p-2 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors shrink-0 cursor-pointer"
+                      title="Refrescar Lista"
+                    >
+                      <RefreshCw size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNombre('');
+                        setEmail('');
+                        setPassword('');
+                        setConfirmPassword('');
+                        setRolOption('ROL_VENDEDOR');
+                        setPermiteCambiarPrecio(false);
+                        setAddUserEmailError('');
+                        setShowPasswordAddUser(false);
+                        setShowConfirmPasswordAddUser(false);
+                        setShowPasswordMeter(false);
+                        if (!isGlobalAdmin) {
+                          setSelectedTenantForNewUser(loggedUser?.tenantId || (sucursales[0]?.id || ''));
+                        } else if (sucursales.length > 0 && !selectedTenantForNewUser) {
+                          setSelectedTenantForNewUser(sucursales[0].id);
+                        }
+                        setShowAddModal(true);
+                      }}
+                      className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                    >
+                      <Plus size={15} /> Nuevo Colaborador
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1729,21 +1733,21 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
             </p>
           </div>
 
-          <form onSubmit={handleSearchStockInter} className="flex gap-3 max-w-lg">
-            <div className="relative flex-1">
-              <Search size={16} className="absolute left-3.5 top-3 text-[var(--muted-foreground)]" />
+          <form onSubmit={handleSearchStockInter} className="flex flex-col sm:flex-row gap-3 max-w-lg w-full">
+            <div className="relative w-full sm:flex-1">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
               <input
                 type="text"
                 value={searchStockQuery}
                 onChange={(e) => setSearchStockQuery(e.target.value)}
                 placeholder="Buscar por modelo o código (Ej: Oxford, 2026)..."
-                className="w-full pl-10 pr-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A]"
+                className="w-full pl-10 pr-3 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-semibold focus:outline-none focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10 transition-all shadow-2xs"
               />
             </div>
             <button
               type="submit"
               disabled={loadingStock}
-              className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+              className="w-full sm:w-auto px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loadingStock ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
               Consultar

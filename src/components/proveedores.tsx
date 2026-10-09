@@ -1745,10 +1745,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         </div>
 
         {online && (
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
             <button
               onClick={() => setShowSupplierModal(true)}
-              className="flex items-center gap-2 px-3.5 py-2 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-xs font-bold rounded-xl transition-colors shadow-sm"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-xs font-bold rounded-xl transition-colors shadow-sm whitespace-nowrap"
             >
               <Plus size={14} className="text-emerald-500" />
               <span>Nuevo Proveedor</span>
@@ -1762,10 +1762,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 setBusquedaModelo('');
                 setShowOrderModal(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm border border-slate-700"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm border border-slate-700 whitespace-nowrap"
             >
               <Plus size={14} className="text-amber-400" />
-              <span>Emitir Orden de Compra (Borrador)</span>
+              <span>Emitir Orden de Compra</span>
             </button>
           </div>
         )}
@@ -1818,9 +1818,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         </div>
       </div>
 
-      {/* ══════ TABS PRINCIPALES ══════ */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-2">
-        <div className="flex gap-2">
+      {/* ══════ TABS PRINCIPALES & BUSCADOR ══════ */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {([
             ['proveedores', 'Proveedores & Deudas', Truck, 0],
             ['ordenes', 'Órdenes de Compra', FileText, 0],
@@ -1831,10 +1831,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all relative ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all relative whitespace-nowrap ${
                 activeTab === id
                   ? 'bg-[#0F172A] text-white dark:bg-amber-400 dark:text-slate-900 shadow-sm'
-                  : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
+                  : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] border border-[var(--border)]'
               }`}
             >
               <Icon size={14} />
@@ -1848,14 +1848,14 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           ))}
         </div>
 
-        <div className="relative w-full sm:w-64">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+        <div className="relative w-full sm:w-64 shrink-0">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
           <input
             type="text"
             placeholder={activeTab === 'ordenes' ? 'Buscar N° orden, modelo...' : 'Buscar proveedor, RUC...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A] transition-colors"
+            className="w-full pl-9 pr-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10 transition-all shadow-2xs"
           />
         </div>
       </div>

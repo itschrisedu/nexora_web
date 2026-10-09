@@ -800,10 +800,10 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         </div>
 
         {/* Pestañas de Navegación */}
-        <div className="flex items-center gap-1.5 p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl w-fit">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl w-full sm:w-fit">
           <button
             onClick={() => setVista('DIRECTORIO')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
               vista === 'DIRECTORIO'
                 ? 'bg-[#0F172A] text-white shadow-xs'
                 : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
@@ -815,7 +815,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
           <button
             onClick={() => setVista('INACTIVOS')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all relative ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all relative ${
               vista === 'INACTIVOS'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-[var(--muted-foreground)] hover:text-amber-600'
@@ -834,7 +834,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
           <button
             onClick={() => setVista('PROMOCIONES')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
               vista === 'PROMOCIONES'
                 ? 'bg-purple-600 text-white shadow-xs'
                 : 'text-[var(--muted-foreground)] hover:text-purple-600'
@@ -872,41 +872,45 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         <div className="flex gap-6 h-full animate-in fade-in duration-150">
           {/* Lista de clientes */}
           <div className="flex-1 space-y-4 min-w-0">
-            <div className="flex items-center justify-between gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 w-full">
+              <div className="relative w-full sm:flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" size={16} />
                 <input
                   type="text"
                   placeholder="Buscar por nombre, cédula, RUC, teléfono o email..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10 transition-all shadow-2xs"
                 />
               </div>
-              <button
-                onClick={loadClientes}
-                className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors shrink-0"
-                title="Actualizar listado"
-              >
-                <RefreshCw size={16} />
-              </button>
-              <button
-                onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
-              >
-                <Plus size={16} /><span>Nuevo Cliente</span>
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={loadClientes}
+                  className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors shrink-0 cursor-pointer"
+                  title="Actualizar listado"
+                >
+                  <RefreshCw size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap"
+                >
+                  <Plus size={16} /><span>Nuevo Cliente</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setVista('PROMOCIONES');
-                  setShowPromoModal(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
-              >
-                <Gift size={16} /><span>+ Nueva Promoción / Cupón</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVista('PROMOCIONES');
+                    setShowPromoModal(true);
+                  }}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap"
+                >
+                  <Gift size={16} /><span>+ Nueva Promoción</span>
+                </button>
+              </div>
             </div>
 
             {/* Tabla Directorio */}
