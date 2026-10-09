@@ -171,7 +171,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<EstadoPedido | 'TODOS'>('TODOS');
-  const [tabSucursalPedido, setTabSucursalPedido] = useState<'ESTA_SUCURSAL' | 'OTRAS_SUCURSALES' | 'TODAS'>('ESTA_SUCURSAL');
+  const [selectedSucursalPedidoId, setSelectedSucursalPedidoId] = useState<string>(activeSucursalId || '');
   const [selectedOrderSucursalId, setSelectedOrderSucursalId] = useState<string>('');
   const [pedidoExpandidoId, setPedidoExpandidoId] = useState<string | null>(null);
 
@@ -561,6 +561,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     loadSeriesConfig();
     loadListaProveedores();
     loadTransportes();
+
+    if (activeSucursalId && activeSucursalId !== 'TODAS') {
+      setSelectedSucursalPedidoId(activeSucursalId);
+    } else if (sucursales && sucursales.length > 0 && !selectedSucursalPedidoId) {
+      setSelectedSucursalPedidoId(sucursales[0].id);
+    }
   }, [online, activeSucursalId]);
 
   const loadTransportes = async () => {
@@ -1862,13 +1868,39 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
+  // ── Lista Dinámica de Sucursales para Pedidos ─────────
+  const listaSucursalesDisponibles = (() => {
+    const map = new Map<string, { id: string; name: string; isMatriz: boolean }>();
+    if (sucursales && sucursales.length > 0) {
+      sucursales.forEach((s) => map.set(s.id, s));
+    }
+    pedidos.forEach((p) => {
+      const pTenantId = (p as any).tenantId;
+      if (pTenantId && !map.has(pTenantId)) {
+        map.set(pTenantId, {
+          id: pTenantId,
+          name: p.sucursalNombre || 'Sucursal Adicional',
+          isMatriz: false,
+        });
+      }
+    });
+    const res = Array.from(map.values());
+    if (res.length === 0) {
+      res.push({ id: activeSucursalId || 'matriz', name: 'Matriz Principal', isMatriz: true });
+    }
+    return res;
+  })();
+
   const pedidosFiltrados = pedidos.filter((p) => {
     const cumpleEstado = filtroEstado === 'TODOS' || p.estado === filtroEstado;
     let cumpleSucursal = true;
-    if (tabSucursalPedido === 'ESTA_SUCURSAL') {
-      cumpleSucursal = !activeSucursalId || activeSucursalId === 'TODAS' || !(p as any).tenantId || (p as any).tenantId === activeSucursalId;
-    } else if (tabSucursalPedido === 'OTRAS_SUCURSALES') {
-      cumpleSucursal = Boolean(activeSucursalId && activeSucursalId !== 'TODAS' && (p as any).tenantId && (p as any).tenantId !== activeSucursalId);
+    if (selectedSucursalPedidoId) {
+      const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
+      if (targetSuc?.isMatriz && !(p as any).tenantId) {
+        cumpleSucursal = true;
+      } else {
+        cumpleSucursal = (p as any).tenantId === selectedSucursalPedidoId;
+      }
     }
     return cumpleEstado && cumpleSucursal;
   });
@@ -1913,44 +1945,46 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         </button>
       </div>
 
-      {/* Sub-tabs de Sucursal & Filtros de Estado */}
+      {/* Pestañas Dinámicas de Sucursal & Filtros de Estado */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Sub-tabs de Sucursal */}
-        <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
-          <button
-            onClick={() => setTabSucursalPedido('ESTA_SUCURSAL')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              tabSucursalPedido === 'ESTA_SUCURSAL'
-                ? 'bg-[#0F172A] text-white shadow-sm'
-                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            <Building size={14} />
-            <span>🏪 Pedidos de esta Sucursal</span>
-          </button>
-          <button
-            onClick={() => setTabSucursalPedido('OTRAS_SUCURSALES')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              tabSucursalPedido === 'OTRAS_SUCURSALES'
-                ? 'bg-[#0F172A] text-white shadow-sm'
-                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            <Building size={14} className="text-amber-500" />
-            <span>🌐 Pedidos de Otras Sucursales</span>
-          </button>
-          <button
-            onClick={() => setTabSucursalPedido('TODAS')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              tabSucursalPedido === 'TODAS'
-                ? 'bg-[#0F172A] text-white shadow-sm'
-                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            <Layers size={14} />
-            <span>🏢 Todos los Pedidos Consolidados</span>
-          </button>
-        </div>
+        {/* Pestañas de Sucursal Dinámicas por Nombre */}
+        {listaSucursalesDisponibles.length > 1 && (
+          <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
+            {listaSucursalesDisponibles.map((suc) => {
+              const isSelected = selectedSucursalPedidoId === suc.id;
+              const isMiLocal = activeSucursalId === suc.id;
+              const countPedidos = pedidos.filter((p) => (p as any).tenantId === suc.id || (!(p as any).tenantId && suc.isMatriz)).length;
+
+              return (
+                <button
+                  key={suc.id}
+                  type="button"
+                  onClick={() => setSelectedSucursalPedidoId(suc.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#0F172A] text-white shadow-sm font-black'
+                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                  }`}
+                >
+                  <Building size={13} className={isSelected ? 'text-emerald-400' : 'text-slate-400'} />
+                  <span>{suc.name}</span>
+                  {isMiLocal && (
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
+                      isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                    }`}>
+                      Mi Local
+                    </span>
+                  )}
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                  }`}>
+                    {countPedidos}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Filtros de Estado */}
         <div className="flex flex-wrap items-center gap-1.5">

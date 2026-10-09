@@ -472,7 +472,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [loading, setLoading] = useState(false);
   const [vista, setVista] = useState<'CLIENTES' | 'FACTURAS'>('CLIENTES');
   const [filtro, setFiltro] = useState<EstadoCobro | 'TODOS'>('TODOS');
-  const [tabSucursalCobro, setTabSucursalCobro] = useState<'ESTA_SUCURSAL' | 'OTRAS_SUCURSALES' | 'TODAS'>('ESTA_SUCURSAL');
+  const [selectedSucursalCobroId, setSelectedSucursalCobroId] = useState<string>(activeSucursalId || '');
   const [busqueda, setBusqueda] = useState('');
 
   // Cliente o Cobro seleccionado para el modal de cuenta corriente
@@ -665,6 +665,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     loadCobros();
     loadBusinessConfig();
 
+    if (activeSucursalId && activeSucursalId !== 'TODAS') {
+      setSelectedSucursalCobroId(activeSucursalId);
+    } else if (sucursales && sucursales.length > 0 && !selectedSucursalCobroId) {
+      setSelectedSucursalCobroId(sucursales[0].id);
+    }
+
     const handleConfigChange = () => {
       const stored = localStorage.getItem('nexora_auto_whatsapp_abono');
       setAutoEnviarWhatsAppAbono(stored === null ? true : stored === 'true');
@@ -729,13 +735,33 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     }
   };
 
-  // ── Agrupación Consolidada por Cliente ─────────
+  // ── Agrupación Consolidada por Cliente y Sucursal ─────────
+  const listaSucursalesDisponibles = (() => {
+    const map = new Map<string, { id: string; name: string; isMatriz: boolean }>();
+    if (sucursales && sucursales.length > 0) {
+      sucursales.forEach((s) => map.set(s.id, s));
+    }
+    cobros.forEach((c) => {
+      if (c.tenantId && !map.has(c.tenantId)) {
+        map.set(c.tenantId, {
+          id: c.tenantId,
+          name: c.sucursalNombre || 'Sucursal Adicional',
+          isMatriz: false,
+        });
+      }
+    });
+    const res = Array.from(map.values());
+    if (res.length === 0) {
+      res.push({ id: activeSucursalId || 'matriz', name: 'Matriz Principal', isMatriz: true });
+    }
+    return res;
+  })();
+
   const cobrosFiltradosPorSucursal = cobros.filter((c) => {
-    if (tabSucursalCobro === 'TODAS') return true;
-    const esDeEstaSucursal = !activeSucursalId || !c.tenantId || c.tenantId === activeSucursalId;
-    if (tabSucursalCobro === 'ESTA_SUCURSAL') return esDeEstaSucursal;
-    if (tabSucursalCobro === 'OTRAS_SUCURSALES') return !esDeEstaSucursal;
-    return true;
+    if (!selectedSucursalCobroId) return true;
+    const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalCobroId);
+    if (targetSuc?.isMatriz && !c.tenantId) return true;
+    return c.tenantId === selectedSucursalCobroId;
   });
 
   const clientesCartera: ClienteCartera[] = (() => {
@@ -1936,42 +1962,44 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           </div>
         </div>
 
-        {/* Sub-tabs de Sucursal */}
-        <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
-          <button
-            onClick={() => setTabSucursalCobro('ESTA_SUCURSAL')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              tabSucursalCobro === 'ESTA_SUCURSAL'
-                ? 'bg-[#0F172A] text-white shadow-sm'
-                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            <Building size={14} />
-            <span>🏪 Cobros de esta Sucursal</span>
-          </button>
-          <button
-            onClick={() => setTabSucursalCobro('OTRAS_SUCURSALES')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              tabSucursalCobro === 'OTRAS_SUCURSALES'
-                ? 'bg-[#0F172A] text-white shadow-sm'
-                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            <Building size={14} className="text-amber-500" />
-            <span>🌐 Cobros de Otras Sucursales</span>
-          </button>
-          <button
-            onClick={() => setTabSucursalCobro('TODAS')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              tabSucursalCobro === 'TODAS'
-                ? 'bg-[#0F172A] text-white shadow-sm'
-                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            <Layers size={14} />
-            <span>🏢 Todos los Cobros (Consolidado Red)</span>
-          </button>
-        </div>
+        {/* Pestañas de Sucursal Dinámicas por Nombre */}
+        {listaSucursalesDisponibles.length > 1 && (
+          <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
+            {listaSucursalesDisponibles.map((suc) => {
+              const isSelected = selectedSucursalCobroId === suc.id;
+              const isMiLocal = activeSucursalId === suc.id;
+              const countDeudas = cobros.filter((c) => c.tenantId === suc.id || (!c.tenantId && suc.isMatriz)).length;
+
+              return (
+                <button
+                  key={suc.id}
+                  type="button"
+                  onClick={() => setSelectedSucursalCobroId(suc.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#0F172A] text-white shadow-sm font-black'
+                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                  }`}
+                >
+                  <Building size={13} className={isSelected ? 'text-emerald-400' : 'text-slate-400'} />
+                  <span>{suc.name}</span>
+                  {isMiLocal && (
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
+                      isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                    }`}>
+                      Mi Local
+                    </span>
+                  )}
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                  }`}>
+                    {countDeudas}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-1.5">
           {(['TODOS', 'PENDIENTE', 'PARCIALMENTE_PAGADO', 'SALDADO', 'VENCIDO'] as const).map((e) => (
