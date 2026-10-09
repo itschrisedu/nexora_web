@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tailwindcss/preflight" layer(base);
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);

@@ -2143,13 +2143,13 @@ export default function ModelosComponent({
                       {/* Acciones principales */}
                       <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
                         <div className="text-left md:text-right">
-                          <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precios Variantes</span>
+                          <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Precios Variantes</span>
                           <span className="text-sm font-black text-slate-900 dark:text-white block">
                             {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
                           </span>
                           {isAdmin && activeProduct && (
-                            <span className="text-[10px] text-slate-900 dark:text-slate-300 font-medium block">
-                              Costo: <strong className="text-black dark:text-white font-mono font-bold">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
+                            <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold block">
+                              Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
                             </span>
                           )}
                         </div>
@@ -2258,19 +2258,19 @@ export default function ModelosComponent({
                                 <div className="flex items-center justify-between">
                                   <div>
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Código Variante</span>
+                                      <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Código Variante</span>
                                       {!p.activo && (
                                         <span className="px-1.5 py-0.5 bg-red-500/15 text-red-500 rounded text-[9px] font-bold leading-none">Deshabilitada</span>
                                       )}
                                     </div>
-                                    <span className="text-xs font-mono font-bold text-slate-900 dark:text-slate-200">{p.codigo}</span>
+                                    <span className="text-xs font-mono font-black text-slate-900 dark:text-slate-100">{p.codigo}</span>
                                   </div>
                                   <div>
-                                    <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Serie</span>
-                                    <span className="text-xs font-semibold">{p.serie?.nombre ? getNombreSerie(p.serie.nombre) : "—"}</span>
+                                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Serie</span>
+                                    <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100">{p.serie?.nombre ? getNombreSerie(p.serie.nombre) : "—"}</span>
                                   </div>
                                   <div className="text-right">
-                                    <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precio</span>
+                                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Precio</span>
                                     <span className="text-xs font-black text-slate-900 dark:text-white">${Number(p.precioVenta).toFixed(2)}</span>
                                   </div>
                                 </div>
@@ -2278,7 +2278,7 @@ export default function ModelosComponent({
                                 {/* Insignia Discreta de Taller y Costo */}
                                 <div className="flex items-center justify-between text-[11px] px-1">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] text-[var(--muted-foreground)]">Taller:</span>
+                                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">Taller:</span>
                                     {p.supplier ? (
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
                                         <Truck size={10} />
@@ -2291,8 +2291,8 @@ export default function ModelosComponent({
                                       <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin taller asignado</span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-slate-900 dark:text-slate-300 font-medium">
-                                    Costo: <strong className="text-black dark:text-white font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
+                                  <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
+                                    Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
                                   </div>
                                 </div>
 
@@ -2718,7 +2718,7 @@ export default function ModelosComponent({
 
                       <div className="text-right text-xs">
                         <div className="font-black text-slate-900 dark:text-white">${Number(v.salePrice).toFixed(2)}</div>
-                        <div className="text-[10px] text-slate-900 dark:text-slate-300 font-medium">Costo: <strong className="text-black dark:text-white font-mono font-bold">${Number(v.costPrice).toFixed(2)}</strong></div>
+                        <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(v.costPrice).toFixed(2)}</strong></div>
                       </div>
                     </label>
                   );

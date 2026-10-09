@@ -570,8 +570,8 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                         {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
                       </span>
                       {isAdmin && activeProduct && (
-                        <span className="text-[10px] text-slate-900 dark:text-slate-300 font-medium block">
-                          Costo: <strong className="text-black dark:text-white font-mono font-bold">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
+                        <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold block">
+                          Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
                         </span>
                       )}
                     </div>
@@ -632,8 +632,8 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div>
-                                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Código Variante</span>
-                                  <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">{p.codigo}</span>
+                                  <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Código Variante</span>
+                                  <span className="text-xs font-mono font-black text-slate-900 dark:text-slate-100">{p.codigo}</span>
                                   {isAdmin && (p.supplier || p.supplierSigla) && (
                                     <div className="flex items-center gap-1 mt-0.5">
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.2 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[9px] font-bold">
@@ -646,20 +646,20 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                                   )}
                                 </div>
                                 <div>
-                                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Serie</span>
-                                  <span className="text-xs font-semibold text-[var(--foreground)]">
+                                  <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Serie</span>
+                                  <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
                                     {p.serie?.nombre ? getNombreSerie(p.serie.nombre, tallas) : "—"}
                                   </span>
                                 </div>
                                 <div className="text-right">
-                                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precio</span>
+                                  <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Precio</span>
                                   <span className="text-xs font-black text-slate-900 dark:text-white">
                                     ${Number(p.precioVenta).toFixed(2)}
                                   </span>
                                   {/* COSTO VISIBLE EXCLUSIVAMENTE PARA ADMINISTRADOR */}
                                   {isAdmin && (
-                                    <div className="text-[10px] text-slate-900 dark:text-slate-300 font-medium mt-0.5">
-                                      Costo: <strong className="text-black dark:text-white font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
+                                    <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold mt-0.5">
+                                      Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
                                     </div>
                                   )}
                                 </div>
