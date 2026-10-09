@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { ApiService } from "@/services/api.service";
-import { formatearEmail, validarEmailEstricto, handleEmailKeyDown } from "@/utils/text-formatters";
+import { formatearEmail, validarEmailEstricto, handleEmailKeyDown, capitalizarNombreCompleto } from "@/utils/text-formatters";
 import { useWindowFocusRefresh } from "@/hooks/useWindowFocusRefresh";
 import { getStoredPlanPrices } from "@/utils/saas-plans";
 import {
@@ -2249,8 +2249,8 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                                 textClassName="text-sm font-black"
                               />
                               <div>
-                                <span className="font-bold text-[var(--foreground)] block text-xs">
-                                  {sa.nombre}
+                                <span className="font-bold text-[var(--foreground)] block text-xs capitalize">
+                                  {capitalizarNombreCompleto(sa.nombre)}
                                 </span>
                                 <span className="text-[11px] text-[var(--muted-foreground)] font-mono">
                                   {sa.email}

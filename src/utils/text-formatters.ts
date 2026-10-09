@@ -15,6 +15,22 @@ export function capitalizarPalabra(palabra: string): string {
 }
 
 /**
+ * Convierte cualquier nombre o frase a formato de nombre propio (cada palabra con la primera letra en mayúscula).
+ * Maneja valores nulos, espacios múltiples, tildes y caracteres especiales.
+ * Ejemplos: "chris paucar" -> "Chris Paucar", "elizabeth manzano" -> "Elizabeth Manzano"
+ */
+export function capitalizarNombreCompleto(valor?: string | null): string {
+  if (!valor) return '';
+  return valor
+    .toString()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(capitalizarPalabra)
+    .join(' ');
+}
+
+/**
  * Formatea una cadena de nombres.
  * - Elimina números y caracteres especiales (solo letras y espacios).
  * - Convierte cada palabra a formato Capital Case (Primera letra mayúscula, resto minúsculas).

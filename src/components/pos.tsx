@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "./ui/toast";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
+import { capitalizarNombreCompleto } from "@/utils/text-formatters";
 import {
   generarUrlPublicaVentaPOS,
   armarMensajeWhatsAppVentaPOS,
@@ -2484,7 +2485,7 @@ export default function PosComponent() {
                 </div>
                 <div className="flex justify-between">
                   <span className="font-bold">CLIENTE:</span>
-                  <span className="truncate max-w-[65%] text-slate-900">{ultimoTicket.clienteNombre || "Consumidor Final"}</span>
+                  <span className="truncate max-w-[65%] text-slate-900 capitalize">{capitalizarNombreCompleto(ultimoTicket.clienteNombre) || "Consumidor Final"}</span>
                 </div>
                 {ultimoTicket.clienteIdentificacion && ultimoTicket.clienteIdentificacion !== "9999999999" && (
                   <div className="flex justify-between">

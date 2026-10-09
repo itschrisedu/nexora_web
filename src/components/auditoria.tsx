@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ApiService } from "@/services/api.service";
+import { capitalizarNombreCompleto } from "@/utils/text-formatters";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -713,7 +714,7 @@ export default function AuditoriaComponent() {
                 <option value="TODOS">👤 Todos los Responsables / Sistema</option>
                 {listaResponsables.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.nombre} {u.rol ? `(${u.rol.replace('ROL_', '')})` : ''} - {u.email}
+                    {capitalizarNombreCompleto(u.nombre)} {u.rol ? `(${u.rol.replace('ROL_', '')})` : ''} - {u.email}
                   </option>
                 ))}
               </select>

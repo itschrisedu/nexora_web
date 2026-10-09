@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 import { useToast } from '@/components/ui/toast';
+import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 
 interface NotificacionesModalProps {
   isOpen: boolean;
@@ -583,7 +584,7 @@ export default function NotificacionesModal({
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-black text-[var(--foreground)] flex items-center gap-1.5 min-w-0">
                                 <User size={14} className="text-[var(--primary)] shrink-0" />
-                                <span className="truncate">{cobro.clienteNombre}</span>
+                                <span className="truncate capitalize">{capitalizarNombreCompleto(cobro.clienteNombre)}</span>
                               </div>
                               <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-2 mt-0.5 flex-wrap">
                                 <span>{cobro.numeroNota}</span>
@@ -999,7 +1000,7 @@ export default function NotificacionesModal({
                           <div className="min-w-0 flex-1">
                             <div className="text-xs font-black text-[var(--foreground)] flex items-center gap-2 flex-wrap">
                               <RotateCcw size={13} className="text-orange-500 shrink-0" />
-                              <span>Devolución de {dev.clienteNombre}</span>
+                              <span>Devolución de <span className="capitalize">{capitalizarNombreCompleto(dev.clienteNombre)}</span></span>
                               <span className="text-[var(--muted-foreground)]">→</span>
                               <span className="truncate text-orange-600 dark:text-orange-400">{dev.proveedorNombre}</span>
                             </div>
@@ -1404,7 +1405,7 @@ export default function NotificacionesModal({
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-black truncate">Recordatorio de Cobro por WhatsApp</h3>
                   <p className="text-[11px] text-[var(--muted-foreground)] truncate">
-                    Cliente: <b>{selectedCobro.clienteNombre}</b> • Saldo: <b className="text-rose-500">${Number(selectedCobro.saldoPendiente || 0).toFixed(2)}</b>
+                    Cliente: <b className="capitalize">{capitalizarNombreCompleto(selectedCobro.clienteNombre)}</b> • Saldo: <b className="text-rose-500">${Number(selectedCobro.saldoPendiente || 0).toFixed(2)}</b>
                   </p>
                 </div>
               </div>

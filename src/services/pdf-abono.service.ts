@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { generarUrlPublicaAbono } from './comprobante-url.service';
+import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 
 export interface ComprobanteAbonoPdfData {
   emisor: {
@@ -117,7 +118,7 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   doc.text(`Cliente / Razón Social:`, 17, y + 12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text(data.cliente.nombre, 54, y + 12);
+  doc.text(capitalizarNombreCompleto(data.cliente.nombre), 54, y + 12);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(51, 65, 85);
@@ -179,13 +180,27 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   doc.text('VALORES (USD)', pageWidth - 16, y + 5, { align: 'right' });
   y += 7.5;
 
-  const filas = [
+  const totalEntregasHoy = (data.movimiento.entregasHoy || []).reduce((acc, curr) => acc + curr.monto, 0);
+
+  const filas: Array<{ concepto: string; desc: string; monto: number; tipo: 'NORMAL' | 'ENTREGA' | 'ABONO' | 'SALDO_FINAL' }> = [
     {
       concepto: 'Saldo Anterior Adeudado por el Cliente',
-      desc: data.movimiento.numeroNota ? `Cuenta corriente asociada (${data.movimiento.numeroNota})` : 'Total consolidado pendiente antes del abono',
+      desc: data.movimiento.numeroNota ? `Cuenta corriente asociada (${data.movimiento.numeroNota})` : 'Total consolidado pendiente antes del movimiento',
       monto: data.movimiento.saldoAnterior,
       tipo: 'NORMAL',
     },
+  ];
+
+  if (totalEntregasHoy > 0 && data.movimiento.entregasHoy) {
+    filas.push({
+      concepto: '(+) Entrega de Calzado / Mercadería Nueva',
+      desc: data.movimiento.entregasHoy.map((e) => `${e.nota} ($${e.monto.toFixed(2)})`).join(' • '),
+      monto: totalEntregasHoy,
+      tipo: 'ENTREGA',
+    });
+  }
+
+  filas.push(
     {
       concepto: 'MONTO DEL ABONO RECIBIDO',
       desc: `Liquidación vía ${data.comprobante.formaPago}${data.comprobante.referencia ? ` (Ref: ${data.comprobante.referencia})` : ''}`,
@@ -197,8 +212,8 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
       desc: data.movimiento.saldoRestante <= 0 ? '¡CUENTA TOTALMENTE SALDADA!' : 'Saldo remanente por cobrar',
       monto: data.movimiento.saldoRestante,
       tipo: 'SALDO_FINAL',
-    },
-  ];
+    }
+  );
 
   filas.forEach((f, idx) => {
     const alturaFila = 12;
@@ -294,8 +309,8 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
-  doc.text(data.comprobante.cajero ? `Cajero/a: ${data.comprobante.cajero}` : data.emisor.nombre, 57.5, firmaY + 8, { align: 'center' });
-  doc.text(data.cliente.nombre, pageWidth - 57.5, firmaY + 8, { align: 'center' });
+  doc.text(data.comprobante.cajero ? `Cajero/a: ${capitalizarNombreCompleto(data.comprobante.cajero)}` : data.emisor.nombre, 57.5, firmaY + 8, { align: 'center' });
+  doc.text(capitalizarNombreCompleto(data.cliente.nombre), pageWidth - 57.5, firmaY + 8, { align: 'center' });
 
   // ── 6. Footer de Seguridad y Validez ─────────────
   doc.setFillColor(248, 250, 252);
@@ -337,7 +352,7 @@ export function descargarComprobanteAbonoPdf(data: ComprobanteAbonoPdfData): voi
  */
 export async function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, incluirDescargaPdf = false): Promise<string> {
   const nombreNegocio = data.emisor.nombre || 'Administración de Cobros';
-  let msg = `Estimado/a *${data.cliente.nombre}*,\n\n`;
+  let msg = `Estimado/a *${capitalizarNombreCompleto(data.cliente.nombre)}*,\n\n`;
   msg += `Le saludamos de *${nombreNegocio}*. Confirmamos la recepción de su abono:\n\n`;
   msg += `📋 *COMPROBANTE DE ABONO No:* ${data.comprobante.numero}\n`;
   msg += `📅 *Fecha y Hora:* ${data.comprobante.fecha}${data.comprobante.hora ? ` a las ${data.comprobante.hora}` : ''}\n`;
@@ -347,7 +362,24 @@ export async function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, i
   }
 
   msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `💵 *Saldo Anterior:* $${data.movimiento.saldoAnterior.toFixed(2)}\n`;
+  const tieneEntregas = data.movimiento.entregasHoy && data.movimiento.entregasHoy.length > 0;
+  const totalEntregas = (data.movimiento.entregasHoy || []).reduce((sum, e) => sum + e.monto, 0);
+
+  if (data.movimiento.saldoAnterior > 0 || tieneEntregas) {
+    msg += `💵 *Saldo Anterior:* $${data.movimiento.saldoAnterior.toFixed(2)}\n`;
+  }
+
+  if (tieneEntregas && data.movimiento.entregasHoy) {
+    msg += `📦 *Entrega de Calzado / Mercadería:*\n`;
+    data.movimiento.entregasHoy.forEach((e) => {
+      msg += `   • ${e.nota} - Valor: $${e.monto.toFixed(2)}\n`;
+    });
+    if (data.movimiento.saldoAnterior > 0) {
+      const subtotalConCompra = data.movimiento.saldoAnterior + totalEntregas;
+      msg += `📊 *Total a la fecha:* $${subtotalConCompra.toFixed(2)}\n`;
+    }
+  }
+
   msg += `✅ *Abono Aplicado:* -$${data.movimiento.montoAbonado.toFixed(2)}\n`;
 
   if (data.movimiento.saldoRestante <= 0) {

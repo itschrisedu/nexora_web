@@ -49,6 +49,7 @@ import { GyreOtpVerification } from '@/components/ui/GyreOtpVerification';
 import SubscriptionGraceBanner from '@/components/ui/SubscriptionGraceBanner';
 import UnsavedChangesModal from '@/components/ui/unsaved-changes-modal';
 import { getUnsavedChanges, clearUnsavedChanges, UnsavedChangesDetail } from '@/utils/unsaved-changes';
+import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
@@ -1442,7 +1443,7 @@ function MainApp() {
               textClassName="text-xs font-bold"
             />
             <div className="min-w-0">
-              <div className="text-xs font-semibold truncate max-w-[110px]">{user?.nombre || 'Usuario'}</div>
+              <div className="text-xs font-semibold truncate max-w-[110px] capitalize">{capitalizarNombreCompleto(user?.nombre) || 'Usuario'}</div>
               <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[110px]">
                 {isSuperAdmin ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? (isGlobalAdmin ? 'Admin General' : 'Admin de Sucursal') : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
               </div>

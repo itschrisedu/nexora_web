@@ -6,6 +6,7 @@
 
 import { ComprobanteAbonoPdfData } from './pdf-abono.service';
 import { FacturaPdfData, OrdenCompraPdfData } from './pdf-factura.service';
+import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 
 /**
  * Obtiene la URL base del backend (API)
@@ -419,7 +420,7 @@ export function armarMensajeWhatsAppVentaPOS(data: VentaPosComprobanteData, urlC
 
   let msg = `🧾 *COMPROBANTE DE VENTA — ${negocioNombre}*\n\n`;
   msg += `📅 *Fecha:* ${data.fecha}\n`;
-  msg += `👤 *Cliente:* ${data.clienteNombre}\n`;
+  msg += `👤 *Cliente:* ${capitalizarNombreCompleto(data.clienteNombre) || 'Consumidor Final'}\n`;
   if (data.clienteIdentificacion && data.clienteIdentificacion !== '9999999999') {
     msg += `🆔 *C.I./RUC:* ${data.clienteIdentificacion}\n`;
   }

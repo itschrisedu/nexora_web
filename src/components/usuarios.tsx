@@ -9,7 +9,7 @@ import {
   Palette, Upload, ArrowRightLeft, Paintbrush, ImageIcon, Trash2, Eye, EyeOff, Lock, Unlock
 } from 'lucide-react';
 import UnsavedChangesModal from './ui/unsaved-changes-modal';
-import { formatearEmail, validarEmailEstricto, handleEmailKeyDown } from '@/utils/text-formatters';
+import { formatearEmail, validarEmailEstricto, handleEmailKeyDown, capitalizarNombreCompleto } from '@/utils/text-formatters';
 import VaultPasswordMeter from './ui/VaultPasswordMeter';
 import { useWindowFocusRefresh } from '@/hooks/useWindowFocusRefresh';
 
@@ -1469,8 +1469,8 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                           {admin.nombre.charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-bold text-xs text-[var(--foreground)] truncate flex items-center gap-1.5">
-                            <span>{admin.nombre}</span>
+                          <div className="font-bold text-xs text-[var(--foreground)] truncate flex items-center gap-1.5 capitalize">
+                            <span>{capitalizarNombreCompleto(admin.nombre)}</span>
                             {admin.id === loggedUser?.id && (
                               <span className="text-[9px] px-1.5 py-0.2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded font-semibold">Tú</span>
                             )}
@@ -1603,7 +1603,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                       filtradosOperativos.map((user) => (
                         <tr key={user.id} className="hover:bg-[var(--muted)]/20 transition-colors">
                           <td className="p-3.5">
-                            <div className="font-bold text-sm text-[var(--foreground)]">{user.nombre}</div>
+                            <div className="font-bold text-sm text-[var(--foreground)] capitalize">{capitalizarNombreCompleto(user.nombre)}</div>
                             <div className="text-[11px] text-[var(--muted-foreground)]">{user.email}</div>
                           </td>
                           <td className="p-3.5">

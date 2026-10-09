@@ -38,6 +38,7 @@ import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
 import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
 import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock } from '../utils/curvas';
+import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 
 interface ComercialProps {
   online: boolean;
@@ -2101,7 +2102,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
                             return (
                               <div className="flex flex-col gap-1">
-                                <span className="font-bold text-xs text-[var(--foreground)]">{nombreCompleto}</span>
+                                <span className="font-bold text-xs text-[var(--foreground)] capitalize">{capitalizarNombreCompleto(nombreCompleto)}</span>
                                 {cliObj && (
                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border w-fit ${rep.badgeClass}`} title={rep.descripcion}>
                                     <span>{rep.icon}</span>
@@ -2112,7 +2113,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                     <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
                                       <User size={10} />
-                                      <span>Vendedor: {p.vendedorNombre}</span>
+                                      <span>Vendedor: <strong className="font-semibold capitalize">{capitalizarNombreCompleto(p.vendedorNombre)}</strong></span>
                                     </span>
                                   </div>
                                 )}

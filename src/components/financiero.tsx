@@ -64,6 +64,7 @@ import {
 } from '../services/pdf-abono.service';
 import { generarUrlPublicaAbono } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
+import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 
 interface FinancieroProps {
   online: boolean;
@@ -1071,7 +1072,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     const subtotalConCompra = saldoAnterior + montoComprasHoy;
 
-    let msg = `Estimado/a *${cartera.clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Le compartimos el comprobante de su movimiento actual:\n\n*Fecha:* ${hoyLegible}\n`;
+    let msg = `Estimado/a *${capitalizarNombreCompleto(cartera.clienteNombre)}*,\n\nLe saludamos de *${negocioNombre}*. Le compartimos el comprobante de su movimiento actual:\n\n*Fecha:* ${hoyLegible}\n`;
 
     // Si había saldo anterior antes de este movimiento
     if (saldoAnterior > 0) {
@@ -2091,8 +2092,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                     {isExpanded ? <ChevronUp size={16} className="text-[#0F172A]" /> : <ChevronDown size={16} />}
                                   </button>
                                   <div>
-                                    <div className="font-extrabold text-xs text-[var(--foreground)]">
-                                      {cliente.clienteNombre}
+                                    <div className="font-extrabold text-xs text-[var(--foreground)] capitalize">
+                                      {capitalizarNombreCompleto(cliente.clienteNombre)}
                                     </div>
                                     <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] mt-0.5">
                                       <span>C.I: {cliente.clienteCedula}</span>
@@ -2381,8 +2382,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             </td>
 
                             <td className="px-5 py-4">
-                              <div className="font-extrabold text-xs text-[var(--foreground)]">
-                                {cobro.clienteNombre}
+                              <div className="font-extrabold text-xs text-[var(--foreground)] capitalize">
+                                {capitalizarNombreCompleto(cobro.clienteNombre)}
                               </div>
                               <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] mt-0.5 flex-wrap">
                                 <span>C.I: {cobro.clienteCedula}</span>
@@ -2392,9 +2393,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                   </span>
                                 )}
                                 {cobro.vendedorNombre && (
-                                  <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                                  <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium capitalize">
                                     <User size={10} />
-                                    <span>{cobro.vendedorNombre}</span>
+                                    <span>{capitalizarNombreCompleto(cobro.vendedorNombre)}</span>
                                   </span>
                                 )}
                               </div>
@@ -2481,7 +2482,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <User size={14} className="text-emerald-400" />
-                    <span className="font-black text-sm text-white">{carteraSeleccionada.clienteNombre}</span>
+                    <span className="font-black text-sm text-white capitalize">{capitalizarNombreCompleto(carteraSeleccionada.clienteNombre)}</span>
                     <span className="px-1.5 py-0.5 bg-emerald-400/20 text-emerald-300 rounded text-[10px] font-bold border border-emerald-400/20">
                       {carteraSeleccionada.clienteNivel}
                     </span>
@@ -2913,7 +2914,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             {a.usuarioNombre && (
                               <span className="inline-flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
                                 <User size={10} />
-                                <span>Cobrado por: {a.usuarioNombre}</span>
+                                <span>Cobrado por: <strong className="font-semibold capitalize">{capitalizarNombreCompleto(a.usuarioNombre)}</strong></span>
                                 {a.esCobroOtraSucursal && a.usuarioSucursal && (
                                   <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                                     📍 Sucursal: {a.usuarioSucursal}
@@ -3494,7 +3495,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-white">Registro de Devolución de Calzado</h3>
-                  <p className="text-[11px] text-slate-300">Cliente: <strong className="text-white">{carteraSeleccionada.clienteNombre}</strong> (C.I: {carteraSeleccionada.clienteCedula})</p>
+                  <p className="text-[11px] text-slate-300">Cliente: <strong className="text-white capitalize">{capitalizarNombreCompleto(carteraSeleccionada.clienteNombre)}</strong> (C.I: {carteraSeleccionada.clienteCedula})</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

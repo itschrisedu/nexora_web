@@ -27,6 +27,7 @@ import {
   validarEmailEstricto,
   formatearTelefono,
   formatearDireccion,
+  capitalizarNombreCompleto,
 } from "../utils/text-formatters";
 
 interface ClientesProps {
@@ -980,8 +981,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                           {(c.nombre || "?").charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <h4 className="font-extrabold text-sm text-[var(--foreground)] truncate">
-                            {c.nombre} {c.apellido || ""}
+                          <h4 className="font-extrabold text-sm text-[var(--foreground)] truncate capitalize">
+                            {capitalizarNombreCompleto(c.nombre)} {capitalizarNombreCompleto(c.apellido) || ""}
                           </h4>
                           <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)] flex-wrap">
                             {(c.cedula || c.ruc) && (
@@ -1109,7 +1110,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-semibold text-sm">{c.nombre} {c.apellido || ""}</span>
+                                  <span className="font-semibold text-sm capitalize">{capitalizarNombreCompleto(c.nombre)} {capitalizarNombreCompleto(c.apellido) || ""}</span>
                                   {Number(c.saldoAFavor || 0) > 0 && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                                       <Wallet size={10} />
@@ -1191,7 +1192,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                     {(selected.nombre || "?").charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <div className="font-bold text-sm">{selected.nombre} {selected.apellido || ""}</div>
+                    <div className="font-bold text-sm capitalize">{capitalizarNombreCompleto(selected.nombre)} {capitalizarNombreCompleto(selected.apellido) || ""}</div>
                     <div className={`text-[10px] px-2 py-0.5 rounded-lg border inline-block mt-0.5 font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>
                       {selected.nivelCredito?.replace("_", " ")}
                     </div>
@@ -1388,8 +1389,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 {(selected.nombre || "?").charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <h3 className="font-extrabold text-sm text-white truncate">
-                  {selected.nombre} {selected.apellido || ""}
+                <h3 className="font-extrabold text-sm text-white truncate capitalize">
+                  {capitalizarNombreCompleto(selected.nombre)} {capitalizarNombreCompleto(selected.apellido) || ""}
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>

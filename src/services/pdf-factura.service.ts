@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { generarUrlPublicaFactura, generarUrlPublicaOrden } from "./comprobante-url.service";
+import { capitalizarNombreCompleto } from "@/utils/text-formatters";
 
 export interface FacturaPdfData {
   emisor: {
@@ -119,7 +120,7 @@ export function generarFacturaPdfDoc(data: FacturaPdfData): jsPDF {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text(`Razón Social: ${data.comprador.nombre}`, 16, y + 11);
+  doc.text(`Razón Social: ${capitalizarNombreCompleto(data.comprador.nombre)}`, 16, y + 11);
   doc.text(`Identificación: ${data.comprador.cedula}`, 16, y + 16);
 
   doc.text(`Dirección: ${data.comprador.direccion || "Cevallos, Ecuador"}`, pageWidth / 2 + 10, y + 11);
@@ -701,7 +702,7 @@ export function generarPedidoClientePdfDoc(data: PedidoClientePdfData): jsPDF {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text(`Cliente: ${data.cliente.nombre}`, 16, y + 11);
+  doc.text(`Cliente: ${capitalizarNombreCompleto(data.cliente.nombre)}`, 16, y + 11);
   if (data.cliente.cedula) {
     doc.text(`C.I / RUC: ${data.cliente.cedula}`, 16, y + 16);
   }
