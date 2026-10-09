@@ -1685,7 +1685,14 @@ function MainApp() {
               sucursales={sucursales}
             />
           )}
-          {vistaActual === 'modelos' && <ModelosComponent online={online} />}
+          {vistaActual === 'modelos' && (
+            <ModelosComponent
+              online={online}
+              userRole={user?.rol}
+              activeSucursalId={activeSucursalId}
+              sucursales={sucursales}
+            />
+          )}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
           {vistaActual === 'comercial' && (
             <ComercialComponent

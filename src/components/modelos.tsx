@@ -24,6 +24,9 @@ import { validarRuc, validarCedula } from "../utils/ecuador-validators";
 
 interface ModelosProps {
   online: boolean;
+  userRole?: string;
+  activeSucursalId?: string;
+  sucursales?: { id: string; name: string; isMatriz?: boolean }[];
 }
 
 interface TallaStock {
@@ -84,6 +87,43 @@ interface ModeloAgrupado {
   alternateSupplierIds?: string[];
   suppliers?: SupplierInfo[];
   products: Producto[];
+}
+
+interface VarianteRed {
+  id: string;
+  code: string;
+  color: string;
+  imageUrl: string | null;
+  costPrice: number;
+  salePrice: number;
+  serieId: string;
+  serieNombre: string;
+  tallas: number[];
+  supplierId: string | null;
+  supplier: { id: string; razonSocial: string; ruc?: string; contacto?: string } | null;
+}
+
+interface ModeloRed {
+  id: string;
+  tenantId: string;
+  sucursalOrigenNombre: string;
+  baseCode: string;
+  name: string;
+  brand: string;
+  material?: string;
+  status: 'DISPONIBLE' | 'PARCIAL' | 'COMPLETO';
+  yaImportado: boolean;
+  parcial: boolean;
+  totalVariantesRed: number;
+  variantesFaltantes: VarianteRed[];
+  variantesExistentes: VarianteRed[];
+  localModelId: string | null;
+  colores: { color: string; fotoUrl: string | null }[];
+  series: { id: string; nombre: string; tallas: number[]; costPrice: number; salePrice: number }[];
+  precioCostoReferencial: number;
+  precioVentaReferencial: number;
+  fotoPrincipal: string | null;
+  supplier: { id: string; razonSocial: string; ruc?: string; contacto?: string } | null;
 }
 
 interface ModeloMatriz {
@@ -244,7 +284,34 @@ const compressImageToWebP = (base64Str: string, maxWidth = 800, maxHeight = 800,
   });
 };
 
-export default function ModelosComponent({ online }: ModelosProps) {
+export default function ModelosComponent({
+  online,
+  userRole,
+  activeSucursalId,
+  sucursales,
+}: ModelosProps) {
+  const isAdmin = !userRole || userRole === "ROL_ADMIN" || userRole === "ROL_SUPER_ADMIN";
+  const isBodeguero = userRole === "ROL_BODEGUERO";
+  const isVendedor = userRole === "ROL_VENDEDOR";
+
+  // Pestaña activa: 'local' (Mi Catálogo Local) o 'red' (Modelos Disponibles en la Red Comercial)
+  const [activeTab, setActiveTab] = useState<'local' | 'red'>('local');
+  const [modelosRed, setModelosRed] = useState<ModeloRed[]>([]);
+  const [redSucursales, setRedSucursales] = useState<{ id: string; nombre: string }[]>([]);
+  const [filterRedSucursal, setFilterRedSucursal] = useState<string>("TODAS");
+  const [importingModelId, setImportingModelId] = useState<string | null>(null);
+
+  // Modal selector de importación detallada de variantes
+  const [importModalData, setImportModalData] = useState<{
+    isOpen: boolean;
+    model: ModeloRed | null;
+    selectedVariantIds: string[];
+  }>({
+    isOpen: false,
+    model: null,
+    selectedVariantIds: [],
+  });
+
   const [modelos, setModelos] = useState<ModeloAgrupado[]>([]);
   const [series, setSeries] = useState<SerieConfig[]>([]);
   const [loading, setLoading] = useState(false);
@@ -516,20 +583,29 @@ export default function ModelosComponent({ online }: ModelosProps) {
     };
     window.addEventListener("nexora:margin-changed", handleMarginUpdate);
     return () => window.removeEventListener("nexora:margin-changed", handleMarginUpdate);
-  }, [online]);
+  }, [online, activeSucursalId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const mdls = await ApiService.get("/inventario/modelos");
+      const [mdls, redRes] = await Promise.all([
+        ApiService.get("/inventario/modelos").catch(() => []),
+        ApiService.get("/inventario/modelos/red").catch(() => null),
+      ]);
       setModelos(Array.isArray(mdls) ? mdls : []);
+
+      if (redRes) {
+        setIsMatrizTenant(Boolean(redRes.isMatriz));
+        setRedSucursales(Array.isArray(redRes.redSucursales) ? redRes.redSucursales : []);
+        setModelosRed(Array.isArray(redRes.modelosRed) ? redRes.modelosRed : []);
+        setModelosMatrizDisponibles(Array.isArray(redRes.modelosRed) ? redRes.modelosRed : []);
+      }
 
       if (online) {
         try {
-          const [srs, provs, matrizRes] = await Promise.all([
+          const [srs, provs] = await Promise.all([
             ApiService.get("/configuracion/series").catch(() => []),
             ApiService.get("/proveedores").catch(() => []),
-            ApiService.get("/inventario/modelos/matriz").catch(() => null),
           ]);
 
           if (Array.isArray(srs)) {
@@ -547,14 +623,6 @@ export default function ModelosComponent({ online }: ModelosProps) {
 
           if (Array.isArray(provs)) {
             setListaProveedores(provs);
-          }
-
-          if (matrizRes) {
-            setIsMatrizTenant(Boolean(matrizRes.isMatriz));
-            setMatrizNombre(matrizRes.matrizName || "Matriz Principal");
-            setModelosMatrizDisponibles(
-              Array.isArray(matrizRes.modelosMatriz) ? matrizRes.modelosMatriz : []
-            );
           }
         } catch {}
       }
@@ -1681,23 +1749,68 @@ export default function ModelosComponent({ online }: ModelosProps) {
     }
   };
 
+  const handleImportarModeloDirecto = async (model: ModeloRed, variantIds?: string[]) => {
+    if (!isAdmin) return;
+    setImportingModelId(model.id);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await ApiService.post("/inventario/modelos/importar-red", {
+        sourceModelId: model.id,
+        variantIds: variantIds && variantIds.length > 0 ? variantIds : undefined,
+      });
+      setSuccess(res.message || `Modelo "${model.name}" importado exitosamente con sus variantes y proveedores vinculados.`);
+      setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] });
+      await loadData();
+      setTimeout(() => setSuccess(""), 5000);
+    } catch (err: any) {
+      setError(err.message || "Error al importar el modelo.");
+    } finally {
+      setImportingModelId(null);
+    }
+  };
+
   const handleDeleteModel = (id: string, modelName: string) => {
     setConfirmModal({
       isOpen: true,
-      title: "Eliminar Modelo Permanentemente",
-      message: `¿Estás seguro de que deseas ELIMINAR PERMANENTEMENTE el modelo "${modelName}"?\n\nEsta acción eliminará el modelo, todas sus variantes de color y su inventario de la base de datos. Esta acción no se puede deshacer.`,
-      confirmText: "Eliminar permanentemente",
+      title: "Eliminar Modelo de esta Sucursal",
+      message: `¿Estás seguro de que deseas retirar el modelo "${modelName}" y todas sus variantes de este local comercial?\n\n• Esta acción NO afecta a la matriz ni a las demás sucursales.\n• Los proveedores no utilizados en este local se desvincularán de forma automática.\n• El modelo volverá a estar disponible en la pestaña "Modelos Disponibles en la Red" para cuando desees reincorporarlo.`,
+      confirmText: "Retirar de esta sucursal",
       danger: true,
       onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
         setSaving(true);
         try {
           await ApiService.delete(`/inventario/modelos/${id}`);
-          setSuccess(`Modelo "${modelName}" eliminado permanentemente.`);
-          loadData();
+          setSuccess(`Modelo "${modelName}" retirado exitosamente de este local.`);
+          await loadData();
           setTimeout(() => setSuccess(""), 4000);
         } catch (err: any) {
-          setError(err.message || "Error al eliminar el modelo.");
+          setError(err.message || "Error al retirar el modelo.");
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
+  };
+
+  const handleDeleteProduct = (productId: string, productName: string, color: string, serieNombre?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir Variante de esta Sucursal",
+      message: `¿Estás seguro de que deseas retirar la variante "${color}${serieNombre ? ` (${serieNombre})` : ''}" del modelo "${productName}" de este local comercial?\n\n• Esta acción NO afecta a la matriz ni a las demás sucursales.\n• Si el proveedor de esta variante no suministra otros productos en este local, se desvinculará automáticamente.\n• La variante volverá a estar disponible en la pestaña "Modelos Disponibles en la Red" para cuando desees reincorporarla.`,
+      confirmText: "Retirar de esta sucursal",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setSaving(true);
+        try {
+          await ApiService.delete(`/inventario/productos/${productId}`);
+          setSuccess(`Variante "${color}" retirada exitosamente de este local comercial.`);
+          await loadData();
+          setTimeout(() => setSuccess(""), 4000);
+        } catch (err: any) {
+          setError(err.message || "Error al retirar la variante.");
         } finally {
           setSaving(false);
         }
@@ -1755,21 +1868,80 @@ export default function ModelosComponent({ online }: ModelosProps) {
     m.brand.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Filtrar modelos de la red: solo mostrar los que no están completamente importados (ocultar status 'COMPLETO')
+  const modelosRedDisponibles = modelosRed.filter((m) => m.status !== 'COMPLETO');
+
+  const filteredModelosRed = modelosRedDisponibles.filter((m) => {
+    const matchSearch =
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
+      m.baseCode.toLowerCase().includes(search.toLowerCase()) ||
+      m.brand.toLowerCase().includes(search.toLowerCase()) ||
+      (m.sucursalOrigenNombre && m.sucursalOrigenNombre.toLowerCase().includes(search.toLowerCase())) ||
+      (m.colores && m.colores.some((c: any) => c.color.toLowerCase().includes(search.toLowerCase())));
+
+    const matchSucursal =
+      filterRedSucursal === "TODAS" || m.tenantId === filterRedSucursal;
+
+    return matchSearch && matchSucursal;
+  });
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <p className="text-xs text-[var(--muted-foreground)] font-medium">Administra diseños base y sus variantes de color y serie</p>
+      {/* Pestañas de Navegación: Catálogo Local vs. Modelos en la Red Comercial */}
+      <div className="flex items-center justify-between border-b border-[var(--border)] pb-2 gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('local')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'local'
+                ? "bg-[#0F172A] text-white shadow-sm"
+                : "bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40"
+            }`}
+          >
+            <Boxes size={15} />
+            <span>Mi Catálogo Local</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+              activeTab === 'local' ? "bg-white/20 text-white" : "bg-[var(--muted)] text-[var(--muted-foreground)]"
+            }`}>
+              {modelos.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('red')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'red'
+                ? "bg-[#0F172A] text-white shadow-sm"
+                : "bg-[var(--card)] text-[var(--muted-foreground)] border border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40"
+            }`}
+          >
+            <Building2 size={15} />
+            <span>Modelos Disponibles en la Red</span>
+            {modelosRedDisponibles.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500 text-white font-black animate-pulse">
+                {modelosRedDisponibles.length}
+              </span>
+            )}
+          </button>
         </div>
+
         <div className="flex items-center gap-3">
-          <button onClick={loadData} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors">
+          <button
+            onClick={loadData}
+            title="Refrescar catálogo y sincronización con la red"
+            className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+          >
             <RefreshCw size={16} />
           </button>
-          {online && (
-            <button onClick={() => { resetForm(); setShowCreate(true); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
-              <Plus size={16} /><span>Nuevo Modelo</span>
+          {online && isAdmin && activeTab === 'local' && (
+            <button
+              onClick={() => { resetForm(); setShowCreate(true); }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              <Plus size={16} />
+              <span>Nuevo Modelo Propio</span>
             </button>
           )}
         </div>
@@ -1781,254 +1953,676 @@ export default function ModelosComponent({ online }: ModelosProps) {
         </div>
       )}
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
-        <input type="text" placeholder="Buscar por código base, nombre o marca..."
-          value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors" />
-      </div>
-
-      {loading ? (
-        <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
-          <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
-          <span className="text-sm">Cargando catálogo...</span>
-        </div>
-      ) : filteredModelos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-16 bg-[var(--card)] border border-[var(--border)] border-dashed rounded-2xl text-[var(--muted-foreground)]">
-          <Package size={48} className="mb-4 opacity-30" />
-          <p className="font-semibold">Sin modelos registrados</p>
-          <p className="text-xs mt-1">Haz clic en "Nuevo Modelo" para agregar diseños y generar variantes en lote.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredModelos.map(m => {
-            // Obtener colores únicos disponibles en el modelo
-            const products = m.products || [];
-            const uniqueColors = Array.from(new Set(products.map(p => p.color)));
-            const activeColor = selectedColorForModel[m.id] || uniqueColors[0] || "";
-
-            // Variante seleccionada por color (primer producto que coincida con el color activo)
-            const activeProduct = products.find(p => p.color === activeColor);
-
-            const isExpanded = expandedModels[m.id];
-
-            return (
-              <div key={m.id} className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all ${
-                !m.active ? "opacity-60 bg-[var(--muted)]/20" : ""
-              }`}>
-                {/* Resumen del Modelo */}
-                <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-start sm:items-center gap-4">
-                    <div className="w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
-                      {activeProduct?.fotoUrl ? (
-                        <img src={activeProduct.fotoUrl} alt={m.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageIcon size={20} className="text-[var(--muted-foreground)] opacity-40" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-base">{m.name}</h4>
-                        <span className="px-2 py-0.5 bg-slate-900 text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider">{m.baseCode}</span>
-                        {m.material && (
-                          <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded-lg text-[10px] font-semibold">{m.material}</span>
-                        )}
-                        {!m.active && (
-                          <span className="px-2 py-0.5 bg-red-500/15 text-red-500 rounded-lg text-[10px] font-bold">Deshabilitado</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <p className="text-xs text-[var(--muted-foreground)]">{m.brand} · {uniqueColors.length} colores</p>
-                        {m.supplier && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
-                            <Truck size={10} />
-                            {m.supplier.razonSocial}
-                            {(m.alternateSupplierIds?.length || 0) > 0 && (
-                              <span className="text-[9px] font-normal opacity-70">+{m.alternateSupplierIds!.length}</span>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Acciones principales */}
-                  <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
-                    <div className="text-left md:text-right">
-                      <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precios Variantes</span>
-                      <span className="text-sm font-extrabold text-[#0F172A]">
-                        {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {online && (
-                        <>
-                          <button type="button" onClick={() => openEditModel(m)}
-                            title="Editar nombre, marca, código base o material del modelo"
-                            className="px-3 py-2 text-xs font-bold rounded-xl bg-blue-600/10 text-blue-600 border border-blue-600/20 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1">
-                            <Edit2 size={13} />
-                            <span>Editar Modelo</span>
-                          </button>
-                          <button type="button" onClick={() => openAddColorModal(m)}
-                            title="Añadir un nuevo color a este modelo"
-                            className="px-3 py-2 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm">
-                            <Plus size={13} />
-                            <span>Añadir Color</span>
-                          </button>
-                          <button type="button" onClick={() => handleToggleModel(m.id, m.name, m.active)}
-                            className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors ${
-                              m.active
-                                ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
-                                : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
-                            }`}>
-                            {m.active ? "Deshabilitar" : "Habilitar"}
-                          </button>
-                          <button type="button" onClick={() => handleDeleteModel(m.id, m.name)}
-                            title="Eliminar modelo permanentemente"
-                            className="px-3 py-2 text-xs font-semibold rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1">
-                            <Trash2 size={13} />
-                            <span>Eliminar</span>
-                          </button>
-                        </>
-                      )}
-                      <button onClick={() => toggleExpandModel(m.id)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-xs font-semibold rounded-xl transition-colors">
-                        {isExpanded ? (
-                          <><span>Ocultar Variantes</span><ChevronUp size={14} /></>
-                        ) : (
-                          <><span>Ver Variantes ({products.length})</span><ChevronDown size={14} /></>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Vista Detallada de Variantes (Expandible) */}
-                {isExpanded && (
-                  <div className="border-t border-[var(--border)] bg-[var(--muted)]/10 p-4 sm:p-5 space-y-4">
-                    {/* Selector de Color */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1"><Palette size={12}/> Color Activo:</span>
-                      {uniqueColors.map(col => {
-                        const countActive = products.filter(p => p.color === col && p.activo).length;
-                        const countTotal = products.filter(p => p.color === col).length;
-
-                        return (
-                          <button key={col} onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: col }))}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${
-                              activeColor === col
-                                ? "bg-slate-900 text-white border-slate-900"
-                                : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
-                            }`}>
-                            <span>{col}</span>
-                            {countActive < countTotal && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-red-400" title="Contiene variantes deshabilitadas" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Tabla/Listado de Series para el Color Seleccionado */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {products.filter(p => p.color === activeColor).map(p => {
-                        const tallas = p.tallas || (p as any).stockPorTalla || [];
-                        const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
-
-                        return (
-                          <div key={p.id} className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${
-                            !p.activo ? "opacity-60 bg-[var(--muted)]/10 border-dashed" : ""
-                          }`}>
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Código Variante</span>
-                                  {!p.activo && (
-                                    <span className="px-1.5 py-0.5 bg-red-500/15 text-red-500 rounded text-[9px] font-bold leading-none">Deshabilitada</span>
-                                  )}
-                                </div>
-                                <span className="text-xs font-mono font-bold text-slate-800">{p.codigo}</span>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Serie</span>
-                                <span className="text-xs font-semibold">{p.serie?.nombre ? getNombreSerie(p.serie.nombre) : "—"}</span>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precio</span>
-                                <span className="text-xs font-extrabold text-[#0F172A]">${Number(p.precioVenta).toFixed(2)}</span>
-                              </div>
-                            </div>
-
-                            {/* Insignia Discreta de Taller y Costo */}
-                            <div className="flex items-center justify-between text-[11px] px-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] text-[var(--muted-foreground)]">Taller:</span>
-                                {p.supplier ? (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
-                                    <Truck size={10} />
-                                    <span>{p.supplier.razonSocial}</span>
-                                    {p.supplierSigla && (
-                                      <span className="bg-blue-600 text-white px-1 py-0.2 rounded text-[8px] font-mono font-black">{p.supplierSigla}</span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin taller asignado</span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-[var(--muted-foreground)]">
-                                Costo: <strong className="text-slate-800 dark:text-slate-200 font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
-                              </div>
-                            </div>
-
-                            {/* Detalle de Tallas y Stocks */}
-                            <div className="bg-[var(--muted)]/20 rounded-lg p-2.5 space-y-1.5">
-                              <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Stock Físico por Talla</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {tallas.map(t => (
-                                  <span key={t.tallaId} title={`Stock: ${t.cantidad} pares`}
-                                    className={`px-2 py-1 rounded-md text-[10px] font-bold border ${
-                                      t.cantidad === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
-                                      : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                                    }`}>
-                                    T{t.numero}: {t.cantidad}
-                                  </span>
-                                ))}
-                              </div>
-                              <div className="text-[10px] text-[var(--muted-foreground)] pt-1 flex justify-between">
-                                <span>Total: <b>{totalStock} pares</b></span>
-                                {totalStock === 0 && <span className="text-red-500 font-bold">Sin Stock</span>}
-                              </div>
-                            </div>
-
-                            {/* Botones de acción */}
-                            <div className="flex justify-end items-center gap-2 pt-1">
-                              {online && (
-                                <button type="button" onClick={() => handleToggleProduct(p.id, p.codigo, p.activo)}
-                                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                                    p.activo
-                                      ? "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
-                                      : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
-                                  }`}>
-                                  {p.activo ? "Deshabilitar" : "Habilitar"}
-                                </button>
-                              )}
-                              <button onClick={() => openEditProduct(p)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs">
-                                <Edit2 size={12} /><span>Editar Variante</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-sm rounded-xl">
+          <AlertCircle size={16} /> {error}
         </div>
       )}
+
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* VISTA 1: MI CATÁLOGO LOCAL                              */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {activeTab === 'local' && (
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
+            <input
+              type="text"
+              placeholder="Buscar por código base, nombre o marca en este local..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
+            />
+          </div>
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
+              <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
+              <span className="text-sm">Cargando catálogo local...</span>
+            </div>
+          ) : filteredModelos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-16 bg-[var(--card)] border border-[var(--border)] border-dashed rounded-2xl text-[var(--muted-foreground)]">
+              <Package size={48} className="mb-4 opacity-30" />
+              <p className="font-semibold">Sin modelos registrados en este local</p>
+              <p className="text-xs mt-1 text-center max-w-md">
+                Haz clic en "Nuevo Modelo Propio" para diseñar desde cero, o explora la pestaña <strong>"Modelos Disponibles en la Red"</strong> para adoptar modelos de otras sucursales.
+              </p>
+              {modelosRedDisponibles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('red')}
+                  className="mt-4 flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  <Sparkles size={14} />
+                  <span>Ver {modelosRedDisponibles.length} Modelos Disponibles en la Red</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredModelos.map(m => {
+                const products = m.products || [];
+                const uniqueColors = Array.from(new Set(products.map(p => p.color)));
+                const activeColor = selectedColorForModel[m.id] || uniqueColors[0] || "";
+                const activeProduct = products.find(p => p.color === activeColor);
+                const isExpanded = expandedModels[m.id];
+
+                return (
+                  <div key={m.id} className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all ${
+                    !m.active ? "opacity-60 bg-[var(--muted)]/20" : ""
+                  }`}>
+                    {/* Resumen del Modelo */}
+                    <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-start sm:items-center gap-4">
+                        <div className="w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                          {activeProduct?.fotoUrl ? (
+                            <img src={activeProduct.fotoUrl} alt={m.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon size={20} className="text-[var(--muted-foreground)] opacity-40" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-base">{m.name}</h4>
+                            <span className="px-2 py-0.5 bg-slate-900 text-white rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider">{m.baseCode}</span>
+                            {m.material && (
+                              <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded-lg text-[10px] font-semibold">{m.material}</span>
+                            )}
+                            {!m.active && (
+                              <span className="px-2 py-0.5 bg-red-500/15 text-red-500 rounded-lg text-[10px] font-bold">Deshabilitado</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <p className="text-xs text-[var(--muted-foreground)]">{m.brand} · {uniqueColors.length} colores</p>
+                            {m.supplier && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[10px] font-bold">
+                                <Truck size={10} />
+                                {m.supplier.razonSocial}
+                                {(m.alternateSupplierIds?.length || 0) > 0 && (
+                                  <span className="text-[9px] font-normal opacity-70">+{m.alternateSupplierIds!.length}</span>
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Acciones principales */}
+                      <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+                        <div className="text-left md:text-right">
+                          <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precios Variantes</span>
+                          <span className="text-sm font-extrabold text-[#0F172A]">
+                            {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {online && isAdmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEditModel(m)}
+                                title="Editar nombre, marca, código base o material del modelo"
+                                className="px-3 py-2 text-xs font-bold rounded-xl bg-blue-600/10 text-blue-600 border border-blue-600/20 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit2 size={13} />
+                                <span>Editar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openAddColorModal(m)}
+                                title="Añadir un nuevo color a este modelo"
+                                className="px-3 py-2 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                              >
+                                <Plus size={13} />
+                                <span>Añadir Color</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleModel(m.id, m.name, m.active)}
+                                className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+                                  m.active
+                                    ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+                                    : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                                }`}
+                              >
+                                {m.active ? "Deshabilitar" : "Habilitar"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteModel(m.id, m.name)}
+                                title="Eliminar modelo de este local comercial"
+                                className="px-3 py-2 text-xs font-semibold rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 size={13} />
+                                <span>Eliminar</span>
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => toggleExpandModel(m.id)}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                          >
+                            {isExpanded ? (
+                              <><span>Ocultar Variantes</span><ChevronUp size={14} /></>
+                            ) : (
+                              <><span>Ver Variantes ({products.length})</span><ChevronDown size={14} /></>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Vista Detallada de Variantes (Expandible) */}
+                    {isExpanded && (
+                      <div className="border-t border-[var(--border)] bg-[var(--muted)]/10 p-4 sm:p-5 space-y-4">
+                        {/* Selector de Color */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
+                            <Palette size={12}/> Color Activo:
+                          </span>
+                          {uniqueColors.map(col => {
+                            const countActive = products.filter(p => p.color === col && p.activo).length;
+                            const countTotal = products.filter(p => p.color === col).length;
+
+                            return (
+                              <button
+                                key={col}
+                                onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: col }))}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                                  activeColor === col
+                                    ? "bg-slate-900 text-white border-slate-900"
+                                    : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
+                                }`}
+                              >
+                                <span>{col}</span>
+                                {countActive < countTotal && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-400" title="Contiene variantes deshabilitadas" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Listado de Series para el Color Seleccionado */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {products.filter(p => p.color === activeColor).map(p => {
+                            const tallas = p.tallas || (p as any).stockPorTalla || [];
+                            const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
+
+                            return (
+                              <div
+                                key={p.id}
+                                className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${
+                                  !p.activo ? "opacity-60 bg-[var(--muted)]/10 border-dashed" : ""
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Código Variante</span>
+                                      {!p.activo && (
+                                        <span className="px-1.5 py-0.5 bg-red-500/15 text-red-500 rounded text-[9px] font-bold leading-none">Deshabilitada</span>
+                                      )}
+                                    </div>
+                                    <span className="text-xs font-mono font-bold text-slate-800">{p.codigo}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Serie</span>
+                                    <span className="text-xs font-semibold">{p.serie?.nombre ? getNombreSerie(p.serie.nombre) : "—"}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precio</span>
+                                    <span className="text-xs font-extrabold text-[#0F172A]">${Number(p.precioVenta).toFixed(2)}</span>
+                                  </div>
+                                </div>
+
+                                {/* Insignia Discreta de Taller y Costo */}
+                                <div className="flex items-center justify-between text-[11px] px-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">Taller:</span>
+                                    {p.supplier ? (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
+                                        <Truck size={10} />
+                                        <span>{p.supplier.razonSocial}</span>
+                                        {p.supplierSigla && (
+                                          <span className="bg-blue-600 text-white px-1 py-0.2 rounded text-[8px] font-mono font-black">{p.supplierSigla}</span>
+                                        )}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin taller asignado</span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    Costo: <strong className="text-slate-800 dark:text-slate-200 font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
+                                  </div>
+                                </div>
+
+                                {/* Detalle de Tallas y Stocks */}
+                                <div className="bg-[var(--muted)]/20 rounded-lg p-2.5 space-y-1.5">
+                                  <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Stock Físico por Talla</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {tallas.map(t => (
+                                      <span
+                                        key={t.tallaId}
+                                        title={`Stock: ${t.cantidad} pares`}
+                                        className={`px-2 py-1 rounded-md text-[10px] font-bold border ${
+                                          t.cantidad === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
+                                          : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                        }`}
+                                      >
+                                        T{t.numero}: {t.cantidad}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)] pt-1 flex justify-between">
+                                    <span>Total: <b>{totalStock} pares</b></span>
+                                    {totalStock === 0 && <span className="text-red-500 font-bold">Sin Stock</span>}
+                                  </div>
+                                </div>
+
+                                {/* Botones de acción */}
+                                <div className="flex justify-end items-center gap-2 pt-1 flex-wrap">
+                                  {online && isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleProduct(p.id, p.codigo, p.activo)}
+                                      className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+                                        p.activo
+                                          ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+                                          : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                                      }`}
+                                    >
+                                      {p.activo ? "Deshabilitar" : "Habilitar"}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => openEditProduct(p)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs cursor-pointer"
+                                  >
+                                    <Edit2 size={12} />
+                                    <span>Editar</span>
+                                  </button>
+                                  {online && isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteProduct(p.id, m.name, p.color, p.serie?.nombre)}
+                                      title="Retirar variante de este local sin afectar a otros locales"
+                                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all cursor-pointer"
+                                    >
+                                      <Trash2 size={12} />
+                                      <span>Retirar</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* VISTA 2: MODELOS DISPONIBLES EN LA RED COMERCIAL        */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {activeTab === 'red' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
+              <input
+                type="text"
+                placeholder="Buscar modelo en la red por nombre, código base, color o marca..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors"
+              />
+            </div>
+
+            {redSucursales.length > 1 && (
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs text-[var(--muted-foreground)] whitespace-nowrap font-medium">Filtrar por origen:</span>
+                <select
+                  value={filterRedSucursal}
+                  onChange={e => setFilterRedSucursal(e.target.value)}
+                  className="px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none"
+                >
+                  <option value="TODAS">Todas las Sucursales y Matriz</option>
+                  {redSucursales.map(s => (
+                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
+              <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
+              <span className="text-sm">Explorando modelos en la red comercial...</span>
+            </div>
+          ) : filteredModelosRed.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-16 bg-[var(--card)] border border-emerald-500/20 border-dashed rounded-3xl text-center space-y-3">
+              <div className="w-14 h-14 bg-emerald-500/10 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle size={32} />
+              </div>
+              <h4 className="font-extrabold text-base text-[var(--foreground)]">¡Catálogo Totalmente Sincronizado!</h4>
+              <p className="text-xs text-[var(--muted-foreground)] max-w-md mx-auto">
+                {search.trim()
+                  ? "No se encontraron modelos con los términos de búsqueda ingresados."
+                  : "Tu local comercial ya cuenta con todos los modelos y variantes existentes en la matriz y en las demás sucursales."}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredModelosRed.map(m => {
+                const isImportingThis = importingModelId === m.id;
+                const isParcial = m.status === 'PARCIAL';
+
+                return (
+                  <div
+                    key={m.id}
+                    className={`bg-[var(--card)] border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all space-y-4 ${
+                      isParcial ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-[var(--border)]"
+                    }`}
+                  >
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-20 h-20 bg-white border border-[var(--border)] rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+                          {m.fotoPrincipal ? (
+                            <img src={m.fotoPrincipal} alt={m.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon size={28} className="text-slate-300" />
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-black uppercase tracking-wide text-base text-[var(--foreground)]">{m.name}</h4>
+                            <span className="px-2 py-0.5 bg-slate-900 text-white rounded-lg text-[10px] font-mono font-bold uppercase">{m.baseCode}</span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 rounded-lg text-[10px] font-bold">
+                              <Building2 size={11} />
+                              <span>Origen: {m.sucursalOrigenNombre}</span>
+                            </span>
+                            {isParcial ? (
+                              <span className="px-2.5 py-0.5 bg-amber-500/15 text-amber-600 border border-amber-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1">
+                                <Sparkles size={11} />
+                                <span>Variantes Nuevas (+{m.variantesFaltantes.length})</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 rounded-lg text-[10px] font-bold">
+                                ★ Modelo Nuevo en esta Sucursal
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-[var(--muted-foreground)] flex-wrap">
+                            <span>Marca: <strong>{m.brand}</strong></span>
+                            {m.material && <span>· Material: <strong>{m.material}</strong></span>}
+                            <span>· Total Variantes en Red: <strong>{m.totalVariantesRed}</strong></span>
+                          </div>
+
+                          {m.supplier && (
+                            <div className="flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-xl w-fit">
+                              <Truck size={13} className="shrink-0" />
+                              <span>Taller Proveedor: <strong>{m.supplier.razonSocial}</strong> {m.supplier.ruc ? `(${m.supplier.ruc})` : ''}</span>
+                              <span className="text-[10px] opacity-75 font-normal">· Se auto-vinculará a tu local</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Botones de Importación */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                        {isParcial ? (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isImportingThis || !isAdmin}
+                              onClick={() => setImportModalData({
+                                isOpen: true,
+                                model: m,
+                                selectedVariantIds: m.variantesFaltantes.map(v => v.id),
+                              })}
+                              className="px-3.5 py-2.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] border border-[var(--border)] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <span>Seleccionar Variantes</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isImportingThis || !isAdmin}
+                              onClick={() => handleImportarModeloDirecto(m, m.variantesFaltantes.map(v => v.id))}
+                              className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                              {isImportingThis ? (
+                                <><Loader2 size={14} className="animate-spin" /><span>Sincronizando...</span></>
+                              ) : (
+                                <><Sparkles size={14} /><span>Importar Faltantes (+{m.variantesFaltantes.length})</span></>
+                              )}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isImportingThis || !isAdmin}
+                              onClick={() => setImportModalData({
+                                isOpen: true,
+                                model: m,
+                                selectedVariantIds: m.variantesFaltantes.map(v => v.id),
+                              })}
+                              className="px-3.5 py-2.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] border border-[var(--border)] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <span>Personalizar Variantes</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isImportingThis || !isAdmin}
+                              onClick={() => handleImportarModeloDirecto(m)}
+                              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                              {isImportingThis ? (
+                                <><Loader2 size={14} className="animate-spin" /><span>Importando a tu Local...</span></>
+                              ) : (
+                                <><Sparkles size={14} /><span>Importar Modelo Completo</span></>
+                              )}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Previsualización de Colores y Variantes Faltantes */}
+                    <div className="bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-3.5 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--muted-foreground)]">
+                        <span>Variantes disponibles para incorporar a este local:</span>
+                        <span>Precios sugeridos: Costo ref. ${m.precioCostoReferencial.toFixed(2)} · Venta ref. ${m.precioVentaReferencial.toFixed(2)}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                        {m.variantesFaltantes.map(v => (
+                          <div
+                            key={v.id}
+                            className="bg-[var(--card)] border border-emerald-500/20 rounded-xl p-2.5 flex items-center gap-3 shadow-2xs"
+                          >
+                            <div className="w-10 h-10 bg-white border border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                              {v.imageUrl ? (
+                                <img src={v.imageUrl} alt={v.color} className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon size={16} className="text-slate-300" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-bold text-xs truncate">{v.color}</span>
+                                <span className="text-[10px] font-mono font-bold text-emerald-600">${Number(v.salePrice).toFixed(2)}</span>
+                              </div>
+                              <div className="text-[10px] text-[var(--muted-foreground)] flex items-center justify-between gap-1 mt-0.5">
+                                <span>{getNombreSerie(v.serieNombre)}</span>
+                                {v.supplier?.razonSocial && (
+                                  <span className="truncate text-blue-600 text-[9px]">Taller: {v.supplier.razonSocial}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* MODAL DE IMPORTACIÓN DETALLADA / SELECTIVA               */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {importModalData.isOpen && importModalData.model && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onMouseDown={e => { if (e.target === e.currentTarget) setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] }); }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Importar "{importModalData.model.name}"</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Selecciona las variantes que deseas incorporar a tu sucursal. Los proveedores asociados se vincularán de forma automática.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] })}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div className="flex items-center justify-between bg-[var(--muted)]/20 border border-[var(--border)] p-3 rounded-xl text-xs">
+                <div>
+                  <span className="text-[var(--muted-foreground)]">Origen: </span>
+                  <strong className="text-[var(--foreground)]">{importModalData.model.sucursalOrigenNombre}</strong>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setImportModalData(prev => ({
+                      ...prev,
+                      selectedVariantIds: prev.model?.variantesFaltantes.map(v => v.id) || [],
+                    }))}
+                    className="text-xs text-blue-600 hover:underline font-bold cursor-pointer"
+                  >
+                    Marcar todas
+                  </button>
+                  <span>·</span>
+                  <button
+                    type="button"
+                    onClick={() => setImportModalData(prev => ({ ...prev, selectedVariantIds: [] }))}
+                    className="text-xs text-[var(--muted-foreground)] hover:underline font-bold cursor-pointer"
+                  >
+                    Desmarcar todas
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  Variantes Disponibles ({importModalData.model.variantesFaltantes.length})
+                </label>
+
+                {importModalData.model.variantesFaltantes.map(v => {
+                  const isChecked = importModalData.selectedVariantIds.includes(v.id);
+
+                  return (
+                    <label
+                      key={v.id}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                        isChecked
+                          ? "bg-emerald-500/5 border-emerald-500/40 shadow-2xs"
+                          : "bg-[var(--card)] border-[var(--border)] opacity-60 hover:opacity-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setImportModalData(prev => ({
+                              ...prev,
+                              selectedVariantIds: checked
+                                ? [...prev.selectedVariantIds, v.id]
+                                : prev.selectedVariantIds.filter(id => id !== v.id),
+                            }));
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <div className="w-10 h-10 bg-white border border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                          {v.imageUrl ? (
+                            <img src={v.imageUrl} alt={v.color} className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon size={16} className="text-slate-300" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-bold text-xs text-[var(--foreground)]">{v.color}</div>
+                          <div className="text-[10px] text-[var(--muted-foreground)]">
+                            {getNombreSerie(v.serieNombre)} {v.supplier?.razonSocial ? `· Taller: ${v.supplier.razonSocial}` : ''}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right text-xs">
+                        <div className="font-bold text-[var(--foreground)]">${Number(v.salePrice).toFixed(2)}</div>
+                        <div className="text-[10px] text-[var(--muted-foreground)]">Costo: ${Number(v.costPrice).toFixed(2)}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/10 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] })}
+                className="px-4 py-2.5 text-xs font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={importModalData.selectedVariantIds.length === 0 || Boolean(importingModelId)}
+                onClick={() => handleImportarModeloDirecto(importModalData.model!, importModalData.selectedVariantIds)}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {importingModelId ? (
+                  <><Loader2 size={15} className="animate-spin" /><span>Sincronizando...</span></>
+                ) : (
+                  <><Sparkles size={15} /><span>Importar {importModalData.selectedVariantIds.length} Variantes Seleccionadas</span></>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* MODAL CREAR MASIVO */}
       {showCreate && (
