@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { SyncService } from '@/services/sync.service';
 import { ApiService } from '@/services/api.service';
@@ -147,6 +147,64 @@ function MainApp() {
   const [unsavedDetail, setUnsavedDetail] = useState<UnsavedChangesDetail>({ hasChanges: false });
   const [pendingVista, setPendingVista] = useState<Vista | null>(null);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+
+  // ── Estado y Control Inteligente de Navbar Móvil (Ocultar al bajar, mostrar de inmediato al subir) ──
+  const [showHeaderMobile, setShowHeaderMobile] = useState(true);
+  const lastScrollTopRef = useRef(0);
+
+  useEffect(() => {
+    setShowHeaderMobile(true);
+    lastScrollTopRef.current = 0;
+  }, [vistaActual, activeSucursalId]);
+
+  useEffect(() => {
+    const handleScroll = (scrollTop: number) => {
+      // Si está en la parte superior (<= 20px), siempre visible
+      if (scrollTop <= 20) {
+        setShowHeaderMobile(true);
+        lastScrollTopRef.current = scrollTop;
+        return;
+      }
+
+      const diff = scrollTop - lastScrollTopRef.current;
+
+      // Al scrollear hacia abajo (más de 8px), ocultar el navbar en móvil para ganar espacio
+      if (diff > 8) {
+        setShowHeaderMobile(false);
+      } 
+      // Al scrollear hacia arriba (más de 4px hacia arriba), reaparecer de inmediato en móvil
+      else if (diff < -4) {
+        setShowHeaderMobile(true);
+      }
+
+      lastScrollTopRef.current = scrollTop;
+    };
+
+    const sectionEl = document.getElementById('nexora-main-content');
+    
+    const onSectionScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target) {
+        handleScroll(target.scrollTop);
+      }
+    };
+
+    const onWindowScroll = () => {
+      handleScroll(window.scrollY || document.documentElement.scrollTop);
+    };
+
+    if (sectionEl) {
+      sectionEl.addEventListener('scroll', onSectionScroll, { passive: true });
+    }
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+
+    return () => {
+      if (sectionEl) {
+        sectionEl.removeEventListener('scroll', onSectionScroll);
+      }
+      window.removeEventListener('scroll', onWindowScroll);
+    };
+  }, [vistaActual, activeSucursalId]);
 
   const verifyGpsPermission = () => {
     if (typeof window === 'undefined') return;
@@ -1453,9 +1511,13 @@ function MainApp() {
         {/* Banner de Suscripción / Período de Gracia & Modal de Bloqueo */}
         <SubscriptionGraceBanner />
 
-        {/* Navbar superior (Fijo arriba) */}
+        {/* Navbar superior (Smart Sticky / Auto-Hide en móvil al bajar, reaparición inmediata al subir) */}
         <header
-          className="h-16 shrink-0 border-b px-4 sm:px-6 md:px-8 flex items-center justify-between z-30 shadow-xs transition-colors duration-200"
+          className={`h-16 shrink-0 border-b px-4 sm:px-6 md:px-8 flex items-center justify-between z-30 shadow-xs transition-all duration-300 ease-in-out ${
+            showHeaderMobile
+              ? 'translate-y-0 opacity-100'
+              : '-translate-y-full md:translate-y-0 -mt-16 md:mt-0 opacity-0 md:opacity-100 pointer-events-none md:pointer-events-auto'
+          }`}
           style={{ 
             backgroundColor: 'var(--primary)', 
             color: 'var(--primary-foreground)',
