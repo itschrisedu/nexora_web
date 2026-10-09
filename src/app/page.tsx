@@ -1553,7 +1553,7 @@ function MainApp() {
                 }}
               >
                 <MapPin size={14} className="shrink-0" style={{ color: 'var(--primary-foreground)' }} />
-                {!isBranchRestricted && user?.rol === 'ROL_ADMIN' ? (
+                {sucursales.length > 0 ? (
                   <select
                     value={activeSucursalId}
                     onChange={(e) => {
@@ -1576,9 +1576,6 @@ function MainApp() {
                 ) : (
                   <span className="font-bold text-xs truncate max-w-[200px] flex items-center gap-1.5" style={{ color: 'var(--primary-foreground)' }}>
                     <span>📍 {sucursales.find((s) => s.id === (user?.tenantId || activeSucursalId))?.name || 'Sucursal Asignada'}</span>
-                    {user?.rol === 'ROL_ADMIN' && (
-                      <span className="text-[10px] opacity-80 font-normal">(Admin Local)</span>
-                    )}
                   </span>
                 )}
               </div>

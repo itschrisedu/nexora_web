@@ -148,6 +148,7 @@ interface Cobro {
   vendedorEmail?: string;
   vendedorRol?: string;
   sucursalNombre?: string;
+  tenantId?: string;
   tipoEntrega?: 'PRESENCIAL' | 'ENVIO';
   courier?: string;
   guiaEnvio?: string;
@@ -471,6 +472,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [loading, setLoading] = useState(false);
   const [vista, setVista] = useState<'CLIENTES' | 'FACTURAS'>('CLIENTES');
   const [filtro, setFiltro] = useState<EstadoCobro | 'TODOS'>('TODOS');
+  const [tabSucursalCobro, setTabSucursalCobro] = useState<'ESTA_SUCURSAL' | 'OTRAS_SUCURSALES' | 'TODAS'>('ESTA_SUCURSAL');
   const [busqueda, setBusqueda] = useState('');
 
   // Cliente o Cobro seleccionado para el modal de cuenta corriente
@@ -728,9 +730,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   };
 
   // ── Agrupación Consolidada por Cliente ─────────
+  const cobrosFiltradosPorSucursal = cobros.filter((c) => {
+    if (tabSucursalCobro === 'TODAS') return true;
+    const esDeEstaSucursal = !activeSucursalId || !c.tenantId || c.tenantId === activeSucursalId;
+    if (tabSucursalCobro === 'ESTA_SUCURSAL') return esDeEstaSucursal;
+    if (tabSucursalCobro === 'OTRAS_SUCURSALES') return !esDeEstaSucursal;
+    return true;
+  });
+
   const clientesCartera: ClienteCartera[] = (() => {
     const map = new Map<string, Cobro[]>();
-    cobros.forEach((c) => {
+    cobrosFiltradosPorSucursal.forEach((c) => {
       const key = c.clientId || 'SIN_CLIENTE';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(c);
@@ -1843,7 +1853,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   });
 
   // Filtrado de Cobros Individuales
-  const facturasFiltradas = cobros.filter((c) => {
+  const facturasFiltradas = cobrosFiltradosPorSucursal.filter((c) => {
     const cumpleEstado = filtro === 'TODOS' ? true : c.estado === filtro;
     const q = busqueda.toLowerCase().trim();
     if (!q) return cumpleEstado;
@@ -1924,6 +1934,43 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               </button>
             )}
           </div>
+        </div>
+
+        {/* Sub-tabs de Sucursal */}
+        <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
+          <button
+            onClick={() => setTabSucursalCobro('ESTA_SUCURSAL')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              tabSucursalCobro === 'ESTA_SUCURSAL'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <Building size={14} />
+            <span>🏪 Cobros de esta Sucursal</span>
+          </button>
+          <button
+            onClick={() => setTabSucursalCobro('OTRAS_SUCURSALES')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              tabSucursalCobro === 'OTRAS_SUCURSALES'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <Building size={14} className="text-amber-500" />
+            <span>🌐 Cobros de Otras Sucursales</span>
+          </button>
+          <button
+            onClick={() => setTabSucursalCobro('TODAS')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              tabSucursalCobro === 'TODAS'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <Layers size={14} />
+            <span>🏢 Todos los Cobros (Consolidado Red)</span>
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-1.5">
@@ -2474,6 +2521,23 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   >
                     Hacer Paso
                   </button>
+                </div>
+              )}
+
+              {/* Notice Banner de Cobro Cruzado Inter-Sucursal */}
+              {cobroSeleccionado && activeSucursalId && cobroSeleccionado.tenantId && cobroSeleccionado.tenantId !== activeSucursalId && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-amber-800 dark:text-amber-300 text-xs shadow-2xs">
+                  <div className="p-2 bg-amber-500/20 rounded-xl text-amber-600 shrink-0">
+                    <Building size={18} />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-xs block text-amber-900 dark:text-amber-200">
+                      Aviso de Cobro Cruzado Inter-Sucursal
+                    </span>
+                    <p className="text-[11px] leading-relaxed mt-0.5 opacity-90">
+                      📍 <strong>Abono recibido en:</strong> {sucursales?.find((s) => s.id === activeSucursalId)?.name || 'Tu caja actual'} ➔ <strong>Aplicado a deuda de:</strong> {cobroSeleccionado.sucursalNombre || 'Otra Sucursal'}.
+                    </p>
+                  </div>
                 </div>
               )}
 

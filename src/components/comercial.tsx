@@ -30,6 +30,7 @@ import {
   Download,
   CreditCard,
   DollarSign,
+  Layers,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -170,6 +171,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<EstadoPedido | 'TODOS'>('TODOS');
+  const [tabSucursalPedido, setTabSucursalPedido] = useState<'ESTA_SUCURSAL' | 'OTRAS_SUCURSALES' | 'TODAS'>('ESTA_SUCURSAL');
+  const [selectedOrderSucursalId, setSelectedOrderSucursalId] = useState<string>('');
   const [pedidoExpandidoId, setPedidoExpandidoId] = useState<string | null>(null);
 
   // Formulario nuevo pedido
@@ -1611,6 +1614,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         clientId,
         canal: canalMapeado,
         tipoPago,
+        sucursalId: selectedOrderSucursalId || (activeSucursalId !== 'TODAS' ? activeSucursalId : undefined),
         lineas: lineasPedido.map((l) => ({
           productId: l.productId,
           tallaId: l.tallaId,
@@ -1719,7 +1723,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     try {
       setLoading(true);
       if (online) {
-        const data = await ApiService.get('/pedidos');
+        const data = await ApiService.get('/pedidos?incluirOtrasSucursales=true');
         setPedidos(data || []);
       } else {
         const local = await db.pedidosOffline.toArray();
@@ -1859,8 +1863,14 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   };
 
   const pedidosFiltrados = pedidos.filter((p) => {
-    if (filtroEstado === 'TODOS') return true;
-    return p.estado === filtroEstado;
+    const cumpleEstado = filtroEstado === 'TODOS' || p.estado === filtroEstado;
+    let cumpleSucursal = true;
+    if (tabSucursalPedido === 'ESTA_SUCURSAL') {
+      cumpleSucursal = !activeSucursalId || activeSucursalId === 'TODAS' || !(p as any).tenantId || (p as any).tenantId === activeSucursalId;
+    } else if (tabSucursalPedido === 'OTRAS_SUCURSALES') {
+      cumpleSucursal = Boolean(activeSucursalId && activeSucursalId !== 'TODAS' && (p as any).tenantId && (p as any).tenantId !== activeSucursalId);
+    }
+    return cumpleEstado && cumpleSucursal;
   });
 
   const getNumeroPedido = (p: Pedido, index?: number) => {
@@ -1903,38 +1913,78 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         </button>
       </div>
 
-      {/* Filtros de Estado */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setFiltroEstado('TODOS')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-            filtroEstado === 'TODOS'
-              ? 'bg-[#0F172A] text-white shadow-xs'
-              : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-          }`}
-        >
-          Todos ({pedidos.length})
-        </button>
-        {(['PENDIENTE', 'EN_PREPARACION', 'ENTREGADO_PARCIAL', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
-          const cfg = ESTADO_CONFIG[st];
-          const count = pedidos.filter((p) => p.estado === st).length;
-          const active = filtroEstado === st;
-          return (
-            <button
-              key={st}
-              onClick={() => setFiltroEstado(st)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                active
-                  ? `${cfg.color} shadow-xs font-black`
-                  : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-              }`}
-            >
-              {cfg.icon}
-              <span>{cfg.label}</span>
-              <span className="text-[10px] opacity-75">({count})</span>
-            </button>
-          );
-        })}
+      {/* Sub-tabs de Sucursal & Filtros de Estado */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Sub-tabs de Sucursal */}
+        <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
+          <button
+            onClick={() => setTabSucursalPedido('ESTA_SUCURSAL')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              tabSucursalPedido === 'ESTA_SUCURSAL'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <Building size={14} />
+            <span>🏪 Pedidos de esta Sucursal</span>
+          </button>
+          <button
+            onClick={() => setTabSucursalPedido('OTRAS_SUCURSALES')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              tabSucursalPedido === 'OTRAS_SUCURSALES'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <Building size={14} className="text-amber-500" />
+            <span>🌐 Pedidos de Otras Sucursales</span>
+          </button>
+          <button
+            onClick={() => setTabSucursalPedido('TODAS')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              tabSucursalPedido === 'TODAS'
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <Layers size={14} />
+            <span>🏢 Todos los Pedidos Consolidados</span>
+          </button>
+        </div>
+
+        {/* Filtros de Estado */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => setFiltroEstado('TODOS')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              filtroEstado === 'TODOS'
+                ? 'bg-[#0F172A] text-white shadow-xs'
+                : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            Todos ({pedidos.length})
+          </button>
+          {(['PENDIENTE', 'EN_PREPARACION', 'ENTREGADO_PARCIAL', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
+            const cfg = ESTADO_CONFIG[st];
+            const count = pedidos.filter((p) => p.estado === st).length;
+            const active = filtroEstado === st;
+            return (
+              <button
+                key={st}
+                onClick={() => setFiltroEstado(st)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  active
+                    ? `${cfg.color} shadow-xs font-black`
+                    : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                {cfg.icon}
+                <span>{cfg.label}</span>
+                <span className="text-[10px] opacity-75">({count})</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tabla de Pedidos */}
@@ -2627,6 +2677,27 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       <option value="CATALOGO_DIGITAL">Catálogo Digital / WhatsApp</option>
                     </select>
                   </div>
+
+                  {/* Selector de Sucursal de Emisión y Despacho */}
+                  {sucursales && sucursales.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 flex items-center gap-1.5">
+                        <Building size={12} className="text-emerald-500" />
+                        <span>Sucursal de Emisión y Despacho</span>
+                      </label>
+                      <select
+                        value={selectedOrderSucursalId || (activeSucursalId !== 'TODAS' ? activeSucursalId : (sucursales[0]?.id || ''))}
+                        onChange={(e) => setSelectedOrderSucursalId(e.target.value)}
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-[var(--foreground)] focus:outline-none focus:border-emerald-500 min-h-[42px]"
+                      >
+                        {sucursales.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            🏢 {s.name} {s.id === activeSucursalId ? '(Local Actual)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Detalle de Pago de Contado */}
                   {tipoPago === 'CONTADO' && (
