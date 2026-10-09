@@ -566,12 +566,12 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                       <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">
                         Precios Variantes
                       </span>
-                      <span className="text-sm font-extrabold text-[#0F172A] dark:text-white">
+                      <span className="text-sm font-black text-slate-900 dark:text-white">
                         {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
                       </span>
                       {isAdmin && activeProduct && (
-                        <span className="text-[10px] text-slate-900 dark:text-[var(--muted-foreground)] font-medium block">
-                          Costo: <strong className="text-black dark:text-slate-200 font-mono font-bold">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
+                        <span className="text-[10px] text-slate-900 dark:text-slate-300 font-medium block">
+                          Costo: <strong className="text-black dark:text-white font-mono font-bold">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
                         </span>
                       )}
                     </div>
@@ -653,13 +653,13 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                                 </div>
                                 <div className="text-right">
                                   <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider block">Precio</span>
-                                  <span className="text-xs font-extrabold text-[#0F172A] dark:text-emerald-400">
+                                  <span className="text-xs font-black text-slate-900 dark:text-white">
                                     ${Number(p.precioVenta).toFixed(2)}
                                   </span>
                                   {/* COSTO VISIBLE EXCLUSIVAMENTE PARA ADMINISTRADOR */}
                                   {isAdmin && (
-                                    <div className="text-[10px] text-slate-900 dark:text-[var(--muted-foreground)] font-medium mt-0.5">
-                                      Costo: <strong className="text-black dark:text-slate-200 font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
+                                    <div className="text-[10px] text-slate-900 dark:text-slate-300 font-medium mt-0.5">
+                                      Costo: <strong className="text-black dark:text-white font-mono font-bold">${Number(p.precioCosto).toFixed(2)}</strong>
                                     </div>
                                   )}
                                 </div>

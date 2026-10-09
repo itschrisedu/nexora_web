@@ -4755,12 +4755,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               )}
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    RUC del Proveedor / Cédula
-                  </label>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">(Opcional)</span>
-                </div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  RUC del Proveedor / Cédula
+                </label>
                 <input
                   type="text"
                   placeholder="Ej. 1792348574001 (10 o 13 dígitos)"
@@ -4800,12 +4797,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Nombre Comercial / Taller
-                  </label>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">(Opcional)</span>
-                </div>
+                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                  Nombre Comercial / Taller
+                </label>
                 <input
                   type="text"
                   placeholder="Ej. Calzados Artesanales Cevallos (Dejar vacío si es persona natural)"
