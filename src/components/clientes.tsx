@@ -377,6 +377,13 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       setTipoDoc("CEDULA");
       setNumDoc(c.cedula || "");
     }
+
+    setTieneDeudaAnterior(false);
+    setDeudaAnteriorMonto("");
+    setDeudaAnteriorConcepto("Saldo anterior pendiente");
+    setDeudaAnteriorFechaEmision(new Date().toISOString().split('T')[0]);
+    setDeudaAnteriorFechaVencimiento(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+    setDeudaAnteriorNotas("");
     
     setError(""); setDocErr(""); setTelErr("");
     setShowEdit(true);
@@ -417,8 +424,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       }
     }
 
-    // Validación de Deuda Anterior al crear cliente
-    if (showCreate && tieneDeudaAnterior) {
+    // Validación de Deuda Anterior al crear o editar cliente
+    if ((showCreate || showEdit) && tieneDeudaAnterior) {
       const montoNum = parseFloat(deudaAnteriorMonto);
       if (isNaN(montoNum) || montoNum <= 0) {
         setError("El monto de la deuda anterior debe ser mayor a $0.00.");
@@ -519,7 +526,29 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         direccion: direccion.trim() || undefined,
         notas: notas.trim() || undefined,
       });
-      setSuccess("Cliente actualizado correctamente.");
+
+      // Si se indicó saldo anterior / deuda pendiente al editar
+      const montoNum = parseFloat(deudaAnteriorMonto);
+      if (tieneDeudaAnterior && selected.id && !isNaN(montoNum) && montoNum > 0) {
+        try {
+          await ApiService.post('/financiero/cobros/deuda-manual', {
+            clientId: selected.id,
+            monto: montoNum,
+            concepto: deudaAnteriorConcepto.trim() || 'Saldo anterior pendiente',
+            fechaEmision: deudaAnteriorFechaEmision || new Date().toISOString().split('T')[0],
+            fechaVencimiento: deudaAnteriorFechaVencimiento || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+            notas: deudaAnteriorNotas.trim() || undefined,
+            sucursalId: (activeSucursalId && activeSucursalId !== 'TODAS') ? activeSucursalId : undefined,
+          });
+          setSuccess(`Cliente actualizado y registrado saldo anterior de $${montoNum.toFixed(2)}.`);
+        } catch (errDeuda: any) {
+          console.error("Aviso con saldo inicial:", errDeuda);
+          setSuccess("Cliente actualizado, pero ocurrió una observación al guardar el saldo: " + (errDeuda.message || ''));
+        }
+      } else {
+        setSuccess("Cliente actualizado correctamente.");
+      }
+
       setShowEdit(false); setSelected(null); resetForm(); loadClientes();
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
@@ -2523,8 +2552,8 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 />
               </div>
 
-              {/* Sección Opcional: Saldo Anterior / Deuda Previa al crear cliente */}
-              {showCreate && (
+              {/* Sección Opcional: Saldo Anterior / Deuda Previa al crear o editar cliente */}
+              {(showCreate || showEdit) && (
                 <div className="pt-2 border-t border-[var(--border)]">
                   <div className="bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 space-y-3">
                     <div className="flex items-center justify-between">
@@ -2537,7 +2566,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                         />
                         <span className="flex items-center gap-1.5">
                           <DollarSign size={14} className="text-amber-600" />
-                          ¿Tiene saldo o deuda anterior pendiente?
+                          {showCreate ? "¿Tiene saldo o deuda anterior pendiente?" : "¿Agregar saldo o deuda pendiente a este cliente?"}
                         </span>
                       </label>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 rounded-full border border-amber-500/20">
@@ -2637,7 +2666,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                         </div>
 
                         <p className="text-[10px] text-amber-800 dark:text-amber-300/80 leading-tight">
-                          💡 Al registrar al cliente, este saldo se ingresará automáticamente a la <strong>Gestión de Cobros & Crédito</strong> para su control y seguimiento.
+                          💡 Al guardar, este saldo se ingresará automáticamente a la <strong>Gestión de Cobros & Crédito</strong> para su control y seguimiento.
                         </p>
                       </div>
                     )}
