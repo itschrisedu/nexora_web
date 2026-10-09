@@ -1511,7 +1511,7 @@ export default function ModelosComponent({
 
       await ApiService.put(`/inventario/productos/${editProduct.id}`, {
         color: editProductColor.trim(),
-        imageUrl: finalImageUrl || undefined,
+        imageUrl: editProductImageChanged ? (finalImageUrl || null) : undefined,
         serieId: editProductSerieId || undefined,
         costPrice: costo,
         salePrice: venta,
@@ -2340,12 +2340,22 @@ export default function ModelosComponent({
                   >
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                       <div className="flex items-start gap-4">
-                        <div className="w-20 h-20 bg-white border border-[var(--border)] rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+                        <div className="w-20 h-20 bg-white border border-[var(--border)] rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative">
                           {m.fotoPrincipal ? (
-                            <img src={m.fotoPrincipal} alt={m.name} className="w-full h-full object-cover" />
-                          ) : (
+                            <img
+                              src={m.fotoPrincipal}
+                              alt={m.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div className={`w-full h-full items-center justify-center ${m.fotoPrincipal ? 'hidden' : 'flex'}`}>
                             <ImageIcon size={28} className="text-slate-300" />
-                          )}
+                          </div>
                         </div>
 
                         <div className="space-y-1.5">
@@ -2457,12 +2467,22 @@ export default function ModelosComponent({
                             key={v.id}
                             className="bg-[var(--card)] border border-emerald-500/20 rounded-xl p-2.5 flex items-center gap-3 shadow-2xs"
                           >
-                            <div className="w-10 h-10 bg-white border border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                            <div className="w-10 h-10 bg-white border border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden relative">
                               {v.imageUrl ? (
-                                <img src={v.imageUrl} alt={v.color} className="w-full h-full object-cover" />
-                              ) : (
+                                <img
+                                  src={v.imageUrl}
+                                  alt={v.color}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (fallback) fallback.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              <div className={`w-full h-full items-center justify-center ${v.imageUrl ? 'hidden' : 'flex'}`}>
                                 <ImageIcon size={16} className="text-slate-300" />
-                              )}
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-1">
@@ -2578,12 +2598,22 @@ export default function ModelosComponent({
                           }}
                           className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                         />
-                        <div className="w-10 h-10 bg-white border border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                        <div className="w-10 h-10 bg-white border border-[var(--border)] rounded-lg flex items-center justify-center shrink-0 overflow-hidden relative">
                           {v.imageUrl ? (
-                            <img src={v.imageUrl} alt={v.color} className="w-full h-full object-cover" />
-                          ) : (
+                            <img
+                              src={v.imageUrl}
+                              alt={v.color}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div className={`w-full h-full items-center justify-center ${v.imageUrl ? 'hidden' : 'flex'}`}>
                             <ImageIcon size={16} className="text-slate-300" />
-                          )}
+                          </div>
                         </div>
                         <div>
                           <div className="font-bold text-xs text-[var(--foreground)]">{v.color}</div>
