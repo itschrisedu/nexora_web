@@ -7,7 +7,7 @@ import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary
 import {
   Plus, Search, Loader2, ImageIcon, Package, Edit2, Edit3, Trash2, AlertTriangle,
   DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette,
-  Layers, Boxes, Truck, Sparkles, Copy, Building2
+  Layers, Boxes, Truck, Sparkles, Copy, Building2, PackageCheck, Info, Check
 } from "lucide-react";
 import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
 import {
@@ -852,8 +852,38 @@ export default function ModelosComponent({
     });
   };
 
+  const getDocenaLabelExt = (totalPares: number) => {
+    if (totalPares === 0) return "Sin Stock (0 pares)";
+    if (totalPares === 6) return "½ Docena (6 pares)";
+    if (totalPares === 12) return "1 Docena Completa (12 pares)";
+    if (totalPares > 0 && totalPares % 12 === 0) return `${totalPares / 12} Docenas (${totalPares} pares)`;
+    if (totalPares > 0 && totalPares % 6 === 0) return `${totalPares / 6} Medias Docenas (${totalPares} pares)`;
+    return `${totalPares} pares`;
+  };
+
+  const detectarTipoCurva = (serieId: string, selectedIds: string[]): 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA' | 'CUSTOM' => {
+    if (!selectedIds || selectedIds.length === 0) return 'NINGUNA';
+    const sObj = series.find(s => s.id === serieId);
+    if (!sObj || !sObj.tallas) return 'CUSTOM';
+
+    const docenaIds = buildTallaIdsFromCurva(sObj, getCurvaDocena(sObj.nombre, 'DOCENA'));
+    const mediaAIds = buildTallaIdsFromCurva(sObj, getCurvaDocena(sObj.nombre, 'MEDIA_A'));
+    const mediaBIds = buildTallaIdsFromCurva(sObj, getCurvaDocena(sObj.nombre, 'MEDIA_B'));
+
+    const sCurrent = [...selectedIds].sort().join(',');
+    if (sCurrent === [...docenaIds].sort().join(',')) return 'DOCENA';
+    if (sCurrent === [...mediaAIds].sort().join(',')) return 'MEDIA_A';
+    if (sCurrent === [...mediaBIds].sort().join(',')) return 'MEDIA_B';
+
+    return 'CUSTOM';
+  };
+
   // Aplicar curva estándar en el formulario de CREACIÓN
-  const aplicarCurvaEnCreacion = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
+  const aplicarCurvaEnCreacion = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+    if (tipo === 'NINGUNA') {
+      setCustomTallas(ct => ({ ...ct, [serieId]: [] }));
+      return;
+    }
     const sObj = series.find(s => s.id === serieId);
     if (!sObj || !sObj.tallas) return;
     const curva = getCurvaDocena(sObj.nombre, tipo);
@@ -867,6 +897,10 @@ export default function ModelosComponent({
       sObj.tallas.forEach(t => { for (let i = 0; i < factor; i++) ids.push(t.id); });
       setCustomTallas(ct => ({ ...ct, [serieId]: ids }));
     }
+  };
+
+  const aplicarCurvaATodasEnCreacion = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+    serieIds.forEach(sid => aplicarCurvaEnCreacion(sid, tipo));
   };
 
   const toggleTallaInSerie = (serieId: string, tallaId: string) => {
@@ -1044,7 +1078,11 @@ export default function ModelosComponent({
     });
   };
 
-  const aplicarCurvaEnNuevoColor = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
+  const aplicarCurvaEnNuevoColor = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+    if (tipo === 'NINGUNA') {
+      setNewColorCustomTallas(ct => ({ ...ct, [serieId]: [] }));
+      return;
+    }
     const sObj = series.find(s => s.id === serieId);
     if (!sObj || !sObj.tallas) return;
     const curva = getCurvaDocena(sObj.nombre, tipo);
@@ -1058,6 +1096,10 @@ export default function ModelosComponent({
       sObj.tallas.forEach(t => { for (let i = 0; i < factor; i++) ids.push(t.id); });
       setNewColorCustomTallas(ct => ({ ...ct, [serieId]: ids }));
     }
+  };
+
+  const aplicarCurvaATodasEnNuevoColor = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
+    newColorSerieIds.forEach(sid => aplicarCurvaEnNuevoColor(sid, tipo));
   };
 
   const toggleTallaInNewColorSerie = (serieId: string, tallaId: string) => {
@@ -1223,11 +1265,14 @@ export default function ModelosComponent({
         finalImageUrl = await uploadToCloudinary(newColorFoto, 'nexora_modelos');
       }
 
+      const totalParesColor = Object.values(newColorCustomTallas).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+      const effectiveStockInicialColor = totalParesColor > 0 ? 1 : 0;
+
       await ApiService.post(`/inventario/modelos/${selectedModelForColor.id}/colores`, {
         color: newColorName.trim(),
         imageUrl: finalImageUrl,
         serieIds: newColorSerieIds,
-        stockInicial: parseInt(newColorStockInicial) || 0,
+        stockInicial: effectiveStockInicialColor,
         seriesPrices: seriesPricesMap,
         customTallas: newColorCustomTallas,
         supplierId: newColorSupplierId || undefined,
@@ -1321,6 +1366,9 @@ export default function ModelosComponent({
         })
       );
 
+      const totalParesCreacion = Object.values(customTallas).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+      const effectiveStockInicialCreacion = totalParesCreacion > 0 ? 1 : 0;
+
       await ApiService.post("/inventario/modelos", {
         baseCode,
         name,
@@ -1330,7 +1378,7 @@ export default function ModelosComponent({
         salePrice: firstPrices.salePrice,
         colors: colorsWithImages,
         serieIds,
-        stockInicial: parseInt(stockInicial) || 0,
+        stockInicial: effectiveStockInicialCreacion,
         stockMinimo: 0,
         seriesPrices: seriesPricesMap,
         customTallas,
@@ -3066,20 +3114,56 @@ export default function ModelosComponent({
                                     }}
                                     className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
                                   >−1 par c/talla</button>
-                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium">= {selectedTallaIds.length} pares total</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium font-mono">= {selectedTallaIds.length} pares ({getDocenaLabelExt(selectedTallaIds.length)})</span>
                                 </div>
 
                                 {/* Preset de Curvas */}
-                                <div className="flex flex-wrap gap-1.5">
-                                  <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'DOCENA')}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
-                                  >Docena (12 pares)</button>
-                                  <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'MEDIA_A')}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
-                                  >Media Docena A (6 pares)</button>
-                                  <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'MEDIA_B')}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
-                                  >Media Docena B (6 pares)</button>
+                                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                                    Seleccionar Curva de Stock Inicial:
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'MEDIA_A')}
+                                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                        detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_A'
+                                          ? "border-amber-500 bg-amber-500 text-white shadow-xs"
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+                                      }`}
+                                    >
+                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_A' && <Check size={11} />}
+                                      Media Docena A (6 pares)
+                                    </button>
+                                    <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'MEDIA_B')}
+                                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                        detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_B'
+                                          ? "border-amber-500 bg-amber-500 text-white shadow-xs"
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+                                      }`}
+                                    >
+                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_B' && <Check size={11} />}
+                                      Media Docena B (6 pares)
+                                    </button>
+                                    <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'DOCENA')}
+                                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                        detectarTipoCurva(s.id, selectedTallaIds) === 'DOCENA'
+                                          ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+                                      }`}
+                                    >
+                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'DOCENA' && <Check size={11} />}
+                                      1 Docena Completa (12 pares)
+                                    </button>
+                                    <button type="button" onClick={() => aplicarCurvaEnCreacion(s.id, 'NINGUNA')}
+                                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                        detectarTipoCurva(s.id, selectedTallaIds) === 'NINGUNA'
+                                          ? "border-slate-600 bg-slate-700 text-white shadow-xs"
+                                          : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
+                                      }`}
+                                    >
+                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'NINGUNA' && <Check size={11} />}
+                                      Sin Stock Inicial (0 pares)
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -3090,14 +3174,55 @@ export default function ModelosComponent({
                   })}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 bg-[var(--muted)]/20 p-3.5 rounded-xl border border-[var(--border)]">
-                  <div>
-                    <Lbl t="Stock Físico por Talla (Por Defecto)" req />
-                    <input type="number" min="0" value={stockInicial} onChange={e => setStockInicial(e.target.value)} className="px-3 py-1.5 w-full bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none" />
+                <div className="bg-[var(--muted)]/20 border border-[var(--border)] p-3.5 sm:p-4 rounded-2xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)]/40 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                        <PackageCheck size={18} />
+                      </div>
+                      <div>
+                        <h6 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
+                          Stock Inicial por Talla y Curva
+                        </h6>
+                        <p className="text-[10px] text-[var(--muted-foreground)]">
+                          Selecciona el tipo de curva deseada para cada serie o aplica a todas
+                        </p>
+                      </div>
+                    </div>
+
+                    {serieIds.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] mr-1">Aplicar a todas:</span>
+                        <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('MEDIA_A')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media A (6)</button>
+                        <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('MEDIA_B')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media B (6)</button>
+                        <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('DOCENA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 cursor-pointer">1 Docena (12)</button>
+                        <button type="button" onClick={() => aplicarCurvaATodasEnCreacion('NINGUNA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-slate-500/30 bg-slate-500/10 text-slate-700 hover:bg-slate-500/20 cursor-pointer">Sin Stock (0)</button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center text-[10px] text-[var(--muted-foreground)] italic leading-relaxed">
-                    Cada talla de las series activadas se creará inicialmente con esta cantidad de stock.
-                  </div>
+
+                  {(() => {
+                    const totalParesLote = Object.values(customTallas).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+                    return (
+                      <div className="flex items-center gap-2.5 p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl">
+                        {totalParesLote > 0 ? (
+                          <>
+                            <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+                            <div className="text-xs text-[var(--foreground)] leading-relaxed">
+                              Se creará un stock inicial de <strong className="font-extrabold text-emerald-600">{totalParesLote} pares</strong> <span className="font-semibold text-[var(--muted-foreground)]">({getDocenaLabelExt(totalParesLote)})</span> por cada color generado.
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <Info size={16} className="text-slate-400 shrink-0" />
+                            <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                              <strong className="font-bold text-[var(--foreground)]">Sin stock inicial (0 pares):</strong> Se registrarán las variantes en el catálogo sin unidades físicas.
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -3415,20 +3540,56 @@ export default function ModelosComponent({
                                     }}
                                     className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
                                   >−1 par c/talla</button>
-                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium">= {selectedTallaIds.length} pares total</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium font-mono">= {selectedTallaIds.length} pares ({getDocenaLabelExt(selectedTallaIds.length)})</span>
                                 </div>
 
                                 {/* Preset de Curvas */}
-                                <div className="flex flex-wrap gap-1.5">
-                                  <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'DOCENA')}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
-                                  >Docena (12 pares)</button>
-                                  <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'MEDIA_A')}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
-                                  >Media Docena A (6 pares)</button>
-                                  <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'MEDIA_B')}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
-                                  >Media Docena B (6 pares)</button>
+                                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                                    Seleccionar Curva de Stock Inicial:
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'MEDIA_A')}
+                                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                        detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_A'
+                                          ? "border-amber-500 bg-amber-500 text-white shadow-xs"
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+                                      }`}
+                                    >
+                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_A' && <Check size={11} />}
+                                      Media Docena A (6 pares)
+                                    </button>
+                                    <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'MEDIA_B')}
+                                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                        detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_B'
+                                          ? "border-amber-500 bg-amber-500 text-white shadow-xs"
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+                                      }`}
+                                    >
+                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_B' && <Check size={11} />}
+                                      Media Docena B (6 pares)
+                                    </button>
+                                    <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'DOCENA')}
+                                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                        detectarTipoCurva(s.id, selectedTallaIds) === 'DOCENA'
+                                          ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+                                      }`}
+                                    >
+                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'DOCENA' && <Check size={11} />}
+                                      1 Docena Completa (12 pares)
+                                    </button>
+                                    <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'NINGUNA')}
+                                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                        detectarTipoCurva(s.id, selectedTallaIds) === 'NINGUNA'
+                                          ? "border-slate-600 bg-slate-700 text-white shadow-xs"
+                                          : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
+                                      }`}
+                                    >
+                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'NINGUNA' && <Check size={11} />}
+                                      Sin Stock Inicial (0 pares)
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -3439,14 +3600,55 @@ export default function ModelosComponent({
                   })}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 bg-[var(--muted)]/20 p-3.5 rounded-xl border border-[var(--border)]">
-                  <div>
-                    <Lbl t="Stock Físico por Talla (Por Defecto)" req />
-                    <input type="number" min="0" value={newColorStockInicial} onChange={e => setNewColorStockInicial(e.target.value)} className="px-3 py-1.5 w-full bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none" />
+                <div className="bg-[var(--muted)]/20 border border-[var(--border)] p-3.5 sm:p-4 rounded-2xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)]/40 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                        <PackageCheck size={18} />
+                      </div>
+                      <div>
+                        <h6 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
+                          Stock Inicial por Talla y Curva
+                        </h6>
+                        <p className="text-[10px] text-[var(--muted-foreground)]">
+                          Selecciona el tipo de curva deseada para cada serie o aplica a todas
+                        </p>
+                      </div>
+                    </div>
+
+                    {newColorSerieIds.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] mr-1">Aplicar a todas:</span>
+                        <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('MEDIA_A')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media A (6)</button>
+                        <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('MEDIA_B')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 cursor-pointer">Media B (6)</button>
+                        <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('DOCENA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 cursor-pointer">1 Docena (12)</button>
+                        <button type="button" onClick={() => aplicarCurvaATodasEnNuevoColor('NINGUNA')} className="px-2 py-0.5 text-[9px] font-bold rounded-md border border-slate-500/30 bg-slate-500/10 text-slate-700 hover:bg-slate-500/20 cursor-pointer">Sin Stock (0)</button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center text-[10px] text-[var(--muted-foreground)] italic leading-relaxed">
-                    Cada talla de las series activadas se creará inicialmente con esta cantidad de stock.
-                  </div>
+
+                  {(() => {
+                    const totalParesLote = Object.values(newColorCustomTallas).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+                    return (
+                      <div className="flex items-center gap-2.5 p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl">
+                        {totalParesLote > 0 ? (
+                          <>
+                            <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+                            <div className="text-xs text-[var(--foreground)] leading-relaxed">
+                              Se creará un stock inicial de <strong className="font-extrabold text-emerald-600">{totalParesLote} pares</strong> <span className="font-semibold text-[var(--muted-foreground)]">({getDocenaLabelExt(totalParesLote)})</span> para este nuevo color.
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <Info size={16} className="text-slate-400 shrink-0" />
+                            <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                              <strong className="font-bold text-[var(--foreground)]">Sin stock inicial (0 pares):</strong> Se registrará la variante en el catálogo sin unidades físicas.
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
