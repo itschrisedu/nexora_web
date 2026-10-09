@@ -3308,14 +3308,6 @@ export default function ModelosComponent({
                     <Truck size={14} className="text-emerald-600" />
                     <span>2. Proveedor / Taller Fabricante</span>
                   </h5>
-                  <button
-                    type="button"
-                    onClick={() => { setQsContext('addColor'); setShowQuickSupplier(true); }}
-                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition-colors cursor-pointer"
-                  >
-                    <Plus size={12} />
-                    <span>+ Registrar Nuevo Proveedor</span>
-                  </button>
                 </div>
                 <p className="text-[10px] text-[var(--muted-foreground)] -mt-1">
                   Selecciona el taller o proveedor que suministra esta variante. El precio de costo que ingreses abajo corresponderá al valor entregado por este proveedor.
