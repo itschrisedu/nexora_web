@@ -416,6 +416,7 @@ export default function ModelosComponent({
   const [knownSeriesCosts, setKnownSeriesCosts] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [editProductTallas, setEditProductTallas] = useState<{ tallaId: string; numero: number; cantidad: number }[]>([]);
   const [newTallaNumeroInput, setNewTallaNumeroInput] = useState("");
+  const [tallaInputError, setTallaInputError] = useState("");
 
   // ── Estado para modal de Edición del Modelo Base y sus Series ──
   const [showEditModel, setShowEditModel] = useState(false);
@@ -1449,17 +1450,23 @@ export default function ModelosComponent({
   };
 
   const handleAddCustomTallaToEdit = () => {
+    setTallaInputError("");
     const num = parseInt(newTallaNumeroInput);
     if (isNaN(num) || num < 10 || num > 60) {
-      setError("Ingresa un número de talla válido (ej: 38, 39, 44).");
+      const msg = "Ingresa un número de talla válido (ej: 38, 39, 44).";
+      setTallaInputError(msg);
+      setError(msg);
       return;
     }
     if (editProductTallas.some(t => t.numero === num)) {
-      setError(`La talla #${num} ya está en la lista.`);
+      const msg = `La talla #${num} ya está en la lista.`;
+      setTallaInputError(msg);
+      setError(msg);
       return;
     }
     setEditProductTallas(prev => [...prev, { tallaId: "", numero: num, cantidad: 0 }].sort((a, b) => a.numero - b.numero));
     setNewTallaNumeroInput("");
+    setTallaInputError("");
     setError("");
   };
 
@@ -1946,6 +1953,44 @@ export default function ModelosComponent({
           )}
         </div>
       </div>
+
+      {/* Toast Flotante en Primer Plano (z-[9999] por encima de cualquier modal o backdrop) */}
+      {(error || success) && (
+        <div className="fixed top-5 right-5 z-[9999] max-w-md w-[calc(100vw-40px)] sm:w-auto pointer-events-auto animate-in slide-in-from-top-3 fade-in duration-200">
+          {error && (
+            <div className="flex items-start justify-between gap-3 p-4 bg-red-950/95 border border-red-500/50 text-red-100 rounded-2xl shadow-2xl backdrop-blur-xl">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
+                <p className="text-xs font-semibold leading-relaxed">{error}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setError("")}
+                className="text-red-400 hover:text-white transition-colors p-1 rounded-lg cursor-pointer"
+                title="Cerrar notificación"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          )}
+          {success && (
+            <div className="flex items-start justify-between gap-3 p-4 bg-emerald-950/95 border border-emerald-500/50 text-emerald-100 rounded-2xl shadow-2xl backdrop-blur-xl">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                <p className="text-xs font-semibold leading-relaxed">{success}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccess("")}
+                className="text-emerald-400 hover:text-white transition-colors p-1 rounded-lg cursor-pointer"
+                title="Cerrar notificación"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {success && (
         <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-sm rounded-xl">
@@ -3668,6 +3713,18 @@ export default function ModelosComponent({
               </button>
             </div>
             <form onSubmit={handleUpdateProduct} className="p-5 space-y-4 overflow-y-auto flex-1">
+              {error && (
+                <div className="flex items-start justify-between gap-2.5 p-3.5 bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 text-xs rounded-2xl font-bold animate-in fade-in duration-150">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                  <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
               {/* Imagen */}
               <div>
                 <Lbl t="Imagen del Producto" />
@@ -3800,24 +3857,33 @@ export default function ModelosComponent({
                 )}
 
                 {/* Formulario rápido para añadir talla adicional a la numeración */}
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="number"
-                    min="10"
-                    max="60"
-                    placeholder="N° Talla (ej: 44)"
-                    value={newTallaNumeroInput}
-                    onChange={(e) => setNewTallaNumeroInput(e.target.value)}
-                    className="w-32 px-3 py-1.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-blue-600"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomTallaToEdit}
-                    className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-600 hover:text-white rounded-xl text-xs font-bold border border-blue-500/30 flex items-center gap-1 transition-all"
-                  >
-                    <Plus size={13} />
-                    <span>Añadir Talla</span>
-                  </button>
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="10"
+                      max="60"
+                      placeholder="N° Talla (ej: 44)"
+                      value={newTallaNumeroInput}
+                      onChange={(e) => { setNewTallaNumeroInput(e.target.value); setTallaInputError(""); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomTallaToEdit(); } }}
+                      className="w-32 px-3 py-1.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-blue-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomTallaToEdit}
+                      className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-600 hover:text-white rounded-xl text-xs font-bold border border-blue-500/30 flex items-center gap-1 transition-all cursor-pointer"
+                    >
+                      <Plus size={13} />
+                      <span>Añadir Talla</span>
+                    </button>
+                  </div>
+                  {tallaInputError && (
+                    <p className="text-[11px] font-bold text-red-500 flex items-center gap-1 animate-in fade-in duration-150">
+                      <AlertCircle size={12} className="shrink-0" />
+                      <span>{tallaInputError}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
