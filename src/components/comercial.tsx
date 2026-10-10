@@ -31,6 +31,7 @@ import {
   CreditCard,
   DollarSign,
   Layers,
+  UserPlus,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -39,6 +40,7 @@ import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.serv
 import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
 import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock } from '../utils/curvas';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import NuevoClienteModal from './ui/nuevo-cliente-modal';
 
 interface ComercialProps {
   online: boolean;
@@ -193,6 +195,18 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [esperandoDebounce, setEsperandoDebounce] = useState(false);
   const [showDropdownCliente, setShowDropdownCliente] = useState(false);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<any | null>(null);
+  const [showNuevoClienteModal, setShowNuevoClienteModal] = useState(false);
+
+  const handleClienteCreadoRapido = (nuevoCliente: any) => {
+    setListaClientes((prev) => [nuevoCliente, ...prev.filter((c) => c.id !== nuevoCliente.id)]);
+    setClientId(nuevoCliente.id);
+    setClienteSeleccionado(nuevoCliente);
+    setBusquedaCliente('');
+    setBusquedaDebounced('');
+    setShowDropdownCliente(false);
+    showToast(`¡Cliente ${nuevoCliente.nombre} registrado y seleccionado para el pedido!`, 'success');
+    loadListaClientes();
+  };
 
   // Catálogo de Productos y Líneas de Pedido
   const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
@@ -358,6 +372,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (showDiscardModal) return;
+      if (showNuevoClienteModal) {
+        e.preventDefault();
+        setShowNuevoClienteModal(false);
+        return;
+      }
       if (showNuevoTransporteModal) {
         e.preventDefault();
         safeDismiss(() => setShowNuevoTransporteModal(false), isDirtyNuevoTransporte());
@@ -2535,7 +2554,20 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">1. Datos del Cliente & Pago</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative sm:col-span-2">
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Cliente *</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)]">Cliente *</label>
+                      {!clienteSeleccionado && (
+                        <button
+                          type="button"
+                          onClick={() => setShowNuevoClienteModal(true)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                          title="Registrar cliente rápido sin salir del pedido"
+                        >
+                          <UserPlus size={13} />
+                          <span>+ Nuevo Cliente</span>
+                        </button>
+                      )}
+                    </div>
                     {clienteSeleccionado ? (() => {
                       const repSel = getClienteReputacion(clienteSeleccionado);
 
@@ -2600,26 +2632,37 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       );
                     })() : (
                       <div>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Escribe apellido, nombre o número de cédula..."
-                            value={busquedaCliente}
-                            onChange={(e) => {
-                              setBusquedaCliente(e.target.value);
-                              setShowDropdownCliente(true);
-                            }}
-                            onFocus={() => {
-                              if (listaClientes.length === 0) loadListaClientes();
-                              setShowDropdownCliente(true);
-                            }}
-                            className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] pr-24"
-                          />
-                          {esperandoDebounce && (
-                            <span className="absolute right-3 top-2.5 text-[10px] text-amber-600 flex items-center gap-1 font-semibold animate-pulse">
-                              <Loader2 size={12} className="animate-spin" /> Buscando en 3s...
-                            </span>
-                          )}
+                        <div className="flex gap-2 items-center">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              placeholder="Escribe apellido, nombre o número de cédula..."
+                              value={busquedaCliente}
+                              onChange={(e) => {
+                                setBusquedaCliente(e.target.value);
+                                setShowDropdownCliente(true);
+                              }}
+                              onFocus={() => {
+                                if (listaClientes.length === 0) loadListaClientes();
+                                setShowDropdownCliente(true);
+                              }}
+                              className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] pr-24"
+                            />
+                            {esperandoDebounce && (
+                              <span className="absolute right-3 top-2.5 text-[10px] text-amber-600 flex items-center gap-1 font-semibold animate-pulse">
+                                <Loader2 size={12} className="animate-spin" /> Buscando en 3s...
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowNuevoClienteModal(true)}
+                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer h-[38px]"
+                            title="Registrar nuevo cliente"
+                          >
+                            <UserPlus size={14} />
+                            <span className="hidden sm:inline">Nuevo</span>
+                          </button>
                         </div>
 
                         {showDropdownCliente && busquedaCliente.trim().length > 0 && (
@@ -2670,8 +2713,21 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   (c.telefono && c.telefono.toLowerCase().includes(q))
                                 );
                               }).length === 0 && (
-                                <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
-                                  No se encontraron clientes con "{busquedaDebounced}".
+                                <div className="p-4 text-center space-y-2.5 bg-slate-50/50 dark:bg-slate-900/50">
+                                  <p className="text-xs text-[var(--muted-foreground)]">
+                                    No se encontraron clientes con "{busquedaDebounced}".
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowDropdownCliente(false);
+                                      setShowNuevoClienteModal(true);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer"
+                                  >
+                                    <UserPlus size={14} />
+                                    <span>Registrar a "{busquedaCliente}" como Nuevo Cliente</span>
+                                  </button>
                                 </div>
                               )}
                           </div>
@@ -5300,6 +5356,17 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           </div>
         </div>
       )}
+
+      {/* Modal para Crear Nuevo Cliente de forma Rápida e Inmediata */}
+      <NuevoClienteModal
+        isOpen={showNuevoClienteModal}
+        onClose={() => setShowNuevoClienteModal(false)}
+        onClienteCreado={handleClienteCreadoRapido}
+        online={online}
+        activeSucursalId={activeSucursalId}
+        initialBusqueda={busquedaCliente}
+        zIndexClass="z-[70]"
+      />
 
       {/* Modal de confirmación de descarte de cambios */}
       <UnsavedChangesModal

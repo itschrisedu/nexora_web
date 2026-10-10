@@ -1101,15 +1101,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     // Si hubo entrega de calzado en este movimiento
     if (montoComprasHoy > 0) {
-      msg += `\n\n*Entrega de Calzado / Mercadería Nueva:*`;
+      msg += `\n\n📦 *Entrega de Calzado / Mercadería Nueva:*`;
       cobrosDeHoy.forEach((c) => {
-        const num = c.saleNote?.numero ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}` : (c.numeroCobro || 'Nota');
         const monto = Number(c.montoOriginal || c.montoTotal || 0);
         const lineas = c.lines || c.saleNote?.lines || [];
         const modelos = agruparLineasPorModelo(lineas, catalogoProductos);
 
         if (modelos.length > 0) {
-          msg += `\n• *${num}* (Total: $${monto.toFixed(2)}):`;
           modelos.forEach((m) => {
             const colorStr = m.color ? ` (${m.color})` : '';
             const serieStr = m.serieNombre && m.serieNombre !== 'Estándar' && m.serieNombre !== 'General' ? ` • ${m.serieNombre}` : '';
@@ -1118,9 +1116,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             msg += `\n   ▫️ ${m.modelName}${colorStr}${serieStr}\n      ${volStr}${tallasStr} • $${m.subtotal.toFixed(2)}`;
           });
         } else {
-          msg += `\n• ${num} - Valor: $${monto.toFixed(2)}`;
+          msg += `\n   ▫️ Mercadería entregada • $${monto.toFixed(2)}`;
         }
       });
+      msg += `\n   💰 *Subtotal mercadería:* $${montoComprasHoy.toFixed(2)}`;
       if (saldoAnterior > 0) {
         msg += `\n\n*Total a la fecha:* $${subtotalConCompra.toFixed(2)}`;
       }

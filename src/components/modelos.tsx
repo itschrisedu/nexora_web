@@ -143,6 +143,7 @@ interface ModeloMatriz {
 interface ColorInput {
   color: string;
   foto: string | null;
+  supplierId?: string;
 }
 
 interface SerieTallaConfig {
@@ -373,7 +374,7 @@ export default function ModelosComponent({
   };
   const [brand, setBrand] = useState("");
   const [material, setMaterial] = useState("");
-  const [colors, setColors] = useState<ColorInput[]>([{ color: "", foto: null }]);
+  const [colors, setColors] = useState<ColorInput[]>([{ color: "", foto: null, supplierId: "" }]);
   const [serieIds, setSerieIds] = useState<string[]>([]);
   // Soporte para modelos heredables de la Matriz (Sucursales)
   const [isMatrizTenant, setIsMatrizTenant] = useState(true);
@@ -593,7 +594,25 @@ export default function ModelosComponent({
         ApiService.get("/inventario/modelos").catch(() => []),
         ApiService.get("/inventario/modelos/red").catch(() => null),
       ]);
-      setModelos(Array.isArray(mdls) ? mdls : []);
+      if (Array.isArray(mdls)) {
+        setModelos(mdls);
+        const costMap: Record<string, { costPrice: string; salePrice: string }> = {};
+        mdls.forEach((m: any) => {
+          (m.products || []).forEach((p: any) => {
+            const sid = (p.serie as any)?.id || (p as any).serieId;
+            const supId = p.supplierId || (p.supplier as any)?.id || m.supplierId || 'default';
+            if (sid && p.precioCosto > 0) {
+              costMap[`${sid}_${supId}`] = { costPrice: String(p.precioCosto), salePrice: String(p.precioVenta) };
+              if (!costMap[sid]) {
+                costMap[sid] = { costPrice: String(p.precioCosto), salePrice: String(p.precioVenta) };
+              }
+            }
+          });
+        });
+        setKnownSeriesCosts(prev => ({ ...costMap, ...prev }));
+      } else {
+        setModelos([]);
+      }
 
       if (redRes) {
         setIsMatrizTenant(Boolean(redRes.isMatriz));
@@ -643,7 +662,7 @@ export default function ModelosComponent({
     setMaterial("");
     setSupplierId("");
     setCreateAlternateIds([]);
-    setColors([{ color: "", foto: null }]);
+    setColors([{ color: "", foto: null, supplierId: "" }]);
     setSerieIds([]);
     setSeriesPrices({});
     setCustomTallas({});
@@ -803,7 +822,7 @@ export default function ModelosComponent({
   };
 
   const addColorField = () => {
-    setColors(prev => [...prev, { color: "", foto: null }]);
+    setColors(prev => [...prev, { color: "", foto: null, supplierId: "" }]);
   };
 
   const removeColorField = (index: number) => {
@@ -984,23 +1003,33 @@ export default function ModelosComponent({
     setNewColorSupplierId(newSupId);
     if (!selectedModelForColor) return;
 
-    // Actualizar los precios para cada serie activa según el historial de este proveedor en el modelo
+    // Actualizar los precios para cada serie activa según el historial de este proveedor en el modelo o en knownSeriesCosts
     setNewColorSeriesPrices(prev => {
       const updated = { ...prev };
       newColorSerieIds.forEach(sid => {
+        const cacheKey = `${sid}_${newSupId || 'default'}`;
         const matchingProd = selectedModelForColor.products?.find(
-          p => (p.supplierId === newSupId || p.supplier?.id === newSupId) && p.serie?.id === sid
+          p => (p.supplierId === newSupId || (p.supplier as any)?.id === newSupId) && ((p.serie as any)?.id === sid || (p as any).serieId === sid)
         );
+
         if (matchingProd && matchingProd.precioCosto > 0) {
           updated[sid] = {
             costPrice: String(matchingProd.precioCosto),
             salePrice: String(matchingProd.precioVenta),
           };
-        } else {
+        } else if (knownSeriesCosts[cacheKey]) {
           updated[sid] = {
-            costPrice: "",
-            salePrice: "",
+            costPrice: knownSeriesCosts[cacheKey].costPrice,
+            salePrice: knownSeriesCosts[cacheKey].salePrice,
           };
+        } else if (!newSupId || newSupId === selectedModelForColor.supplierId) {
+          const baseProd = selectedModelForColor.products?.find(p => ((p.serie as any)?.id === sid || (p as any).serieId === sid));
+          if (baseProd && baseProd.precioCosto > 0) {
+            updated[sid] = {
+              costPrice: String(baseProd.precioCosto),
+              salePrice: String(baseProd.precioVenta),
+            };
+          }
         }
       });
       return updated;
@@ -1362,6 +1391,7 @@ export default function ModelosComponent({
           return {
             color: c.color,
             imageUrl: imgUrl,
+            supplierId: c.supplierId || supplierId || undefined,
           };
         })
       );
@@ -1621,7 +1651,8 @@ export default function ModelosComponent({
         activeSerieIds.push(sid);
       }
       if (sid) {
-        if (!initialPrices[sid]) {
+        const isPrimarySup = !p.supplierId || p.supplierId === m.supplierId;
+        if (!initialPrices[sid] || isPrimarySup) {
           initialPrices[sid] = {
             costPrice: p.precioCosto ? String(p.precioCosto) : "",
             salePrice: p.precioVenta ? String(p.precioVenta) : "",
@@ -1735,19 +1766,26 @@ export default function ModelosComponent({
         alternateSupplierIds: editModelAlternateIds.filter(Boolean),
       });
 
-      // Actualizar precios y serie en las variantes existentes
+      // Actualizar precios y serie SOLO en las variantes que corresponden al proveedor principal o sin proveedor específico
+      // NUNCA sobreescribir el costo/precio de variantes que tienen proveedores alternos con sus propios costos distintos
       for (const p of editModel.products || []) {
         const sid = (p.serie as any)?.id || (p as any).serieId;
         if (sid && editModelSerieIds.includes(sid)) {
-          const prices = editModelSeriesPrices[sid];
-          const costVal = parseFloat(prices?.costPrice || String(p.precioCosto));
-          const saleVal = parseFloat(prices?.salePrice || String(p.precioVenta));
+          const pSupId = p.supplierId || (p.supplier as any)?.id;
+          const isPrimaryOrUnassigned = !pSupId || pSupId === editModel.supplierId || pSupId === editModelSupplierId;
 
-          await ApiService.put(`/inventario/productos/${p.id}`, {
-            serieId: sid,
-            costPrice: isNaN(costVal) ? Number(p.precioCosto) : costVal,
-            salePrice: isNaN(saleVal) ? Number(p.precioVenta) : saleVal,
-          });
+          if (isPrimaryOrUnassigned) {
+            const prices = editModelSeriesPrices[sid];
+            const costVal = parseFloat(prices?.costPrice || String(p.precioCosto));
+            const saleVal = parseFloat(prices?.salePrice || String(p.precioVenta));
+
+            await ApiService.put(`/inventario/productos/${p.id}`, {
+              serieId: sid,
+              costPrice: isNaN(costVal) ? Number(p.precioCosto) : costVal,
+              salePrice: isNaN(saleVal) ? Number(p.precioVenta) : saleVal,
+              supplierId: editModelSupplierId || null,
+            });
+          }
         }
       }
 
@@ -2933,6 +2971,25 @@ export default function ModelosComponent({
                           <input type="file" accept="image/*" onChange={e => handleFoto(idx, e)}
                             className="w-full text-[10px] text-[var(--muted-foreground)] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-900 file:text-white file:text-[9px] file:font-semibold hover:file:opacity-90 cursor-pointer" />
                         </div>
+                        {/* Selector opcional de taller para este color */}
+                        {listaProveedores.length > 0 && (
+                          <div className="pt-1">
+                            <select
+                              value={cInput.supplierId || ""}
+                              onChange={e => setColors(prev => {
+                                const copy = [...prev];
+                                copy[idx].supplierId = e.target.value;
+                                return copy;
+                              })}
+                              className="w-full px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-[11px] text-[var(--foreground)]"
+                            >
+                              <option value="">-- Proveedor Principal del Modelo --</option>
+                              {listaProveedores.map(p => (
+                                <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -3317,7 +3374,7 @@ export default function ModelosComponent({
                   <div className="flex gap-2">
                     <select
                       value={newColorSupplierId}
-                      onChange={e => setNewColorSupplierId(e.target.value)}
+                      onChange={e => handleSupplierChangeInAddColor(e.target.value)}
                       className={`${INPUT} flex-1 font-medium`}
                     >
                       <option value="">-- Sin proveedor específico (Heredar del modelo) --</option>

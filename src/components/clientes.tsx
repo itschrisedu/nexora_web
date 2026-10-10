@@ -792,24 +792,42 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     setTimeout(() => setCopiadoId(null), 3000);
   };
 
-  // Filtrado Directorio
-  const filtered = clientes.filter(c => {
-    const q = search.toLowerCase();
-    const fullName = `${c.nombre || ""} ${c.apellido || ""}`.toLowerCase();
-    return (
-      fullName.includes(q) ||
-      (c.cedula && c.cedula.includes(q)) ||
-      (c.ruc && c.ruc.includes(q)) ||
-      (c.telefono && c.telefono.includes(q)) ||
-      (c.email && c.email.toLowerCase().includes(q))
-    );
-  });
+  // Filtrado y Ordenamiento Alfabético por Apellido (Directorio)
+  const filtered = clientes
+    .filter(c => {
+      const q = search.toLowerCase();
+      const fullName = `${c.nombre || ""} ${c.apellido || ""}`.toLowerCase();
+      return (
+        fullName.includes(q) ||
+        (c.cedula && c.cedula.includes(q)) ||
+        (c.ruc && c.ruc.includes(q)) ||
+        (c.telefono && c.telefono.includes(q)) ||
+        (c.email && c.email.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      const apellidoA = (a.apellido || a.nombre || "").trim().toLowerCase();
+      const apellidoB = (b.apellido || b.nombre || "").trim().toLowerCase();
+      const comp = apellidoA.localeCompare(apellidoB, "es", { sensitivity: "base" });
+      if (comp !== 0) return comp;
+      const nombreA = (a.nombre || "").trim().toLowerCase();
+      const nombreB = (b.nombre || "").trim().toLowerCase();
+      return nombreA.localeCompare(nombreB, "es", { sensitivity: "base" });
+    });
 
-  // Filtrado Inactivos
-  const inactivosFiltrados = inactivos.filter(c => {
-    if (filtroRangoInactivo === 'TODOS') return true;
-    return c.rangoInactividad === filtroRangoInactivo;
-  });
+  // Filtrado e Inactivos ordenados
+  const inactivosFiltrados = inactivos
+    .filter(c => {
+      if (filtroRangoInactivo === 'TODOS') return true;
+      return c.rangoInactividad === filtroRangoInactivo;
+    })
+    .sort((a, b) => {
+      const apellidoA = (a.apellido || a.nombre || "").trim().toLowerCase();
+      const apellidoB = (b.apellido || b.nombre || "").trim().toLowerCase();
+      const comp = apellidoA.localeCompare(apellidoB, "es", { sensitivity: "base" });
+      if (comp !== 0) return comp;
+      return (a.nombre || "").trim().toLowerCase().localeCompare((b.nombre || "").trim().toLowerCase(), "es", { sensitivity: "base" });
+    });
 
   return (
     <div className="space-y-5">
