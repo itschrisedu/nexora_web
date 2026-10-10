@@ -2,6 +2,23 @@ import { jsPDF } from 'jspdf';
 import { generarUrlPublicaAbono } from './comprobante-url.service';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 
+export interface EntregaItemDetalle {
+  modelo: string;
+  color?: string;
+  serie?: string;
+  tallas?: string; // Ej: "T38: 1, T39: 2, T40: 1"
+  cantidadPares: number;
+  etiquetaVolumen?: string; // Ej: "1 Docena" o "4 pares"
+  precioUnitario?: number;
+  subtotal: number;
+}
+
+export interface EntregaHoyDetalle {
+  nota: string;
+  monto: number;
+  items?: EntregaItemDetalle[];
+}
+
 export interface ComprobanteAbonoPdfData {
   emisor: {
     nombre: string;
@@ -36,10 +53,7 @@ export interface ComprobanteAbonoPdfData {
     montoAbonado: number;
     saldoRestante: number;
     totalNotasPendientes?: number;
-    entregasHoy?: {
-      nota: string;
-      monto: number;
-    }[];
+    entregasHoy?: EntregaHoyDetalle[];
   };
 }
 
@@ -156,15 +170,32 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(51, 65, 85);
-    doc.text('MOVIMIENTOS / ENTREGAS ASOCIADAS', 16, y + 4.5);
+    doc.text('MOVIMIENTOS / ENTREGAS DE CALZADO ASOCIADAS', 16, y + 4.5);
     y += 9;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.8);
     data.movimiento.entregasHoy.forEach((e) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(15, 23, 42);
       doc.text(`• ${e.nota}`, 16, y);
       doc.text(`$${e.monto.toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
-      y += 5;
+      y += 4.5;
+
+      if (e.items && e.items.length > 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.2);
+        doc.setTextColor(71, 85, 105);
+        e.items.forEach((item) => {
+          const colorStr = item.color ? ` (${item.color})` : '';
+          const tallasStr = item.tallas ? ` [${item.tallas}]` : '';
+          const volStr = item.etiquetaVolumen || `${item.cantidadPares} pares`;
+          const lineaDesc = `    ▫ ${item.modelo}${colorStr} • ${volStr}${tallasStr}`;
+          doc.text(lineaDesc, 18, y);
+          doc.text(`$${item.subtotal.toFixed(2)}`, pageWidth - 20, y, { align: 'right' });
+          y += 4;
+        });
+      }
+      y += 1.5;
     });
     y += 2;
   }
@@ -182,6 +213,14 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
 
   const totalEntregasHoy = (data.movimiento.entregasHoy || []).reduce((acc, curr) => acc + curr.monto, 0);
 
+  const descEntregas = (data.movimiento.entregasHoy || []).map((e) => {
+    if (e.items && e.items.length > 0) {
+      const prods = e.items.map((it) => `${it.modelo}${it.color ? ` (${it.color})` : ''} - ${it.etiquetaVolumen || `${it.cantidadPares}p`}`).join(', ');
+      return `${e.nota}: ${prods} ($${e.monto.toFixed(2)})`;
+    }
+    return `${e.nota} ($${e.monto.toFixed(2)})`;
+  }).join(' • ');
+
   const filas: Array<{ concepto: string; desc: string; monto: number; tipo: 'NORMAL' | 'ENTREGA' | 'ABONO' | 'SALDO_FINAL' }> = [
     {
       concepto: 'Saldo Anterior Adeudado por el Cliente',
@@ -194,7 +233,7 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   if (totalEntregasHoy > 0 && data.movimiento.entregasHoy) {
     filas.push({
       concepto: '(+) Entrega de Calzado / Mercadería Nueva',
-      desc: data.movimiento.entregasHoy.map((e) => `${e.nota} ($${e.monto.toFixed(2)})`).join(' • '),
+      desc: descEntregas,
       monto: totalEntregasHoy,
       tipo: 'ENTREGA',
     });
@@ -370,9 +409,20 @@ export async function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, i
   }
 
   if (tieneEntregas && data.movimiento.entregasHoy) {
-    msg += `📦 *Entrega de Calzado / Mercadería:*\n`;
+    msg += `📦 *Entrega de Calzado / Mercadería Nueva:*\n`;
     data.movimiento.entregasHoy.forEach((e) => {
-      msg += `   • ${e.nota} - Valor: $${e.monto.toFixed(2)}\n`;
+      if (e.items && e.items.length > 0) {
+        msg += `   • *${e.nota}* (Total: $${e.monto.toFixed(2)}):\n`;
+        e.items.forEach((it) => {
+          const colorStr = it.color ? ` (${it.color})` : '';
+          const serieStr = it.serie && it.serie !== 'Estándar' && it.serie !== 'General' ? ` • ${it.serie}` : '';
+          const tallasStr = it.tallas ? ` [${it.tallas}]` : '';
+          const volStr = it.etiquetaVolumen || `${it.cantidadPares} ${it.cantidadPares === 1 ? 'par' : 'pares'}`;
+          msg += `     ▫️ ${it.modelo}${colorStr}${serieStr}\n        ${volStr}${tallasStr} • $${it.subtotal.toFixed(2)}\n`;
+        });
+      } else {
+        msg += `   • ${e.nota} - Valor: $${e.monto.toFixed(2)}\n`;
+      }
     });
     if (data.movimiento.saldoAnterior > 0) {
       const subtotalConCompra = data.movimiento.saldoAnterior + totalEntregas;

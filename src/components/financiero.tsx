@@ -940,10 +940,30 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     // Cobros/entregas de hoy
     const cobrosDeHoy = cartera.cobros.filter((c) => c.createdAt && c.createdAt.startsWith(hoyStr));
     const montoComprasHoy = cobrosDeHoy.reduce((sum, c) => sum + Number(c.montoOriginal || c.montoTotal || 0), 0);
-    const entregasHoy = cobrosDeHoy.map((c) => ({
-      nota: c.saleNote?.numero ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}` : (c.numeroCobro || 'Nota de Venta'),
-      monto: Number(c.montoOriginal || c.montoTotal || 0),
-    }));
+    const entregasHoy = cobrosDeHoy.map((c) => {
+      const lineas = c.lines || c.saleNote?.lines || [];
+      const modelos = agruparLineasPorModelo(lineas, catalogoProductos);
+
+      const items = modelos.map((m) => {
+        const tallasStr = m.tallas.map((t) => `T${t.numero}: ${t.cantidad}`).join(', ');
+        return {
+          modelo: m.modelName,
+          color: m.color,
+          serie: m.serieNombre,
+          tallas: tallasStr,
+          cantidadPares: m.totalPares,
+          etiquetaVolumen: m.etiquetaVolumen,
+          precioUnitario: m.precioUnitario,
+          subtotal: m.subtotal,
+        };
+      });
+
+      return {
+        nota: c.saleNote?.numero ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}` : (c.numeroCobro || 'Nota de Entrega'),
+        monto: Number(c.montoOriginal || c.montoTotal || 0),
+        items: items.length > 0 ? items : undefined,
+      };
+    });
 
     // Saldos
     const saldoRestante = Math.max(0, cartera.saldoTotalPendiente - abonoInfo.monto);
@@ -1081,14 +1101,28 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     // Si hubo entrega de calzado en este movimiento
     if (montoComprasHoy > 0) {
-      msg += `\n\n*Entrega de Calzado:*`;
+      msg += `\n\n*Entrega de Calzado / Mercadería Nueva:*`;
       cobrosDeHoy.forEach((c) => {
         const num = c.saleNote?.numero ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}` : (c.numeroCobro || 'Nota');
         const monto = Number(c.montoOriginal || c.montoTotal || 0);
-        msg += `\n• ${num} - Valor: $${monto.toFixed(2)}`;
+        const lineas = c.lines || c.saleNote?.lines || [];
+        const modelos = agruparLineasPorModelo(lineas, catalogoProductos);
+
+        if (modelos.length > 0) {
+          msg += `\n• *${num}* (Total: $${monto.toFixed(2)}):`;
+          modelos.forEach((m) => {
+            const colorStr = m.color ? ` (${m.color})` : '';
+            const serieStr = m.serieNombre && m.serieNombre !== 'Estándar' && m.serieNombre !== 'General' ? ` • ${m.serieNombre}` : '';
+            const tallasStr = m.tallas.length > 0 ? ` [${m.tallas.map((t) => `T${t.numero}: ${t.cantidad}`).join(', ')}]` : '';
+            const volStr = m.etiquetaVolumen || `${m.totalPares} ${m.totalPares === 1 ? 'par' : 'pares'}`;
+            msg += `\n   ▫️ ${m.modelName}${colorStr}${serieStr}\n      ${volStr}${tallasStr} • $${m.subtotal.toFixed(2)}`;
+          });
+        } else {
+          msg += `\n• ${num} - Valor: $${monto.toFixed(2)}`;
+        }
       });
       if (saldoAnterior > 0) {
-        msg += `\n*Total a la fecha:* $${subtotalConCompra.toFixed(2)}`;
+        msg += `\n\n*Total a la fecha:* $${subtotalConCompra.toFixed(2)}`;
       }
     }
 
