@@ -586,6 +586,20 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   }, [clientId, selectedProductId, online]);
 
   const [businessConfig, setBusinessConfig] = useState<any | null>(null);
+  const [sucursalesEmpresa, setSucursalesEmpresa] = useState<any[]>([]);
+
+  const loadSucursales = async () => {
+    try {
+      if (online) {
+        const data = await ApiService.get('/configuracion/sucursales');
+        if (Array.isArray(data) && data.length > 0) {
+          setSucursalesEmpresa(data);
+        }
+      }
+    } catch (e) {
+      console.warn('Error cargando sucursales de la empresa:', e);
+    }
+  };
 
   useEffect(() => {
     loadPedidos();
@@ -595,6 +609,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     loadSeriesConfig();
     loadListaProveedores();
     loadTransportes();
+    loadSucursales();
 
     if (activeSucursalId && activeSucursalId !== 'TODAS') {
       setSelectedSucursalPedidoId(activeSucursalId);
@@ -1963,8 +1978,13 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   // ── Lista Dinámica de Sucursales para Pedidos ─────────
   const listaSucursalesDisponibles = (() => {
     const map = new Map<string, { id: string; name: string; isMatriz: boolean }>();
+    if (sucursalesEmpresa && sucursalesEmpresa.length > 0) {
+      sucursalesEmpresa.forEach((s) => map.set(s.id, { id: s.id, name: s.name, isMatriz: !!s.isMatriz }));
+    }
     if (sucursales && sucursales.length > 0) {
-      sucursales.forEach((s) => map.set(s.id, s));
+      sucursales.forEach((s) => {
+        if (!map.has(s.id)) map.set(s.id, { id: s.id, name: s.name, isMatriz: !!s.isMatriz });
+      });
     }
     pedidos.forEach((p) => {
       const pTenantId = (p as any).tenantId;
@@ -2049,54 +2069,62 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       </div>
 
       {/* Pestañas Dinámicas de Sucursal & Filtros de Estado */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Pestañas de Sucursal Dinámicas por Nombre */}
+      <div className="space-y-2.5">
+        {/* Pestañas de Sucursal Dinámicas por Nombre (Una pestaña por cada sucursal del negocio) */}
         {listaSucursalesDisponibles.length >= 1 && (
-          <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
-            {listaSucursalesDisponibles.map((suc) => {
-              const isSelected = selectedSucursalPedidoId === suc.id;
-              const isMiLocal = activeSucursalId === suc.id;
-              const countPedidos = pedidos.filter((p) => (p as any).tenantId === suc.id || (!(p as any).tenantId && suc.isMatriz)).length;
-              const esOtra = !isMiLocal;
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted-foreground)] shrink-0 hidden sm:inline-block">
+              Sucursal:
+            </span>
+            <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1.5">
+              {listaSucursalesDisponibles.map((suc) => {
+                const isSelected = selectedSucursalPedidoId === suc.id;
+                const isMiLocal = activeSucursalId === suc.id;
+                const countPedidos = pedidos.filter((p) => (p as any).tenantId === suc.id || (!(p as any).tenantId && suc.isMatriz)).length;
+                const esOtra = !isMiLocal;
 
-              return (
-                <button
-                  key={suc.id}
-                  type="button"
-                  onClick={() => setSelectedSucursalPedidoId(suc.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    isSelected
-                      ? (esOtra ? 'bg-amber-600 text-white shadow-sm font-black' : 'bg-[#0F172A] text-white shadow-sm font-black')
-                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
-                  }`}
-                >
-                  <Building size={13} className={isSelected ? (esOtra ? 'text-amber-200' : 'text-emerald-400') : 'text-slate-400'} />
-                  <span>{suc.name}</span>
-                  {isMiLocal && (
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
-                      isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                return (
+                  <button
+                    key={suc.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSucursalPedidoId(suc.id);
+                      setSelectedOrderSucursalId(suc.id);
+                    }}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? (esOtra ? 'bg-amber-600 text-white shadow-sm font-black ring-2 ring-amber-400/40' : 'bg-[#0F172A] text-white shadow-sm font-black ring-2 ring-slate-400/40')
+                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                    }`}
+                  >
+                    <Building size={13} className={isSelected ? (esOtra ? 'text-amber-200' : 'text-emerald-400') : 'text-slate-400'} />
+                    <span>{suc.name}</span>
+                    {isMiLocal && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                        isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      }`}>
+                        Mi Local
+                      </span>
+                    )}
+                    {esOtra && isSelected && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-amber-400/30 text-amber-100">
+                        Otra Sucursal
+                      </span>
+                    )}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
                     }`}>
-                      Mi Local
+                      {countPedidos}
                     </span>
-                  )}
-                  {esOtra && isSelected && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-amber-400/30 text-amber-100">
-                      Otra Sucursal
-                    </span>
-                  )}
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                    isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
-                  }`}>
-                    {countPedidos}
-                  </span>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* Filtros de Estado */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        {/* Filtros de Estado: autoajustables en la siguiente línea */}
+        <div className="flex flex-wrap items-center gap-1.5 w-full pt-0.5">
           <button
             onClick={() => setFiltroEstado('TODOS')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -2885,36 +2913,73 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                     </select>
                   </div>
 
-                  {/* Selector de Sucursal de Emisión y Despacho */}
-                  {sucursales && sucursales.length > 0 && (
+                  {/* Selector Elegante de Sucursal de Emisión y Despacho (Pestañas tipo píldora, sin menú desplegable) */}
+                  {listaSucursalesDisponibles.length > 1 ? (
                     <div>
                       <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 flex items-center gap-1.5">
                         <Building size={12} className="text-emerald-500" />
                         <span>Sucursal de Emisión y Despacho</span>
                       </label>
-                      <select
-                        value={selectedOrderSucursalId || (activeSucursalId !== 'TODAS' ? activeSucursalId : (sucursales[0]?.id || ''))}
-                        onChange={(e) => {
-                          const nuevaSucursalId = e.target.value;
-                          setSelectedOrderSucursalId(nuevaSucursalId);
-                          setSelectedProductId('');
-                          setProductoSeleccionadoObj(null);
-                          setBusquedaModelo('');
-                          setPrecioItem(0);
-                          setPrecioItemInput('');
-                          setTallaCantidadesMap({});
-                          cargarCatalogo(nuevaSucursalId);
-                        }}
-                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-[var(--foreground)] focus:outline-none focus:border-emerald-500 min-h-[42px]"
-                      >
-                        {sucursales.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            🏢 {s.name} {s.id === activeSucursalId ? '(Local Actual)' : ''}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex flex-wrap gap-1.5 p-1 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] min-h-[42px] items-center">
+                        {listaSucursalesDisponibles.map((s) => {
+                          const currentSelected = selectedOrderSucursalId || selectedSucursalPedidoId || (activeSucursalId !== 'TODAS' ? activeSucursalId : s.id);
+                          const isSel = currentSelected === s.id;
+                          const isMiLocal = s.id === activeSucursalId;
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedOrderSucursalId(s.id);
+                                setSelectedProductId('');
+                                setProductoSeleccionadoObj(null);
+                                setBusquedaModelo('');
+                                setPrecioItem(0);
+                                setPrecioItemInput('');
+                                setTallaCantidadesMap({});
+                                cargarCatalogo(s.id);
+                              }}
+                              className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                isSel
+                                  ? 'bg-[#0F172A] text-white shadow-xs font-black'
+                                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                              }`}
+                            >
+                              <Building size={13} className={isSel ? 'text-emerald-400' : 'text-slate-400'} />
+                              <span>{s.name}</span>
+                              {isMiLocal ? (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                                  isSel ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                }`}>
+                                  Mi Local
+                                </span>
+                              ) : (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                                  isSel ? 'bg-amber-400/30 text-amber-200' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                                }`}>
+                                  Otra
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  )}
+                  ) : listaSucursalesDisponibles.length === 1 ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 flex items-center gap-1.5">
+                        <Building size={12} className="text-emerald-500" />
+                        <span>Sucursal de Emisión</span>
+                      </label>
+                      <div className="flex items-center gap-2 px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] min-h-[42px]">
+                        <Building size={14} className="text-emerald-500" />
+                        <span>{listaSucursalesDisponibles[0].name}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                          Local Actual
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {/* Detalle de Pago de Contado */}
                   {tipoPago === 'CONTADO' && (
