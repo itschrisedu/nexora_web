@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from 'react';
 import { ApiService } from '../services/api.service';
 import { db } from '../db/local-db';
 import { SyncService } from '../services/sync.service';
@@ -431,11 +431,27 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [validandoCupon, setValidandoCupon] = useState(false);
   const [cuponErrorMsg, setCuponErrorMsg] = useState('');
 
-  // Búsqueda interactiva de Modelos de productos
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
   const [productoSeleccionadoObj, setProductoSeleccionadoObj] = useState<any | null>(null);
   const [serieFiltroBuscador, setSerieFiltroBuscador] = useState<string>('TODAS');
+
+  // Mapa de cantidad total de pares vendidos por variante para ordenar de más vendidas a menos vendidas
+  const ventasPorVarianteMap = useMemo(() => {
+    const map = new Map<string, number>();
+    pedidos.forEach((ped) => {
+      if (ped.estado === 'CANCELADO') return;
+      (ped.lines || []).forEach((l: any) => {
+        const cant = Number(l.cantidad) || 1;
+        if (l.productId) {
+          map.set(l.productId, (map.get(l.productId) || 0) + cant);
+        }
+        const modelKey = `${(l.modelName || '').toLowerCase().trim()}_${(l.color || '').toLowerCase().trim()}`;
+        map.set(modelKey, (map.get(modelKey) || 0) + cant);
+      });
+    });
+    return map;
+  }, [pedidos]);
 
   // Consulta de Stock Inter-Sucursal en Punto de Venta
   const [stockInterSucursalResult, setStockInterSucursalResult] = useState<any[]>([]);
@@ -3396,7 +3412,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                               type="button"
                               onClick={() => {
                                 setSerieFiltroBuscador('TODAS');
-                                if (busquedaModelo.trim().length > 0) setShowDropdownModelo(true);
+                                if (busquedaModelo.trim().length > 0) {
+                                  setShowDropdownModelo(true);
+                                } else {
+                                  setShowDropdownModelo(false);
+                                }
                               }}
                               className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
                                 serieFiltroBuscador === 'TODAS'
@@ -3419,7 +3439,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   onClick={() => {
                                     const nueva = isActiva ? 'TODAS' : ser;
                                     setSerieFiltroBuscador(nueva);
-                                    setShowDropdownModelo(true);
+                                    if (busquedaModelo.trim().length > 0) {
+                                      setShowDropdownModelo(true);
+                                    } else {
+                                      setShowDropdownModelo(false);
+                                    }
                                   }}
                                   className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                                     isActiva
@@ -3515,102 +3539,137 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       <div className="relative">
                         <input
                           type="text"
-                          placeholder={serieFiltroBuscador !== 'TODAS' ? `Filtrando por serie ${serieFiltroBuscador}... (ej. Mocasín, Negro)` : "Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."}
+                          placeholder={
+                            serieFiltroBuscador !== 'TODAS'
+                              ? `Serie ${serieFiltroBuscador} seleccionada: escribe el modelo (ej. Mocasín, Botín)...`
+                              : "Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."
+                          }
                           value={busquedaModelo}
                           onChange={(e) => {
-                            setBusquedaModelo(e.target.value);
-                            setShowDropdownModelo(true);
+                            const val = e.target.value;
+                            setBusquedaModelo(val);
+                            setShowDropdownModelo(val.trim().length > 0);
                           }}
-                          onFocus={() => setShowDropdownModelo(true)}
+                          onFocus={() => {
+                            if (busquedaModelo.trim().length > 0) {
+                              setShowDropdownModelo(true);
+                            }
+                          }}
                           className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                         />
 
-                        {showDropdownModelo && (busquedaModelo.trim().length > 0 || serieFiltroBuscador !== 'TODAS') && (
-                          <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto">
-                            {catalogoProductos
-                              .filter((p) => {
-                                // Filtro por Serie Seleccionada
-                                if (serieFiltroBuscador !== 'TODAS') {
-                                  const coincideSerie = (p.serieNombre || '').toLowerCase().trim() === serieFiltroBuscador.toLowerCase().trim();
-                                  if (!coincideSerie) return false;
-                                }
-                                // Filtro por texto en el buscador
-                                const q = busquedaModelo.toLowerCase().trim();
-                                if (!q) return true;
-                                return (
-                                  p.modelName.toLowerCase().includes(q) ||
-                                  (p.color && p.color.toLowerCase().includes(q)) ||
-                                  (p.serieNombre && p.serieNombre.toLowerCase().includes(q)) ||
-                                  (p.code && p.code.toLowerCase().includes(q))
-                                );
-                              })
-                              .map((p) => {
-                                const totalPares = (p.tallas || []).reduce(
-                                  (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
-                                  0
-                                );
-                                const docenas = Math.floor(totalPares / 12);
-                                const mediasDocenas = Math.floor(totalPares / 6);
+                        {serieFiltroBuscador !== 'TODAS' && busquedaModelo.trim().length === 0 && (
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 font-semibold">
+                            <span>💡</span>
+                            <span>Serie <strong>{serieFiltroBuscador}</strong> lista. Ingresa letras o el nombre en el buscador para ver los modelos.</span>
+                          </p>
+                        )}
 
-                                return (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    onClick={() => handleSeleccionarProducto(p)}
-                                    className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)]"
-                                  >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                      {p.imageUrl ? (
-                                        <img src={p.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
-                                      ) : (
-                                        <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">👟</div>
-                                      )}
-                                      <div className="min-w-0">
-                                        <span className="block font-bold text-[var(--foreground)] truncate">{p.modelName}</span>
-                                        <div className="flex items-center gap-2 text-[10px] mt-0.5">
-                                          <span className="text-[var(--muted-foreground)] font-medium">Color: <strong className="text-[var(--foreground)]">{p.color}</strong></span>
-                                          <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                            Serie: {p.serieNombre || 'Estándar'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <div className="text-right shrink-0">
-                                      {totalPares > 0 ? (
-                                        <>
-                                          <span className="text-xs font-black text-emerald-600 block">{totalPares} pares</span>
-                                          <span className="text-[9px] text-[var(--muted-foreground)] block">
-                                            ({docenas} doc. / {mediasDocenas} ½ doc.)
-                                          </span>
-                                        </>
-                                      ) : (
-                                        <span className="text-[10px] font-bold text-rose-500">0 pares</span>
-                                      )}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            {catalogoProductos.filter((p) => {
+                        {showDropdownModelo && busquedaModelo.trim().length > 0 && (() => {
+                          const q = busquedaModelo.toLowerCase().trim();
+                          const listaModelosFiltradosYOrdenados = catalogoProductos
+                            .filter((p) => {
+                              // Filtro por Serie Seleccionada (si no es TODAS)
                               if (serieFiltroBuscador !== 'TODAS') {
                                 const coincideSerie = (p.serieNombre || '').toLowerCase().trim() === serieFiltroBuscador.toLowerCase().trim();
                                 if (!coincideSerie) return false;
                               }
-                              const q = busquedaModelo.toLowerCase().trim();
-                              if (!q) return true;
+                              // Filtro por coincidencia de texto (letra, letras o palabra)
+                              if (!q) return false;
                               return (
-                                p.modelName.toLowerCase().includes(q) ||
+                                (p.modelName || '').toLowerCase().includes(q) ||
                                 (p.color && p.color.toLowerCase().includes(q)) ||
                                 (p.serieNombre && p.serieNombre.toLowerCase().includes(q)) ||
                                 (p.code && p.code.toLowerCase().includes(q))
                               );
-                            }).length === 0 && (
-                              <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
-                                No se encontraron modelos {serieFiltroBuscador !== 'TODAS' ? `en serie "${serieFiltroBuscador}"` : ''} {busquedaModelo.trim() ? `con "${busquedaModelo}"` : ''}.
-                              </div>
-                            )}
-                          </div>
-                        )}
+                            })
+                            .sort((a, b) => {
+                              // 1. Primero: orden alfabético por nombre del modelo
+                              const cmpModelo = (a.modelName || '').localeCompare(b.modelName || '', 'es', { sensitivity: 'base' });
+                              if (cmpModelo !== 0) return cmpModelo;
+
+                              // 2. Si son variantes del mismo modelo, ordenar de más vendidas a menos vendidas
+                              const ventasA = (ventasPorVarianteMap.get(a.id) || 0) +
+                                (ventasPorVarianteMap.get(`${(a.modelName || '').toLowerCase().trim()}_${(a.color || '').toLowerCase().trim()}`) || 0);
+
+                              const ventasB = (ventasPorVarianteMap.get(b.id) || 0) +
+                                (ventasPorVarianteMap.get(`${(b.modelName || '').toLowerCase().trim()}_${(b.color || '').toLowerCase().trim()}`) || 0);
+
+                              if (ventasB !== ventasA) {
+                                return ventasB - ventasA; // Más vendidas primero
+                              }
+
+                              // Desempate: orden alfabético por color
+                              return (a.color || '').localeCompare(b.color || '', 'es', { sensitivity: 'base' });
+                            });
+
+                          return (
+                            <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
+                              {listaModelosFiltradosYOrdenados.length > 0 ? (
+                                listaModelosFiltradosYOrdenados.map((p) => {
+                                  const totalPares = (p.tallas || []).reduce(
+                                    (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
+                                    0
+                                  );
+                                  const docenas = Math.floor(totalPares / 12);
+                                  const mediasDocenas = Math.floor(totalPares / 6);
+                                  const ventasTotal = (ventasPorVarianteMap.get(p.id) || 0) +
+                                    (ventasPorVarianteMap.get(`${(p.modelName || '').toLowerCase().trim()}_${(p.color || '').toLowerCase().trim()}`) || 0);
+
+                                  return (
+                                    <button
+                                      key={p.id}
+                                      type="button"
+                                      onClick={() => handleSeleccionarProducto(p)}
+                                      className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)] cursor-pointer"
+                                    >
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        {p.imageUrl ? (
+                                          <img src={p.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">👟</div>
+                                        )}
+                                        <div className="min-w-0">
+                                          <span className="block font-bold text-[var(--foreground)] truncate">{p.modelName}</span>
+                                          <div className="flex items-center gap-2 text-[10px] mt-0.5 flex-wrap">
+                                            <span className="text-[var(--muted-foreground)] font-medium">
+                                              Color: <strong className="text-[var(--foreground)]">{p.color}</strong>
+                                            </span>
+                                            <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                              Serie: {p.serieNombre || 'Estándar'}
+                                            </span>
+                                            {ventasTotal > 0 && (
+                                              <span className="text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                                🔥 {ventasTotal} {ventasTotal === 1 ? 'par vendido' : 'pares vendidos'}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right shrink-0">
+                                        {totalPares > 0 ? (
+                                          <>
+                                            <span className="text-xs font-black text-emerald-600 block">{totalPares} pares</span>
+                                            <span className="text-[9px] text-[var(--muted-foreground)] block">
+                                              ({docenas} doc. / {mediasDocenas} ½ doc.)
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <span className="text-[10px] font-bold text-rose-500">0 pares</span>
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
+                                  No se encontraron modelos {serieFiltroBuscador !== 'TODAS' ? `en serie "${serieFiltroBuscador}"` : ''} que coincidan con "{busquedaModelo}".
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
