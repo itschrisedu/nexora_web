@@ -353,6 +353,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setAdelantoInput('');
     setMetodoAdelanto('EFECTIVO');
     setReferenciaAdelanto('');
+    setSerieFiltroBuscador('TODAS');
   };
 
   const isDirtyOrder = useCallback(() => {
@@ -434,6 +435,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
   const [productoSeleccionadoObj, setProductoSeleccionadoObj] = useState<any | null>(null);
+  const [serieFiltroBuscador, setSerieFiltroBuscador] = useState<string>('TODAS');
 
   // Consulta de Stock Inter-Sucursal en Punto de Venta
   const [stockInterSucursalResult, setStockInterSucursalResult] = useState<any[]>([]);
@@ -1284,10 +1286,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
-  const cargarCatalogo = async () => {
+  const cargarCatalogo = async (sucursalIdParam?: string) => {
     try {
       if (online) {
-        const res = await ApiService.get('/catalogo/productos');
+        const targetSuc = sucursalIdParam || selectedOrderSucursalId || (activeSucursalId !== 'TODAS' ? activeSucursalId : '');
+        const queryStr = targetSuc ? `?tenantId=${encodeURIComponent(targetSuc)}` : '';
+        const res = await ApiService.get(`/catalogo/productos${queryStr}`);
         const modelosData = Array.isArray(res) ? res : (res?.modelos || []);
         const flat: any[] = [];
         modelosData.forEach((modelo: any) => {
@@ -2023,8 +2027,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
             setNotasPedido('');
             setMetodoPagoContado('EFECTIVO');
             setReferenciaComprobante('');
-            setErrorMsg('');
-            setSelectedOrderSucursalId(selectedSucursalPedidoId || (activeSucursalId !== 'TODAS' ? activeSucursalId : sucursales?.[0]?.id) || '');
+            const targetSuc = selectedSucursalPedidoId || (activeSucursalId !== 'TODAS' ? activeSucursalId : sucursales?.[0]?.id) || '';
+            setSelectedOrderSucursalId(targetSuc);
+            cargarCatalogo(targetSuc);
             setShowModal(true);
           }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm shrink-0"
@@ -2652,19 +2657,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">1. Datos del Cliente & Pago</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative sm:col-span-2">
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="mb-1">
                       <label className="block text-xs font-semibold text-[var(--muted-foreground)]">Cliente *</label>
-                      {!clienteSeleccionado && (
-                        <button
-                          type="button"
-                          onClick={() => setShowNuevoClienteModal(true)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-                          title="Registrar cliente rápido sin salir del pedido"
-                        >
-                          <UserPlus size={13} />
-                          <span>+ Nuevo Cliente</span>
-                        </button>
-                      )}
                     </div>
                     {clienteSeleccionado ? (() => {
                       const repSel = getClienteReputacion(clienteSeleccionado);
@@ -2900,7 +2894,17 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       </label>
                       <select
                         value={selectedOrderSucursalId || (activeSucursalId !== 'TODAS' ? activeSucursalId : (sucursales[0]?.id || ''))}
-                        onChange={(e) => setSelectedOrderSucursalId(e.target.value)}
+                        onChange={(e) => {
+                          const nuevaSucursalId = e.target.value;
+                          setSelectedOrderSucursalId(nuevaSucursalId);
+                          setSelectedProductId('');
+                          setProductoSeleccionadoObj(null);
+                          setBusquedaModelo('');
+                          setPrecioItem(0);
+                          setPrecioItemInput('');
+                          setTallaCantidadesMap({});
+                          cargarCatalogo(nuevaSucursalId);
+                        }}
                         className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-[var(--foreground)] focus:outline-none focus:border-emerald-500 min-h-[42px]"
                       >
                         {sucursales.map((s) => (
@@ -3300,7 +3304,77 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">2. Seleccionar Modelo, Talla y Cantidad</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative sm:col-span-2">
-                    <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">Modelo / Producto * (Buscar por Nombre o Color)</label>
+                    {/* Header de Selección de Modelo con Píldoras de Filtro por Serie */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1.5">
+                      <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
+                        Modelo / Producto * (Buscar por Nombre o Color)
+                      </label>
+
+                      {/* Botones / Píldoras de Series Dinámicas */}
+                      {(() => {
+                        const seriesUnicas = Array.from(
+                          new Set(
+                            catalogoProductos
+                              .map((p) => p.serieNombre?.trim())
+                              .filter((s): s is string => Boolean(s && s.length > 0))
+                          )
+                        ).sort();
+
+                        if (seriesUnicas.length === 0) return null;
+
+                        return (
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
+                            <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-0.5 shrink-0">
+                              Series:
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSerieFiltroBuscador('TODAS');
+                                if (busquedaModelo.trim().length > 0) setShowDropdownModelo(true);
+                              }}
+                              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
+                                serieFiltroBuscador === 'TODAS'
+                                  ? 'bg-[#0F172A] text-white dark:bg-emerald-600 dark:text-white shadow-xs'
+                                  : 'bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]'
+                              }`}
+                            >
+                              Todas
+                            </button>
+                            {seriesUnicas.map((ser) => {
+                              const isActiva = serieFiltroBuscador.toLowerCase() === ser.toLowerCase();
+                              const count = catalogoProductos.filter(
+                                (p) => (p.serieNombre || '').toLowerCase() === ser.toLowerCase()
+                              ).length;
+
+                              return (
+                                <button
+                                  key={ser}
+                                  type="button"
+                                  onClick={() => {
+                                    const nueva = isActiva ? 'TODAS' : ser;
+                                    setSerieFiltroBuscador(nueva);
+                                    setShowDropdownModelo(true);
+                                  }}
+                                  className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                                    isActiva
+                                      ? 'bg-emerald-600 text-white shadow-xs border border-emerald-500 font-black'
+                                      : 'bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]'
+                                  }`}
+                                  title={`Filtrar variantes de serie ${ser}`}
+                                >
+                                  <span>{ser}</span>
+                                  <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isActiva ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'}`}>
+                                    {count}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
                     {productoSeleccionadoObj ? (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl gap-3">
                         <div className="flex items-center gap-3">
@@ -3376,7 +3450,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       <div className="relative">
                         <input
                           type="text"
-                          placeholder="Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."
+                          placeholder={serieFiltroBuscador !== 'TODAS' ? `Filtrando por serie ${serieFiltroBuscador}... (ej. Mocasín, Negro)` : "Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."}
                           value={busquedaModelo}
                           onChange={(e) => {
                             setBusquedaModelo(e.target.value);
@@ -3386,12 +3460,18 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                           className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                         />
 
-                        {showDropdownModelo && busquedaModelo.trim().length > 0 && (
-                          <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto">
+                        {showDropdownModelo && (busquedaModelo.trim().length > 0 || serieFiltroBuscador !== 'TODAS') && (
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto">
                             {catalogoProductos
                               .filter((p) => {
+                                // Filtro por Serie Seleccionada
+                                if (serieFiltroBuscador !== 'TODAS') {
+                                  const coincideSerie = (p.serieNombre || '').toLowerCase().trim() === serieFiltroBuscador.toLowerCase().trim();
+                                  if (!coincideSerie) return false;
+                                }
+                                // Filtro por texto en el buscador
                                 const q = busquedaModelo.toLowerCase().trim();
-                                if (!q) return false;
+                                if (!q) return true;
                                 return (
                                   p.modelName.toLowerCase().includes(q) ||
                                   (p.color && p.color.toLowerCase().includes(q)) ||
@@ -3447,8 +3527,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                 );
                               })}
                             {catalogoProductos.filter((p) => {
+                              if (serieFiltroBuscador !== 'TODAS') {
+                                const coincideSerie = (p.serieNombre || '').toLowerCase().trim() === serieFiltroBuscador.toLowerCase().trim();
+                                if (!coincideSerie) return false;
+                              }
                               const q = busquedaModelo.toLowerCase().trim();
-                              if (!q) return false;
+                              if (!q) return true;
                               return (
                                 p.modelName.toLowerCase().includes(q) ||
                                 (p.color && p.color.toLowerCase().includes(q)) ||
@@ -3457,7 +3541,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                               );
                             }).length === 0 && (
                               <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
-                                No se encontraron combinaciones coincidentes con "{busquedaModelo}".
+                                No se encontraron modelos {serieFiltroBuscador !== 'TODAS' ? `en serie "${serieFiltroBuscador}"` : ''} {busquedaModelo.trim() ? `con "${busquedaModelo}"` : ''}.
                               </div>
                             )}
                           </div>

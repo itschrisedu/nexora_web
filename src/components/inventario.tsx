@@ -60,6 +60,7 @@ interface ModeloAgrupadoInventario {
   fotoUrl?: string;
   sucursalNombre?: string;
   products: Producto[];
+  totalMovimientos?: number;
 }
 
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
@@ -440,7 +441,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   const totalParesLote = Object.values(loteCantidades).reduce((sum, val) => sum + (Number(val) || 0), 0);
   const totalParesTransf = Object.values(transfLoteCantidades).reduce((sum, val) => sum + (Number(val) || 0), 0);
 
-  // Agrupar productos por Modelo
+  // Agrupar productos por Modelo y ordenar por movimiento (mayor a menor rotación)
   const groupedModelos: ModeloAgrupadoInventario[] = (() => {
     const map = new Map<string, ModeloAgrupadoInventario>();
 
@@ -458,6 +459,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
           fotoUrl: p.fotoUrl,
           sucursalNombre: p.sucursalNombre,
           products: [],
+          totalMovimientos: 0,
         });
       }
       const m = map.get(key)!;
@@ -465,9 +467,20 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
         m.fotoUrl = p.fotoUrl;
       }
       m.products.push(p);
+      m.totalMovimientos = (m.totalMovimientos || 0) + (Number((p as any).totalMovimientos) || 0);
     });
 
-    return Array.from(map.values());
+    // Ordenar primero el modelo que más movimiento tiene y al final los que no tienen mucho movimiento
+    return Array.from(map.values()).sort((a, b) => {
+      const movA = a.totalMovimientos || 0;
+      const movB = b.totalMovimientos || 0;
+      if (movB !== movA) {
+        return movB - movA;
+      }
+      const stockA = a.products.reduce((acc, p) => acc + (p.tallas || []).reduce((s, t) => s + (t.cantidad || 0), 0), 0);
+      const stockB = b.products.reduce((acc, p) => acc + (p.tallas || []).reduce((s, t) => s + (t.cantidad || 0), 0), 0);
+      return stockB - stockA;
+    });
   })();
 
   // Filtro de búsqueda por modelo, marca, código, color o serie
