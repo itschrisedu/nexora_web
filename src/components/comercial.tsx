@@ -40,6 +40,8 @@ import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.serv
 import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
 import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock } from '../utils/curvas';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import { abrirWhatsAppUniversal } from '../utils/whatsapp';
+import ImageLightboxModal from './ui/image-lightbox-modal';
 import NuevoClienteModal from './ui/nuevo-cliente-modal';
 
 interface ComercialProps {
@@ -160,7 +162,7 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
 const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: React.ReactNode }> = {
   PENDIENTE:         { label: 'Pendiente',          color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',        icon: <Clock size={12} /> },
   EN_PREPARACION:    { label: 'En Preparación',     color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',           icon: <Package size={12} /> },
-  EN_ESPERA_STOCK:   { label: 'Espera de Stock',     color: 'bg-orange-500/10 text-orange-600 border-orange-500/20',     icon: <Clock size={12} /> },
+  EN_ESPERA_STOCK:   { label: 'Pendiente por Pedir', color: 'bg-orange-500/10 text-orange-600 border-orange-500/20',     icon: <Clock size={12} /> },
   ENTREGADO_PARCIAL: { label: 'Entrega Parcial',     color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',           icon: <Package size={12} /> },
   ENTREGADO:         { label: 'Entregado',          color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',  icon: <CheckCircle size={12} /> },
   CANCELADO:         { label: 'Anulado',            color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',           icon: <XCircle size={12} /> },
@@ -248,7 +250,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [showSupplierOrderModal, setShowSupplierOrderModal] = useState(false);
   const [supplierOrderProductData, setSupplierOrderProductData] = useState<any>(null);
   const [supplierOrderModalType, setSupplierOrderModalType] = useState<'SERIE_COMPLETA' | 'NUMERACION'>('SERIE_COMPLETA');
-  const [supplierOrderSubtipoSerie, setSupplierOrderSubtipoSerie] = useState<'MEDIA_DOCENA' | 'DOCENA'>('MEDIA_DOCENA');
+  const [supplierOrderSubtipoSerie, setSupplierOrderSubtipoSerie] = useState<'MEDIA_A' | 'MEDIA_B' | 'DOCENA'>('MEDIA_A');
   const [supplierOrderCantSeries, setSupplierOrderCantSeries] = useState(1);
   const [supplierOrderTallasMap, setSupplierOrderTallasMap] = useState<Record<string, number>>({});
   const [supplierOrderObservaciones, setSupplierOrderObservaciones] = useState('');
@@ -310,7 +312,17 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [showEntregaModal, setShowEntregaModal] = useState(false);
   const [pedidoEntregaSeleccionado, setPedidoEntregaSeleccionado] = useState<Pedido | null>(null);
   const [entregaItemsMap, setEntregaItemsMap] = useState<Record<string, number>>({});
+  const [entregaPreciosMap, setEntregaPreciosMap] = useState<Record<string, number>>({});
   const [procesandoEntrega, setProcesandoEntrega] = useState(false);
+
+  // ── Modal de Corrección de Precio Post-Venta / Post-Entrega ──
+  const [showCorregirPrecioModal, setShowCorregirPrecioModal] = useState(false);
+  const [pedidoACorregir, setPedidoACorregir] = useState<Pedido | null>(null);
+  const [preciosCorregirMap, setPreciosCorregirMap] = useState<Record<string, number>>({});
+  const [guardandoCorreccionPrecio, setGuardandoCorreccionPrecio] = useState(false);
+
+  // Visor Lightbox de Foto de Calzado
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; title?: string } | null>(null);
 
   // Cupones Promocionales (Fase E2)
   const [codigoCuponInput, setCodigoCuponInput] = useState('');
@@ -663,12 +675,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setSupplierOrderProductData(item);
     
     // Determinar si es venta por serie completa o numeración
-    const esMediaDocena = item.subtipoSerie === 'MEDIA_DOCENA';
+    const esMediaDocena = item.subtipoSerie === 'MEDIA_DOCENA' || item.subtipoSerie === 'MEDIA_A' || item.subtipoSerie === 'MEDIA_B';
     const esDocena = item.subtipoSerie === 'DOCENA';
     const esSerieCompleta = item.tipoVenta === 'SERIE_COMPLETA' || item.tipoVenta === 'SERIE_ESPECIAL' || esMediaDocena || esDocena;
 
     setSupplierOrderModalType(esSerieCompleta ? 'SERIE_COMPLETA' : 'NUMERACION');
-    setSupplierOrderSubtipoSerie(esDocena ? 'DOCENA' : 'MEDIA_DOCENA');
+    setSupplierOrderSubtipoSerie(esDocena ? 'DOCENA' : (item.subtipoSerie === 'MEDIA_B' ? 'MEDIA_B' : 'MEDIA_A'));
     setSupplierOrderCantSeries(1);
 
     // Mapear tallas si vienen líneas específicas
@@ -703,7 +715,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
 
     const paresTotales = supplierOrderModalType === 'SERIE_COMPLETA'
-      ? (supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * supplierOrderCantSeries
+      ? (supplierOrderSubtipoSerie === 'DOCENA' ? 12 : 6) * supplierOrderCantSeries
       : Object.values(supplierOrderTallasMap).reduce((a, b) => a + (b || 0), 0);
 
     if (paresTotales <= 0) {
@@ -715,7 +727,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     try {
       let detalleNumeracion = '';
       if (supplierOrderModalType === 'SERIE_COMPLETA') {
-        detalleNumeracion = `Serie Completa: ${supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? '½ Docena (6 pares)' : '1 Docena (12 pares)'} x ${supplierOrderCantSeries} pedido(s)`;
+        const curvaNombre = supplierOrderSubtipoSerie === 'MEDIA_A'
+          ? 'Media A (38/1, 39/2, 40/1, 41/1, 42/1)'
+          : supplierOrderSubtipoSerie === 'MEDIA_B'
+          ? 'Media B (38/1, 39/1, 40/2, 41/1, 42/1)'
+          : 'Docena (38/2, 39/3, 40/3, 41/2, 42/2)';
+        detalleNumeracion = `Serie Completa: ${curvaNombre} x ${supplierOrderCantSeries} pedido(s) = ${paresTotales} pares`;
       } else {
         const tallasDesglose = Object.entries(supplierOrderTallasMap)
           .filter(([_, qty]) => qty > 0)
@@ -1097,15 +1114,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
     let enviadoWhatsApp = false;
     if (autoWhatsApp && telefono) {
-      let numLimpio = telefono.replace(/\D/g, '');
-      if (numLimpio.startsWith('09') && numLimpio.length === 10) {
-        numLimpio = '593' + numLimpio.substring(1);
-      } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
-        numLimpio = '593' + numLimpio.substring(1);
-      }
-
-      const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-      window.open(url, '_blank');
+      abrirWhatsAppUniversal(telefono, mensaje);
       enviadoWhatsApp = true;
     }
 
@@ -1266,15 +1275,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
     let enviadoWhatsApp = false;
     if (autoWhatsApp && telefono) {
-      let numLimpio = telefono.replace(/\D/g, '');
-      if (numLimpio.startsWith('09') && numLimpio.length === 10) {
-        numLimpio = '593' + numLimpio.substring(1);
-      } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
-        numLimpio = '593' + numLimpio.substring(1);
-      }
-
-      const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-      window.open(url, '_blank');
+      abrirWhatsAppUniversal(telefono, mensaje);
       enviadoWhatsApp = true;
     }
 
@@ -1316,10 +1317,15 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       if (online) {
         const data = await ApiService.get('/clientes');
         if (Array.isArray(data)) {
-          setListaClientes(
-            data.map((c: any) => ({
+          const clientesFormateados = data.map((c: any) => {
+            const apellido = (c.apellido || '').trim();
+            const nombre = (c.nombre || '').trim();
+            const nombreFormateado = apellido ? `${apellido}, ${nombre}` : (nombre || 'Cliente');
+            return {
               id: c.id,
-              nombre: `${c.nombre || ''} ${c.apellido || ''}`.trim() || c.nombre || 'Cliente',
+              nombre: nombreFormateado,
+              apellido: c.apellido || '',
+              nombrePila: c.nombre || '',
               cedula: c.cedula || c.ruc || '',
               telefono: c.telefono || '',
               score: c.score ?? c.scoringCredito ?? 100,
@@ -1331,8 +1337,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
               creditoUtilizado: Number(c.creditoUtilizado || 0),
               creditoDisponible: Number(c.creditoDisponible || 0),
               activo: c.activo !== false,
-            }))
-          );
+            };
+          });
+
+          // Ordenar alfabéticamente por apellido/nombre
+          clientesFormateados.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+          setListaClientes(clientesFormateados);
         }
       } else {
         const local = await db.clientes.toArray();
@@ -1646,6 +1656,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           tallaId: l.tallaId,
           cantidad: l.cantidad,
           tipoVenta: l.tipoVenta,
+          precioUnitario: Number(l.precioUnitario),
           observacion: l.observacionModelo || undefined,
         })),
         notas: notasFinales || undefined,
@@ -1837,6 +1848,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
     setPedidoEntregaSeleccionado(orderToUse);
     const initialMap: Record<string, number> = {};
+    const initialPrecios: Record<string, number> = {};
     (orderToUse.lines || []).forEach((l: any) => {
       const cantPedida = l.cantidad || 0;
       const cantEntregada = l.cantidadEntregada !== undefined ? l.cantidadEntregada : 0;
@@ -1844,8 +1856,14 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       const disponible = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : pendiente);
       const sugerido = Math.min(pendiente, Math.max(0, disponible));
       initialMap[l.id] = sugerido;
+
+      const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
+        ? Number(l.precioUnitario)
+        : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
+      initialPrecios[l.id] = pUnit;
     });
     setEntregaItemsMap(initialMap);
+    setEntregaPreciosMap(initialPrecios);
     setShowEntregaModal(true);
   };
 
@@ -1856,6 +1874,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       .map(([lineId, cant]) => ({
         lineId,
         cantidadAEntregar: Number(cant) || 0,
+        precioUnitario: entregaPreciosMap[lineId] !== undefined ? Number(entregaPreciosMap[lineId]) : undefined,
       }))
       .filter((i) => i.cantidadAEntregar > 0);
 
@@ -1876,6 +1895,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         setShowEntregaModal(false);
         setPedidoEntregaSeleccionado(null);
         setEntregaItemsMap({});
+        setEntregaPreciosMap({});
         await loadPedidos();
         await loadListaClientes();
       } else {
@@ -1885,6 +1905,54 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       showToast(err.message || 'Error al procesar la entrega', 'error');
     } finally {
       setProcesandoEntrega(false);
+    }
+  };
+
+  const handleAbrirCorregirPrecio = async (p: Pedido) => {
+    let orderToUse = p;
+    try {
+      if (online) {
+        const fresh = await ApiService.get(`/pedidos/${p.id}`);
+        if (fresh && fresh.lines) orderToUse = fresh;
+      }
+    } catch (e) {}
+
+    setPedidoACorregir(orderToUse);
+    const mapPrecios: Record<string, number> = {};
+    (orderToUse.lines || []).forEach((l: any) => {
+      const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
+        ? Number(l.precioUnitario)
+        : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
+      const key = l.productId || l.id;
+      if (mapPrecios[key] === undefined) {
+        mapPrecios[key] = pUnit;
+      }
+    });
+    setPreciosCorregirMap(mapPrecios);
+    setShowCorregirPrecioModal(true);
+  };
+
+  const handleGuardarCorreccionPrecio = async (productId: string, nuevoPrecioUnitario: number) => {
+    if (!pedidoACorregir) return;
+    if (nuevoPrecioUnitario <= 0 || isNaN(nuevoPrecioUnitario)) {
+      showToast('Ingresa un precio mayor a 0', 'warning');
+      return;
+    }
+    setGuardandoCorreccionPrecio(true);
+    try {
+      const res = await ApiService.patch(`/pedidos/${pedidoACorregir.id}/corregir-precio`, {
+        productId,
+        nuevoPrecioUnitario,
+      });
+      showToast(res.message || 'Precio corregido exitosamente. Se actualizaron saldos y notas de entrega.', 'success');
+      setShowCorregirPrecioModal(false);
+      setPedidoACorregir(null);
+      await loadPedidos();
+      await loadListaClientes();
+    } catch (err: any) {
+      showToast(err.message || 'Error al corregir precio', 'error');
+    } finally {
+      setGuardandoCorreccionPrecio(false);
     }
   };
 
@@ -2034,7 +2102,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           >
             Todos ({pedidos.length})
           </button>
-          {(['PENDIENTE', 'EN_PREPARACION', 'ENTREGADO_PARCIAL', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
+          {(['PENDIENTE', 'EN_PREPARACION', 'EN_ESPERA_STOCK', 'ENTREGADO_PARCIAL', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
             const cfg = ESTADO_CONFIG[st];
             const count = pedidos.filter((p) => p.estado === st).length;
             const active = filtroEstado === st;
@@ -2264,6 +2332,17 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   <CheckCircle size={13} /> Entregado
                                 </span>
                                 <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAbrirCorregirPrecio(p);
+                                  }}
+                                  className="px-2.5 py-1 bg-violet-600/10 text-violet-600 hover:bg-violet-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-violet-600/20 flex items-center gap-1"
+                                  title="Corregir precio de venta y ajustar notas y cuenta del cliente"
+                                >
+                                  ✏️ Editar Precio
+                                </button>
+                                <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleEnviarPedidoEntregadoWhatsApp(p);
@@ -2436,7 +2515,13 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                           className="p-3 bg-[var(--card)] dark:bg-slate-900/60 border border-[var(--border)] rounded-2xl flex items-start gap-3 shadow-2xs hover:border-slate-400 transition-all"
                                         >
                                           {/* Miniatura del calzado */}
-                                          <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                                          <div
+                                            onClick={() => {
+                                              if (g.imageUrl) setLightboxImage({ url: g.imageUrl, title: `${g.modelName} (${g.color || ''})` });
+                                            }}
+                                            className={`w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center ${g.imageUrl ? 'cursor-zoom-in hover:opacity-90' : ''}`}
+                                            title={g.imageUrl ? "Ver foto ampliada del calzado" : ""}
+                                          >
                                             {g.imageUrl ? (
                                               <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
                                             ) : (
@@ -2486,9 +2571,22 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
                                             {/* Subtotal del modelo */}
                                             <div className="mt-2 pt-1 border-t border-[var(--border)]/60 flex items-center justify-between text-[11px]">
-                                              <span className="text-[var(--muted-foreground)] text-[10px]">
-                                                ${g.precioUnitario.toFixed(2)} c/u
-                                              </span>
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="text-[var(--muted-foreground)] text-[10px]">
+                                                  ${g.precioUnitario.toFixed(2)} c/u
+                                                </span>
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAbrirCorregirPrecio(p);
+                                                  }}
+                                                  className="text-[10px] text-violet-600 dark:text-violet-400 hover:underline font-bold cursor-pointer"
+                                                  title="Modificar precio de este modelo y actualizar saldos de cuenta"
+                                                >
+                                                  ✏️ Editar
+                                                </button>
+                                              </div>
                                               <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
                                                 Total: ${g.subtotal.toFixed(2)}
                                               </span>
@@ -2515,8 +2613,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
       {/* MODAL CREAR / EDITAR PEDIDO */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder()); }}>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-4xl h-[92vh] max-h-[92vh] sm:h-auto sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header Modal Estandarizado */}
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
@@ -2542,7 +2640,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
             </div>
 
             {/* Body Modal */}
-            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+            <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
               {!online && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs rounded-xl flex items-center gap-2">
                   <span>📡 Modo Offline: El pedido se guardará localmente y se sincronizará cuando vuelva la conexión.</span>
@@ -4100,10 +4198,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 </div>
               )}
 
-              {errorMsg && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl">{errorMsg}</div>}
+              {errorMsg && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-medium">{errorMsg}</div>}
             </div>
 
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Sticky Pinned Footer on Mobile and Desktop */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-lg z-20">
               {(() => {
                 const subtotalBase = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
                 const descCupon = cuponAplicado ? Number(cuponAplicado.descuentoCalculado || 0) : 0;
@@ -4280,35 +4379,46 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
                       Curva de Serie
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setSupplierOrderSubtipoSerie('MEDIA_DOCENA')}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold border text-center transition-all ${
-                          supplierOrderSubtipoSerie === 'MEDIA_DOCENA'
-                            ? 'bg-purple-600 text-white border-transparent'
-                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                        onClick={() => setSupplierOrderSubtipoSerie('MEDIA_A')}
+                        className={`flex-1 min-w-[130px] py-1.5 px-2 rounded-lg text-xs font-bold border text-center transition-all cursor-pointer ${
+                          supplierOrderSubtipoSerie === 'MEDIA_A'
+                            ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/50'
                         }`}
                       >
-                        ½ Media Docena (6 pares)
+                        ½ Media A (6 pares: 38/1, 39/2, 40/1, 41/1, 42/1)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSupplierOrderSubtipoSerie('MEDIA_B')}
+                        className={`flex-1 min-w-[130px] py-1.5 px-2 rounded-lg text-xs font-bold border text-center transition-all cursor-pointer ${
+                          supplierOrderSubtipoSerie === 'MEDIA_B'
+                            ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/50'
+                        }`}
+                      >
+                        ½ Media B (6 pares: 38/1, 39/1, 40/2, 41/1, 42/1)
                       </button>
                       <button
                         type="button"
                         onClick={() => setSupplierOrderSubtipoSerie('DOCENA')}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold border text-center transition-all ${
+                        className={`flex-1 min-w-[130px] py-1.5 px-2 rounded-lg text-xs font-bold border text-center transition-all cursor-pointer ${
                           supplierOrderSubtipoSerie === 'DOCENA'
-                            ? 'bg-purple-600 text-white border-transparent'
-                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                            ? 'bg-purple-600 text-white border-transparent shadow-xs'
+                            : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/50'
                         }`}
                       >
-                        1 Docena (12 pares)
+                        1 Docena (12 pares: 38/2, 39/3, 40/3, 41/2, 42/2)
                       </button>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
                     <label className="text-xs font-semibold text-[var(--muted-foreground)]">
-                      Cantidad de {supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? 'medias docenas' : 'docenas'}:
+                      Cantidad de {supplierOrderSubtipoSerie === 'DOCENA' ? 'docenas' : 'medias docenas'}:
                     </label>
                     <div className="flex items-center gap-1">
                       <button
@@ -4335,10 +4445,10 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                     </div>
                   </div>
 
-                  <div className="p-2 bg-purple-500/10 rounded-lg text-[11px] font-semibold text-purple-900 flex justify-between">
+                  <div className="p-2 bg-purple-500/10 rounded-lg text-[11px] font-semibold text-purple-900 dark:text-purple-200 flex justify-between">
                     <span>Pares Totales a Fabricar:</span>
                     <span className="font-black font-mono">
-                      {(supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * supplierOrderCantSeries} pares
+                      {(supplierOrderSubtipoSerie === 'DOCENA' ? 12 : 6) * supplierOrderCantSeries} pares
                     </span>
                   </div>
                 </div>
@@ -4410,7 +4520,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                   </label>
                   <div className="w-full px-3 py-2 bg-purple-500/10 border border-purple-500/25 rounded-xl text-xs font-black text-purple-900 flex items-center">
                     ${((supplierOrderModalType === 'SERIE_COMPLETA'
-                        ? (supplierOrderSubtipoSerie === 'MEDIA_DOCENA' ? 6 : 12) * supplierOrderCantSeries
+                        ? (supplierOrderSubtipoSerie === 'DOCENA' ? 12 : 6) * supplierOrderCantSeries
                         : Object.values(supplierOrderTallasMap).reduce((a, b) => a + (b || 0), 0)
                       ) * (parseFloat(supplierOrderCost) || 0)).toFixed(2)}
                   </div>
@@ -5094,7 +5204,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                     const totalParesPedidoModelo = g.lineas.reduce((acc, l) => acc + (l.cantidad || 0), 0);
                     const totalParesEntregadosAntes = g.lineas.reduce((acc, l) => acc + (l.cantidadEntregada || 0), 0);
                     const totalParesADespacharHoy = g.lineas.reduce((acc, l) => acc + (entregaItemsMap[l.id] || 0), 0);
-                    const subtotalDespachoHoy = totalParesADespacharHoy * g.precioUnitario;
+                    const precioEntregaActual = entregaPreciosMap[g.lineas[0]?.id] !== undefined ? entregaPreciosMap[g.lineas[0]?.id] : g.precioUnitario;
+                    const subtotalDespachoHoy = totalParesADespacharHoy * precioEntregaActual;
 
                     let formato = `${totalParesADespacharHoy} pares`;
                     if (totalParesADespacharHoy === 6) formato = '6 pares (½ Docena)';
@@ -5109,17 +5220,23 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       >
                         {/* Izquierda: Imagen, Información y Steppers por Talla */}
                         <div className="flex items-start gap-3 min-w-0 flex-1">
-                          {g.imageUrl ? (
-                            <img
-                              src={g.imageUrl}
-                              alt={g.modelName}
-                              className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] shrink-0 mt-0.5"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0 mt-0.5">
-                              👟
-                            </div>
-                          )}
+                          <div
+                            onClick={() => {
+                              if (g.imageUrl) setLightboxImage({ url: g.imageUrl, title: g.modelName });
+                            }}
+                            className={`w-12 h-12 rounded-xl bg-[var(--muted)]/50 border border-[var(--border)] overflow-hidden shrink-0 mt-0.5 flex items-center justify-center ${g.imageUrl ? 'cursor-zoom-in hover:opacity-90' : ''}`}
+                            title={g.imageUrl ? "Ver foto ampliada" : ""}
+                          >
+                            {g.imageUrl ? (
+                              <img
+                                src={g.imageUrl}
+                                alt={g.modelName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-lg">👟</span>
+                            )}
+                          </div>
 
                           <div className="min-w-0 flex-1">
                             <div className="font-extrabold text-sm text-[var(--foreground)] uppercase tracking-wide truncate">
@@ -5262,8 +5379,28 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                             <div className="text-xs font-bold text-[var(--foreground)]">
                               {formato}
                             </div>
-                            <div className="text-[11px] text-[var(--muted-foreground)] font-medium">
-                              ${g.precioUnitario.toFixed(2)} / par
+                            <div className="flex items-center justify-end gap-1 mt-0.5">
+                              <span className="text-[11px] text-[var(--muted-foreground)] font-medium">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={precioEntregaActual}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  const nuevoP = isNaN(val) ? 0 : val;
+                                  setEntregaPreciosMap((prev) => {
+                                    const next = { ...prev };
+                                    g.lineas.forEach((l) => {
+                                      next[l.id] = nuevoP;
+                                    });
+                                    return next;
+                                  });
+                                }}
+                                className="w-16 h-6 px-1 text-right text-xs font-bold bg-[var(--card)] border border-[var(--border)] rounded focus:outline-hidden focus:ring-1 focus:ring-emerald-500 font-mono"
+                                title="Precio de entrega por par (editable)"
+                              />
+                              <span className="text-[11px] text-[var(--muted-foreground)] font-medium">/ par</span>
                             </div>
                             <div className="font-black text-base text-emerald-600 dark:text-emerald-400 mt-0.5">
                               ${subtotalDespachoHoy.toFixed(2)}
@@ -5356,6 +5493,206 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           </div>
         </div>
       )}
+
+      {/* Modal de Corrección de Precio Post-Venta / Post-Entrega */}
+      {showCorregirPrecioModal && pedidoACorregir && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCorregirPrecioModal(false);
+              setPedidoACorregir(null);
+            }
+          }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+            {/* Cabecera */}
+            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                  <Edit3 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">
+                    Corregir Precio de Venta
+                  </h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Pedido #{pedidoACorregir.numeroCodigo || pedidoACorregir.id.slice(0, 8).toUpperCase()} · Se recalculan totales, nota de entrega y saldo
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowCorregirPrecioModal(false);
+                  setPedidoACorregir(null);
+                }}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Cuerpo del Modal */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-200">
+                💡 Si hubo un error en el precio pactado o acordado con el cliente, cámbialo aquí. El sistema reajustará la nota de entrega y el saldo pendiente del cliente.
+              </div>
+
+              {(() => {
+                const grouped = new Map<string, {
+                  productId: string;
+                  modelName: string;
+                  color: string;
+                  serieNombre: string;
+                  imageUrl?: string;
+                  totalPares: number;
+                  precioActual: number;
+                }>();
+
+                (pedidoACorregir.lines || []).forEach((l: any) => {
+                  const key = l.productId || l.id;
+                  if (!grouped.has(key)) {
+                    const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
+                      ? Number(l.precioUnitario)
+                      : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
+                    grouped.set(key, {
+                      productId: key,
+                      modelName: l.modelName || l.product?.name || 'Calzado',
+                      color: l.color || l.product?.color || '',
+                      serieNombre: l.serieNombre || l.product?.serie?.nombre || 'Estándar',
+                      imageUrl: l.imageUrl || l.product?.imageUrl,
+                      totalPares: 0,
+                      precioActual: pUnit,
+                    });
+                  }
+                  grouped.get(key)!.totalPares += (l.cantidad || 0);
+                });
+
+                const list = Array.from(grouped.values());
+                if (list.length === 0) {
+                  return (
+                    <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
+                      No se encontraron líneas de producto en este pedido.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {list.map((prod) => {
+                      const precioEditado = preciosCorregirMap[prod.productId] !== undefined
+                        ? preciosCorregirMap[prod.productId]
+                        : prod.precioActual;
+                      const nuevoSubtotal = prod.totalPares * precioEditado;
+
+                      return (
+                        <div
+                          key={prod.productId}
+                          className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div
+                              onClick={() => {
+                                if (prod.imageUrl) setLightboxImage({ url: prod.imageUrl, title: prod.modelName });
+                              }}
+                              className={`w-12 h-12 rounded-xl bg-[var(--muted)]/50 border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center ${
+                                prod.imageUrl ? 'cursor-zoom-in hover:opacity-90' : ''
+                              }`}
+                              title={prod.imageUrl ? 'Ver foto ampliada' : ''}
+                            >
+                              {prod.imageUrl ? (
+                                <img src={prod.imageUrl} alt={prod.modelName} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-lg">👟</span>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-extrabold text-xs text-[var(--foreground)] uppercase truncate">
+                                {prod.modelName} {prod.color ? `· ${prod.color}` : ''}
+                              </h4>
+                              <p className="text-[11px] text-emerald-600 font-semibold">
+                                Serie: {prod.serieNombre} · {prod.totalPares} pares
+                              </p>
+                              <p className="text-[10px] text-[var(--muted-foreground)]">
+                                Precio previo: ${prod.precioActual.toFixed(2)} / par
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-[var(--border)]">
+                            <div className="text-right">
+                              <label className="text-[10px] font-bold text-[var(--muted-foreground)] block">
+                                Nuevo Precio / Par:
+                              </label>
+                              <div className="flex items-center gap-1 mt-0.5 justify-end">
+                                <span className="text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0.01"
+                                  value={precioEditado}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    setPreciosCorregirMap((prev) => ({
+                                      ...prev,
+                                      [prod.productId]: isNaN(val) ? 0 : val,
+                                    }));
+                                  }}
+                                  className="w-20 h-7 px-1.5 text-right text-xs font-bold bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-hidden focus:border-purple-600 font-mono"
+                                />
+                              </div>
+                              <div className="text-[10px] font-extrabold text-emerald-600 mt-0.5">
+                                Total: ${nuevoSubtotal.toFixed(2)}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={guardandoCorreccionPrecio || precioEditado <= 0}
+                              onClick={() => handleGuardarCorreccionPrecio(prod.productId, precioEditado)}
+                              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                            >
+                              {guardandoCorreccionPrecio ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <CheckCircle size={12} />
+                              )}
+                              <span>Guardar</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Pie */}
+            <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCorregirPrecioModal(false);
+                  setPedidoACorregir(null);
+                }}
+                className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal de Foto de Calzado */}
+      <ImageLightboxModal
+        isOpen={Boolean(lightboxImage)}
+        imageUrl={lightboxImage?.url || ''}
+        title={lightboxImage?.title}
+        onClose={() => setLightboxImage(null)}
+      />
 
       {/* Modal para Crear Nuevo Cliente de forma Rápida e Inmediata */}
       <NuevoClienteModal

@@ -10,6 +10,7 @@ import {
   armarMensajeWhatsAppVentaPOS,
   type VentaPosComprobanteData,
 } from "@/services/comprobante-url.service";
+import { abrirWhatsAppUniversal } from "../utils/whatsapp";
 import {
   Store,
   DollarSign,
@@ -844,24 +845,7 @@ export default function PosComponent() {
       // 2. Abrir WhatsApp directamente (si está activado)
       let enviadoWhatsApp = false;
       if (autoWhatsApp) {
-        let numLimpio = (ultimoTicket.clienteTelefono || "").replace(/\D/g, "");
-        if (numLimpio.startsWith("09") && numLimpio.length === 10) {
-          numLimpio = "593" + numLimpio.substring(1);
-        } else if (numLimpio.startsWith("0") && numLimpio.length === 10) {
-          numLimpio = "593" + numLimpio.substring(1);
-        }
-        const waUrl = numLimpio
-          ? `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`
-          : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-
-        const a = document.createElement("a");
-        a.href = waUrl;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        enviadoWhatsApp = true;
+        enviadoWhatsApp = abrirWhatsAppUniversal(ultimoTicket.clienteTelefono, mensaje);
       }
 
       setComprobanteEnviadoPOS(true);

@@ -65,6 +65,7 @@ import {
 import { generarUrlPublicaAbono } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 
 interface FinancieroProps {
   online: boolean;
@@ -899,25 +900,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       showToast('El cliente no tiene un número telefónico válido para WhatsApp.', 'warning');
       return;
     }
-    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
-      numLimpio = '593' + numLimpio.substring(1);
-    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
-      numLimpio = '593' + numLimpio.substring(1);
-    }
-    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-    
-    // Disparo inmediato para evitar bloqueo de popups del navegador
-    const win = window.open(url, '_blank');
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-      // Fallback seguro mediante enlace clicado en el DOM
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
+    abrirWhatsAppUniversal(telefono, mensaje);
   };
 
   const armarDatosComprobanteAbono = (
@@ -1222,24 +1205,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       // Envío AUTOMÁTICO por WhatsApp estandarizado
       if (autoEnviarWhatsAppAbono && telefonoCliente) {
         const msg = await armarMensajeWhatsAppAbono(dataAbono, false);
-        let numLimpio = telefonoCliente.replace(/\D/g, '');
-        if (numLimpio.startsWith('09') && numLimpio.length === 10) {
-          numLimpio = '593' + numLimpio.substring(1);
-        } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
-          numLimpio = '593' + numLimpio.substring(1);
-        }
-        const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(msg)}`;
-        if (ventanaWhatsApp && !ventanaWhatsApp.closed) {
-          ventanaWhatsApp.location.href = waUrl;
-        } else {
-          const a = document.createElement('a');
-          a.href = waUrl;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        }
+        abrirWhatsAppUniversal(telefonoCliente, msg);
         showToast('Comprobante oficial de abono enviado por WhatsApp.', 'success');
       } else if (autoEnviarWhatsAppAbono && !telefonoCliente) {
         showToast('Abono registrado. El cliente no tiene teléfono para enviar WhatsApp.', 'info');
@@ -1697,15 +1663,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
   // ── Enviar por WhatsApp ─────────────
   const handleEnviarWhatsApp = (telefono: string, mensaje: string) => {
-    let numLimpio = telefono.replace(/\D/g, '');
-    // Conversión Ecuador: 09XXXXXXXX → 5939XXXXXXXX
-    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
-      numLimpio = '593' + numLimpio.substring(1);
-    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
-      numLimpio = '593' + numLimpio.substring(1);
-    }
-    const url = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`;
-    window.open(url, '_blank');
+    abrirWhatsAppUniversal(telefono, mensaje);
   };
 
   // ── Facturación Electrónica SRI ─────────────

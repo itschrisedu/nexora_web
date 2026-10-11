@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import { generarUrlPublicaFactura, generarUrlPublicaOrden } from "./comprobante-url.service";
 import { capitalizarNombreCompleto } from "@/utils/text-formatters";
+import { abrirWhatsAppUniversal } from "@/utils/whatsapp";
 
 export interface FacturaPdfData {
   emisor: {
@@ -243,28 +244,8 @@ export async function compartirFacturaPdf(
 
   const mensajeTexto = `Estimado/a *${data.comprador.nombre}*,\n\nLe saludamos de *${emisorNombre}*. Adjuntamos el detalle de su Factura Electrónica Oficial:\n\n🧾 *FACTURA No:* ${data.comprobante.numero}\n📅 *Fecha:* ${data.comprobante.fecha}\n👤 *RUC/Cédula:* ${data.comprador.cedula}${itemsTexto ? `\n\n📦 *DETALLE DE COMPRA:*${itemsTexto}` : ""}\n\n━━━━━━━━━━━━━━━━━━━━━\n💵 *Subtotal:* $${subtotalFactura.toFixed(2)}\n📊 *IVA (15%):* $${ivaFactura.toFixed(2)}\n💰 *TOTAL FACTURA:* $${totalFactura.toFixed(2)}\n━━━━━━━━━━━━━━━━━━━━━\n${urlDigital ? `\n📥 *Descarga aquí tu factura digital oficial:*\n👉 ${urlDigital}\n` : ""}\n¡Muchas gracias por su preferencia!\n*${emisorNombre}*`;
 
-  // Apertura directa a WhatsApp sin popups de Windows ni descargas en disco
-  const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
-  try {
-    const win = window.open(waUrl, "_blank");
-    if (!win || win.closed || typeof win.closed === "undefined") {
-      const a = document.createElement("a");
-      a.href = waUrl;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
-  } catch (e) {
-    const a = document.createElement("a");
-    a.href = waUrl;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
+  // Apertura directa universal de WhatsApp
+  abrirWhatsAppUniversal(numLimpio, mensajeTexto);
 
   return { metodo: "DOWNLOAD_WHATSAPP" };
 }
@@ -559,28 +540,8 @@ export async function compartirOrdenCompraPdf(
 
   const mensajeTexto = `Estimado/a *${data.proveedor.nombre}*,\n\nLe compartimos la *Orden de Compra No. ${data.orden.numero}* (${data.totales.totalPares} pares):\n\n📥 *Descarga aquí la orden de compra oficial en PDF:*\n👉 ${urlDigital}\n\nPor favor confirmar recepción del pedido. ¡Muchas gracias!\n*${data.emisor.nombre || "Gerencia de Compras"}*`;
 
-  // Apertura directa garantizada de WhatsApp Web / móvil
-  const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
-  try {
-    const win = window.open(waUrl, "_blank");
-    if (!win || win.closed || typeof win.closed === "undefined") {
-      const a = document.createElement("a");
-      a.href = waUrl;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
-  } catch (e) {
-    const a = document.createElement("a");
-    a.href = waUrl;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
+  // Apertura directa garantizada de WhatsApp
+  abrirWhatsAppUniversal(numLimpio, mensajeTexto);
 
   return { metodo: "DOWNLOAD_WHATSAPP" };
 }

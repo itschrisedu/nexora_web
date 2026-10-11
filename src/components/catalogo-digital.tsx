@@ -25,6 +25,7 @@ import {
 import { useToast } from "./ui/toast";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
 import SlideToVerifyModal, { isHumanVerified } from "./slide-to-verify-modal";
+import { abrirWhatsAppUniversal } from "@/utils/whatsapp";
 
 interface TiendaInfo {
   tenantId: string;
@@ -475,15 +476,8 @@ export default function CatalogoDigitalComponent() {
       mensajeWA += `\n📥 *Descarga aquí tu comprobante oficial de pedido en PDF:*\n👉 ${urlComprobante}\n\n`;
       mensajeWA += `¡Muchas gracias por su preferencia!\n*${tienda?.nombreNegocio || 'NEXORA'}*`;
 
-      // 5. Formatear número de teléfono destino WhatsApp
-      let numeroDestino = (tienda?.telefono || "593991234567").replace(/\D/g, "");
-      if (numeroDestino.startsWith('09') && numeroDestino.length === 10) numeroDestino = '593' + numeroDestino.substring(1);
-      else if (numeroDestino.startsWith('0') && numeroDestino.length === 10) numeroDestino = '593' + numeroDestino.substring(1);
-
-      const urlWA = `https://wa.me/${numeroDestino}?text=${encodeURIComponent(mensajeWA)}`;
-
-      // 6. Abrir WhatsApp y limpiar estado
-      window.open(urlWA, "_blank");
+      // 5. Abrir WhatsApp con selector universal
+      abrirWhatsAppUniversal(tienda?.telefono || "593991234567", mensajeWA);
       showToast("Pedido generado y enviado por WhatsApp exitosamente", "success");
       setPedidoExitoso(true);
       setCarrito([]);

@@ -57,6 +57,7 @@ import { useToast } from './ui/toast';
 import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, compartirOrdenCompraPdf, OrdenCompraPdfData } from '../services/pdf-factura.service';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { validarRuc } from '../utils/ecuador-validators';
+import { getCurvaDocena, TipoCurva } from '../utils/curvas';
 import {
   formatearNombres,
   formatearApellidos,
@@ -65,6 +66,7 @@ import {
   formatearTelefono,
   formatearDireccion,
 } from '../utils/text-formatters';
+import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 
 interface ProveedoresProps {
   online: boolean;
@@ -518,7 +520,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState<any | null>(null);
-  const [subtipoCurva, setSubtipoCurva] = useState<'MEDIA_DOCENA' | 'DOCENA'>('MEDIA_DOCENA');
+  const [subtipoCurva, setSubtipoCurva] = useState<TipoCurva>('MEDIA_A');
   const [cantidadCurvas, setCantidadCurvas] = useState<number>(2); // Por defecto 2 medias docenas = 12 pares
   const [precioCostoInput, setPrecioCostoInput] = useState<number>(0);
   const [observacionItemInput, setObservacionItemInput] = useState<string>('');
@@ -913,53 +915,59 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     }
   };
 
-  // Cálculo dinámico de pares totales y distribución de curva según la serie real del modelo
-  const baseParesSerieSeleccionada = useMemo(() => {
-    if (!productoSeleccionado) return 6;
-    const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
-    if (prodTallas.length === 0) return 6;
-    const sum = prodTallas.reduce(
-      (acc: number, t: any) => acc + getCurvaRatio(t, prodTallas),
-      0
-    );
-    return sum || prodTallas.length || 6;
+  const serieNombreActiva = useMemo(() => {
+    if (!productoSeleccionado) return 'ADULTO';
+    return productoSeleccionado.serie?.name || productoSeleccionado.serieNombre || productoSeleccionado.serie || 'ADULTO';
   }, [productoSeleccionado]);
 
+  // Cálculo de pares totales de la orden
   const paresCalculados = useMemo(() => {
-    const base = subtipoCurva === 'MEDIA_DOCENA' ? baseParesSerieSeleccionada : baseParesSerieSeleccionada * 2;
+    const base = subtipoCurva === 'DOCENA' ? 12 : 6;
     return (cantidadCurvas || 1) * base;
-  }, [subtipoCurva, cantidadCurvas, baseParesSerieSeleccionada]);
+  }, [subtipoCurva, cantidadCurvas]);
 
+  // Previsualización y distribución exacta de tallas según curva de calzado (Media A, Media B, Docena)
   const distribucionPreview = useMemo(() => {
     if (!productoSeleccionado) return [];
     const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
-    
+    const curvaMap = getCurvaDocena(serieNombreActiva, subtipoCurva);
+    const hasCurva = Object.keys(curvaMap).length > 0;
+    const factorCurvas = cantidadCurvas || 1;
+
     if (prodTallas.length > 0) {
       const sortedTallas = [...prodTallas].sort((a: any, b: any) => {
         const numA = Number(a.numero ?? a.sizeNumber ?? a.talla ?? a.nombre) || 0;
         const numB = Number(b.numero ?? b.sizeNumber ?? b.talla ?? b.nombre) || 0;
         return numA - numB;
       });
+
       return sortedTallas.map((t: any) => {
-        const ratio = getCurvaRatio(t, prodTallas);
-        const factor = ratio * (subtipoCurva === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadCurvas || 1);
+        const num = Number(t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre) || 0;
+        let qty = 0;
+        if (hasCurva) {
+          qty = (curvaMap[num] || 0) * factorCurvas;
+        } else {
+          qty = (subtipoCurva === 'DOCENA' ? 2 : 1) * factorCurvas;
+        }
         return {
           tallaId: t.id || t.tallaId || '',
-          talla: t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre,
-          cantidad: factor,
+          talla: num || (t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre),
+          cantidad: qty,
         };
       });
     }
 
-    // Curva estándar
-    const ratios = [1, 1, 2, 1, 1]; // 6 pares base
-    const tallas = [34, 35, 36, 37, 38];
-    return tallas.map((t, i) => ({
+    // Tallas estándar de respaldo si no están cargadas en BD
+    const tallasFallback = serieNombreActiva.toUpperCase().includes('JUVENIL')
+      ? [34, 35, 36, 37, 38]
+      : [38, 39, 40, 41, 42];
+
+    return tallasFallback.map((num) => ({
       tallaId: '',
-      talla: t,
-      cantidad: ratios[i] * (subtipoCurva === 'MEDIA_DOCENA' ? 1 : 2) * (cantidadCurvas || 1),
+      talla: num,
+      cantidad: ((curvaMap[num] ?? (subtipoCurva === 'DOCENA' ? 2 : 1)) * factorCurvas),
     }));
-  }, [productoSeleccionado, subtipoCurva, cantidadCurvas]);
+  }, [productoSeleccionado, serieNombreActiva, subtipoCurva, cantidadCurvas]);
 
   // Agregar Modelo a la orden
   const handleAgregarModeloAOrden = (isEditingExisting: boolean = false) => {
@@ -1600,11 +1608,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
     const mensaje = `*COMPROBANTE DE PAGO A PROVEEDOR*\n\nEstimado/a *${p.supplier?.nombre || 'Proveedor'}*,\n\nLe confirmamos que se ha registrado un pago a su favor:\n\n💵 *Monto:* $${Number(p.monto).toFixed(2)}\n💳 *Método:* ${p.metodo}${p.banco ? ` (${p.banco})` : ''}\n📄 *Comprobante / Ref:* ${p.comprobante || 'N/A'}\n📅 *Fecha:* ${new Date(p.createdAt).toLocaleDateString('es-EC')}\n${p.notas ? `📝 *Concepto:* ${p.notas}\n` : ''}\n💼 *Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Comprobante emitido automáticamente._`;
 
-    const waUrl = numLimpio
-      ? `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`
-      : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-
-    window.open(waUrl, "_blank");
+    abrirWhatsAppUniversal(numLimpio, mensaje);
   };
 
   const handleAbrirDevolucionProveedor = (item?: any) => {
@@ -1749,11 +1753,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
     const mensaje = `*CONSTANCIA DE DEVOLUCIÓN DE CALZADO (GARANTÍA / FALLA)*\n\nEstimado/a *${dev.supplier?.razonSocial || 'Proveedor'}*,\n\nLe notificamos formalmente la devolución de mercadería por defecto / garantía:\n\n📄 *Comprobante N°:* ${dev.numeroCodigo || 'DEV-0001'}\n📅 *Fecha:* ${new Date(dev.createdAt).toLocaleDateString('es-EC')}\n📝 *Motivo:* ${dev.motivo || 'Falla de fábrica / defecto de fabricación'}\n\n👟 *DETALLE DE MERCADERÍA DEVUELTA:*\n${itemsDetalle}\n\n📦 *Total Pares Devueltos:* ${dev.totalPares || (dev.lines || []).reduce((acc: number, l: any) => acc + l.cantidad, 0)} pares\n💵 *Monto Total Devuelto:* $${Number(dev.totalDevuelto || 0).toFixed(2)}\n📉 *Descontado de Deuda / Saldo:* -$${Number(dev.deudaDescontada || dev.totalDevuelto || 0).toFixed(2)}\n💼 *Nuevo Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Constancia comercial emitida por sistema NEXORA._`;
 
-    const waUrl = numLimpio
-      ? `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensaje)}`
-      : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-
-    window.open(waUrl, "_blank");
+    abrirWhatsAppUniversal(numLimpio, mensaje);
   };
 
   const proveedoresFiltrados = useMemo(() => {
@@ -4292,8 +4292,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
               </button>
             </div>
 
-            <form onSubmit={handleCrearOrden} className="p-6 space-y-5 overflow-y-auto flex-1 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleCrearOrden} className="flex flex-col flex-1 overflow-hidden text-xs">
+              <div className="p-6 space-y-5 overflow-y-auto flex-1 pb-24 sm:pb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                     Proveedor Aprovisionador *
@@ -4456,37 +4457,46 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   <div className="p-3 bg-[var(--card)] rounded-xl border border-[var(--border)] space-y-3">
                     <div>
                       <span className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Seleccionar Curva de Serie:</span>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => setSubtipoCurva('MEDIA_DOCENA')}
-                          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                            subtipoCurva === 'MEDIA_DOCENA'
-                              ? 'bg-emerald-600 text-white border-transparent shadow-xs'
-                              : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]'
+                          onClick={() => setSubtipoCurva('MEDIA_A')}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                            subtipoCurva === 'MEDIA_A'
+                              ? 'bg-emerald-600 text-white border-transparent shadow-xs font-black'
+                              : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
                           }`}
                         >
-                          {baseParesSerieSeleccionada === 6 ? '½ Media Docena (6 pares)' : `Curva Serie (${baseParesSerieSeleccionada} pares)`}
+                          ½ Media A (6 pares: 38/1, 39/2, 40/1, 41/1, 42/1)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubtipoCurva('MEDIA_B')}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                            subtipoCurva === 'MEDIA_B'
+                              ? 'bg-emerald-600 text-white border-transparent shadow-xs font-black'
+                              : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
+                          }`}
+                        >
+                          ½ Media B (6 pares: 38/1, 39/1, 40/2, 41/1, 42/1)
                         </button>
                         <button
                           type="button"
                           onClick={() => setSubtipoCurva('DOCENA')}
-                          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                             subtipoCurva === 'DOCENA'
-                              ? 'bg-emerald-600 text-white border-transparent shadow-xs'
-                              : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]'
+                              ? 'bg-emerald-600 text-white border-transparent shadow-xs font-black'
+                              : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
                           }`}
                         >
-                          {baseParesSerieSeleccionada * 2 === 12 ? '1 Docena (12 pares)' : `Doble Serie (${baseParesSerieSeleccionada * 2} pares)`}
+                          1 Docena (12 pares: 38/2, 39/3, 40/3, 41/2, 42/2)
                         </button>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-xs font-bold text-[var(--foreground)]">
-                        {subtipoCurva === 'MEDIA_DOCENA'
-                          ? (baseParesSerieSeleccionada === 6 ? '¿Cuántas medias docenas?:' : '¿Cuántas series?:')
-                          : (baseParesSerieSeleccionada * 2 === 12 ? '¿Cuántas docenas?:' : '¿Cuántas doble series?:')}
+                        {subtipoCurva === 'DOCENA' ? '¿Cuántas docenas?:' : '¿Cuántas medias docenas?:'}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
@@ -4520,7 +4530,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                          DISTRIBUCIÓN DE CURVA ({subtipoCurva === 'MEDIA_DOCENA' ? 'MEDIA DOCENA' : 'DOCENA COMPLETA'}):
+                          DISTRIBUCIÓN DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
                         </span>
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
                           Serie: {distribucionPreview.map((d: any) => `${d.cantidad}/${d.talla}`).join(', ')}
@@ -4657,10 +4667,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                     })}
                   </div>
                 )}
+                </div>
               </div>
 
-              <div className="pt-4 border-t border-[var(--border)] flex items-center justify-between">
-                <div className="text-xs">
+              <div className="p-4 sm:p-5 border-t border-[var(--border)] bg-[var(--card)] flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-lg sticky bottom-0 z-10">
+                <div className="text-xs w-full sm:w-auto text-center sm:text-left">
                   <span className="text-[var(--muted-foreground)]">Total de la Orden: </span>
                   <span className="font-black text-[#0F172A] dark:text-amber-400 font-mono text-base ml-1">
                     ${orderLines.reduce((sum, l) => sum + (l.cantidadPedida * l.precioCosto), 0).toFixed(2)}
@@ -4673,7 +4684,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 <button
                   type="submit"
                   disabled={saving || orderLines.length === 0}
-                  className="px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700 cursor-pointer"
                 >
                   {saving ? 'Guardando...' : 'Guardar Borrador de Orden'}
                 </button>

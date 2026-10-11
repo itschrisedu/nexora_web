@@ -10,6 +10,8 @@ import {
   ArrowRightLeft, Building2, ChevronDown, ChevronUp, Palette
 } from "lucide-react";
 import { generarSiglaProveedor } from "../utils/text-formatters";
+import ImageLightboxModal from "./ui/image-lightbox-modal";
+import { calcularCurvaParaTallas, TipoCurva } from "../utils/curvas";
 
 interface InventarioProps {
   online: boolean;
@@ -141,7 +143,11 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   // Multiformato (Pares Sueltos vs Serie Completa)
   const [ingresoFormato, setIngresoFormato] = useState<"suelto" | "serie">("suelto");
   const [serieMultiplicador, setSerieMultiplicador] = useState<number>(1);
+  const [subtipoCurvaMov, setSubtipoCurvaMov] = useState<TipoCurva>('MEDIA_A');
   const [loteCantidades, setLoteCantidades] = useState<Record<string, number>>({});
+
+  // Lightbox visor de imágenes de calzado
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; title?: string } | null>(null);
 
   // Control de descartes y cierre seguro de modales
   const [showDiscardModal, setShowDiscardModal] = useState(false);
@@ -236,15 +242,27 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
     setShowMovModal(true);
   };
 
-  const aplicarPresetSerie = (mult: number) => {
-    setSerieMultiplicador(mult);
+  const aplicarCurvaRelativaMov = (tipo: TipoCurva, operacion: 'sumar' | 'restar') => {
     if (!movProd || !movProd.tallas || movProd.tallas.length === 0) return;
-    const paresPorTalla = Math.max(1, Math.round((12 * mult) / movProd.tallas.length));
-    const newLote: Record<string, number> = {};
+    const curva = calcularCurvaParaTallas(movProd.serie?.nombre || '', movProd.tallas, tipo);
+    const newLote: Record<string, number> = { ...loteCantidades };
     movProd.tallas.forEach((t) => {
-      newLote[t.id] = paresPorTalla;
+      const delta = curva[t.id] ?? 0;
+      const actual = newLote[t.id] || 0;
+      if (operacion === 'sumar') {
+        newLote[t.id] = actual + delta;
+      } else {
+        newLote[t.id] = Math.max(0, actual - delta);
+      }
     });
     setLoteCantidades(newLote);
+  };
+
+  const aplicarPresetSerie = (tipo: TipoCurva) => {
+    setSubtipoCurvaMov(tipo);
+    if (!movProd || !movProd.tallas || movProd.tallas.length === 0) return;
+    const curva = calcularCurvaParaTallas(movProd.serie?.nombre || '', movProd.tallas, tipo);
+    setLoteCantidades(curva);
   };
 
   const handleMovimiento = async (e: React.FormEvent) => {
@@ -321,14 +339,30 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
     setShowTransfModal(true);
   };
 
-  const aplicarPresetTransfSerie = (mult: number) => {
-    setTransfMultiplicador(mult);
+  const aplicarCurvaRelativaTransf = (tipo: TipoCurva, operacion: 'sumar' | 'restar') => {
     if (!transfProd || !transfProd.tallas || transfProd.tallas.length === 0) return;
-    const paresPorTalla = Math.max(1, Math.round((12 * mult) / transfProd.tallas.length));
+    const curva = calcularCurvaParaTallas(transfProd.serie?.nombre || '', transfProd.tallas, tipo);
+    const newLote: Record<string, number> = { ...transfLoteCantidades };
+    transfProd.tallas.forEach((t) => {
+      const delta = curva[t.id] ?? 0;
+      const actual = newLote[t.id] || 0;
+      const stockDisp = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+      if (operacion === 'sumar') {
+        newLote[t.id] = Math.min(stockDisp, actual + delta);
+      } else {
+        newLote[t.id] = Math.max(0, actual - delta);
+      }
+    });
+    setTransfLoteCantidades(newLote);
+  };
+
+  const aplicarPresetTransfSerie = (tipo: TipoCurva) => {
+    if (!transfProd || !transfProd.tallas || transfProd.tallas.length === 0) return;
+    const curva = calcularCurvaParaTallas(transfProd.serie?.nombre || '', transfProd.tallas, tipo);
     const newLote: Record<string, number> = {};
     transfProd.tallas.forEach((t) => {
       const stockDisp = t.stock ?? t.cantidad ?? t.disponible ?? 0;
-      newLote[t.id] = Math.min(stockDisp, paresPorTalla);
+      newLote[t.id] = Math.min(stockDisp, curva[t.id] ?? 0);
     });
     setTransfLoteCantidades(newLote);
   };
@@ -515,7 +549,14 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                 {/* Resumen Cabecera del Modelo */}
                 <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start sm:items-center gap-4">
-                    <div className="w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                    <div
+                      onClick={() => {
+                        const img = activeProduct?.fotoUrl || m.fotoUrl;
+                        if (img) setLightboxImage({ url: img, title: `${m.name} (${m.baseCode})` });
+                      }}
+                      className={`w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden ${(activeProduct?.fotoUrl || m.fotoUrl) ? 'cursor-zoom-in hover:opacity-90' : ''}`}
+                      title={(activeProduct?.fotoUrl || m.fotoUrl) ? "Ver foto ampliada del calzado" : ""}
+                    >
                       {activeProduct?.fotoUrl || m.fotoUrl ? (
                         <img
                           src={activeProduct?.fotoUrl || m.fotoUrl}
@@ -747,9 +788,9 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
       {/* MODAL MOVIMIENTO MULTIFORMATO */}
       {showMovModal && movProd && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowMovModal(false), isDirtyMov()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowMovModal(false), isDirtyMov()); }}>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+            <div className="p-5 sm:p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 font-bold ${
                   movType === "entrada" ? "text-emerald-400" : "text-rose-400"
@@ -773,228 +814,269 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleMovimiento} className="p-5 space-y-4">
-              {movType === "entrada" && (
-                <div className="space-y-4">
-                  {/* Selector de modo: Pares Sueltos vs Serie Completa */}
-                  <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setIngresoFormato("suelto")}
-                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                        ingresoFormato === "suelto"
-                          ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]"
-                          : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                      }`}
-                    >
-                      👟 Pares Sueltos
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIngresoFormato("serie");
-                        if (totalParesLote === 0) {
-                          aplicarPresetSerie(1);
-                        }
-                      }}
-                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                        ingresoFormato === "serie"
-                          ? "bg-emerald-600 text-white shadow-sm"
-                          : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                      }`}
-                    >
-                      📦 Serie Completa
-                    </button>
-                  </div>
-
-                  {/* Componente Interactivo Idéntico */}
-                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-3.5">
-                    {/* Cabecera del Producto */}
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-1 border-b border-[var(--border)]/50">
-                      <div>
-                        <h4 className="font-extrabold text-base text-[var(--foreground)] uppercase tracking-wide">
-                          {movProd.modelo || movProd.nombre}
-                        </h4>
-                        <p className="text-xs text-[var(--muted-foreground)]">
-                          <span className="font-semibold">{movProd.marca}</span>
-                          {movProd.nombre && movProd.modelo && <span> · {movProd.nombre}</span>}
-                          {movProd.serie?.nombre && (
-                            <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {movProd.serie.nombre}</span></span>
-                          )}
-                          {movProd.codigo && <span className="ml-1 opacity-70">({movProd.codigo})</span>}
-                        </p>
-                      </div>
-
-                      {/* Resumen Derecho de Pares, Docenas y Costo */}
-                      <div className="text-left sm:text-right shrink-0">
-                        <div className="font-extrabold text-xs text-[var(--foreground)]">
-                          {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} {totalParesLote > 0 ? `(${getDocenaLabel(totalParesLote)})` : ''}
-                        </div>
-                        {isAdmin && (
-                          <>
-                            <div className="text-[11px] text-[var(--muted-foreground)]">
-                              ${Number(movProd.precioCosto).toFixed(2)} / par
-                            </div>
-                            <div className="font-black text-sm text-emerald-600">
-                              ${(totalParesLote * Number(movProd.precioCosto)).toFixed(2)}
-                            </div>
-                          </>
-                        )}
-                      </div>
+            <form onSubmit={handleMovimiento} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 pb-6">
+                {movType === "entrada" && (
+                  <div className="space-y-4">
+                    {/* Selector de modo: Pares Sueltos vs Serie Completa */}
+                    <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setIngresoFormato("suelto")}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                          ingresoFormato === "suelto"
+                            ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]"
+                            : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                        }`}
+                      >
+                        👟 Pares Sueltos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIngresoFormato("serie");
+                          if (totalParesLote === 0) {
+                            aplicarPresetSerie('MEDIA_A');
+                          }
+                        }}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                          ingresoFormato === "serie"
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                        }`}
+                      >
+                        📦 Serie Completa
+                      </button>
                     </div>
 
-                    {/* Fila Principal: Foto | Pastillas de Tallas y Botones */}
-                    <div className="flex items-start gap-3.5">
-                      <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
-                        {movProd.fotoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={movProd.fotoUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <Package size={20} className="text-[var(--muted-foreground)]" />
-                        )}
-                      </div>
-
-                      <div className="space-y-2.5 flex-1 min-w-0">
-                        {/* Pastillas Interactivas por Talla */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          {movProd.tallas?.map((t) => {
-                            const qty = loteCantidades[t.id] ?? 0;
-                            return (
-                              <div
-                                key={t.id}
-                                className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
-                                  qty > 0
-                                    ? 'bg-emerald-500/10 border-emerald-500/40 text-[var(--foreground)]'
-                                    : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
-                                }`}
-                              >
-                                <span className="font-extrabold text-xs font-mono mr-0.5">
-                                  T{t.nombre || t.numero}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, qty - 1)})}
-                                  className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
-                                  title={`Restar 1 par T${t.nombre || t.numero}`}
-                                >
-                                  −
-                                </button>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={qty}
-                                  onChange={(e) => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, parseInt(e.target.value) || 0)})}
-                                  className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setLoteCantidades({...loteCantidades, [t.id]: qty + 1})}
-                                  className="w-5 h-5 flex items-center justify-center bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-md text-xs font-black transition-colors cursor-pointer"
-                                  title={`Sumar 1 par T${t.nombre || t.numero}`}
-                                >
-                                  +
-                                </button>
-                                <span className="text-[10px] text-[var(--muted-foreground)] font-mono ml-0.5" title={`Stock actual: ${t.stock}`}>
-                                  stk:{t.stock}
-                                </span>
-                              </div>
-                            );
-                          })}
+                    {/* Componente Interactivo Idéntico */}
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-3.5">
+                      {/* Cabecera del Producto */}
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-1 border-b border-[var(--border)]/50">
+                        <div>
+                          <h4 className="font-extrabold text-base text-[var(--foreground)] uppercase tracking-wide">
+                            {movProd.modelo || movProd.nombre}
+                          </h4>
+                          <p className="text-xs text-[var(--muted-foreground)]">
+                            <span className="font-semibold">{movProd.marca}</span>
+                            {movProd.nombre && movProd.modelo && <span> · {movProd.nombre}</span>}
+                            {movProd.serie?.nombre && (
+                              <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {movProd.serie.nombre}</span></span>
+                            )}
+                            {movProd.codigo && <span className="ml-1 opacity-70">({movProd.codigo})</span>}
+                          </p>
                         </div>
 
-                        {/* Acciones Rápidas Masivas */}
-                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newLote: Record<string, number> = {...loteCantidades};
-                              movProd.tallas?.forEach((t) => { newLote[t.id] = (newLote[t.id] || 0) + 1; });
-                              setLoteCantidades(newLote);
-                            }}
-                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                          >
-                            +1 par c/talla
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newLote: Record<string, number> = {...loteCantidades};
-                              movProd.tallas?.forEach((t) => { newLote[t.id] = Math.max(0, (newLote[t.id] || 0) - 1); });
-                              setLoteCantidades(newLote);
-                            }}
-                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                          >
-                            −1 par c/talla
-                          </button>
-                          {ingresoFormato === "serie" && (
+                        {/* Resumen Derecho de Pares, Docenas y Costo */}
+                        <div className="text-left sm:text-right shrink-0">
+                          <div className="font-extrabold text-xs text-[var(--foreground)]">
+                            {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} {totalParesLote > 0 ? `(${getDocenaLabel(totalParesLote)})` : ''}
+                          </div>
+                          {isAdmin && (
                             <>
-                              {[0.5, 1, 2].map(m => {
-                                const label = m === 0.5 ? "½ Docena" : m === 1 ? "1 Docena" : "2 Docenas";
+                              <div className="text-[11px] text-[var(--muted-foreground)]">
+                                ${Number(movProd.precioCosto).toFixed(2)} / par
+                              </div>
+                              <div className="font-black text-sm text-emerald-600">
+                                ${(totalParesLote * Number(movProd.precioCosto)).toFixed(2)}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Fila Principal: Foto | Pastillas de Tallas y Botones */}
+                      <div className="flex items-start gap-3.5">
+                        <div
+                          onClick={() => {
+                            if (movProd.fotoUrl) {
+                              setLightboxImage({ url: movProd.fotoUrl, title: `${movProd.modelo || movProd.nombre} (${movProd.codigo})` });
+                            }
+                          }}
+                          className={`w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs ${movProd.fotoUrl ? 'cursor-zoom-in hover:opacity-90' : ''}`}
+                          title={movProd.fotoUrl ? "Ver foto ampliada del calzado" : ""}
+                        >
+                          {movProd.fotoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={movProd.fotoUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Package size={20} className="text-[var(--muted-foreground)]" />
+                          )}
+                        </div>
+
+                        <div className="space-y-2.5 flex-1 min-w-0">
+                          {/* Pastillas Interactivas por Talla */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {movProd.tallas?.map((t) => {
+                              const qty = loteCantidades[t.id] ?? 0;
+                              return (
+                                <div
+                                  key={t.id}
+                                  className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
+                                    qty > 0
+                                      ? 'bg-emerald-500/10 border-emerald-500/40 text-[var(--foreground)]'
+                                      : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
+                                  }`}
+                                >
+                                  <span className="font-extrabold text-xs font-mono mr-0.5">
+                                    T{t.nombre || t.numero}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, qty - 1)})}
+                                    className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                                    title={`Restar 1 par T${t.nombre || t.numero}`}
+                                  >
+                                    −
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={qty}
+                                    onChange={(e) => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, parseInt(e.target.value) || 0)})}
+                                    className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setLoteCantidades({...loteCantidades, [t.id]: qty + 1})}
+                                    className="w-5 h-5 flex items-center justify-center bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                                    title={`Sumar 1 par T${t.nombre || t.numero}`}
+                                  >
+                                    +
+                                  </button>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-mono ml-0.5" title={`Stock actual: ${t.stock}`}>
+                                    stk:{t.stock}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Presets en modo Serie */}
+                          {ingresoFormato === "serie" && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1">Fijar Curva:</span>
+                              {(['MEDIA_A', 'MEDIA_B', 'DOCENA'] as TipoCurva[]).map((curv) => {
+                                const lbl = curv === 'MEDIA_A' ? '½ Media A' : curv === 'MEDIA_B' ? '½ Media B' : '1 Docena';
                                 return (
                                   <button
-                                    key={m}
+                                    key={curv}
                                     type="button"
-                                    onClick={() => aplicarPresetSerie(m)}
+                                    onClick={() => aplicarPresetSerie(curv)}
                                     className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer shadow-2xs ${
-                                      serieMultiplicador === m
-                                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-600"
+                                      subtipoCurvaMov === curv
+                                        ? "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 font-black"
                                         : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
                                     }`}
                                   >
-                                    📦 {label}
+                                    📦 {lbl}
                                   </button>
                                 );
                               })}
-                            </>
+                            </div>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newLote: Record<string, number> = {};
-                              movProd.tallas?.forEach((t) => { newLote[t.id] = 0; });
-                              setLoteCantidades(newLote);
-                            }}
-                            className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                          >
-                            ↺ Poner en 0
-                          </button>
-                          <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
-                            = {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} total
-                          </span>
+
+                          {/* Acciones Rápidas Masivas: Media A / Media B / Docena */}
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => aplicarCurvaRelativaMov('MEDIA_A', 'sumar')}
+                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title="Sumar curva Media A (38:1, 39:2, 40:1, 41:1, 42:1)"
+                            >
+                              + Media A
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => aplicarCurvaRelativaMov('MEDIA_B', 'sumar')}
+                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title="Sumar curva Media B (38:1, 39:1, 40:2, 41:1, 42:1)"
+                            >
+                              + Media B
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => aplicarCurvaRelativaMov('DOCENA', 'sumar')}
+                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title="Sumar 1 Docena completa (12 pares)"
+                            >
+                              + 1 Docena
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => aplicarCurvaRelativaMov('MEDIA_A', 'restar')}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title="Restar curva Media A"
+                            >
+                              − Media A
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => aplicarCurvaRelativaMov('MEDIA_B', 'restar')}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title="Restar curva Media B"
+                            >
+                              − Media B
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => aplicarCurvaRelativaMov('DOCENA', 'restar')}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title="Restar 1 Docena completa"
+                            >
+                              − 1 Docena
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newLote: Record<string, number> = {};
+                                movProd.tallas?.forEach((t) => { newLote[t.id] = 0; });
+                                setLoteCantidades(newLote);
+                              }}
+                              className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            >
+                              ↺ Poner en 0
+                            </button>
+                            <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
+                              = {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} total
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {movType === "salida" && (
-                <>
-                  <div>
-                    <Lbl t="Talla Seleccionada" req />
-                    <select value={movTallaId} onChange={(e) => setMovTallaId(e.target.value)} className={INPUT}>
-                      <option value="">Seleccionar talla...</option>
-                      {movProd.tallas?.map((t) => <option key={t.id} value={t.id}>Talla {t.nombre || t.numero} (stock: {t.stock})</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <Lbl t="Cantidad de Pares a Descargar" req />
-                    <input type="number" min="1" value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} className={INPUT} />
-                  </div>
-                </>
-              )}
-              <div>
-                <Lbl t="Motivo / Documento" req />
-                <input type="text" value={movMotivo} onChange={(e) => setMovMotivo(e.target.value)} placeholder={movType === "entrada" ? "Ej. Comprobante de recepción / Guía N° 001" : "Ej. Ajuste de inventario"} className={INPUT} />
-              </div>
-              {movError && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-                  <AlertCircle size={14} /> {movError}
+                {movType === "salida" && (
+                  <>
+                    <div>
+                      <Lbl t="Talla Seleccionada" req />
+                      <select value={movTallaId} onChange={(e) => setMovTallaId(e.target.value)} className={INPUT}>
+                        <option value="">Seleccionar talla...</option>
+                        {movProd.tallas?.map((t) => <option key={t.id} value={t.id}>Talla {t.nombre || t.numero} (stock: {t.stock})</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <Lbl t="Cantidad de Pares a Descargar" req />
+                      <input type="number" min="1" value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} className={INPUT} />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <Lbl t="Motivo / Documento" req />
+                  <input type="text" value={movMotivo} onChange={(e) => setMovMotivo(e.target.value)} placeholder={movType === "entrada" ? "Ej. Comprobante de recepción / Guía N° 001" : "Ej. Ajuste de inventario"} className={INPUT} />
                 </div>
-              )}
-              <button type="submit" disabled={movSaving} className={`w-full py-3 text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 ${movType === "entrada" ? "bg-emerald-600" : "bg-red-500"}`}>
-                {movSaving ? <><Loader2 size={16} className="animate-spin" /> Registrando...</> : movType === "entrada" ? <><TrendingUp size={16} /> Registrar Entrada ({ingresoFormato === "serie" ? `${totalParesLote} pares` : "Pares sueltos"})</> : <><TrendingDown size={16} /> Registrar Salida</>}
-              </button>
+                {movError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} /> {movError}
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] shrink-0">
+                <button type="submit" disabled={movSaving} className={`w-full py-3 text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 ${movType === "entrada" ? "bg-emerald-600" : "bg-red-500"}`}>
+                  {movSaving ? <><Loader2 size={16} className="animate-spin" /> Registrando...</> : movType === "entrada" ? <><TrendingUp size={16} /> Registrar Entrada ({ingresoFormato === "serie" ? `${totalParesLote} pares` : "Pares sueltos"})</> : <><TrendingDown size={16} /> Registrar Salida</>}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -1002,9 +1084,9 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
       {/* MODAL TRANSFERENCIA INTER-SUCURSAL */}
       {showTransfModal && transfProd && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransfModal(false), isDirtyTransf()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransfModal(false), isDirtyTransf()); }}>
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+            <div className="p-5 sm:p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-blue-500/20 backdrop-blur-sm rounded-2xl border border-blue-400/30 font-bold text-blue-300">
                   <ArrowRightLeft size={20} />
@@ -1027,262 +1109,294 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
               </button>
             </div>
 
-            <form onSubmit={handleTransferencia} className="p-5 space-y-4">
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-300">
-                <span>Transfiere pares físicos desde <strong>{activeSucursalId === 'TODAS' ? 'Matriz' : sucursales?.find(s => s.id === activeSucursalId)?.name || 'Matriz'}</strong> hacia otra sucursal del negocio. El stock se actualizará de inmediato en ambos locales.</span>
-              </div>
-
-              <div>
-                <Lbl t="Sucursal de Destino" req />
-                <select
-                  value={transfDestinoId}
-                  onChange={(e) => setTransfDestinoId(e.target.value)}
-                  className={INPUT}
-                >
-                  {(sucursales || [])
-                    .filter((s) => s.id !== activeSucursalId)
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.isMatriz ? "🏢 Matriz: " : "🏪 Sucursal: "} {s.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              {/* Selector de modo: Pares Sueltos vs Serie Completa */}
-              <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setTransfFormato("suelto")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                    transfFormato === "suelto"
-                      ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]"
-                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                  }`}
-                >
-                  👟 Pares Sueltos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTransfFormato("serie");
-                    if (totalParesTransf === 0) {
-                      aplicarPresetTransfSerie(1);
-                    }
-                  }}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                    transfFormato === "serie"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                  }`}
-                >
-                  📦 Serie Completa
-                </button>
-              </div>
-
-              {/* Componente Interactivo Idéntico */}
-              <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-3.5">
-                {/* Cabecera del Producto */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-1 border-b border-[var(--border)]/50">
-                  <div>
-                    <h4 className="font-extrabold text-base text-[var(--foreground)] uppercase tracking-wide">
-                      {transfProd.modelo || transfProd.nombre}
-                    </h4>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      <span className="font-semibold">{transfProd.marca}</span>
-                      {transfProd.nombre && transfProd.modelo && <span> · {transfProd.nombre}</span>}
-                      {transfProd.serie?.nombre && (
-                        <span> · <span className="text-blue-600 dark:text-blue-400 font-bold">Serie: {transfProd.serie.nombre}</span></span>
-                      )}
-                      {transfProd.codigo && <span className="ml-1 opacity-70">({transfProd.codigo})</span>}
-                    </p>
-                  </div>
-
-                  {/* Resumen Derecho de Pares, Docenas y Costo */}
-                  <div className="text-left sm:text-right shrink-0">
-                    <div className="font-extrabold text-xs text-[var(--foreground)]">
-                      {totalParesTransf} {totalParesTransf === 1 ? 'par' : 'pares'} {totalParesTransf > 0 ? `(${getDocenaLabel(totalParesTransf)})` : ''}
-                    </div>
-                    {isAdmin && (
-                      <>
-                        <div className="text-[11px] text-[var(--muted-foreground)]">
-                          ${Number(transfProd.precioCosto || transfProd.precioVenta || 0).toFixed(2)} / par
-                        </div>
-                        <div className="font-black text-sm text-blue-600 dark:text-blue-400">
-                          ${(totalParesTransf * Number(transfProd.precioCosto || transfProd.precioVenta || 0)).toFixed(2)}
-                        </div>
-                      </>
-                    )}
-                  </div>
+            <form onSubmit={handleTransferencia} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 pb-6">
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-300">
+                  <span>Transfiere pares físicos desde <strong>{activeSucursalId === 'TODAS' ? 'Matriz' : sucursales?.find(s => s.id === activeSucursalId)?.name || 'Matriz'}</strong> hacia otra sucursal del negocio. El stock se actualizará de inmediato en ambos locales.</span>
                 </div>
 
-                {/* Fila Principal: Foto | Pastillas de Tallas y Botones */}
-                <div className="flex items-start gap-3.5">
-                  <div className="w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
-                    {transfProd.fotoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={transfProd.fotoUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <Package size={20} className="text-[var(--muted-foreground)]" />
-                    )}
-                  </div>
+                <div>
+                  <Lbl t="Sucursal de Destino" req />
+                  <select
+                    value={transfDestinoId}
+                    onChange={(e) => setTransfDestinoId(e.target.value)}
+                    className={INPUT}
+                  >
+                    {(sucursales || [])
+                      .filter((s) => s.id !== activeSucursalId)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.isMatriz ? "🏢 Matriz: " : "🏪 Sucursal: "} {s.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
 
-                  <div className="space-y-2.5 flex-1 min-w-0">
-                    {/* Pastillas Interactivas por Talla */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {transfProd.tallas?.map((t) => {
-                        const qty = transfLoteCantidades[t.id] ?? 0;
-                        const stockDisp = t.stock ?? t.cantidad ?? t.disponible ?? 0;
-                        return (
-                          <div
-                            key={t.id}
-                            className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
-                              qty > 0
-                                ? 'bg-blue-500/10 border-blue-500/40 text-[var(--foreground)]'
-                                : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
-                            }`}
-                          >
-                            <span className="font-extrabold text-xs font-mono mr-0.5">
-                              T{t.nombre || t.numero}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setTransfLoteCantidades({...transfLoteCantidades, [t.id]: Math.max(0, qty - 1)})}
-                              className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
-                              title={`Restar 1 par T${t.nombre || t.numero}`}
-                            >
-                              −
-                            </button>
-                            <input
-                              type="number"
-                              min="0"
-                              max={stockDisp}
-                              value={qty}
-                              onChange={(e) => {
-                                const parsed = parseInt(e.target.value) || 0;
-                                const clamped = Math.max(0, Math.min(stockDisp, parsed));
-                                setTransfLoteCantidades({...transfLoteCantidades, [t.id]: clamped});
-                              }}
-                              className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
-                            />
-                            <button
-                              type="button"
-                              disabled={qty >= stockDisp}
-                              onClick={() => setTransfLoteCantidades({...transfLoteCantidades, [t.id]: Math.min(stockDisp, qty + 1)})}
-                              className="w-5 h-5 flex items-center justify-center bg-blue-500/15 hover:bg-blue-500/30 text-blue-600 dark:text-blue-400 rounded-md text-xs font-black transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                              title={`Sumar 1 par T${t.nombre || t.numero}`}
-                            >
-                              +
-                            </button>
-                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono ml-0.5" title={`Disponible en origen: ${stockDisp}`}>
-                              stk:{stockDisp}
-                            </span>
-                          </div>
-                        );
-                      })}
+                {/* Selector de modo: Pares Sueltos vs Serie Completa */}
+                <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setTransfFormato("suelto")}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                      transfFormato === "suelto"
+                        ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]"
+                        : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    👟 Pares Sueltos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTransfFormato("serie");
+                      if (totalParesTransf === 0) {
+                        aplicarPresetTransfSerie('MEDIA_A');
+                      }
+                    }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                      transfFormato === "serie"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    📦 Serie Completa
+                  </button>
+                </div>
+
+                {/* Componente Interactivo Idéntico */}
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-3.5">
+                  {/* Cabecera del Producto */}
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-1 border-b border-[var(--border)]/50">
+                    <div>
+                      <h4 className="font-extrabold text-base text-[var(--foreground)] uppercase tracking-wide">
+                        {transfProd.modelo || transfProd.nombre}
+                      </h4>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        <span className="font-semibold">{transfProd.marca}</span>
+                        {transfProd.nombre && transfProd.modelo && <span> · {transfProd.nombre}</span>}
+                        {transfProd.serie?.nombre && (
+                          <span> · <span className="text-blue-600 dark:text-blue-400 font-bold">Serie: {transfProd.serie.nombre}</span></span>
+                        )}
+                        {transfProd.codigo && <span className="ml-1 opacity-70">({transfProd.codigo})</span>}
+                      </p>
                     </div>
 
-                    {/* Acciones Rápidas Masivas */}
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newLote: Record<string, number> = {...transfLoteCantidades};
-                          transfProd.tallas?.forEach((t) => {
-                            const stockDisp = t.stock ?? t.cantidad ?? t.disponible ?? 0;
-                            newLote[t.id] = Math.min(stockDisp, (newLote[t.id] || 0) + 1);
-                          });
-                          setTransfLoteCantidades(newLote);
-                        }}
-                        className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                      >
-                        +1 par c/talla
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newLote: Record<string, number> = {...transfLoteCantidades};
-                          transfProd.tallas?.forEach((t) => {
-                            newLote[t.id] = Math.max(0, (newLote[t.id] || 0) - 1);
-                          });
-                          setTransfLoteCantidades(newLote);
-                        }}
-                        className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                      >
-                        −1 par c/talla
-                      </button>
-                      {transfFormato === "serie" && (
+                    {/* Resumen Derecho de Pares, Docenas y Costo */}
+                    <div className="text-left sm:text-right shrink-0">
+                      <div className="font-extrabold text-xs text-[var(--foreground)]">
+                        {totalParesTransf} {totalParesTransf === 1 ? 'par' : 'pares'} {totalParesTransf > 0 ? `(${getDocenaLabel(totalParesTransf)})` : ''}
+                      </div>
+                      {isAdmin && (
                         <>
-                          {[0.5, 1, 2].map(m => {
-                            const label = m === 0.5 ? "½ Docena" : m === 1 ? "1 Docena" : "2 Docenas";
+                          <div className="text-[11px] text-[var(--muted-foreground)]">
+                            ${Number(transfProd.precioCosto || transfProd.precioVenta || 0).toFixed(2)} / par
+                          </div>
+                          <div className="font-black text-sm text-blue-600 dark:text-blue-400">
+                            ${(totalParesTransf * Number(transfProd.precioCosto || transfProd.precioVenta || 0)).toFixed(2)}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Fila Principal: Foto | Pastillas de Tallas y Botones */}
+                  <div className="flex items-start gap-3.5">
+                    <div
+                      onClick={() => {
+                        if (transfProd.fotoUrl) {
+                          setLightboxImage({ url: transfProd.fotoUrl, title: `${transfProd.modelo || transfProd.nombre} (${transfProd.codigo})` });
+                        }
+                      }}
+                      className={`w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs ${transfProd.fotoUrl ? 'cursor-zoom-in hover:opacity-90' : ''}`}
+                      title={transfProd.fotoUrl ? "Ver foto ampliada del calzado" : ""}
+                    >
+                      {transfProd.fotoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={transfProd.fotoUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Package size={20} className="text-[var(--muted-foreground)]" />
+                      )}
+                    </div>
+
+                    <div className="space-y-2.5 flex-1 min-w-0">
+                      {/* Pastillas Interactivas por Talla */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {transfProd.tallas?.map((t) => {
+                          const qty = transfLoteCantidades[t.id] ?? 0;
+                          const stockDisp = t.stock ?? t.cantidad ?? t.disponible ?? 0;
+                          return (
+                            <div
+                              key={t.id}
+                              className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
+                                qty > 0
+                                  ? 'bg-blue-500/10 border-blue-500/40 text-[var(--foreground)]'
+                                  : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
+                              }`}
+                            >
+                              <span className="font-extrabold text-xs font-mono mr-0.5">
+                                T{t.nombre || t.numero}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setTransfLoteCantidades({...transfLoteCantidades, [t.id]: Math.max(0, qty - 1)})}
+                                className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                                title={`Restar 1 par T${t.nombre || t.numero}`}
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                min="0"
+                                max={stockDisp}
+                                value={qty}
+                                onChange={(e) => {
+                                  const parsed = parseInt(e.target.value) || 0;
+                                  const clamped = Math.max(0, Math.min(stockDisp, parsed));
+                                  setTransfLoteCantidades({...transfLoteCantidades, [t.id]: clamped});
+                                }}
+                                className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
+                              />
+                              <button
+                                type="button"
+                                disabled={qty >= stockDisp}
+                                onClick={() => setTransfLoteCantidades({...transfLoteCantidades, [t.id]: Math.min(stockDisp, qty + 1)})}
+                                className="w-5 h-5 flex items-center justify-center bg-blue-500/15 hover:bg-blue-500/30 text-blue-600 dark:text-blue-400 rounded-md text-xs font-black transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                title={`Sumar 1 par T${t.nombre || t.numero}`}
+                              >
+                                +
+                              </button>
+                              <span className="text-[10px] text-[var(--muted-foreground)] font-mono ml-0.5" title={`Disponible en origen: ${stockDisp}`}>
+                                stk:{stockDisp}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Presets en modo Serie */}
+                      {transfFormato === "serie" && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1">Fijar Curva:</span>
+                          {(['MEDIA_A', 'MEDIA_B', 'DOCENA'] as TipoCurva[]).map((curv) => {
+                            const lbl = curv === 'MEDIA_A' ? '½ Media A' : curv === 'MEDIA_B' ? '½ Media B' : '1 Docena';
                             return (
                               <button
-                                key={m}
+                                key={curv}
                                 type="button"
-                                onClick={() => aplicarPresetTransfSerie(m)}
-                                className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer shadow-2xs ${
-                                  transfMultiplicador === m
-                                    ? "bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400"
-                                    : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
-                                }`}
+                                onClick={() => aplicarPresetTransfSerie(curv)}
+                                className="px-2.5 py-1 rounded-xl border border-[var(--border)] text-[11px] font-bold text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-all cursor-pointer shadow-2xs"
                               >
-                                📦 {label}
+                                📦 {lbl}
                               </button>
                             );
                           })}
-                        </>
+                        </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newLote: Record<string, number> = {};
-                          transfProd.tallas?.forEach((t) => { newLote[t.id] = 0; });
-                          setTransfLoteCantidades(newLote);
-                        }}
-                        className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                      >
-                        ↺ Poner en 0
-                      </button>
-                      <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
-                        = {totalParesTransf} {totalParesTransf === 1 ? 'par' : 'pares'} total
-                      </span>
+
+                      {/* Acciones Rápidas Masivas: Media A / Media B / Docena */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => aplicarCurvaRelativaTransf('MEDIA_A', 'sumar')}
+                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          title="Sumar curva Media A según stock disponible"
+                        >
+                          + Media A
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => aplicarCurvaRelativaTransf('MEDIA_B', 'sumar')}
+                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          title="Sumar curva Media B según stock disponible"
+                        >
+                          + Media B
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => aplicarCurvaRelativaTransf('DOCENA', 'sumar')}
+                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          title="Sumar 1 Docena completa según stock disponible"
+                        >
+                          + 1 Docena
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => aplicarCurvaRelativaTransf('MEDIA_A', 'restar')}
+                          className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          title="Restar curva Media A"
+                        >
+                          − Media A
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => aplicarCurvaRelativaTransf('MEDIA_B', 'restar')}
+                          className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          title="Restar curva Media B"
+                        >
+                          − Media B
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => aplicarCurvaRelativaTransf('DOCENA', 'restar')}
+                          className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          title="Restar 1 Docena completa"
+                        >
+                          − 1 Docena
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newLote: Record<string, number> = {};
+                            transfProd.tallas?.forEach((t) => { newLote[t.id] = 0; });
+                            setTransfLoteCantidades(newLote);
+                          }}
+                          className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                        >
+                          ↺ Poner en 0
+                        </button>
+                        <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
+                          = {totalParesTransf} {totalParesTransf === 1 ? 'par' : 'pares'} total
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <Lbl t="Motivo / Guía Interna de Despacho" req />
-                <input
-                  type="text"
-                  value={transfMotivo}
-                  onChange={(e) => setTransfMotivo(e.target.value)}
-                  placeholder="Ej. Abastecimiento de mostrador para fin de semana"
-                  className={INPUT}
-                />
-              </div>
-
-              {transfError && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-                  <AlertCircle size={14} /> {transfError}
+                <div>
+                  <Lbl t="Motivo / Guía Interna de Despacho" req />
+                  <input
+                    type="text"
+                    value={transfMotivo}
+                    onChange={(e) => setTransfMotivo(e.target.value)}
+                    placeholder="Ej. Abastecimiento de mostrador para fin de semana"
+                    className={INPUT}
+                  />
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={transfSaving}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {transfSaving ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Despachando pares...
-                  </>
-                ) : (
-                  <>
-                    <ArrowRightLeft size={16} /> Confirmar Despacho a Sucursal ({transfFormato === "serie" ? `${totalParesTransf} pares` : "Pares sueltos"})
-                  </>
+                {transfError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} /> {transfError}
+                  </div>
                 )}
-              </button>
+              </div>
+
+              <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] shrink-0">
+                <button
+                  type="submit"
+                  disabled={transfSaving}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {transfSaving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Despachando pares...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRightLeft size={16} /> Confirmar Despacho a Sucursal ({transfFormato === "serie" ? `${totalParesTransf} pares` : "Pares sueltos"})
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -1304,6 +1418,14 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
             pendingCloseRef.current = null;
           }
         }}
+      />
+
+      {/* Visor interactivo de foto de calzado */}
+      <ImageLightboxModal
+        isOpen={Boolean(lightboxImage)}
+        imageUrl={lightboxImage?.url || ''}
+        title={lightboxImage?.title}
+        onClose={() => setLightboxImage(null)}
       />
     </div>
   );

@@ -29,6 +29,7 @@ import {
   formatearDireccion,
   capitalizarNombreCompleto,
 } from "../utils/text-formatters";
+import { abrirWhatsAppUniversal } from "../utils/whatsapp";
 
 interface ClientesProps {
   online: boolean;
@@ -610,14 +611,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
   const enviarWhatsAppInactivo = () => {
     if (!clienteWhatsApp || !clienteWhatsApp.telefono) return;
-    let tel = clienteWhatsApp.telefono.replace(/[^0-9]/g, '');
-    if (tel.startsWith('0')) {
-      tel = `593${tel.substring(1)}`;
-    } else if (!tel.startsWith('593')) {
-      tel = `593${tel}`;
-    }
-    const url = `https://wa.me/${tel}?text=${encodeURIComponent(mensajeWhatsAppCustom)}`;
-    window.open(url, '_blank');
+    abrirWhatsAppUniversal(clienteWhatsApp.telefono, mensajeWhatsAppCustom);
     setShowModalWhatsApp(false);
   };
 
@@ -1000,7 +994,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-extrabold text-sm text-[var(--foreground)] truncate capitalize">
-                            {capitalizarNombreCompleto(c.nombre)} {capitalizarNombreCompleto(c.apellido) || ""}
+                            {capitalizarNombreCompleto(c.apellido || '') ? `${capitalizarNombreCompleto(c.apellido || '')}, ` : ''}{capitalizarNombreCompleto(c.nombre || '')}
                           </h4>
                           <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)] flex-wrap">
                             {(c.cedula || c.ruc) && (
@@ -1128,7 +1122,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-semibold text-sm capitalize">{capitalizarNombreCompleto(c.nombre)} {capitalizarNombreCompleto(c.apellido) || ""}</span>
+                                  <span className="font-semibold text-sm capitalize">{capitalizarNombreCompleto(c.apellido || '') ? `${capitalizarNombreCompleto(c.apellido || '')}, ` : ''}{capitalizarNombreCompleto(c.nombre || '')}</span>
                                   {Number(c.saldoAFavor || 0) > 0 && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                                       <Wallet size={10} />
@@ -1210,7 +1204,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                     {(selected.nombre || "?").charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <div className="font-bold text-sm capitalize">{capitalizarNombreCompleto(selected.nombre)} {capitalizarNombreCompleto(selected.apellido) || ""}</div>
+                    <div className="font-bold text-sm capitalize">{capitalizarNombreCompleto(selected.apellido || '') ? `${capitalizarNombreCompleto(selected.apellido || '')}, ` : ''}{capitalizarNombreCompleto(selected.nombre || '')}</div>
                     <div className={`text-[10px] px-2 py-0.5 rounded-lg border inline-block mt-0.5 font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>
                       {selected.nivelCredito?.replace("_", " ")}
                     </div>
@@ -1408,7 +1402,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               </div>
               <div className="min-w-0">
                 <h3 className="font-extrabold text-sm text-white truncate capitalize">
-                  {capitalizarNombreCompleto(selected.nombre)} {capitalizarNombreCompleto(selected.apellido) || ""}
+                  {capitalizarNombreCompleto(selected.apellido || '') ? `${capitalizarNombreCompleto(selected.apellido || '')}, ` : ''}{capitalizarNombreCompleto(selected.nombre || '')}
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>

@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { generarUrlPublicaAbono } from './comprobante-url.service';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import { abrirWhatsAppUniversal } from '@/utils/whatsapp';
 
 export interface EntregaItemDetalle {
   modelo: string;
@@ -486,28 +487,8 @@ export async function compartirComprobanteAbonoPdf(
     doc.save(`Recibo_Abono_${cleanNum}.pdf`);
   }
 
-  // Apertura directa e inmediata de WhatsApp sin ventanas emergentes de Windows
-  const waUrl = `https://wa.me/${numLimpio}?text=${encodeURIComponent(mensajeTexto)}`;
-  try {
-    const win = window.open(waUrl, '_blank');
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-      const a = document.createElement('a');
-      a.href = waUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
-  } catch (e) {
-    const a = document.createElement('a');
-    a.href = waUrl;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
+  // Apertura directa universal de WhatsApp
+  abrirWhatsAppUniversal(numLimpio, mensajeTexto);
 
   return { metodo: 'DOWNLOAD_WHATSAPP' };
 }
