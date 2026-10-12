@@ -19,6 +19,7 @@ import {
   validarEmailEstricto,
   formatearTelefono,
   formatearDireccion,
+  formatearNombreSerie,
 } from "../utils/text-formatters";
 import { validarRuc, validarCedula } from "../utils/ecuador-validators";
 
@@ -182,7 +183,7 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
   if (typeof s === "string") {
     target = seriesList?.find(x => x.nombre === s || x.id === s);
     if (!target) {
-      return SERIES_NOMBRES[s] || s.toLowerCase().replace(/_/g, " ");
+      return formatearNombreSerie(s);
     }
   } else {
     target = s;
@@ -192,12 +193,12 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
     const sorted = [...target.tallas].sort((a, b) => a.numero - b.numero);
     const min = sorted[0].numero;
     const max = sorted[sorted.length - 1].numero;
-    const nombreClean = target.nombre.toLowerCase().replace(/_/g, " ");
+    const nombreClean = formatearNombreSerie(target.nombre);
     return `${nombreClean} (${min}-${max})`;
   }
 
   const nombreClean = target ? target.nombre : String(s);
-  return SERIES_NOMBRES[nombreClean] || nombreClean.toLowerCase().replace(/_/g, " ");
+  return formatearNombreSerie(nombreClean);
 };
 
 // Curvas estándar de distribución por serie

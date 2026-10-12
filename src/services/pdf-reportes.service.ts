@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { formatearNombreSerie } from '../utils/text-formatters';
 
 // ══════════════════════════════════════════════════════════════
 // INTERFACES GLOBALES DE REPORTES
@@ -683,7 +684,7 @@ export function generarReporteResumenEjecutivoPdf(data: ReporteResumenEjecutivoD
       doc.setFont('helvetica', 'bold');
       doc.text(m.modelName, x, y + 4.5); x += colW[1];
       doc.setFont('helvetica', 'normal');
-      doc.text(`${m.color} • ${m.serieNombre || 'General'}`, x, y + 4.5); x += colW[2];
+      doc.text(`${m.color} • ${formatearNombreSerie(m.serieNombre)}`, x, y + 4.5); x += colW[2];
       doc.text(`${m.pares} pares`, x, y + 4.5); x += colW[3];
       doc.setTextColor(16, 185, 129);
       doc.setFont('helvetica', 'bold');
@@ -831,7 +832,7 @@ export function generarReporteModelosRotacionPdf(data: ReporteModelosData): jsPD
     doc.setFont('helvetica', 'bold');
     doc.text(m.modelName, x, y + 5); x += colW[1];
     doc.setFont('helvetica', 'normal');
-    doc.text(`${m.color} • ${m.serieNombre || 'General'}`, x, y + 5); x += colW[2];
+    doc.text(`${m.color} • ${formatearNombreSerie(m.serieNombre)}`, x, y + 5); x += colW[2];
     doc.text(`${m.pares} pares`, x, y + 5); x += colW[3];
 
     doc.setTextColor(16, 185, 129);
@@ -1243,7 +1244,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
       doc.setFont('helvetica', 'bold');
       doc.text(m.modelName, x, y + 4.2); x += colW[1];
       doc.setFont('helvetica', 'normal');
-      doc.text(`${m.color} • ${m.serieNombre || 'General'}`, x, y + 4.2); x += colW[2];
+      doc.text(`${m.color} • ${formatearNombreSerie(m.serieNombre)}`, x, y + 4.2); x += colW[2];
       doc.text(`${m.pares} pares`, x, y + 4.2); x += colW[3];
       doc.setTextColor(16, 185, 129);
       doc.setFont('helvetica', 'bold');
@@ -1723,7 +1724,7 @@ export function generarReporteRendimientoSucursalesPdf(data: ReporteRendimientoS
     doc.text(`${m.ranking || idx + 1}`, xm, y + 4.2); xm += colWMod[0];
     doc.text(m.modelName.substring(0, 28), xm, y + 4.2); xm += colWMod[1];
     doc.setFont('helvetica', 'normal');
-    doc.text(`${m.color} · ${m.serieNombre || ''}`.substring(0, 18), xm, y + 4.2); xm += colWMod[2];
+    doc.text(`${m.color} · ${formatearNombreSerie(m.serieNombre)}`.substring(0, 18), xm, y + 4.2); xm += colWMod[2];
     doc.text(`${m.paresVendidos}`, xm, y + 4.2); xm += colWMod[3];
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(16, 185, 129);

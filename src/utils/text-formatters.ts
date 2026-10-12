@@ -358,3 +358,53 @@ export function generarCodigoBaseModelo(nombreCalzado: string, codigosExistentes
   return `${prefijo}-${sufijo}`;
 }
 
+/**
+ * Normaliza y formatea el nombre de una serie o categoría de calzado:
+ * - Resuelve el problema de caracteres no ASCII en expresiones regulares (evita "NiñO" o "PequeñO").
+ * - Convierte identificadores de base de datos ("NINO", "NINO_PEQUENO_A", "BEBE", "ADULTO", etc.) en texto legible.
+ * - Capitaliza de forma segura cada palabra preservando caracteres en español.
+ */
+export function formatearNombreSerie(serieNombre?: string | null): string {
+  if (!serieNombre) return "Estándar";
+  let s = String(serieNombre).trim();
+  if (!s || s === "—" || s === "undefined" || s === "null") return "Estándar";
+
+  // Reemplazar guiones bajos por espacios
+  s = s.replace(/_/g, " ");
+
+  const MAPA_SERIES: Record<string, string> = {
+    ADULTO: "Adulto",
+    JUVENIL: "Juvenil",
+    JUNIOR: "Junior",
+    NINO: "Niño",
+    NIÑO: "Niño",
+    "NINO PEQUENO A": "Niño Pequeño",
+    "NIÑO PEQUEÑO A": "Niño Pequeño",
+    "NIÑO PEQUEÑO": "Niño Pequeño",
+    "NINO PEQUENO": "Niño Pequeño",
+    PEQUENO: "Pequeño",
+    PEQUEÑO: "Pequeño",
+    BEBE: "Bebé",
+    "TALLA GRANDE": "Talla Grande",
+    ESTANDAR: "Estándar",
+    GENERAL: "General",
+  };
+
+  const upper = s.toUpperCase().trim();
+  if (MAPA_SERIES[upper]) {
+    return MAPA_SERIES[upper];
+  }
+
+  return s
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((palabra) => {
+      const pUpper = palabra.toUpperCase();
+      if (pUpper === "NINO" || pUpper === "NIÑO") return "Niño";
+      if (pUpper === "PEQUENO" || pUpper === "PEQUEÑO") return "Pequeño";
+      if (pUpper === "BEBE") return "Bebé";
+      return palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+

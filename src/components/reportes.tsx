@@ -58,6 +58,7 @@ import {
   ModeloReporte,
   VendedorReporte,
 } from '@/services/pdf-reportes.service';
+import { formatearNombreSerie } from '@/utils/text-formatters';
 import { jsPDF } from 'jspdf';
 
 type PeriodoTipo = 'HOY' | 'SEMANAL' | 'MENSUAL' | 'TRIMESTRAL' | 'ANUAL' | 'PERSONALIZADO';
@@ -1819,7 +1820,7 @@ export default function ReportesComponent() {
                                       {m.modelName}
                                     </div>
                                     <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                                      {m.color} · {m.serieNombre}
+                                      {m.color} · {formatearNombreSerie(m.serieNombre)}
                                     </div>
                                   </div>
                                 </div>
@@ -1913,7 +1914,7 @@ export default function ReportesComponent() {
                                   <td className="py-3 px-4">
                                     <div className="font-semibold text-[11px]">{m.color}</div>
                                     <div className="text-[10px] text-[var(--muted-foreground)]">
-                                      Serie: {m.serieNombre || 'General'}
+                                      Serie: {formatearNombreSerie(m.serieNombre)}
                                     </div>
                                   </td>
                                   <td className="py-3 px-4 text-center">
@@ -2050,7 +2051,7 @@ export default function ReportesComponent() {
                       <div className="min-w-0 flex-1 pr-6">
                         <span className="font-black text-xs text-[var(--foreground)] block truncate">{m.modelName}</span>
                         <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                          Color: <strong className="text-[var(--foreground)]">{m.color}</strong> • {m.serieNombre}
+                          Color: <strong className="text-[var(--foreground)]">{m.color}</strong> • {formatearNombreSerie(m.serieNombre)}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs font-black text-emerald-600">
@@ -3122,7 +3123,7 @@ export default function ReportesComponent() {
                       <div>
                         <div className="font-bold">{l.modelName || l.nombre}</div>
                         <div className="text-[10px] text-[var(--muted-foreground)]">
-                          Talla: {l.talla} · {l.color} {l.serie ? `· Serie ${l.serie}` : ''}
+                          Talla: {l.talla} · {l.color} {l.serie ? `· Serie ${formatearNombreSerie(l.serie)}` : ''}
                         </div>
                       </div>
                       <div className="text-right">

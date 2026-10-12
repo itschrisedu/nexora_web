@@ -39,7 +39,7 @@ import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
 import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
 import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock } from '../utils/curvas';
-import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import { capitalizarNombreCompleto, formatearNombreSerie } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 import ImageLightboxModal from './ui/image-lightbox-modal';
 import NuevoClienteModal from './ui/nuevo-cliente-modal';
@@ -778,7 +778,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       }
 
       const notaFinal = [
-        `Modelo: ${supplierOrderProductData.modelName} (${supplierOrderProductData.color}) - Serie: ${supplierOrderProductData.serieNombre || 'Estándar'}`,
+        `Modelo: ${supplierOrderProductData.modelName} (${supplierOrderProductData.color}) - Serie: ${formatearNombreSerie(supplierOrderProductData.serieNombre)}`,
         detalleNumeracion,
         supplierOrderObservaciones.trim() ? `Observaciones: ${supplierOrderObservaciones.trim()}` : '',
       ].filter(Boolean).join(' | ');
@@ -1007,7 +1007,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         const resolvedImg = item.imageUrl || item.producto?.imageUrl || item.variante?.imageUrl || catProd?.imageUrl || null;
         const resolvedModelName = item.modelName || item.nombre || catProd?.modelName || 'Calzado';
         const resolvedColor = item.color || catProd?.color || 'Color estándar';
-        const resolvedSerie = item.serieNombre || item.serie || catProd?.serieNombre || 'Serie';
+        const resolvedSerie = formatearNombreSerie(item.serieNombre || item.serie || catProd?.serieNombre || 'Serie');
         const resolvedCode = item.codigo || item.code || catProd?.code || '';
 
         const totalPares = lineas.reduce((sum, l) => sum + (l.cantidad || 0), 0);
@@ -1191,7 +1191,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         const resolvedImg = item.imageUrl || item.producto?.imageUrl || item.variante?.imageUrl || catProd?.imageUrl || null;
         const resolvedModelName = item.modelName || item.nombre || catProd?.modelName || 'Calzado';
         const resolvedColor = item.color || catProd?.color || 'Color estándar';
-        const resolvedSerie = item.serieNombre || item.serie || catProd?.serieNombre || 'Serie';
+        const resolvedSerie = formatearNombreSerie(item.serieNombre || item.serie || catProd?.serieNombre || 'Serie');
         const resolvedCode = item.codigo || item.code || catProd?.code || '';
 
         const totalParesEntregados = lineas.reduce((sum, l) => sum + Number(l.cantidadEntregada !== undefined ? l.cantidadEntregada : (l.cantidad || 0)), 0);
@@ -2586,7 +2586,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                             <div className="flex items-start justify-between gap-1">
                                               <div className="min-w-0">
                                                 <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate">
-                                                  {g.color ? `${g.color} · ${g.serieNombre || 'Calzado'}` : (g.serieNombre || 'Calzado')}
+                                                  {g.color ? `${g.color} · ${formatearNombreSerie(g.serieNombre)}` : formatearNombreSerie(g.serieNombre)}
                                                 </div>
                                                 <h4 className="font-extrabold text-xs text-[var(--foreground)] truncate">
                                                   {g.modelName}
@@ -3455,7 +3455,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   }`}
                                   title={`Filtrar variantes de serie ${ser}`}
                                 >
-                                  <span>{ser}</span>
+                                  <span>{formatearNombreSerie(ser)}</span>
                                   <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isActiva ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'}`}>
                                     {count}
                                   </span>
@@ -3480,7 +3480,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                               {productoSeleccionadoObj.modelName} — {productoSeleccionadoObj.color}
                             </div>
                             <div className="text-[11px] font-semibold text-emerald-700">
-                              Serie: {productoSeleccionadoObj.serieNombre || 'Serie Estándar'}
+                              Serie: {formatearNombreSerie(productoSeleccionadoObj.serieNombre)}
                             </div>
                           </div>
                         </div>
@@ -3639,7 +3639,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                               Color: <strong className="text-[var(--foreground)]">{p.color}</strong>
                                             </span>
                                             <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                              Serie: {p.serieNombre || 'Estándar'}
+                                              Serie: {formatearNombreSerie(p.serieNombre)}
                                             </span>
                                             {ventasTotal > 0 && (
                                               <span className="text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
@@ -3817,9 +3817,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                         ? `${mediasDocenasCount} Medias Docenas`
                         : `${totalParesConfig} pares`;
 
-                      const serieNombreDisplay = tipoVentaItem === 'SERIE_ESPECIAL'
-                        ? (listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.nombre?.replace(/_/g, ' ') || 'Serie Especial')
-                        : (prodObj.serieNombre || 'ADULTO');
+                      const serieNombreDisplay = formatearNombreSerie(
+                        tipoVentaItem === 'SERIE_ESPECIAL'
+                          ? listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.nombre || 'Serie Especial'
+                          : prodObj.serieNombre || 'ADULTO'
+                      );
 
                       return (
                         <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3">
@@ -4164,7 +4166,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   {primerItem.modelName}
                                 </div>
                                 <div className="text-xs text-[var(--muted-foreground)]">
-                                  {primerItem.color} · <span className="font-semibold text-emerald-600">Serie: {primerItem.serieNombre || 'Estándar'}</span>
+                                  {primerItem.color} · <span className="font-semibold text-emerald-600">Serie: {formatearNombreSerie(primerItem.serieNombre)}</span>
                                 </div>
 
                                 {/* Chips de Tallas Interactivos y Editables con diseño estandarizado (Photo 1) */}
@@ -4525,7 +4527,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                   {supplierOrderProductData.modelName} ({supplierOrderProductData.color})
                 </p>
                 <p className="text-[11px] text-purple-700 font-semibold">
-                  Serie: {supplierOrderProductData.serieNombre || 'Especial'}
+                  Serie: {formatearNombreSerie(supplierOrderProductData.serieNombre)}
                 </p>
               </div>
 
@@ -5456,7 +5458,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                             <div className="text-xs text-[var(--muted-foreground)]">
                               {g.color ? `${g.color.toUpperCase()} · ` : ''}
                               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                                Serie: {g.serieNombre.toUpperCase()}
+                                Serie: {formatearNombreSerie(g.serieNombre)}
                               </span>
                             </div>
 
@@ -5823,7 +5825,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                 {prod.modelName} {prod.color ? `· ${prod.color}` : ''}
                               </h4>
                               <p className="text-[11px] text-emerald-600 font-semibold">
-                                Serie: {prod.serieNombre} · {prod.totalPares} pares
+                                Serie: {formatearNombreSerie(prod.serieNombre)} · {prod.totalPares} pares
                               </p>
                               <p className="text-[10px] text-[var(--muted-foreground)]">
                                 Precio previo: ${prod.precioActual.toFixed(2)} / par

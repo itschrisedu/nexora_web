@@ -65,6 +65,7 @@ import {
   validarEmailEstricto,
   formatearTelefono,
   formatearDireccion,
+  formatearNombreSerie,
 } from '../utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 
@@ -2614,7 +2615,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                                 <span className="font-semibold">{m.marca}</span>
                                 {m.color && <span> • {m.color}</span>}
                                 {m.serieNombre && (
-                                  <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {m.serieNombre}</span></span>
+                                  <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {formatearNombreSerie(m.serieNombre)}</span></span>
                                 )}
                                 {m.codigo && <span className="ml-1 opacity-70">({m.codigo})</span>}
                               </p>
@@ -3044,7 +3045,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               <span>{color}</span>
                               <span>·</span>
                               <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-                                Serie: {serie}
+                                Serie: {formatearNombreSerie(serie)}
                               </span>
                               {firstLine.supplierNombre && (
                                 <>
@@ -3345,7 +3346,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                               <div className="flex gap-2 text-[10px] text-[var(--muted-foreground)]">
                                 <span>Cód: {line.codigo}</span>
                                 {line.color && <span>• Color: {line.color}</span>}
-                                {line.serie && <span>• Serie: {line.serie}</span>}
+                                {line.serie && <span>• Serie: {formatearNombreSerie(line.serie)}</span>}
                               </div>
                               {line.observacionLinea && (() => {
                                 const obs = line.observacionLinea;
@@ -4383,7 +4384,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                           {productoSeleccionado.nombre || productoSeleccionado.name} — {productoSeleccionado.color}
                         </div>
                         <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                          Marca: {productoSeleccionado.marca} • Cód: {productoSeleccionado.codigo} • Serie: {productoSeleccionado.serie?.name || 'Estándar'}
+                          Marca: {productoSeleccionado.marca} • Cód: {productoSeleccionado.codigo} • Serie: {formatearNombreSerie(productoSeleccionado.serie?.name)}
                         </div>
                       </div>
                     </div>
@@ -5474,7 +5475,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                                     <span>{m.color}</span>
                                     <span>·</span>
                                     <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-                                      Serie: {m.serie}
+                                      Serie: {formatearNombreSerie(m.serie)}
                                     </span>
                                   </div>
                                 </div>

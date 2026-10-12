@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "./ui/toast";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
-import { capitalizarNombreCompleto } from "@/utils/text-formatters";
+import { capitalizarNombreCompleto, formatearNombreSerie } from "@/utils/text-formatters";
 import {
   generarUrlPublicaVentaPOS,
   armarMensajeWhatsAppVentaPOS,
@@ -100,21 +100,6 @@ interface GrupoModeloPos {
   totalStockGeneral: number;
 }
 
-function formatearNombreSerie(serieNombre?: string) {
-  if (!serieNombre) return "General";
-  let s = serieNombre.replace(/_/g, " ");
-  s = s
-    .replace(/\bNINO\b/gi, "Niño")
-    .replace(/\bPEQUENO\b/gi, "Pequeño")
-    .replace(/\bBEBE\b/gi, "Bebé")
-    .replace(/\bTALLA GRANDE\b/gi, "Talla Grande");
-  return s
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
-    .join(" ");
-}
 
 const SERIE_ORDEN_PESO: Record<string, number> = {
   BEBE: 1,
@@ -2412,7 +2397,7 @@ export default function PosComponent() {
                           <span>{linea.color || "Color Estándar"}</span>
                           <span>·</span>
                           <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                            Serie: {linea.serie || "General"}
+                            Serie: {formatearNombreSerie(linea.serie)}
                           </span>
                         </div>
                       </div>

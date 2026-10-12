@@ -64,7 +64,7 @@ import {
 } from '../services/pdf-abono.service';
 import { generarUrlPublicaAbono } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
-import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import { capitalizarNombreCompleto, formatearNombreSerie } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 
 interface FinancieroProps {
@@ -366,11 +366,11 @@ const getNombreSerie = (s: any, tallas?: any[]): string => {
   if (tallasNums.length > 0) {
     const min = Math.min(...tallasNums);
     const max = Math.max(...tallasNums);
-    const nombreClean = nombre.toLowerCase().replace(/_/g, " ");
+    const nombreClean = formatearNombreSerie(nombre);
     return `${nombreClean} (${min}-${max})`;
   }
 
-  return nombre.toLowerCase().replace(/_/g, " ");
+  return formatearNombreSerie(nombre);
 };
 
 function agruparLineasPorModelo(lines: any[], catalogo?: any[]): GrupoModeloResumen[] {
@@ -3943,7 +3943,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                   {grupo.modelName}
                                 </h4>
                                 <div className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                                  {grupo.color} · <span className="font-semibold text-emerald-600 dark:text-emerald-400">Serie: {grupo.serieNombre || 'ADULTO'}</span>
+                                  {grupo.color} · <span className="font-semibold text-emerald-600 dark:text-emerald-400">Serie: {formatearNombreSerie(grupo.serieNombre || 'ADULTO')}</span>
                                 </div>
                               </div>
 

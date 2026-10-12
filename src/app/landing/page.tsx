@@ -35,6 +35,7 @@ import {
 import { getContrastColor } from "@/components/ui/color-picker";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
 import SlideToVerifyModal, { isHumanVerified } from "@/components/slide-to-verify-modal";
+import { formatearNombreSerie } from "@/utils/text-formatters";
 
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const API_BASE_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl.replace(/\/+$/, '')}/api`;
@@ -1997,7 +1998,7 @@ function LandingContent() {
                           <div className="text-[11px] text-slate-500 mt-0.5 space-x-1">
                             <span>Color: <strong className="text-slate-700">{item.color}</strong></span>
                             <span>·</span>
-                            <span>Serie: <strong className="text-amber-700">{item.serieNombre}</strong></span>
+                            <span>Serie: <strong className="text-amber-700">{formatearNombreSerie(item.serieNombre)}</strong></span>
                           </div>
 
                           <div className="mt-1">

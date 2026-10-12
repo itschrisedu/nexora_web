@@ -9,7 +9,7 @@ import {
   RefreshCw, AlertTriangle, X, CheckCircle, AlertCircle, ImageIcon,
   ArrowRightLeft, Building2, ChevronDown, ChevronUp, Palette
 } from "lucide-react";
-import { generarSiglaProveedor } from "../utils/text-formatters";
+import { generarSiglaProveedor, formatearNombreSerie } from "../utils/text-formatters";
 import ImageLightboxModal from "./ui/image-lightbox-modal";
 import { calcularCurvaParaTallas, TipoCurva } from "../utils/curvas";
 
@@ -86,12 +86,12 @@ const getNombreSerie = (s: any, tallas?: any[]): string => {
     if (nums.length > 0) {
       const min = Math.min(...nums);
       const max = Math.max(...nums);
-      const nombreClean = nombre.toLowerCase().replace(/_/g, " ");
+      const nombreClean = formatearNombreSerie(nombre);
       return `${nombreClean} (${min}-${max})`;
     }
   }
 
-  return SERIES_NOMBRES[nombre] || nombre.toLowerCase().replace(/_/g, " ");
+  return formatearNombreSerie(nombre);
 };
 
 function getDocenaLabel(pares: number): string {
@@ -874,7 +874,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                             <span className="font-semibold">{movProd.marca}</span>
                             {movProd.nombre && movProd.modelo && <span> · {movProd.nombre}</span>}
                             {movProd.serie?.nombre && (
-                              <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {movProd.serie.nombre}</span></span>
+                              <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {formatearNombreSerie(movProd.serie.nombre)}</span></span>
                             )}
                             {movProd.codigo && <span className="ml-1 opacity-70">({movProd.codigo})</span>}
                           </p>
@@ -1188,7 +1188,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                         <span className="font-semibold">{transfProd.marca}</span>
                         {transfProd.nombre && transfProd.modelo && <span> · {transfProd.nombre}</span>}
                         {transfProd.serie?.nombre && (
-                          <span> · <span className="text-blue-600 dark:text-blue-400 font-bold">Serie: {transfProd.serie.nombre}</span></span>
+                          <span> · <span className="text-blue-600 dark:text-blue-400 font-bold">Serie: {formatearNombreSerie(transfProd.serie.nombre)}</span></span>
                         )}
                         {transfProd.codigo && <span className="ml-1 opacity-70">({transfProd.codigo})</span>}
                       </p>

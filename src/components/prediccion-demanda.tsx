@@ -26,6 +26,7 @@ import {
   Search,
 } from "lucide-react";
 import { useToast } from "./ui/toast";
+import { formatearNombreSerie } from "@/utils/text-formatters";
 
 interface ItemPrediccion {
   modelo: string;
@@ -613,7 +614,7 @@ export default function PrediccionDemandaComponent() {
                       Reabastecimiento para {temporadaInfoActual.nombre}
                     </h3>
                     <p className="text-[11px] text-slate-300">
-                      {pedidoModalItem.modelo} · {pedidoModalItem.serie} (Talla {pedidoModalItem.talla})
+                      {pedidoModalItem.modelo} · {formatearNombreSerie(pedidoModalItem.serie)} (Talla {pedidoModalItem.talla})
                     </p>
                   </div>
                 </div>
