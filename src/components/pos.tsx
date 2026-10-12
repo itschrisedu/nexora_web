@@ -103,10 +103,17 @@ interface GrupoModeloPos {
 function formatearNombreSerie(serieNombre?: string) {
   if (!serieNombre) return "General";
   let s = serieNombre.replace(/_/g, " ");
-  s = s.replace(/\bNINO\b/gi, "Niño").replace(/\bPEQUENO\b/gi, "Pequeño").replace(/\bBEBE\b/gi, "Bebé");
+  s = s
+    .replace(/\bNINO\b/gi, "Niño")
+    .replace(/\bPEQUENO\b/gi, "Pequeño")
+    .replace(/\bBEBE\b/gi, "Bebé")
+    .replace(/\bTALLA GRANDE\b/gi, "Talla Grande");
   return s
-    .toLowerCase()
-    .replace(/\b\w/g, (l) => l.toUpperCase());
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join(" ");
 }
 
 const SERIE_ORDEN_PESO: Record<string, number> = {

@@ -15,13 +15,27 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "NEXORA - Sistema de Gestión Comercial",
   description: "Plataforma SaaS para el control operativo del ciclo de comercialización",
+  manifest: "/manifest.json",
   icons: {
     icon: [
-      { url: "/logo.png", type: "image/png" },
-      { url: "/favicon.ico" }
+      { url: "/logo.png", type: "image/png", sizes: "512x512" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/favicon.ico" },
     ],
     shortcut: "/logo.png",
-    apple: "/logo.png",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "NEXORA",
+    statusBarStyle: "black-translucent",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "msapplication-TileImage": "/logo.png",
+    "msapplication-TileColor": "#0F172A",
   },
 };
 
