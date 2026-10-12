@@ -36,6 +36,7 @@ import { getContrastColor } from "@/components/ui/color-picker";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
 import SlideToVerifyModal, { isHumanVerified } from "@/components/slide-to-verify-modal";
 import { formatearNombreSerie } from "@/utils/text-formatters";
+import { updateTabFavicon } from "@/utils/favicon";
 
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const API_BASE_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl.replace(/\/+$/, '')}/api`;
@@ -267,14 +268,7 @@ function LandingContent() {
         const json = await res.json();
         setData(json);
         if (json?.negocio) {
-          const iconUrl = json.negocio.logoUrl || '/logo.png';
-          let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-          if (!link) {
-            link = document.createElement('link');
-            link.rel = 'icon';
-            document.head.appendChild(link);
-          }
-          link.href = iconUrl;
+          updateTabFavicon(json.negocio.logoUrl);
           document.title = `${json.negocio.nombreNegocio || 'Calzado de Cuero'} | NEXORA`;
         }
 

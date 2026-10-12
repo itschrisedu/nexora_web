@@ -50,6 +50,7 @@ import SubscriptionGraceBanner from '@/components/ui/SubscriptionGraceBanner';
 import UnsavedChangesModal from '@/components/ui/unsaved-changes-modal';
 import { getUnsavedChanges, clearUnsavedChanges, UnsavedChangesDetail } from '@/utils/unsaved-changes';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import { updateTabFavicon } from '@/utils/favicon';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
@@ -348,9 +349,21 @@ function MainApp() {
       }
       if (e.detail?.nombre) {
         setBusinessNombre(e.detail.nombre);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('nexora_business_nombre', e.detail.nombre);
+        }
       }
-      if (e.detail?.logoUrl) {
-        setBusinessLogo(e.detail.logoUrl);
+      if (e.detail?.logoUrl !== undefined) {
+        const newLogo = e.detail.logoUrl || '';
+        setBusinessLogo(newLogo);
+        if (typeof window !== 'undefined') {
+          if (newLogo) {
+            localStorage.setItem('nexora_business_logo', newLogo);
+          } else {
+            localStorage.removeItem('nexora_business_logo');
+          }
+        }
+        updateTabFavicon(newLogo);
       }
     };
     window.addEventListener('nexora:theme-changed', handleThemeChange);
@@ -507,8 +520,23 @@ function MainApp() {
     }
   };
 
-  const [businessLogo, setBusinessLogo] = useState<string>('');
-  const [businessNombre, setBusinessNombre] = useState<string>('');
+  const [businessLogo, setBusinessLogo] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('nexora_business_logo') || '';
+    }
+    return '';
+  });
+  const [businessNombre, setBusinessNombre] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return localStorage.getItem('nexora_business_nombre') || u?.tenantName || '';
+      } catch {
+        return '';
+      }
+    }
+    return '';
+  });
 
   const fetchBusinessBranding = async () => {
     try {
@@ -518,15 +546,42 @@ function MainApp() {
         if (parsed?.rol === 'ROL_SUPER_ADMIN') {
           setBusinessNombre('NEXORA GLOBAL');
           setBusinessLogo('');
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('nexora_business_logo');
+            localStorage.setItem('nexora_business_nombre', 'NEXORA GLOBAL');
+          }
           applyBrandingColor('#0F172A');
+          updateTabFavicon('/favicon.ico');
           return;
         }
-        if (parsed?.tenantName) setBusinessNombre(parsed.tenantName);
+        if (parsed?.tenantName) {
+          setBusinessNombre(parsed.tenantName);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('nexora_business_nombre', parsed.tenantName);
+          }
+        }
       }
       const config = await ApiService.get('/configuracion/negocio');
       if (config) {
-        if (config.logoUrl) setBusinessLogo(config.logoUrl);
-        if (config.nombre) setBusinessNombre(config.nombre);
+        if (config.logoUrl) {
+          setBusinessLogo(config.logoUrl);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('nexora_business_logo', config.logoUrl);
+          }
+          updateTabFavicon(config.logoUrl);
+        } else {
+          setBusinessLogo('');
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('nexora_business_logo');
+          }
+          updateTabFavicon('/favicon.ico');
+        }
+        if (config.nombre) {
+          setBusinessNombre(config.nombre);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('nexora_business_nombre', config.nombre);
+          }
+        }
         if (config.primaryColor) {
           applyBrandingColor(config.primaryColor);
         }
@@ -537,18 +592,12 @@ function MainApp() {
   };
 
   useEffect(() => {
-    // Sincronización dinámica del favicon y título de la pestaña del navegador
-    const targetIcon = businessLogo || '/logo.png';
-    const iconLinks = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']");
-    if (iconLinks.length > 0) {
-      iconLinks.forEach((l) => {
-        l.href = targetIcon;
-      });
+    // Sincronización dinámica del favicon exclusivamente en la pestaña de navegación
+    // Preserva intacto apple-touch-icon y manifest para accesos directos móviles
+    if (businessLogo) {
+      updateTabFavicon(businessLogo);
     } else {
-      const link = document.createElement('link');
-      link.rel = 'icon';
-      link.href = targetIcon;
-      document.head.appendChild(link);
+      updateTabFavicon('/favicon.ico');
     }
 
     if (businessNombre) {
@@ -781,6 +830,8 @@ function MainApp() {
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('tenantId');
     localStorage.removeItem('nexora_active_view');
+    localStorage.removeItem('nexora_business_logo');
+    localStorage.removeItem('nexora_business_nombre');
     clearUnsavedChanges();
     setUser(null);
     setIsLoggedIn(false);
@@ -788,6 +839,7 @@ function MainApp() {
     setBusinessNombre('');
     setBusinessLogo('');
     setSucursales([]);
+    updateTabFavicon('/favicon.ico');
   };
 
   // Manejador de tecla Escape para modal de confirmación de salida

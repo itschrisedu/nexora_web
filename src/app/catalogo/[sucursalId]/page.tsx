@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
+import { updateTabFavicon } from "@/utils/favicon";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
@@ -96,14 +97,7 @@ export default function CatalogoSucursalPage() {
         const json = await res.json();
         setData(json);
         if (json?.negocio) {
-          const iconUrl = json.negocio.logoUrl || '/logo.png';
-          let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-          if (!link) {
-            link = document.createElement('link');
-            link.rel = 'icon';
-            document.head.appendChild(link);
-          }
-          link.href = iconUrl;
+          updateTabFavicon(json.negocio.logoUrl);
           document.title = `${json.negocio.nombreNegocio || 'Catálogo Digital'} | NEXORA`;
         }
       } catch (err: any) {

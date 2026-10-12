@@ -18,6 +18,7 @@ import ImageCropperModal from "./ui/image-cropper-modal";
 import VaultPasswordMeter, { analyzePassword } from "./ui/VaultPasswordMeter";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 import { getStoredPlanPrices, setStoredPlanPrices, calculateYearlyEquivalent } from "../utils/saas-plans";
+import { updateTabFavicon } from "../utils/favicon";
 
 interface CreditLevelConfigItem {
   id?: string;
@@ -97,13 +98,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     }
   }, []);
 
-  const isPersonal = user?.rol === "ROL_VENDEDOR" || user?.rol === "ROL_BODEGUERO";
+  const isPersonal =
+    user?.rol === "ROL_VENDEDOR" ||
+    user?.rol === "ROL_BODEGUERO" ||
+    user?.rol === "VENDEDOR" ||
+    user?.rol === "BODEGUERO";
   const isSuperAdmin = user?.rol === "ROL_SUPER_ADMIN";
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window !== "undefined") {
       try {
         const u = JSON.parse(localStorage.getItem("user") || "{}");
-        if (u?.rol === "ROL_VENDEDOR" || u?.rol === "ROL_BODEGUERO") return "seguridad";
+        const isPers =
+          u?.rol === "ROL_VENDEDOR" ||
+          u?.rol === "ROL_BODEGUERO" ||
+          u?.rol === "VENDEDOR" ||
+          u?.rol === "BODEGUERO";
+        if (isPers) return "catalogo";
       } catch {}
     }
     return "general";
@@ -575,6 +585,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
   const handleSave = async (e?: React.FormEvent, specificTabLabel?: string) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isPersonal) return;
     setSaving(true);
     setSuccess("");
     setError("");
@@ -699,9 +710,20 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         message: successMsg,
       });
 
-      if (typeof document !== "undefined" && config.primaryColor) {
-        document.documentElement.style.setProperty("--primary", config.primaryColor);
-        document.documentElement.style.setProperty("--primary-foreground", getContrastColor(config.primaryColor));
+      if (typeof window !== "undefined") {
+        if (config.primaryColor) {
+          document.documentElement.style.setProperty("--primary", config.primaryColor);
+          document.documentElement.style.setProperty("--primary-foreground", getContrastColor(config.primaryColor));
+        }
+        if (finalLogoUrl) {
+          localStorage.setItem('nexora_business_logo', finalLogoUrl);
+        } else {
+          localStorage.removeItem('nexora_business_logo');
+        }
+        if (config.nombre) {
+          localStorage.setItem('nexora_business_nombre', config.nombre);
+        }
+        updateTabFavicon(finalLogoUrl);
         window.dispatchEvent(new CustomEvent("nexora:theme-changed", {
           detail: {
             primaryColor: config.primaryColor,
@@ -2086,7 +2108,27 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 );
               })()}
 
-              {/* ─── 1. TEXTOS DE LA PORTADA PRINCIPAL ─── */}
+              {/* VISTA DE INFORMACIÓN Y ENLACE PARA VENDEDORES Y BODEGUEROS */}
+              {isPersonal && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <Globe size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                      Acceso Comercial para Venta y Consulta de Catálogo
+                    </h4>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 leading-relaxed">
+                      Como vendedor o bodeguero, dispones del enlace público oficial para compartir el catálogo de calzado directamente con clientes por WhatsApp, copiar el enlace o abrir el sitio web para mostrar los modelos disponibles. La configuración visual y edición de diseño de la página web está reservada exclusivamente a los administradores.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* EDICIÓN Y CONFIGURACIÓN DEL SITIO WEB (SOLO ADMINISTRADORES) */}
+              {!isPersonal && (
+                <>
+                  {/* ─── 1. TEXTOS DE LA PORTADA PRINCIPAL ─── */}
               <div className="p-4 bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl space-y-3">
                 <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
                   <Sparkles className="text-amber-500" size={16} />
@@ -2498,36 +2540,38 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             </div>
             )}
 
-            {/* ACCIÓN DE GUARDAR PESTAÑA SITIO WEB & CATÁLOGO */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-              <div className="text-xs">
-                {hasChanges ? (
-                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    {isSuperAdmin ? "Tienes cambios pendientes en el Portal SaaS" : "Tienes cambios pendientes en Sitio Web & Catálogo"}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
-                    <CheckCircle size={13} className="text-emerald-500" />
-                    {isSuperAdmin ? "Portal SaaS al día" : "Catálogo y portada al día"}
-                  </span>
-                )}
+            {/* ACCIÓN DE GUARDAR PESTAÑA SITIO WEB & CATÁLOGO (SOLO ADMINISTRADORES) */}
+            {!isPersonal && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                <div className="text-xs">
+                  {hasChanges ? (
+                    <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      {isSuperAdmin ? "Tienes cambios pendientes en el Portal SaaS" : "Tienes cambios pendientes en Sitio Web & Catálogo"}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                      <CheckCircle size={13} className="text-emerald-500" />
+                      {isSuperAdmin ? "Portal SaaS al día" : "Catálogo y portada al día"}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSave(undefined, isSuperAdmin ? "Portal SaaS & Planes" : "Sitio Web & Catálogo")}
+                  disabled={!hasChanges || saving}
+                  title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
+                  className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
+                    hasChanges && !saving
+                      ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
+                      : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
+                  }`}
+                >
+                  {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                  <span>{saving ? "Guardando..." : isSuperAdmin ? "Guardar Configuración SaaS" : "Guardar Sitio Web & Catálogo"}</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleSave(undefined, isSuperAdmin ? "Portal SaaS & Planes" : "Sitio Web & Catálogo")}
-                disabled={!hasChanges || saving}
-                title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
-                className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
-                  hasChanges && !saving
-                    ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
-                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
-                }`}
-              >
-                {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                <span>{saving ? "Guardando..." : isSuperAdmin ? "Guardar Configuración SaaS" : "Guardar Sitio Web & Catálogo"}</span>
-              </button>
-            </div>
+            )}
           </div>
         )}
 
