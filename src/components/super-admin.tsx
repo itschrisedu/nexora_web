@@ -129,6 +129,7 @@ interface TenantDetail {
   maxSucursales?: number;
   maxUsuarios?: number;
   precioMensualPlan?: number;
+  logoUrl?: string | null;
   stats: TenantStats;
   users: TenantAdmin[];
   sucursales?: {
@@ -151,6 +152,7 @@ interface TenantDetail {
     ruc: string;
     direccion: string;
     telefono?: string;
+    logoUrl?: string | null;
   } | null;
   subscriptionPayments?: SubscriptionPaymentItem[];
 }
@@ -1481,8 +1483,16 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                                   className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs shadow-2xs"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
-                                      {suc.name.slice(0, 1).toUpperCase()}
+                                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                                      {suc.logoUrl ? (
+                                        <img
+                                          src={suc.logoUrl}
+                                          alt={suc.name}
+                                          className="w-full h-full object-contain p-0.5 bg-white rounded-lg"
+                                        />
+                                      ) : (
+                                        suc.name.slice(0, 1).toUpperCase()
+                                      )}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="font-bold text-[var(--foreground)] truncate flex items-center gap-1.5">
@@ -3161,13 +3171,21 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 <div className="p-6 border-b border-[var(--border)] flex items-center justify-between sticky top-0 bg-[var(--card)] z-10">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold ${
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold shrink-0 overflow-hidden ${
                         selectedTenantDetail.active
                           ? "bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 text-amber-400"
-                          : "bg-slate-500"
+                          : "bg-slate-500 text-white"
                       }`}
                     >
-                      {selectedTenantDetail.name.slice(0, 2).toUpperCase()}
+                      {(selectedTenantDetail.logoUrl || selectedTenantDetail.businessConfig?.logoUrl) ? (
+                        <img
+                          src={(selectedTenantDetail.logoUrl || selectedTenantDetail.businessConfig?.logoUrl)!}
+                          alt={selectedTenantDetail.name}
+                          className="w-full h-full object-contain p-0.5 bg-white rounded-xl"
+                        />
+                      ) : (
+                        selectedTenantDetail.name.slice(0, 2).toUpperCase()
+                      )}
                     </div>
                     <div>
                       <h2 className="text-lg font-bold">{selectedTenantDetail.name}</h2>

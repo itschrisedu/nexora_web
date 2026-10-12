@@ -2537,8 +2537,10 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   </label>
                 </div>
               </div>
-            </div>
-            )}
+            </>
+          )}
+        </div>
+      )}
 
             {/* ACCIÓN DE GUARDAR PESTAÑA SITIO WEB & CATÁLOGO (SOLO ADMINISTRADORES) */}
             {!isPersonal && (

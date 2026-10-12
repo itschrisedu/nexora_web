@@ -627,13 +627,14 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     loadTransportes();
     loadSucursales();
 
-    // Por defecto siempre carga en la sucursal que pertenece el usuario
-    if (activeSucursalId && activeSucursalId !== 'TODAS') {
-      setSelectedSucursalPedidoId(activeSucursalId);
-      setSelectedOrderSucursalId(activeSucursalId);
-    } else if (sucursales && sucursales.length > 0) {
-      setSelectedSucursalPedidoId(sucursales[0].id);
-      setSelectedOrderSucursalId(sucursales[0].id);
+    // Por defecto siempre carga en la sucursal a la que pertenece el usuario
+    const userLocalId = (activeSucursalId && activeSucursalId !== 'TODAS')
+      ? activeSucursalId
+      : (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')?.tenantId : '') || '';
+    const initialTarget = userLocalId || (sucursales && sucursales.length > 0 ? sucursales[0].id : '');
+    if (initialTarget) {
+      setSelectedSucursalPedidoId(initialTarget);
+      setSelectedOrderSucursalId(initialTarget);
     }
   }, [online, activeSucursalId]);
 
@@ -1994,8 +1995,22 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
+  // ── Identificador del local propio del usuario ─────────
+  const miLocalId = useMemo(() => {
+    if (activeSucursalId && activeSucursalId !== 'TODAS') return activeSucursalId;
+    if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u?.tenantId || '';
+      } catch {
+        return '';
+      }
+    }
+    return '';
+  }, [activeSucursalId]);
+
   // ── Lista Dinámica de Sucursales para Pedidos ─────────
-  const listaSucursalesDisponibles = (() => {
+  const listaSucursalesDisponibles = useMemo(() => {
     const map = new Map<string, { id: string; name: string; isMatriz: boolean }>();
     if (sucursalesEmpresa && sucursalesEmpresa.length > 0) {
       sucursalesEmpresa.forEach((s) => map.set(s.id, { id: s.id, name: s.name, isMatriz: !!s.isMatriz }));
@@ -2006,7 +2021,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       });
     }
     pedidos.forEach((p) => {
-      const pTenantId = (p as any).tenantId;
+      const pTenantId = (p as any).tenantId || (p as any).sucursalId;
       if (pTenantId && !map.has(pTenantId)) {
         map.set(pTenantId, {
           id: pTenantId,
@@ -2017,24 +2032,39 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     });
     const res = Array.from(map.values());
     if (res.length === 0) {
-      res.push({ id: activeSucursalId || 'matriz', name: 'Matriz Principal', isMatriz: true });
+      res.push({ id: miLocalId || 'matriz', name: 'Matriz Principal', isMatriz: true });
     }
-    return res;
-  })();
 
-  const pedidosFiltrados = pedidos.filter((p) => {
-    const cumpleEstado = filtroEstado === 'TODOS' || p.estado === filtroEstado;
-    let cumpleSucursal = true;
-    if (selectedSucursalPedidoId) {
-      const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
-      if (targetSuc?.isMatriz && !(p as any).tenantId) {
-        cumpleSucursal = true;
-      } else {
-        cumpleSucursal = (p as any).tenantId === selectedSucursalPedidoId;
+    // Regla obligatoria: La sucursal a la que pertenece el usuario siempre debe salir primera
+    res.sort((a, b) => {
+      if (miLocalId) {
+        if (a.id === miLocalId) return -1;
+        if (b.id === miLocalId) return 1;
       }
-    }
-    return cumpleEstado && cumpleSucursal;
-  });
+      if (a.isMatriz && !b.isMatriz) return -1;
+      if (!a.isMatriz && b.isMatriz) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return res;
+  }, [sucursalesEmpresa, sucursales, pedidos, miLocalId]);
+
+  const pedidosFiltrados = useMemo(() => {
+    return pedidos.filter((p) => {
+      const cumpleEstado = filtroEstado === 'TODOS' || p.estado === filtroEstado;
+      let cumpleSucursal = true;
+      if (selectedSucursalPedidoId) {
+        const pTenant = (p as any).tenantId || (p as any).sucursalId;
+        const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
+        if (targetSuc?.isMatriz) {
+          cumpleSucursal = pTenant === selectedSucursalPedidoId || !pTenant;
+        } else {
+          cumpleSucursal = pTenant === selectedSucursalPedidoId;
+        }
+      }
+      return cumpleEstado && cumpleSucursal;
+    });
+  }, [pedidos, filtroEstado, selectedSucursalPedidoId, listaSucursalesDisponibles]);
 
   const getNumeroPedido = (p: Pedido, index?: number) => {
     if (p.numeroCodigo) return p.numeroCodigo;
@@ -2098,8 +2128,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
             <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1.5">
               {listaSucursalesDisponibles.map((suc) => {
                 const isSelected = selectedSucursalPedidoId === suc.id;
-                const isMiLocal = activeSucursalId === suc.id;
-                const countPedidos = pedidos.filter((p) => (p as any).tenantId === suc.id || (!(p as any).tenantId && suc.isMatriz)).length;
+                const isMiLocal = miLocalId === suc.id;
+                const countPedidos = pedidos.filter((p) => {
+                  const pTenant = (p as any).tenantId || (p as any).sucursalId;
+                  return pTenant === suc.id || (!pTenant && suc.isMatriz);
+                }).length;
                 const esOtra = !isMiLocal;
 
                 return (
