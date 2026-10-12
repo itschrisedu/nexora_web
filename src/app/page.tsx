@@ -688,7 +688,7 @@ function MainApp() {
 
     const interval = setInterval(() => {
       ApiService.post('/auth/heartbeat', {}).catch(() => null);
-    }, 30000); // Latido periódico cada 30 segundos
+    }, 180000); // Latido periódico cada 3 minutos (ahorro de datos y optimización de red móvil)
 
     return () => clearInterval(interval);
   }, [isLoggedIn, online]);
