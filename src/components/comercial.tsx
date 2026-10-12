@@ -1358,7 +1358,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           const clientesFormateados = data.map((c: any) => {
             const apellido = (c.apellido || '').trim();
             const nombre = (c.nombre || '').trim();
-            const nombreFormateado = apellido ? `${apellido}, ${nombre}` : (nombre || 'Cliente');
+            const nombreFormateado = apellido ? `${apellido} ${nombre}` : (nombre || 'Cliente');
             return {
               id: c.id,
               nombre: nombreFormateado,

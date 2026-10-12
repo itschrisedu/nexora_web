@@ -1952,10 +1952,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         </div>
       </div>
 
-      {/* Barra de Búsqueda y Filtros de Estado */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-2xl">
-          <div className="relative flex-1">
+      {/* Barra de Búsqueda, Sucursales y Filtros de Estado */}
+      <div className="space-y-2.5">
+        {/* Fila 1: Búsqueda a la izquierda y Sucursales al lado derecho */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
             <input
               type="text"
@@ -1973,73 +1974,95 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               </button>
             )}
           </div>
+
+          {/* Pestañas de Sucursal Dinámicas por Nombre - Acomodadas al lado derecho */}
+          {listaSucursalesDisponibles.length >= 1 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none shrink-0">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted-foreground)] shrink-0 hidden sm:inline-block">
+                Sucursal:
+              </span>
+              <div className="flex items-center p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl gap-1.5 flex-nowrap shrink-0">
+                {listaSucursalesDisponibles.map((suc) => {
+                  const isSelected = selectedSucursalCobroId === suc.id;
+                  const isMiLocal = activeSucursalId === suc.id;
+                  const countDeudas = cobros.filter((c) => c.tenantId === suc.id || (!c.tenantId && suc.isMatriz)).length;
+                  const esOtra = !isMiLocal;
+
+                  return (
+                    <button
+                      key={suc.id}
+                      type="button"
+                      onClick={() => setSelectedSucursalCobroId(suc.id)}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                        isSelected
+                          ? (esOtra ? 'bg-amber-600 text-white shadow-sm font-black ring-2 ring-amber-400/40' : 'bg-[#0F172A] text-white shadow-sm font-black ring-2 ring-slate-400/40')
+                          : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                      }`}
+                    >
+                      <Building size={13} className={isSelected ? (esOtra ? 'text-amber-200' : 'text-emerald-400') : 'text-slate-400'} />
+                      <span>{suc.name}</span>
+                      {isMiLocal && (
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                          isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                        }`}>
+                          Mi Local
+                        </span>
+                      )}
+                      {esOtra && isSelected && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-amber-400/30 text-amber-100">
+                          Otra Sucursal
+                        </span>
+                      )}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                      }`}>
+                        {countDeudas}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Pestañas de Sucursal Dinámicas por Nombre */}
-        {listaSucursalesDisponibles.length >= 1 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted-foreground)] shrink-0 hidden sm:inline-block">
-              Sucursal:
-            </span>
-            <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1.5">
-              {listaSucursalesDisponibles.map((suc) => {
-                const isSelected = selectedSucursalCobroId === suc.id;
-                const isMiLocal = activeSucursalId === suc.id;
-                const countDeudas = cobros.filter((c) => c.tenantId === suc.id || (!c.tenantId && suc.isMatriz)).length;
-                const esOtra = !isMiLocal;
-
-                return (
-                  <button
-                    key={suc.id}
-                    type="button"
-                    onClick={() => setSelectedSucursalCobroId(suc.id)}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      isSelected
-                        ? (esOtra ? 'bg-amber-600 text-white shadow-sm font-black ring-2 ring-amber-400/40' : 'bg-[#0F172A] text-white shadow-sm font-black ring-2 ring-slate-400/40')
-                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
-                    }`}
-                  >
-                    <Building size={13} className={isSelected ? (esOtra ? 'text-amber-200' : 'text-emerald-400') : 'text-slate-400'} />
-                    <span>{suc.name}</span>
-                    {isMiLocal && (
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
-                        isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                      }`}>
-                        Mi Local
-                      </span>
-                    )}
-                    {esOtra && isSelected && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-amber-400/30 text-amber-100">
-                        Otra Sucursal
-                      </span>
-                    )}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
-                    }`}>
-                      {countDeudas}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Filtros de Estado */}
+        {/* Fila 2: Filtros de Estado - Debajo exactamente como en Pedidos */}
         <div className="flex flex-wrap items-center gap-1.5 w-full pt-0.5">
-          {(['TODOS', 'PENDIENTE', 'PARCIALMENTE_PAGADO', 'SALDADO', 'VENCIDO'] as const).map((e) => (
-            <button
-              key={e}
-              onClick={() => setFiltro(e as any)}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs ${
-                filtro === e
-                  ? 'bg-[#0F172A] text-white border-transparent'
-                  : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'
-              }`}
-            >
-              {e === 'TODOS' ? 'Todos los Registros' : getCobroConfig(e).label}
-            </button>
-          ))}
+          <button
+            onClick={() => setFiltro('TODOS')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+              filtro === 'TODOS'
+                ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
+                : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            Todos ({vista === 'CLIENTES' ? clientesCartera.length : cobrosFiltradosPorSucursal.length})
+          </button>
+          {(['PENDIENTE', 'PARCIALMENTE_PAGADO', 'SALDADO', 'VENCIDO'] as const).map((st) => {
+            const cfg = getCobroConfig(st);
+            const count = vista === 'CLIENTES'
+              ? clientesCartera.filter((c) => (st === 'PENDIENTE' ? (c.saldoTotalPendiente > 0 && c.estadoGlobal !== 'VENCIDO') : c.estadoGlobal === st)).length
+              : cobrosFiltradosPorSucursal.filter((c) => c.estado === st).length;
+            const active = filtro === st;
+            return (
+              <button
+                key={st}
+                onClick={() => setFiltro(st as any)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  active
+                    ? `${cfg.color} shadow-xs font-black`
+                    : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                {st === 'PENDIENTE' && <Clock size={13} />}
+                {st === 'PARCIALMENTE_PAGADO' && <Wallet size={13} />}
+                {st === 'SALDADO' && <CheckCircle size={13} />}
+                {st === 'VENCIDO' && <AlertTriangle size={13} />}
+                <span>{cfg.label}</span>
+                <span className="text-[10px] opacity-75">({count})</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

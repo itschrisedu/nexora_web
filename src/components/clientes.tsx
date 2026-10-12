@@ -994,7 +994,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-extrabold text-sm text-[var(--foreground)] truncate capitalize">
-                            {capitalizarNombreCompleto(c.apellido || '') ? `${capitalizarNombreCompleto(c.apellido || '')}, ` : ''}{capitalizarNombreCompleto(c.nombre || '')}
+                            {capitalizarNombreCompleto(c.apellido || '') ? `${capitalizarNombreCompleto(c.apellido || '')} ` : ''}{capitalizarNombreCompleto(c.nombre || '')}
                           </h4>
                           <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)] flex-wrap">
                             {(c.cedula || c.ruc) && (
@@ -1122,7 +1122,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-semibold text-sm capitalize">{capitalizarNombreCompleto(c.apellido || '') ? `${capitalizarNombreCompleto(c.apellido || '')}, ` : ''}{capitalizarNombreCompleto(c.nombre || '')}</span>
+                                  <span className="font-semibold text-sm capitalize">{capitalizarNombreCompleto(c.apellido || '') ? `${capitalizarNombreCompleto(c.apellido || '')} ` : ''}{capitalizarNombreCompleto(c.nombre || '')}</span>
                                   {Number(c.saldoAFavor || 0) > 0 && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                                       <Wallet size={10} />
@@ -1204,7 +1204,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                     {(selected.nombre || "?").charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <div className="font-bold text-sm capitalize">{capitalizarNombreCompleto(selected.apellido || '') ? `${capitalizarNombreCompleto(selected.apellido || '')}, ` : ''}{capitalizarNombreCompleto(selected.nombre || '')}</div>
+                    <div className="font-bold text-sm capitalize">{capitalizarNombreCompleto(selected.apellido || '') ? `${capitalizarNombreCompleto(selected.apellido || '')} ` : ''}{capitalizarNombreCompleto(selected.nombre || '')}</div>
                     <div className={`text-[10px] px-2 py-0.5 rounded-lg border inline-block mt-0.5 font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>
                       {selected.nivelCredito?.replace("_", " ")}
                     </div>
@@ -1402,7 +1402,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               </div>
               <div className="min-w-0">
                 <h3 className="font-extrabold text-sm text-white truncate capitalize">
-                  {capitalizarNombreCompleto(selected.apellido || '') ? `${capitalizarNombreCompleto(selected.apellido || '')}, ` : ''}{capitalizarNombreCompleto(selected.nombre || '')}
+                  {capitalizarNombreCompleto(selected.apellido || '') ? `${capitalizarNombreCompleto(selected.apellido || '')} ` : ''}{capitalizarNombreCompleto(selected.nombre || '')}
                 </h3>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>
