@@ -1336,10 +1336,43 @@ export default function PosComponent() {
                       })
                     )}
                   </div>
+
+                  {/* Barra Flotante de Acceso Rápido al Ticket en Móvil */}
+                  {itemsVenta.length > 0 && (
+                    <div className="lg:hidden sticky bottom-3 z-30 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          document.getElementById("pos-ticket-panel")?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        className="w-full bg-[#0F172A] hover:bg-slate-800 text-white p-3 rounded-2xl shadow-xl flex items-center justify-between border border-slate-700/60 active:scale-[0.99] transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black shrink-0">
+                            <ShoppingCart size={18} />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-xs font-black block leading-tight">
+                              {itemsVenta.reduce((s, i) => s + i.cantidad, 0)} {itemsVenta.reduce((s, i) => s + i.cantidad, 0) === 1 ? 'par' : 'pares'} en Ticket
+                            </span>
+                            <span className="text-[10px] text-slate-300">Toca para revisar y cobrar</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black text-emerald-400 font-mono">
+                            ${totalVenta.toFixed(2)}
+                          </span>
+                          <span className="text-xs bg-emerald-500 text-slate-950 font-black px-2.5 py-1.5 rounded-xl shadow-xs">
+                            Cobrar →
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Panel Derecho: Ticket de Venta */}
-                <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-3xl p-5 flex flex-col justify-between">
+                <div id="pos-ticket-panel" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-3xl p-4 sm:p-5 flex flex-col justify-between">
                   <div>
                     <h3 className="font-bold text-[var(--card-foreground)] mb-3.5 flex items-center gap-2">
                       <ShoppingCart size={18} className="text-emerald-500" />
