@@ -81,6 +81,7 @@ interface ProductoBusqueda {
 interface ItemVenta {
   productId: string;
   serieId: string;
+  serieNombre?: string;
   tallaId: string;
   tallaNumero: number;
   nombre: string;
@@ -89,6 +90,32 @@ interface ItemVenta {
   cantidad: number;
   precioUnitario: number;
 }
+
+interface GrupoModeloPos {
+  key: string;
+  modelName: string;
+  color: string;
+  imageUrl?: string;
+  series: ProductoBusqueda[];
+  totalStockGeneral: number;
+}
+
+function formatearNombreSerie(serieNombre?: string) {
+  if (!serieNombre) return "General";
+  let s = serieNombre.replace(/_/g, " ");
+  s = s.replace(/\bNINO\b/gi, "Niño").replace(/\bPEQUENO\b/gi, "Pequeño").replace(/\bBEBE\b/gi, "Bebé");
+  return s
+    .toLowerCase()
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+const SERIE_ORDEN_PESO: Record<string, number> = {
+  BEBE: 1,
+  NINO_PEQUENO_A: 2,
+  NINO: 3,
+  JUVENIL: 4,
+  ADULTO: 5,
+};
 
 interface VentaItemDetalle {
   productId: string;
@@ -177,6 +204,7 @@ export default function PosComponent() {
   // Venta POS Mostrador
   const [productos, setProductos] = useState<ProductoBusqueda[]>([]);
   const [busqueda, setBusqueda] = useState("");
+  const [selectedSeriePorCard, setSelectedSeriePorCard] = useState<Record<string, string>>({});
   const [itemsVenta, setItemsVenta] = useState<ItemVenta[]>([]);
   const [descuentoVenta, setDescuentoVenta] = useState("");
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TARJETA" | "TRANSFERENCIA">("EFECTIVO");
@@ -467,6 +495,7 @@ export default function PosComponent() {
         {
           productId: prod.id,
           serieId: prod.serieId,
+          serieNombre: prod.serieNombre,
           tallaId: talla.tallaId,
           tallaNumero: talla.numero,
           nombre: `${prod.modelName} (${prod.color})`,
@@ -863,17 +892,59 @@ export default function PosComponent() {
     }
   };
 
-  // Filtrar catálogo en vivo
-  const productosFiltrados = productos.filter((p) => {
-    if (!busqueda.trim()) return true;
+  // Agrupar catálogo POS por Modelo y Color (para una sola card con selector dinámico de series)
+  const gruposModelosFiltrados = React.useMemo(() => {
     const q = busqueda.toLowerCase().trim();
-    return (
-      p.modelName.toLowerCase().includes(q) ||
-      p.color.toLowerCase().includes(q) ||
-      p.baseCode.toLowerCase().includes(q) ||
-      p.serieNombre.toLowerCase().includes(q)
-    );
-  });
+    const mapGrupos = new Map<string, GrupoModeloPos>();
+
+    productos.forEach((p) => {
+      const key = `${p.modelName.trim()}___${p.color.trim()}`.toLowerCase();
+      const stockProd = p.tallas.reduce((sum, t) => sum + (t.cantidad || 0), 0);
+
+      if (!mapGrupos.has(key)) {
+        mapGrupos.set(key, {
+          key,
+          modelName: p.modelName.trim(),
+          color: p.color.trim(),
+          imageUrl: p.imageUrl,
+          series: [p],
+          totalStockGeneral: stockProd,
+        });
+      } else {
+        const g = mapGrupos.get(key)!;
+        g.series.push(p);
+        g.totalStockGeneral += stockProd;
+        if (!g.imageUrl && p.imageUrl) {
+          g.imageUrl = p.imageUrl;
+        }
+      }
+    });
+
+    // Ordenar las series dentro de cada grupo por orden lógico de serie/precio
+    mapGrupos.forEach((g) => {
+      g.series.sort((a, b) => {
+        const pesoA = SERIE_ORDEN_PESO[a.serieNombre.toUpperCase()] ?? (a.salePrice || 99);
+        const pesoB = SERIE_ORDEN_PESO[b.serieNombre.toUpperCase()] ?? (b.salePrice || 99);
+        if (pesoA !== pesoB) return pesoA - pesoB;
+        return a.salePrice - b.salePrice;
+      });
+    });
+
+    const grupos = Array.from(mapGrupos.values());
+
+    return grupos.filter((g) => {
+      if (!q) return true;
+      const coincideModelo = g.modelName.toLowerCase().includes(q);
+      const coincideColor = g.color.toLowerCase().includes(q);
+      const coincideSerie = g.series.some(
+        (s) =>
+          s.serieNombre.toLowerCase().includes(q) ||
+          s.baseCode.toLowerCase().includes(q) ||
+          s.tallas.some((t) => t.numero.toString() === q || `t${t.numero}` === q)
+      );
+      return coincideModelo || coincideColor || coincideSerie;
+    });
+  }, [productos, busqueda]);
 
   if (loadingInicial) {
     return (
@@ -1081,78 +1152,189 @@ export default function PosComponent() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-h-[58vh] overflow-y-auto pr-1">
-                    {productosFiltrados.slice(0, 40).map((prod) => (
-                      <div
-                        key={prod.id}
-                        className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 hover:border-emerald-500/60 hover:shadow-sm transition-all flex flex-col justify-between gap-3"
-                      >
-                        {/* Cabecera del Calzado con Miniatura */}
-                        <div className="flex items-start gap-3">
-                          <div className="w-16 h-16 rounded-xl bg-slate-900/10 dark:bg-slate-800 border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center relative">
-                            {prod.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={prod.imageUrl}
-                                alt={`${prod.modelName} ${prod.color}`}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex flex-col items-center justify-center text-slate-400 p-1 text-center">
-                                <ShoppingBag size={18} />
-                                <span className="text-[8px] font-mono mt-0.5 uppercase tracking-tighter truncate max-w-full">
-                                  {prod.color.slice(0, 6)}
-                                </span>
+                    {gruposModelosFiltrados.length === 0 ? (
+                      <div className="col-span-full py-12 text-center text-[var(--muted-foreground)]">
+                        <ShoppingBag size={32} className="mx-auto opacity-30 mb-2" />
+                        <p className="text-xs font-semibold">No se encontraron modelos con los criterios de búsqueda.</p>
+                      </div>
+                    ) : (
+                      gruposModelosFiltrados.slice(0, 40).map((grupo) => {
+                        const activeProdId = selectedSeriePorCard[grupo.key];
+                        // Si el usuario buscó por serie o código específico, priorizar esa serie
+                        const q = busqueda.toLowerCase().trim();
+                        const serieCoincidente = q
+                          ? grupo.series.find(
+                              (s) =>
+                                s.serieNombre.toLowerCase().includes(q) ||
+                                s.baseCode.toLowerCase().includes(q) ||
+                                s.tallas.some((t) => t.numero.toString() === q)
+                            )
+                          : null;
+
+                        const prodActivo =
+                          grupo.series.find((s) => s.id === activeProdId) ||
+                          serieCoincidente ||
+                          grupo.series.find((s) => s.tallas.some((t) => t.cantidad > 0)) ||
+                          grupo.series[0];
+
+                        const stockSerieActual = prodActivo.tallas.reduce((sum, t) => sum + (t.cantidad || 0), 0);
+
+                        return (
+                          <div
+                            key={grupo.key}
+                            className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 hover:border-emerald-500/60 hover:shadow-sm transition-all flex flex-col justify-between gap-3"
+                          >
+                            {/* Cabecera del Calzado con Miniatura */}
+                            <div className="flex items-start gap-3">
+                              <div className="w-16 h-16 rounded-xl bg-slate-900/10 dark:bg-slate-800 border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center relative">
+                                {prodActivo.imageUrl || grupo.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={prodActivo.imageUrl || grupo.imageUrl}
+                                    alt={`${grupo.modelName} ${grupo.color}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center text-slate-400 p-1 text-center">
+                                    <ShoppingBag size={18} />
+                                    <span className="text-[8px] font-mono mt-0.5 uppercase tracking-tighter truncate max-w-full">
+                                      {grupo.color.slice(0, 6)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-start gap-1">
+                                  <h4 className="font-bold text-sm text-[var(--card-foreground)] truncate" title={grupo.modelName}>
+                                    {grupo.modelName}
+                                  </h4>
+                                  <div className="text-right shrink-0">
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm font-mono block">
+                                      ${prodActivo.salePrice.toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-[var(--muted-foreground)] flex items-center gap-1.5 mt-0.5 truncate">
+                                  <span className="font-semibold text-[var(--foreground)]">{grupo.color}</span>
+                                  <span>·</span>
+                                  <span className="truncate text-emerald-600 dark:text-emerald-400 font-bold">
+                                    {formatearNombreSerie(prodActivo.serieNombre)}
+                                  </span>
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="inline-block font-mono text-[10px] bg-[var(--background)] px-2 py-0.5 rounded-md text-[var(--muted-foreground)] border border-[var(--border)]">
+                                    {prodActivo.baseCode}
+                                  </span>
+                                  {grupo.series.length > 1 && (
+                                    <span className="text-[10px] text-[var(--muted-foreground)] font-medium">
+                                      {grupo.series.length} series
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Selector de Series Interactivo (Botones dentro de la card) */}
+                            {grupo.series.length > 1 && (
+                              <div className="pt-2 border-t border-[var(--border)]/70">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider flex items-center gap-1">
+                                    <Layers size={11} className="text-emerald-500" />
+                                    Series:
+                                  </span>
+                                  <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                                    Disp: <strong className={stockSerieActual > 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-amber-500"}>{stockSerieActual} pares</strong>
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                  {grupo.series.map((s) => {
+                                    const isSelected = s.id === prodActivo.id;
+                                    const stockSerie = s.tallas.reduce((sum, t) => sum + (t.cantidad || 0), 0);
+                                    const tieneStock = stockSerie > 0;
+
+                                    return (
+                                      <button
+                                        key={s.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedSeriePorCard((prev) => ({ ...prev, [grupo.key]: s.id }));
+                                        }}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                          isSelected
+                                            ? "bg-[#0F172A] text-white shadow-sm ring-2 ring-emerald-500/50 font-black"
+                                            : tieneStock
+                                            ? "bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] hover:border-slate-400"
+                                            : "bg-[var(--muted)]/40 text-[var(--muted-foreground)]/60 border border-dashed border-[var(--border)] hover:bg-[var(--muted)]/80"
+                                        }`}
+                                      >
+                                        <span className={isSelected ? "text-emerald-300" : tieneStock ? "text-slate-700 dark:text-slate-200" : "text-slate-400"}>
+                                          {formatearNombreSerie(s.serieNombre)}
+                                        </span>
+                                        <span
+                                          className={`text-[9px] px-1.5 py-0.2 rounded-md font-mono ${
+                                            isSelected
+                                              ? "bg-white/20 text-white font-bold"
+                                              : tieneStock
+                                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold"
+                                              : "bg-slate-500/10 text-slate-400"
+                                          }`}
+                                        >
+                                          ${s.salePrice.toFixed(2)}
+                                        </span>
+                                        <span
+                                          className={`text-[9px] px-1 py-0.2 rounded-full font-mono ${
+                                            isSelected
+                                              ? "bg-emerald-500/30 text-emerald-200"
+                                              : tieneStock
+                                              ? "text-[var(--muted-foreground)]"
+                                              : "text-amber-500"
+                                          }`}
+                                        >
+                                          ({stockSerie})
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             )}
-                          </div>
 
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start">
-                              <h4 className="font-bold text-sm text-[var(--card-foreground)] truncate" title={prod.modelName}>
-                                {prod.modelName}
-                              </h4>
-                              <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm ml-1 shrink-0 font-mono">
-                                ${prod.salePrice.toFixed(2)}
-                              </span>
+                            {/* Tallas con Botones de Selección */}
+                            <div className="pt-2 border-t border-[var(--border)]/70">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                                  Existencias por Talla ({formatearNombreSerie(prodActivo.serieNombre)}):
+                                </span>
+                                {stockSerieActual <= 0 && (
+                                  <span className="text-[10px] text-amber-500 font-bold">Sin existencias</span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {[...prodActivo.tallas]
+                                  .sort((a, b) => (Number(a.numero) || 0) - (Number(b.numero) || 0))
+                                  .map((t) => (
+                                    <button
+                                      key={t.tallaId}
+                                      disabled={t.cantidad <= 0}
+                                      onClick={() => handleAgregarItem(prodActivo, t)}
+                                      className={`px-2 py-1 text-xs rounded-lg font-bold transition-all ${
+                                        t.cantidad > 0
+                                          ? "bg-[var(--card)] text-[var(--foreground)] hover:bg-emerald-600 hover:text-white border border-[var(--border)] active:scale-95 cursor-pointer shadow-xs"
+                                          : "bg-[var(--muted)]/40 text-[var(--muted-foreground)]/40 border border-transparent cursor-not-allowed text-[11px]"
+                                      }`}
+                                      title={t.cantidad > 0 ? `${t.cantidad} pares disponibles de talla ${t.numero} (${formatearNombreSerie(prodActivo.serieNombre)})` : "Sin existencias"}
+                                    >
+                                      T{t.numero} <span className="text-[9px] font-normal opacity-80">({t.cantidad})</span>
+                                    </button>
+                                  ))}
+                              </div>
                             </div>
-                            <p className="text-xs text-[var(--muted-foreground)] flex items-center gap-1 mt-0.5 truncate">
-                              <span className="font-medium">{prod.color}</span>
-                              <span>·</span>
-                              <span className="truncate text-emerald-600 dark:text-emerald-400 font-semibold">{prod.serieNombre}</span>
-                            </p>
-                            <span className="inline-block mt-1 font-mono text-[10px] bg-[var(--background)] px-2 py-0.5 rounded-md text-[var(--muted-foreground)] border border-[var(--border)]">
-                              {prod.baseCode}
-                            </span>
                           </div>
-                        </div>
-
-                        {/* Tallas con Botones de Selección */}
-                        <div className="pt-2 border-t border-[var(--border)]/70">
-                          <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block mb-1.5">
-                            Existencias por Talla:
-                          </span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {[...prod.tallas]
-                              .sort((a, b) => (Number(a.numero) || 0) - (Number(b.numero) || 0))
-                              .map((t) => (
-                                <button
-                                  key={t.tallaId}
-                                  disabled={t.cantidad <= 0}
-                                  onClick={() => handleAgregarItem(prod, t)}
-                                  className={`px-2 py-1 text-xs rounded-lg font-bold transition-all ${
-                                    t.cantidad > 0
-                                      ? "bg-[var(--card)] text-[var(--foreground)] hover:bg-emerald-600 hover:text-white border border-[var(--border)] active:scale-95 cursor-pointer shadow-xs"
-                                      : "bg-[var(--muted)]/40 text-[var(--muted-foreground)]/40 border border-transparent cursor-not-allowed text-[11px]"
-                                  }`}
-                                  title={t.cantidad > 0 ? `${t.cantidad} pares disponibles` : "Sin existencias"}
-                                >
-                                  T{t.numero} <span className="text-[9px] font-normal opacity-80">({t.cantidad})</span>
-                                </button>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
@@ -1189,8 +1371,14 @@ export default function PosComponent() {
 
                             <div className="flex-1 min-w-0">
                               <div className="truncate font-bold text-[var(--foreground)]">{item.nombre}</div>
-                              <span className="text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold">
-                                Talla {item.tallaNumero}
+                              <span className="text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center gap-1">
+                                <span>Talla {item.tallaNumero}</span>
+                                {item.serieNombre && (
+                                  <>
+                                    <span className="text-[var(--muted-foreground)]">·</span>
+                                    <span className="text-[var(--muted-foreground)] font-medium">{formatearNombreSerie(item.serieNombre)}</span>
+                                  </>
+                                )}
                               </span>
                               <div className="flex items-center gap-2 mt-1">
                                 <button
