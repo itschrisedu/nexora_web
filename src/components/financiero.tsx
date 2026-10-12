@@ -475,6 +475,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [vista, setVista] = useState<'CLIENTES' | 'FACTURAS'>('CLIENTES');
   const [filtro, setFiltro] = useState<EstadoCobro | 'TODOS'>('TODOS');
   const [selectedSucursalCobroId, setSelectedSucursalCobroId] = useState<string>(activeSucursalId || '');
+  const [sucursalesEmpresa, setSucursalesEmpresa] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState('');
 
   // Cliente o Cobro seleccionado para el modal de cuenta corriente
@@ -663,13 +664,28 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showDiscardModal, confirmModal.isOpen, showFacturaModal, showDevolucionModal, showHistorialModal, showCuentaModal, safeDismiss, isDirtyFactura, isDirtyDevolucion, isDirtyAbono]);
 
+  const loadSucursales = async () => {
+    try {
+      if (online) {
+        const data = await ApiService.get('/configuracion/sucursales');
+        if (Array.isArray(data) && data.length > 0) {
+          setSucursalesEmpresa(data);
+        }
+      }
+    } catch (e) {
+      console.warn('Error cargando sucursales en financiero:', e);
+    }
+  };
+
   useEffect(() => {
     loadCobros();
     loadBusinessConfig();
+    loadSucursales();
 
+    // Por defecto siempre carga en la sucursal que pertenece el usuario
     if (activeSucursalId && activeSucursalId !== 'TODAS') {
       setSelectedSucursalCobroId(activeSucursalId);
-    } else if (sucursales && sucursales.length > 0 && !selectedSucursalCobroId) {
+    } else if (sucursales && sucursales.length > 0) {
       setSelectedSucursalCobroId(sucursales[0].id);
     }
 
@@ -740,8 +756,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   // ── Agrupación Consolidada por Cliente y Sucursal ─────────
   const listaSucursalesDisponibles = (() => {
     const map = new Map<string, { id: string; name: string; isMatriz: boolean }>();
+    if (sucursalesEmpresa && sucursalesEmpresa.length > 0) {
+      sucursalesEmpresa.forEach((s) => map.set(s.id, { id: s.id, name: s.name, isMatriz: !!s.isMatriz }));
+    }
     if (sucursales && sucursales.length > 0) {
-      sucursales.forEach((s) => map.set(s.id, s));
+      sucursales.forEach((s) => {
+        if (!map.has(s.id)) map.set(s.id, { id: s.id, name: s.name, isMatriz: !!s.isMatriz });
+      });
     }
     cobros.forEach((c) => {
       if (c.tenantId && !map.has(c.tenantId)) {
@@ -1956,55 +1977,61 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
         {/* Pestañas de Sucursal Dinámicas por Nombre */}
         {listaSucursalesDisponibles.length >= 1 && (
-          <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1">
-            {listaSucursalesDisponibles.map((suc) => {
-              const isSelected = selectedSucursalCobroId === suc.id;
-              const isMiLocal = activeSucursalId === suc.id;
-              const countDeudas = cobros.filter((c) => c.tenantId === suc.id || (!c.tenantId && suc.isMatriz)).length;
-              const esOtra = !isMiLocal;
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted-foreground)] shrink-0 hidden sm:inline-block">
+              Sucursal:
+            </span>
+            <div className="flex p-1 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex-wrap gap-1.5">
+              {listaSucursalesDisponibles.map((suc) => {
+                const isSelected = selectedSucursalCobroId === suc.id;
+                const isMiLocal = activeSucursalId === suc.id;
+                const countDeudas = cobros.filter((c) => c.tenantId === suc.id || (!c.tenantId && suc.isMatriz)).length;
+                const esOtra = !isMiLocal;
 
-              return (
-                <button
-                  key={suc.id}
-                  type="button"
-                  onClick={() => setSelectedSucursalCobroId(suc.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    isSelected
-                      ? (esOtra ? 'bg-amber-600 text-white shadow-sm font-black' : 'bg-[#0F172A] text-white shadow-sm font-black')
-                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
-                  }`}
-                >
-                  <Building size={13} className={isSelected ? (esOtra ? 'text-amber-200' : 'text-emerald-400') : 'text-slate-400'} />
-                  <span>{suc.name}</span>
-                  {isMiLocal && (
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
-                      isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                return (
+                  <button
+                    key={suc.id}
+                    type="button"
+                    onClick={() => setSelectedSucursalCobroId(suc.id)}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? (esOtra ? 'bg-amber-600 text-white shadow-sm font-black ring-2 ring-amber-400/40' : 'bg-[#0F172A] text-white shadow-sm font-black ring-2 ring-slate-400/40')
+                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
+                    }`}
+                  >
+                    <Building size={13} className={isSelected ? (esOtra ? 'text-amber-200' : 'text-emerald-400') : 'text-slate-400'} />
+                    <span>{suc.name}</span>
+                    {isMiLocal && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                        isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      }`}>
+                        Mi Local
+                      </span>
+                    )}
+                    {esOtra && isSelected && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-amber-400/30 text-amber-100">
+                        Otra Sucursal
+                      </span>
+                    )}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
                     }`}>
-                      Mi Local
+                      {countDeudas}
                     </span>
-                  )}
-                  {esOtra && isSelected && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-amber-400/30 text-amber-100">
-                      Otra Sucursal
-                    </span>
-                  )}
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                    isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
-                  }`}>
-                    {countDeudas}
-                  </span>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        <div className="flex flex-wrap gap-1.5">
+        {/* Filtros de Estado */}
+        <div className="flex flex-wrap items-center gap-1.5 w-full pt-0.5">
           {(['TODOS', 'PENDIENTE', 'PARCIALMENTE_PAGADO', 'SALDADO', 'VENCIDO'] as const).map((e) => (
             <button
               key={e}
               onClick={() => setFiltro(e as any)}
-              className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs ${
                 filtro === e
                   ? 'bg-[#0F172A] text-white border-transparent'
                   : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:border-[#0F172A]'

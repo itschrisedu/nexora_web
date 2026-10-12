@@ -627,10 +627,13 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     loadTransportes();
     loadSucursales();
 
+    // Por defecto siempre carga en la sucursal que pertenece el usuario
     if (activeSucursalId && activeSucursalId !== 'TODAS') {
       setSelectedSucursalPedidoId(activeSucursalId);
-    } else if (sucursales && sucursales.length > 0 && !selectedSucursalPedidoId) {
+      setSelectedOrderSucursalId(activeSucursalId);
+    } else if (sucursales && sucursales.length > 0) {
       setSelectedSucursalPedidoId(sucursales[0].id);
+      setSelectedOrderSucursalId(sucursales[0].id);
     }
   }, [online, activeSucursalId]);
 

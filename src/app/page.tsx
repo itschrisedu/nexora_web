@@ -487,14 +487,13 @@ function MainApp() {
       if (Array.isArray(data) && data.length > 0) {
         const storedUser = localStorage.getItem('user');
         const parsed = storedUser ? JSON.parse(storedUser) : null;
-        const isUserGlobal = parsed?.rol === 'ROL_SUPER_ADMIN' || (parsed?.rol === 'ROL_ADMIN' && Boolean(parsed?.esAdminGeneral));
-        if (!isUserGlobal && parsed?.tenantId) {
-          const scoped = data.filter((s: any) => s.id === parsed.tenantId);
-          setSucursales(scoped.length > 0 ? scoped : data);
+        // Guardamos todas las sucursales del negocio para que comercial y financiero muestren las pestañas de cada una
+        setSucursales(data);
+        if (parsed?.tenantId) {
           setActiveSucursalId(parsed.tenantId);
           localStorage.setItem('activeSucursalId', parsed.tenantId);
-        } else {
-          setSucursales(data);
+        } else if (data.length > 0) {
+          setActiveSucursalId(data[0].id);
         }
       } else {
         const storedUser = localStorage.getItem('user');
