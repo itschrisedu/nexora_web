@@ -176,7 +176,18 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<EstadoPedido | 'TODOS'>('TODOS');
-  const [selectedSucursalPedidoId, setSelectedSucursalPedidoId] = useState<string>(activeSucursalId || '');
+  const [selectedSucursalPedidoId, setSelectedSucursalPedidoId] = useState<string>(() => {
+    if (activeSucursalId && activeSucursalId !== 'TODAS') return activeSucursalId;
+    if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u?.tenantId || '';
+      } catch {
+        return '';
+      }
+    }
+    return '';
+  });
   const [selectedOrderSucursalId, setSelectedOrderSucursalId] = useState<string>('');
   const [pedidoExpandidoId, setPedidoExpandidoId] = useState<string | null>(null);
 
@@ -2035,18 +2046,18 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       res.push({ id: miLocalId || 'matriz', name: 'Matriz Principal', isMatriz: true });
     }
 
-    // Regla obligatoria: La sucursal a la que pertenece el usuario siempre debe salir primera
-    res.sort((a, b) => {
-      if (miLocalId) {
-        if (a.id === miLocalId) return -1;
-        if (b.id === miLocalId) return 1;
-      }
+    // Regla obligatoria: La sucursal a la que pertenece el usuario SIEMPRE debe aparecer PRIMERA (extremo izquierdo)
+    const miLocalItem = res.find((s) => s.id === miLocalId);
+    const otrasSucursales = res.filter((s) => s.id !== miLocalId);
+
+    // El resto de sucursales a la derecha: matriz primero, luego alfabético
+    otrasSucursales.sort((a, b) => {
       if (a.isMatriz && !b.isMatriz) return -1;
       if (!a.isMatriz && b.isMatriz) return 1;
       return a.name.localeCompare(b.name);
     });
 
-    return res;
+    return miLocalItem ? [miLocalItem, ...otrasSucursales] : otrasSucursales;
   }, [sucursalesEmpresa, sucursales, pedidos, miLocalId]);
 
   const pedidosFiltrados = useMemo(() => {
