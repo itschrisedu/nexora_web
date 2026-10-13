@@ -1088,19 +1088,53 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     },
     _modo?: 'PDF' | 'TEXTO'
   ) => {
-    if (!cartera.clienteTelefono) {
-      showToast('El cliente no tiene teléfono registrado.', 'warning');
+    const telefono = cartera.clienteTelefono && cartera.clienteTelefono !== '—' ? cartera.clienteTelefono : '';
+    const emailDestino = cartera.clienteEmail || (cartera as any).email;
+
+    if (!telefono && !emailDestino) {
+      showToast('El cliente no tiene teléfono celular ni correo electrónico registrado para el envío.', 'warning');
       return;
     }
 
     const dataAbono = armarDatosComprobanteAbono(cartera, abonoInfo);
-    try {
-      await compartirComprobanteAbonoPdf(dataAbono, cartera.clienteTelefono, false);
-      showToast('Abriendo WhatsApp con el comprobante oficial de abono...', 'info');
-    } catch (err: any) {
-      console.error('Error al generar envío de abono:', err);
-      const msg = await armarMensajeWhatsAppAbono(dataAbono, false);
-      handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
+
+    // 1. Envío obligatorio a WhatsApp si dispone de teléfono
+    if (telefono) {
+      try {
+        await compartirComprobanteAbonoPdf(dataAbono, telefono, false);
+        showToast('Abriendo WhatsApp con el comprobante oficial de abono...', 'info');
+      } catch (err: any) {
+        console.error('Error al generar envío de abono:', err);
+        const msg = await armarMensajeWhatsAppAbono(dataAbono, false);
+        handleEnviarWhatsAppTexto(telefono, msg);
+      }
+    } else {
+      showToast('El cliente no tiene número de teléfono registrado para WhatsApp.', 'info');
+    }
+
+    // 2. Envío obligatorio por Correo Electrónico en segundo plano
+    if (emailDestino) {
+      try {
+        const msgTexto = await armarMensajeWhatsAppAbono(dataAbono, false);
+        const urlRecibo = await generarUrlPublicaAbono(dataAbono);
+        ApiService.post('/notificaciones/email-comprobante', {
+          destinatario: emailDestino,
+          asunto: `Comprobante de Abono — $${Number(abonoInfo.monto).toFixed(2)} — NEXORA`,
+          tipo: 'ABONO',
+          detalles: {
+            mensaje: msgTexto,
+            urlComprobante: urlRecibo,
+          },
+        }).then(() => {
+          showToast(`Comprobante enviado por correo a ${emailDestino}`, 'success');
+        }).catch((e) => {
+          console.warn('Error en despacho de correo:', e);
+        });
+      } catch (e) {
+        console.warn('Error generando comprobante para correo:', e);
+      }
+    } else {
+      showToast('El cliente no tiene correo electrónico registrado para el envío.', 'info');
     }
   };
 
@@ -3075,7 +3109,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             <Download size={13} />
                           </button>
 
-                          {carteraSeleccionada.clienteTelefono && (
+                          {(carteraSeleccionada.clienteTelefono || carteraSeleccionada.clienteEmail) && (
                             <button
                               type="button"
                               onClick={() => {
@@ -3095,10 +3129,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                   formatoEnvioAbono
                                 );
                               }}
-                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 transition-colors cursor-pointer shadow-2xs"
-                              title={`Enviar Comprobante por WhatsApp (${formatoEnvioAbono})`}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                              title="Enviar Comprobante por WhatsApp y Correo Electrónico"
                             >
-                              <MessageCircle size={13} />
+                              <Send size={12} />
                             </button>
                           )}
                         </div>
@@ -3204,31 +3238,6 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
             {/* ── Footer del Modal ── */}
             <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col gap-2">
-
-              {/* Acciones directas de WhatsApp */}
-              {carteraSeleccionada.clienteTelefono && (
-                <button
-                  type="button"
-                  disabled={!montoAbono}
-                  onClick={() => {
-                    handleEnviarComprobanteAbono(
-                      carteraSeleccionada,
-                      {
-                        monto: 0,
-                        metodo: 'ESTADO_CUENTA',
-                        fecha: new Date().toLocaleDateString('es-EC'),
-                      },
-                      formatoEnvioAbono
-                    );
-                  }}
-                  className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={montoAbono ? `Enviar Comprobante por WhatsApp (${formatoEnvioAbono})` : 'Ingrese un monto de abono primero'}
-                >
-                  <MessageCircle size={13} />
-                  <span>Enviar a WhatsApp</span>
-                </button>
-              )}
-
               <button
                 onClick={() => {
                   setShowCuentaModal(false);
