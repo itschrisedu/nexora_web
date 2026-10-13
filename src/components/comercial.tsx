@@ -615,6 +615,14 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [businessConfig, setBusinessConfig] = useState<any | null>(null);
   const [sucursalesEmpresa, setSucursalesEmpresa] = useState<any[]>([]);
 
+  // Modal: Pedir stock a otra sucursal para pedidos EN_ESPERA_STOCK
+  const [modalInterSucursalPedido, setModalInterSucursalPedido] = useState(false);
+  const [pedidoInterSucursal, setPedidoInterSucursal] = useState<any>(null);
+  const [interSucursalOrigenId, setInterSucursalOrigenId] = useState('');
+  const [interSucursalModalidad, setInterSucursalModalidad] = useState<'DEVOLUCION_MERCADERIA' | 'PAGO_INTERNO'>('DEVOLUCION_MERCADERIA');
+  const [interSucursalNotas, setInterSucursalNotas] = useState('');
+  const [loadingInterSucursalPedido, setLoadingInterSucursalPedido] = useState(false);
+
   const loadSucursales = async () => {
     try {
       if (online) {
@@ -1850,6 +1858,42 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
+  // Handler: Abrir modal de préstamo inter-sucursal para pedidos EN_ESPERA_STOCK
+  const handleAbrirInterSucursal = (pedido: any) => {
+    setPedidoInterSucursal(pedido);
+    setInterSucursalOrigenId('');
+    setInterSucursalModalidad('DEVOLUCION_MERCADERIA');
+    setInterSucursalNotas('');
+    if (!sucursalesEmpresa || sucursalesEmpresa.length === 0) {
+      loadSucursales();
+    }
+    setModalInterSucursalPedido(true);
+  };
+
+  // Handler: Confirmar y ejecutar préstamo inter-sucursal
+  const handleConfirmarInterSucursal = async () => {
+    if (!pedidoInterSucursal || !interSucursalOrigenId) {
+      showToast('Selecciona la sucursal de origen para el préstamo de mercadería.', 'warning');
+      return;
+    }
+    setLoadingInterSucursalPedido(true);
+    try {
+      const res = await ApiService.post(`/pedidos/${pedidoInterSucursal.id}/solicitar-inter-sucursal`, {
+        sucursalOrigenId: interSucursalOrigenId,
+        modalidad: interSucursalModalidad,
+        notas: interSucursalNotas.trim() || undefined,
+      });
+      showToast(res.message || 'Préstamo inter-sucursal registrado con éxito. El pedido avanzó a Preparación.', 'success');
+      setModalInterSucursalPedido(false);
+      setPedidoInterSucursal(null);
+      await loadPedidos();
+    } catch (err: any) {
+      showToast(err.message || 'Error al solicitar stock inter-sucursal', 'error');
+    } finally {
+      setLoadingInterSucursalPedido(false);
+    }
+  };
+
   const handleGuardarOffline = async () => {
     if (!clientId || lineasPedido.length === 0) {
       setErrorMsg('Selecciona un cliente y agrega al menos un producto.');
@@ -2394,6 +2438,15 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                     title="Marcar como Listo para Preparar en Bodega"
                                   >
                                     <Package size={12} /> Preparar
+                                  </button>
+                                )}
+                                {p.estado === 'EN_ESPERA_STOCK' && (
+                                  <button
+                                    onClick={() => handleAbrirInterSucursal(p)}
+                                    className="px-2.5 py-1 bg-purple-600/10 text-purple-600 hover:bg-purple-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-purple-600/20 flex items-center gap-1"
+                                    title="Pedir o transferir stock de otra sucursal de la empresa para completar este pedido"
+                                  >
+                                    <Building size={12} /> Pedir a Otra Sucursal
                                   </button>
                                 )}
                                 <button
@@ -5919,6 +5972,188 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Préstamo Inter-Sucursal para Pedidos EN_ESPERA_STOCK */}
+      {modalInterSucursalPedido && pedidoInterSucursal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Cabecera */}
+            <div className="p-5 border-b border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-600">
+                  <Building size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[var(--foreground)]">
+                    Préstamo de Mercadería Inter-Sucursal
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Pedido #{pedidoInterSucursal.id.slice(0, 8)} · Cliente: {pedidoInterSucursal.clienteNombre || 'Consumidor'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalInterSucursalPedido(false);
+                  setPedidoInterSucursal(null);
+                }}
+                className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Cuerpo */}
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-xs text-purple-700 dark:text-purple-300">
+                <strong>¿Cómo funciona?</strong> Este pedido se encuentra en espera de stock. Al solicitar mercadería a otra sucursal, los pares requeridos se descontarán del inventario de la sucursal prestamista y el pedido avanzará automáticamente a <strong>En Preparación</strong>.
+              </div>
+
+              {/* Selector de Sucursal Origen */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                  Sucursal que entregará/prestará la mercadería *
+                </label>
+                <select
+                  value={interSucursalOrigenId}
+                  onChange={(e) => setInterSucursalOrigenId(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                >
+                  <option value="">-- Seleccionar sucursal de origen --</option>
+                  {sucursalesEmpresa
+                    .filter((s) => s.id !== pedidoInterSucursal.tenantId && s.id !== pedidoInterSucursal.sucursalId)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name || s.nombre} {s.code ? `(${s.code})` : ''} {s.isMatriz ? '⭐ Matriz' : ''}
+                      </option>
+                    ))}
+                </select>
+                {sucursalesEmpresa.filter((s) => s.id !== pedidoInterSucursal.tenantId && s.id !== pedidoInterSucursal.sucursalId).length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">
+                    No hay otras sucursales configuradas en el sistema para realizar transferencias.
+                  </p>
+                )}
+              </div>
+
+              {/* Modalidad de Compensación */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1.5">
+                  Modalidad de Compensación / Arreglo
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInterSucursalModalidad('DEVOLUCION_MERCADERIA')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      interSucursalModalidad === 'DEVOLUCION_MERCADERIA'
+                        ? 'bg-purple-500/10 border-purple-500 text-purple-700 dark:text-purple-300 ring-1 ring-purple-500'
+                        : 'border-[var(--border)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]'
+                    }`}
+                  >
+                    <div className="font-extrabold text-xs">🔄 Reposición de Pares</div>
+                    <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                      Devolver los mismos pares físicos cuando llegue nueva mercadería del taller o proveedor.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInterSucursalModalidad('PAGO_INTERNO')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      interSucursalModalidad === 'PAGO_INTERNO'
+                        ? 'bg-purple-500/10 border-purple-500 text-purple-700 dark:text-purple-300 ring-1 ring-purple-500'
+                        : 'border-[var(--border)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]'
+                    }`}
+                  >
+                    <div className="font-extrabold text-xs">💵 Compensación Interna</div>
+                    <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                      Ajuste contable interno de costos entre las cajas o balances de ambas sucursales.
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Resumen de Artículos Solicitados en el Pedido */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1.5">
+                  Artículos que se solicitarán en préstamo:
+                </label>
+                <div className="border border-[var(--border)] rounded-xl p-3 bg-[var(--muted)]/10 space-y-2 max-h-48 overflow-y-auto">
+                  {pedidoInterSucursal.lines && pedidoInterSucursal.lines.length > 0 ? (
+                    agruparLineasPorModelo(pedidoInterSucursal.lines).map((g) => (
+                      <div key={g.key} className="flex items-center justify-between text-xs py-1 border-b border-[var(--border)]/40 last:border-0">
+                        <div>
+                          <span className="font-bold text-[var(--foreground)]">{g.modelName}</span>
+                          <span className="text-[var(--muted-foreground)] ml-1">({g.color || 'Estándar'})</span>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {g.tallas.map((t) => (
+                              <span key={t.numero} className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300 text-[10px] font-bold">
+                                T{t.numero}: {t.cantidad}p
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <span className="font-extrabold text-purple-600 shrink-0">
+                          {g.totalPares} pares
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-xs text-[var(--muted-foreground)] italic">Sin líneas registradas</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Observaciones / Notas */}
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                  Notas u Observaciones (Opcional)
+                </label>
+                <textarea
+                  value={interSucursalNotas}
+                  onChange={(e) => setInterSucursalNotas(e.target.value)}
+                  placeholder="Ej: Acordado entrega por mensajero a las 15:00..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-hidden focus:ring-2 focus:ring-purple-500 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Pie */}
+            <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalInterSucursalPedido(false);
+                  setPedidoInterSucursal(null);
+                }}
+                disabled={loadingInterSucursalPedido}
+                className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarInterSucursal}
+                disabled={!interSucursalOrigenId || loadingInterSucursalPedido}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {loadingInterSucursalPedido ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    Procesando Préstamo...
+                  </>
+                ) : (
+                  <>
+                    <Building size={13} />
+                    Confirmar Préstamo y Preparar
+                  </>
+                )}
               </button>
             </div>
           </div>
