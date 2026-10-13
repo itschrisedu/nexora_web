@@ -3455,24 +3455,6 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                             <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-0.5 shrink-0">
                               Series:
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSerieFiltroBuscador('TODAS');
-                                if (busquedaModelo.trim().length > 0) {
-                                  setShowDropdownModelo(true);
-                                } else {
-                                  setShowDropdownModelo(false);
-                                }
-                              }}
-                              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
-                                serieFiltroBuscador === 'TODAS'
-                                  ? 'bg-[#0F172A] text-white dark:bg-emerald-600 dark:text-white shadow-xs'
-                                  : 'bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]'
-                              }`}
-                            >
-                              Todas
-                            </button>
                             {seriesUnicas.map((ser) => {
                               const isActiva = serieFiltroBuscador.toLowerCase() === ser.toLowerCase();
                               const count = catalogoProductos.filter(

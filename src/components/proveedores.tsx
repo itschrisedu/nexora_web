@@ -197,9 +197,15 @@ function obtenerFotoProducto(prod: any): string {
 function obtenerSerieProducto(prod: any): string {
   if (!prod) return '';
   if (prod.serieNombre && typeof prod.serieNombre === 'string') return prod.serieNombre.trim();
-  if (prod.serie && typeof prod.serie === 'object' && prod.serie.name) return prod.serie.name.trim();
+  if (prod.serie && typeof prod.serie === 'object') {
+    if (prod.serie.nombre && typeof prod.serie.nombre === 'string') return prod.serie.nombre.trim();
+    if (prod.serie.name && typeof prod.serie.name === 'string') return prod.serie.name.trim();
+  }
   if (prod.serie && typeof prod.serie === 'string') return prod.serie.trim();
-  if (prod.model?.serie?.name) return prod.model.serie.name.trim();
+  if (prod.model?.serie && typeof prod.model.serie === 'object') {
+    if (prod.model.serie.nombre && typeof prod.model.serie.nombre === 'string') return prod.model.serie.nombre.trim();
+    if (prod.model.serie.name && typeof prod.model.serie.name === 'string') return prod.model.serie.name.trim();
+  }
   return '';
 }
 
@@ -4398,27 +4404,9 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
                     return (
                       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
-                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-0.5 shrink-0">
-                          Series:
+                        <span className="text-[10px] font-extrabold text-[var(--muted-foreground)] uppercase tracking-wider mr-0.5 shrink-0">
+                          SERIES:
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSerieFiltroOrden('TODAS');
-                            if (busquedaModelo.trim().length > 0) {
-                              setShowDropdownModelo(true);
-                            } else {
-                              setShowDropdownModelo(false);
-                            }
-                          }}
-                          className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
-                            serieFiltroOrden === 'TODAS'
-                              ? 'bg-[#0F172A] text-white dark:bg-emerald-600 dark:text-white shadow-xs'
-                              : 'bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]'
-                          }`}
-                        >
-                          Todas
-                        </button>
                         {seriesUnicas.map((ser) => {
                           const isActiva = serieFiltroOrden.toLowerCase() === ser.toLowerCase();
                           const count = productos.filter(
@@ -4434,15 +4422,19 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                                 setSerieFiltroOrden(nueva);
                                 setShowDropdownModelo(true);
                               }}
-                              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                              className={`px-3 py-1 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                                 isActiva
-                                  ? 'bg-emerald-600 text-white shadow-xs border border-emerald-500 font-black'
-                                  : 'bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]'
+                                  ? 'bg-[#0F172A] text-white dark:bg-emerald-600 dark:text-white shadow-xs'
+                                  : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                               }`}
-                              title={`Filtrar modelos de serie ${ser}`}
+                              title={`Filtrar modelos de serie ${formatearNombreSerie(ser)}`}
                             >
                               <span>{formatearNombreSerie(ser)}</span>
-                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isActiva ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'}`}>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                                isActiva
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                              }`}>
                                 {count}
                               </span>
                             </button>
