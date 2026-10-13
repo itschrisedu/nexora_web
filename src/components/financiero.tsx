@@ -166,6 +166,8 @@ interface ClienteCartera {
   clientId: string;
   sucursalNombre?: string;
   clienteNombre: string;
+  clienteApellido?: string;
+  clienteNombreSolo?: string;
   clienteCedula: string;
   clienteTelefono: string;
   clienteEmail?: string;
@@ -853,10 +855,21 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         primerCobro.clienteTelefono ||
         listaCobros.find((c) => c.clienteTelefono && c.clienteTelefono !== '—')?.clienteTelefono ||
         '—';
-      const nombreResuelto =
-        clienteDb && (clienteDb.nombre || clienteDb.apellido)
-          ? `${clienteDb.nombre || ''} ${clienteDb.apellido || ''}`.trim()
-          : primerCobro.clienteNombre || 'Cliente sin registrar';
+      const clienteApellido = (clienteDb?.apellido || '').trim();
+      const clienteNombreSolo = (clienteDb?.nombre || '').trim();
+
+      let nombreResuelto = '';
+      if (clienteApellido && clienteNombreSolo) {
+        nombreResuelto = `${clienteApellido} ${clienteNombreSolo}`;
+      } else if (clienteApellido) {
+        nombreResuelto = clienteApellido;
+      } else if (clienteNombreSolo) {
+        nombreResuelto = clienteNombreSolo;
+      } else if (primerCobro.clienteNombre) {
+        nombreResuelto = primerCobro.clienteNombre.trim();
+      } else {
+        nombreResuelto = 'Cliente sin registrar';
+      }
 
       const montoTotalFacturado = listaCobros.reduce(
         (sum, c) => sum + Number(c.montoOriginal ?? c.montoTotal ?? 0),
@@ -905,6 +918,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         clientId,
         sucursalNombre,
         clienteNombre: nombreResuelto,
+        clienteApellido,
+        clienteNombreSolo,
         clienteCedula: cedulaResuelta,
         clienteTelefono: telefonoResuelto,
         clienteEmail: clienteDb?.email || cobroConEmail?.clienteEmail || '',
@@ -922,8 +937,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       });
     });
 
-    // Ordenar de mayor saldo pendiente a menor
-    return resultado.sort((a, b) => b.saldoTotalPendiente - a.saldoTotalPendiente);
+    // Ordenar alfabéticamente por apellido y nombre (ej: Acosta Dario), igual que el directorio de clientes
+    return resultado.sort((a, b) => {
+      const apellidoA = (a.clienteApellido || a.clienteNombre || '').trim().toLowerCase();
+      const apellidoB = (b.clienteApellido || b.clienteNombre || '').trim().toLowerCase();
+      const comp = apellidoA.localeCompare(apellidoB, 'es', { sensitivity: 'base' });
+      if (comp !== 0) return comp;
+      const nombreA = (a.clienteNombreSolo || '').trim().toLowerCase();
+      const nombreB = (b.clienteNombreSolo || '').trim().toLowerCase();
+      return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
+    });
   })();
 
   const [acordeonNotasAbierto, setAcordeonNotasAbierto] = useState(false);
@@ -1931,17 +1954,32 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   });
 
   // Filtrado de Cobros Individuales
-  const facturasFiltradas = cobrosFiltradosPorSucursal.filter((c) => {
-    const cumpleEstado = filtro === 'TODOS' ? true : c.estado === filtro;
-    const q = busqueda.toLowerCase().trim();
-    if (!q) return cumpleEstado;
+  const facturasFiltradas = cobrosFiltradosPorSucursal
+    .filter((c) => {
+      const cumpleEstado = filtro === 'TODOS' ? true : c.estado === filtro;
+      const q = busqueda.toLowerCase().trim();
+      if (!q) return cumpleEstado;
 
-    const nombre = (c.clienteNombre || '').toLowerCase();
-    const cedula = (c.clienteCedula || '').toLowerCase();
-    const num = (c.numeroCobro || c.saleNote?.numero?.toString() || c.id || '').toLowerCase();
+      const cliDb = clientesRaw.find((cl) => cl.id === c.clientId);
+      const nombreCompleto = cliDb && (cliDb.apellido || cliDb.nombre)
+        ? `${cliDb.apellido || ''} ${cliDb.nombre || ''}`.toLowerCase()
+        : (c.clienteNombre || '').toLowerCase();
+      const cedula = (c.clienteCedula || '').toLowerCase();
+      const num = (c.numeroCobro || c.saleNote?.numero?.toString() || c.id || '').toLowerCase();
 
-    return cumpleEstado && (nombre.includes(q) || cedula.includes(q) || num.includes(q));
-  });
+      return cumpleEstado && (nombreCompleto.includes(q) || cedula.includes(q) || num.includes(q));
+    })
+    .sort((a, b) => {
+      const cliA = clientesRaw.find((cl) => cl.id === a.clientId);
+      const cliB = clientesRaw.find((cl) => cl.id === b.clientId);
+      const apellidoA = (cliA?.apellido || a.clienteNombre || '').trim().toLowerCase();
+      const apellidoB = (cliB?.apellido || b.clienteNombre || '').trim().toLowerCase();
+      const comp = apellidoA.localeCompare(apellidoB, 'es', { sensitivity: 'base' });
+      if (comp !== 0) return comp;
+      const nombreA = (cliA?.nombre || '').trim().toLowerCase();
+      const nombreB = (cliB?.nombre || '').trim().toLowerCase();
+      return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
+    });
 
   return (
     <div className="space-y-6">
@@ -2463,7 +2501,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                             <td className="px-5 py-4">
                               <div className="font-extrabold text-xs text-[var(--foreground)] capitalize">
-                                {capitalizarNombreCompleto(cobro.clienteNombre)}
+                                {(() => {
+                                  const cliDb = clientesRaw.find((cl) => cl.id === cobro.clientId);
+                                  const nom = cliDb && (cliDb.apellido || cliDb.nombre)
+                                    ? `${cliDb.apellido || ''} ${cliDb.nombre || ''}`.trim()
+                                    : cobro.clienteNombre;
+                                  return capitalizarNombreCompleto(nom);
+                                })()}
                               </div>
                               <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] mt-0.5 flex-wrap">
                                 <span>C.I: {cobro.clienteCedula}</span>
