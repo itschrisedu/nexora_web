@@ -800,10 +800,12 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       );
     })
     .sort((a, b) => {
-      const apellidoA = (a.apellido || a.nombre || "").trim().toLowerCase();
-      const apellidoB = (b.apellido || b.nombre || "").trim().toLowerCase();
-      const comp = apellidoA.localeCompare(apellidoB, "es", { sensitivity: "base" });
+      // Con RUC = nombre comercial → ordenar por nombre; sin RUC → ordenar por apellido
+      const claveA = a.ruc ? (a.nombre || "").trim().toLowerCase() : (a.apellido || a.nombre || "").trim().toLowerCase();
+      const claveB = b.ruc ? (b.nombre || "").trim().toLowerCase() : (b.apellido || b.nombre || "").trim().toLowerCase();
+      const comp = claveA.localeCompare(claveB, "es", { sensitivity: "base" });
       if (comp !== 0) return comp;
+      // Desempate: nombre dentro del mismo grupo
       const nombreA = (a.nombre || "").trim().toLowerCase();
       const nombreB = (b.nombre || "").trim().toLowerCase();
       return nombreA.localeCompare(nombreB, "es", { sensitivity: "base" });
@@ -816,9 +818,10 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       return c.rangoInactividad === filtroRangoInactivo;
     })
     .sort((a, b) => {
-      const apellidoA = (a.apellido || a.nombre || "").trim().toLowerCase();
-      const apellidoB = (b.apellido || b.nombre || "").trim().toLowerCase();
-      const comp = apellidoA.localeCompare(apellidoB, "es", { sensitivity: "base" });
+      // Con RUC = nombre comercial → ordenar por nombre; sin RUC → ordenar por apellido
+      const claveA = a.ruc ? (a.nombre || "").trim().toLowerCase() : (a.apellido || a.nombre || "").trim().toLowerCase();
+      const claveB = b.ruc ? (b.nombre || "").trim().toLowerCase() : (b.apellido || b.nombre || "").trim().toLowerCase();
+      const comp = claveA.localeCompare(claveB, "es", { sensitivity: "base" });
       if (comp !== 0) return comp;
       return (a.nombre || "").trim().toLowerCase().localeCompare((b.nombre || "").trim().toLowerCase(), "es", { sensitivity: "base" });
     });
