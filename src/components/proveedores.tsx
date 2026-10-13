@@ -193,6 +193,16 @@ function obtenerFotoProducto(prod: any): string {
   );
 }
 
+// Función auxiliar para obtener el nombre limpio de la serie de un producto
+function obtenerSerieProducto(prod: any): string {
+  if (!prod) return '';
+  if (prod.serieNombre && typeof prod.serieNombre === 'string') return prod.serieNombre.trim();
+  if (prod.serie && typeof prod.serie === 'object' && prod.serie.name) return prod.serie.name.trim();
+  if (prod.serie && typeof prod.serie === 'string') return prod.serie.trim();
+  if (prod.model?.serie?.name) return prod.model.serie.name.trim();
+  return '';
+}
+
 // Cálculo del ratio de curva de una talla
 function getCurvaRatio(talla: any, tallas: any[] = []): number {
   if (talla.ratio && talla.ratio > 0) return talla.ratio;
@@ -520,6 +530,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   // Selector Interactivo de Modelos con Curva exacta
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
+  const [serieFiltroOrden, setSerieFiltroOrden] = useState<string>('TODAS');
   const [productoSeleccionado, setProductoSeleccionado] = useState<any | null>(null);
   const [subtipoCurva, setSubtipoCurva] = useState<TipoCurva>('MEDIA_A');
   const [cantidadCurvas, setCantidadCurvas] = useState<number>(2); // Por defecto 2 medias docenas = 12 pares
@@ -1822,6 +1833,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                 setOrderLines([]);
                 setProductoSeleccionado(null);
                 setBusquedaModelo('');
+                setSerieFiltroOrden('TODAS');
                 setShowOrderModal(true);
               }}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm border border-slate-700 whitespace-nowrap"
@@ -4366,9 +4378,80 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
               {/* Selector de Modelos con Curva Exacta */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-                  Seleccionar Modelo de Calzado & Curva
-                </span>
+                {/* Header con Título a la izquierda y Botones de Series a la derecha */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
+                    Modelo / Producto * (Buscar por Nombre o Color)
+                  </label>
+
+                  {/* Botones / Píldoras de Series Dinámicas */}
+                  {(() => {
+                    const seriesUnicas = Array.from(
+                      new Set(
+                        productos
+                          .map((p) => obtenerSerieProducto(p))
+                          .filter((s): s is string => Boolean(s && s.length > 0))
+                      )
+                    ).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+                    if (seriesUnicas.length === 0) return null;
+
+                    return (
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-0.5 shrink-0">
+                          Series:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSerieFiltroOrden('TODAS');
+                            if (busquedaModelo.trim().length > 0) {
+                              setShowDropdownModelo(true);
+                            } else {
+                              setShowDropdownModelo(false);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
+                            serieFiltroOrden === 'TODAS'
+                              ? 'bg-[#0F172A] text-white dark:bg-emerald-600 dark:text-white shadow-xs'
+                              : 'bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]'
+                          }`}
+                        >
+                          Todas
+                        </button>
+                        {seriesUnicas.map((ser) => {
+                          const isActiva = serieFiltroOrden.toLowerCase() === ser.toLowerCase();
+                          const count = productos.filter(
+                            (p) => obtenerSerieProducto(p).toLowerCase() === ser.toLowerCase()
+                          ).length;
+
+                          return (
+                            <button
+                              key={ser}
+                              type="button"
+                              onClick={() => {
+                                const nueva = isActiva ? 'TODAS' : ser;
+                                setSerieFiltroOrden(nueva);
+                                setShowDropdownModelo(true);
+                              }}
+                              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                                isActiva
+                                  ? 'bg-emerald-600 text-white shadow-xs border border-emerald-500 font-black'
+                                  : 'bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]'
+                              }`}
+                              title={`Filtrar modelos de serie ${ser}`}
+                            >
+                              <span>{formatearNombreSerie(ser)}</span>
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isActiva ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'}`}>
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
 
                 {productoSeleccionado ? (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl gap-3">
@@ -4384,7 +4467,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                           {productoSeleccionado.nombre || productoSeleccionado.name} — {productoSeleccionado.color}
                         </div>
                         <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                          Marca: {productoSeleccionado.marca} • Cód: {productoSeleccionado.codigo} • Serie: {formatearNombreSerie(productoSeleccionado.serie?.name)}
+                          Marca: {productoSeleccionado.marca} • Cód: {productoSeleccionado.codigo} • Serie: {formatearNombreSerie(obtenerSerieProducto(productoSeleccionado))}
                         </div>
                       </div>
                     </div>
@@ -4401,7 +4484,11 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Escribe para buscar modelo con foto (ej. Samba, Mocasín)..."
+                      placeholder={
+                        serieFiltroOrden !== 'TODAS'
+                          ? `Serie ${serieFiltroOrden} seleccionada: escribe el modelo (ej. Mocasín, Botín)...`
+                          : "Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."
+                      }
                       value={busquedaModelo}
                       onChange={(e) => {
                         setBusquedaModelo(e.target.value);
@@ -4411,45 +4498,91 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                       className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                     />
 
-                    {showDropdownModelo && busquedaModelo.trim().length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto">
-                        {productos
-                          .filter((p) => {
-                            const q = busquedaModelo.toLowerCase().trim();
-                            return (
-                              (p.nombre && p.nombre.toLowerCase().includes(q)) ||
-                              (p.name && p.name.toLowerCase().includes(q)) ||
-                              (p.codigo && p.codigo.toLowerCase().includes(q)) ||
-                              (p.color && p.color.toLowerCase().includes(q)) ||
-                              (p.marca && p.marca.toLowerCase().includes(q))
-                            );
-                          })
-                          .map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => {
-                                setProductoSeleccionado(p);
-                                setPrecioCostoInput(Number(p.precioCosto || p.costPrice || 0));
-                                setShowDropdownModelo(false);
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--muted)] border-b border-[var(--border)] last:border-none flex items-center justify-between"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                {obtenerFotoProducto(p) && (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
-                                )}
-                                <div>
-                                  <span className="font-bold block">{p.nombre || p.name}</span>
-                                  <span className="text-[10px] text-[var(--muted-foreground)]">{p.marca} • {p.color} ({p.codigo})</span>
-                                </div>
-                              </div>
-                              <span className="font-mono text-emerald-600 font-bold">${Number(p.precioCosto || p.costPrice || 0).toFixed(2)}</span>
-                            </button>
-                          ))}
+                    {/* Indicador de serie activa cuando no hay texto ingresado */}
+                    {serieFiltroOrden !== 'TODAS' && busquedaModelo.trim().length === 0 && showDropdownModelo && (
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center justify-between mt-1">
+                        <span>Serie <strong>{serieFiltroOrden}</strong> activa. Mostrando modelos de esta serie:</span>
+                        <button
+                          type="button"
+                          onClick={() => setSerieFiltroOrden('TODAS')}
+                          className="text-[10px] font-bold hover:underline cursor-pointer"
+                        >
+                          Mostrar todas
+                        </button>
                       </div>
                     )}
+
+                    {showDropdownModelo && (busquedaModelo.trim().length > 0 || serieFiltroOrden !== 'TODAS') && (() => {
+                      const q = busquedaModelo.toLowerCase().trim();
+                      const filtrados = productos
+                        .filter((p) => {
+                          if (serieFiltroOrden !== 'TODAS') {
+                            const serProd = obtenerSerieProducto(p);
+                            if (serProd.toLowerCase() !== serieFiltroOrden.toLowerCase()) {
+                              return false;
+                            }
+                          }
+                          if (!q) return true;
+                          return (
+                            (p.nombre && p.nombre.toLowerCase().includes(q)) ||
+                            (p.name && p.name.toLowerCase().includes(q)) ||
+                            (p.codigo && p.codigo.toLowerCase().includes(q)) ||
+                            (p.color && p.color.toLowerCase().includes(q)) ||
+                            (p.marca && p.marca.toLowerCase().includes(q)) ||
+                            (obtenerSerieProducto(p).toLowerCase().includes(q))
+                          );
+                        })
+                        .sort((a, b) => {
+                          const nomA = (a.nombre || a.name || '').toLowerCase();
+                          const nomB = (b.nombre || b.name || '').toLowerCase();
+                          const cmp = nomA.localeCompare(nomB, 'es', { sensitivity: 'base' });
+                          if (cmp !== 0) return cmp;
+                          return (a.color || '').localeCompare(b.color || '', 'es', { sensitivity: 'base' });
+                        });
+
+                      return (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto">
+                          {filtrados.length > 0 ? (
+                            filtrados.map((p) => {
+                              const serieName = obtenerSerieProducto(p);
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setProductoSeleccionado(p);
+                                    setPrecioCostoInput(Number(p.precioCosto || p.costPrice || 0));
+                                    setShowDropdownModelo(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--muted)] border-b border-[var(--border)] last:border-none flex items-center justify-between cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    {obtenerFotoProducto(p) ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">👟</div>
+                                    )}
+                                    <div>
+                                      <span className="font-bold block">{p.nombre || p.name}</span>
+                                      <span className="text-[10px] text-[var(--muted-foreground)]">
+                                        {p.marca} • {p.color} ({p.codigo})
+                                        {serieName && ` • Serie: ${formatearNombreSerie(serieName)}`}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className="font-mono text-emerald-600 font-bold">${Number(p.precioCosto || p.costPrice || 0).toFixed(2)}</span>
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
+                              No se encontraron modelos {serieFiltroOrden !== 'TODAS' ? `en serie "${serieFiltroOrden}"` : ''} que coincidan con "{busquedaModelo}".
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
