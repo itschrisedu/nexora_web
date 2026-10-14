@@ -46,7 +46,7 @@ export default function WhatsAppSelectorModal() {
 
     if (dataEnvio && !dataEnvio.soloConfiguracion && dataEnvio.mensaje) {
       const url = obtenerUrlWhatsApp(dataEnvio.telefono, dataEnvio.mensaje, canal);
-      if (url.startsWith('intent://') || url.startsWith('whatsapp://')) {
+      if (url.startsWith('intent://') || url.startsWith('whatsapp://') || esMovil) {
         window.location.href = url;
       } else {
         window.open(url, '_blank', 'noopener,noreferrer');

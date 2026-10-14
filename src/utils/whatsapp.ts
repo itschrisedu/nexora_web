@@ -206,8 +206,9 @@ export function abrirWhatsAppUniversal(telefono: string | undefined | null, mens
 
   const url = obtenerUrlWhatsApp(telefono, mensaje, canal);
 
-  // En Android los intents se deben navegar en la misma ventana para invocar la app nativa sin bloquearse
-  if (url.startsWith('intent://') || url.startsWith('whatsapp://')) {
+  // En dispositivos móviles (Android e iOS) navegar en la misma ventana evita que Safari o Chrome bloqueen ventanas emergentes
+  const esMovil = esDispositivoMovil();
+  if (url.startsWith('intent://') || url.startsWith('whatsapp://') || esMovil) {
     window.location.href = url;
     return true;
   }
