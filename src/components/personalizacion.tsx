@@ -1477,7 +1477,13 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     type="checkbox"
                     checked={autoWhatsAppAbono}
                     onChange={(e) => {
-                      setAutoWhatsAppAbono(e.target.checked);
+                      const checked = e.target.checked;
+                      setAutoWhatsAppAbono(checked);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("nexora_auto_whatsapp_abono", String(checked));
+                        localStorage.setItem("nexora_auto_whatsapp_comprobante", String(checked));
+                        window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+                      }
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
                   />
@@ -1500,7 +1506,12 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     type="checkbox"
                     checked={autoEmailComprobante}
                     onChange={(e) => {
-                      setAutoEmailComprobante(e.target.checked);
+                      const checked = e.target.checked;
+                      setAutoEmailComprobante(checked);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("nexora_auto_email_comprobante", String(checked));
+                        window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+                      }
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
                   />

@@ -1269,7 +1269,6 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     // ─── PRE-APERTURA SÍNCRONA DE VENTANA (SOLO MODO TEXTO) ────────────
     // Para modo TEXTO pre-abrimos la ventana para evitar bloqueos del navegador.
     // Para modo PDF NO pre-abrimos ventana (se usa Web Share API directo, idéntico a Factura).
-    let ventanaWhatsApp: Window | null = null;
     const telefonoCliente =
       (carteraSeleccionada?.clienteTelefono && carteraSeleccionada.clienteTelefono !== '—')
         ? carteraSeleccionada.clienteTelefono
@@ -1277,9 +1276,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         ? cobroSeleccionado.clienteTelefono
         : '';
 
-    if (autoEnviarWhatsAppAbono && telefonoCliente) {
-      ventanaWhatsApp = window.open('about:blank', '_blank');
-    }
+    // Consultar configuración directa y actualizada de localStorage
+    const autoEnviarWA = typeof window !== 'undefined'
+      ? (localStorage.getItem('nexora_auto_whatsapp_abono') !== 'false' && localStorage.getItem('nexora_auto_whatsapp_comprobante') !== 'false')
+      : autoEnviarWhatsAppAbono;
 
     setSavingAbono(true);
     try {
@@ -1328,12 +1328,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       const carteraParaEnvio = { ...carteraSeleccionada, clienteTelefono: telefonoCliente };
       const dataAbono = armarDatosComprobanteAbono(carteraParaEnvio, datosAbonoRegistrado);
 
-      // Envío AUTOMÁTICO por WhatsApp estandarizado
-      if (autoEnviarWhatsAppAbono && telefonoCliente) {
+      // Envío AUTOMÁTICO por WhatsApp estandarizado (solo si está habilitado en configuración)
+      if (autoEnviarWA && telefonoCliente) {
         const msg = await armarMensajeWhatsAppAbono(dataAbono, false);
         abrirWhatsAppUniversal(telefonoCliente, msg);
         showToast('Comprobante oficial de abono enviado por WhatsApp.', 'success');
-      } else if (autoEnviarWhatsAppAbono && !telefonoCliente) {
+      } else if (autoEnviarWA && !telefonoCliente) {
         showToast('Abono registrado. El cliente no tiene teléfono para enviar WhatsApp.', 'info');
       }
 
@@ -1362,10 +1362,6 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       setNotasAbono('');
       await loadCobros();
     } catch (err: any) {
-      // Si hubo error, cerrar la ventana pre-abierta para no dejar una pestaña vacía
-      if (ventanaWhatsApp && !ventanaWhatsApp.closed) {
-        ventanaWhatsApp.close();
-      }
       showToast(err.message || 'Error al registrar abono.', 'error');
     } finally {
       setSavingAbono(false);
