@@ -872,10 +872,24 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
+  const obtenerDatosSucursalEmisor = (p?: Pedido) => {
+    const targetSucursalId = (p as any)?.sucursalId || selectedSucursalPedidoId || activeSucursalId;
+    const suc = (sucursalesEmpresa || []).find((s: any) => s.id === targetSucursalId) ||
+                (sucursales || []).find((s: any) => s.id === targetSucursalId);
+    return {
+      nombre: suc?.name || businessConfig?.nombre || 'Calzado de Cuero',
+      ruc: suc?.ruc || businessConfig?.ruc || '',
+      direccion: suc?.direccion || businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador',
+      telefono: suc?.telefono || businessConfig?.telefono || businessConfig?.whatsappContacto || '',
+      email: suc?.email || businessConfig?.email || '',
+    };
+  };
+
   const construirPedidoPdfData = (p: Pedido): PedidoClientePdfData => {
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const clienteNombre = p.clienteNombre || cliente?.nombre || 'Estimado/a Cliente';
-    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+    const emisorData = obtenerDatosSucursalEmisor(p);
+    const negocioNombre = emisorData.nombre;
     const numPedido = p.numeroCodigo || (p.numero ? `#${String(p.numero).padStart(4, '0')}` : `#${p.id.slice(0, 6).toUpperCase()}`);
     const fecha = new Date(p.createdAt || new Date()).toLocaleDateString('es-EC');
 
@@ -917,11 +931,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
     return {
       emisor: {
-        nombre: negocioNombre,
-        ruc: businessConfig?.ruc,
-        direccion: businessConfig?.direccion,
-        telefono: businessConfig?.telefono,
-        email: businessConfig?.email,
+        nombre: emisorData.nombre,
+        ruc: emisorData.ruc,
+        direccion: emisorData.direccion,
+        telefono: emisorData.telefono,
+        email: emisorData.email,
       },
       pedido: {
         numero: numPedido,
@@ -1032,18 +1046,19 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     window.open(urlComprobante, '_blank');
   };
 
-  const handleEnviarConfirmacionWhatsApp = async (p: Pedido, clienteTel?: string) => {
+  const handleEnviarConfirmacionWhatsApp = async (p: Pedido, clienteTel?: string, esManual: boolean = false) => {
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const telefono = clienteTel || cliente?.telefono;
     if (!telefono) {
-      showToast('El cliente no tiene número de teléfono registrado.', 'warning');
+      if (esManual) showToast('El cliente no tiene número de teléfono registrado.', 'warning');
       return;
     }
 
+    const emisorData = obtenerDatosSucursalEmisor(p);
     const numPedido = p.numeroCodigo || (p.numero ? `#${String(p.numero).padStart(4, '0')}` : `#${p.id.slice(0, 6).toUpperCase()}`);
     const fecha = new Date(p.createdAt || new Date()).toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
     const clienteNombre = p.clienteNombre || cliente?.nombre || 'Estimado/a Cliente';
-    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+    const negocioNombre = emisorData.nombre;
 
     let desgloseTexto = '';
     const lineasComprobante: any[] = [];
@@ -1131,10 +1146,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         direccion: p.direccionEnvio || cliente?.direccion,
       },
       emisor: {
-        nombre: negocioNombre,
-        ruc: businessConfig?.ruc,
-        direccion: businessConfig?.direccion,
-        telefono: businessConfig?.telefono,
+        nombre: emisorData.nombre,
+        ruc: emisorData.ruc,
+        direccion: emisorData.direccion,
+        telefono: emisorData.telefono,
+        email: emisorData.email,
       },
       lineas: lineasComprobante,
       totales: {
@@ -1177,13 +1193,15 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       desgloseFinancieroTexto = `\n💰 *VALOR TOTAL:* $${totalPagar.toFixed(2)}\n💵 *ANTICIPO RECIBIDO (${(p as any).metodoAdelanto || 'EFECTIVO'}):* -$${montoAdelanto.toFixed(2)}\n⏳ *SALDO PENDIENTE A LA ENTREGA:* *$${saldoPendiente.toFixed(2)}*`;
     }
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares${desgloseFinancieroTexto}\n\n📥 *Descarga aquí tu comprobante oficial de pedido:*\n👉 ${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+    const contactoSucursal = emisorData.telefono ? `\n📞 *Contacto / WhatsApp:* ${emisorData.telefono}` : '';
+    const direccionSucursal = emisorData.direccion ? `\n📍 *Ubicación:* ${emisorData.direccion}` : '';
+
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares${desgloseFinancieroTexto}\n\n📥 *Descarga aquí tu comprobante oficial de pedido:*\n👉 ${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
 
     const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
     const autoWhatsApp = typeof window !== 'undefined' ? (localStorage.getItem('nexora_auto_whatsapp_abono') !== 'false' && localStorage.getItem('nexora_auto_whatsapp_comprobante') !== 'false') : true;
 
-    if (!autoEmail && !autoWhatsApp) {
-      showToast('Los envíos automáticos por WhatsApp y Correo están desactivados en Configuración.', 'info');
+    if (!esManual && !autoEmail && !autoWhatsApp) {
       return;
     }
 
@@ -1206,7 +1224,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
 
     let enviadoWhatsApp = false;
-    if (autoWhatsApp && telefono) {
+    if ((esManual || autoWhatsApp) && telefono) {
       abrirWhatsAppUniversal(telefono, mensaje);
       enviadoWhatsApp = true;
     }
@@ -1216,18 +1234,19 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
   };
 
-  const handleEnviarPedidoEntregadoWhatsApp = async (p: Pedido, clienteTel?: string) => {
+  const handleEnviarPedidoEntregadoWhatsApp = async (p: Pedido, clienteTel?: string, esManual: boolean = false) => {
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const telefono = clienteTel || cliente?.telefono;
     if (!telefono) {
-      showToast('El cliente no tiene número de teléfono registrado para WhatsApp.', 'warning');
+      if (esManual) showToast('El cliente no tiene número de teléfono registrado para WhatsApp.', 'warning');
       return;
     }
 
+    const emisorData = obtenerDatosSucursalEmisor(p);
     const numPedido = p.numeroCodigo || (p.numero ? `#${String(p.numero).padStart(4, '0')}` : `#${p.id.slice(0, 6).toUpperCase()}`);
     const fecha = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
     const clienteNombre = p.clienteNombre || cliente?.nombre || 'Estimado/a Cliente';
-    const negocioNombre = businessConfig?.nombre || 'NEXORA';
+    const negocioNombre = emisorData.nombre;
 
     let desgloseTexto = '';
     const lineasComprobante: any[] = [];
@@ -1323,10 +1342,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         direccion: p.direccionEnvio || cliente?.direccion,
       },
       emisor: {
-        nombre: negocioNombre,
-        ruc: businessConfig?.ruc,
-        direccion: businessConfig?.direccion,
-        telefono: businessConfig?.telefono,
+        nombre: emisorData.nombre,
+        ruc: emisorData.ruc,
+        direccion: emisorData.direccion,
+        telefono: emisorData.telefono,
+        email: emisorData.email,
       },
       lineas: lineasComprobante,
       totales: {
@@ -1338,13 +1358,15 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     const estadoTexto = esEntregaTotal ? '✅ *ENTREGA COMPLETADA (100%)*' : '📦 *ENTREGA PARCIAL REALIZADA*';
     const pendienteTexto = !esEntregaTotal ? `\n⏳ *Pares pendientes por entregar:* ${Math.max(0, totalParesPedidoGeneral - totalParesEntregadosGeneral)} pares` : '';
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📄 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n📥 *Descarga aquí tu comprobante oficial de entrega en PDF:*\n👉 ${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+    const contactoSucursal = emisorData.telefono ? `\n📞 *Contacto / WhatsApp:* ${emisorData.telefono}` : '';
+    const direccionSucursal = emisorData.direccion ? `\n📍 *Ubicación:* ${emisorData.direccion}` : '';
+
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📄 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n📥 *Descarga aquí tu comprobante oficial de entrega en PDF:*\n👉 ${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
 
     const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
     const autoWhatsApp = typeof window !== 'undefined' ? (localStorage.getItem('nexora_auto_whatsapp_abono') !== 'false' && localStorage.getItem('nexora_auto_whatsapp_comprobante') !== 'false') : true;
 
-    if (!autoEmail && !autoWhatsApp) {
-      showToast('Los envíos automáticos por WhatsApp y Correo están desactivados en Configuración.', 'info');
+    if (!esManual && !autoEmail && !autoWhatsApp) {
       return;
     }
 
@@ -1367,7 +1389,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     }
 
     let enviadoWhatsApp = false;
-    if (autoWhatsApp && telefono) {
+    if ((esManual || autoWhatsApp) && telefono) {
       abrirWhatsAppUniversal(telefono, mensaje);
       enviadoWhatsApp = true;
     }
@@ -2602,7 +2624,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleEnviarPedidoEntregadoWhatsApp(p);
+                                      handleEnviarPedidoEntregadoWhatsApp(p, undefined, true);
                                     }}
                                     className="px-2.5 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1"
                                     title="Enviar Comprobante de Entrega por WhatsApp"
@@ -2636,7 +2658,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleEnviarPedidoEntregadoWhatsApp(p);
+                                    handleEnviarPedidoEntregadoWhatsApp(p, undefined, true);
                                   }}
                                   className="px-2.5 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1"
                                   title="Enviar Comprobante de Entrega por WhatsApp al Cliente"
@@ -2780,7 +2802,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleEnviarConfirmacionWhatsApp(p);
+                                      handleEnviarConfirmacionWhatsApp(p, undefined, true);
                                     }}
                                     className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
                                     title="Notificar recepción del pedido al cliente por WhatsApp"

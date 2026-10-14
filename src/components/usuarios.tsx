@@ -393,10 +393,15 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       cleanRucToSend = cleanDigits;
     }
 
-    const cleanTel = newSucursal.telefono.replace(/\D/g, '').trim();
+    let cleanTel = newSucursal.telefono.replace(/\D/g, '').trim();
     if (cleanTel) {
-      if (cleanTel.length !== 10) {
-        setSucursalModalError('El teléfono debe tener exactamente 10 dígitos numéricos (ej. 0991234567).');
+      if (cleanTel.startsWith('593') && cleanTel.length === 12) {
+        cleanTel = '0' + cleanTel.slice(3);
+      } else if (cleanTel.startsWith('9') && cleanTel.length === 9) {
+        cleanTel = '0' + cleanTel;
+      }
+      if (cleanTel.length !== 10 && cleanTel.length !== 9) {
+        setSucursalModalError('El teléfono debe tener un formato válido de 9 o 10 dígitos (ej. 0991234567 o +593 99 123 4567).');
         return;
       }
     }
@@ -780,10 +785,15 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       cleanRucToSend = ''; // Heredar RUC matriz
     }
 
-    const cleanTel = (editSucursalForm.telefono || '').replace(/\D/g, '').trim();
+    let cleanTel = (editSucursalForm.telefono || '').replace(/\D/g, '').trim();
     if (cleanTel) {
-      if (cleanTel.length !== 10) {
-        setEditSucursalModalError('El teléfono debe tener exactamente 10 dígitos numéricos (ej. 0991234567).');
+      if (cleanTel.startsWith('593') && cleanTel.length === 12) {
+        cleanTel = '0' + cleanTel.slice(3);
+      } else if (cleanTel.startsWith('9') && cleanTel.length === 9) {
+        cleanTel = '0' + cleanTel;
+      }
+      if (cleanTel.length !== 10 && cleanTel.length !== 9) {
+        setEditSucursalModalError('El teléfono debe tener un formato válido de 9 o 10 dígitos (ej. 0991234567 o +593 99 123 4567).');
         return;
       }
     }

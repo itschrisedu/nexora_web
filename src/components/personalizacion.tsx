@@ -132,10 +132,40 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     const stored = localStorage.getItem("nexora_auto_whatsapp_abono");
     return stored === null ? true : stored === "true";
   });
+  const [initialAutoWhatsAppAbono, setInitialAutoWhatsAppAbono] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("nexora_auto_whatsapp_abono");
+    return stored === null ? true : stored === "true";
+  });
+
   const [autoEmailComprobante, setAutoEmailComprobante] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     const stored = localStorage.getItem("nexora_auto_email_comprobante");
     return stored === null ? true : stored === "true";
+  });
+  const [initialAutoEmailComprobante, setInitialAutoEmailComprobante] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("nexora_auto_email_comprobante");
+    return stored === null ? true : stored === "true";
+  });
+
+  const [margenGanancia, setMargenGanancia] = useState<number>(() => {
+    if (typeof window === "undefined") return 30;
+    const stored = localStorage.getItem("nexora-margen-ganancia");
+    if (stored) {
+      const val = parseFloat(stored);
+      if (!isNaN(val) && val >= 5 && val <= 80) return val;
+    }
+    return 30;
+  });
+  const [initialMargenGanancia, setInitialMargenGanancia] = useState<number>(() => {
+    if (typeof window === "undefined") return 30;
+    const stored = localStorage.getItem("nexora-margen-ganancia");
+    if (stored) {
+      const val = parseFloat(stored);
+      if (!isNaN(val) && val >= 5 && val <= 80) return val;
+    }
+    return 30;
   });
 
   // Transportes state
@@ -580,8 +610,23 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     if (!initialConfig) return false;
     const configChanged = JSON.stringify(config) !== JSON.stringify(initialConfig);
     const nivelesChanged = initialNiveles ? JSON.stringify(nivelesCredito) !== JSON.stringify(initialNiveles) : false;
-    return configChanged || nivelesChanged;
-  }, [config, initialConfig, nivelesCredito, initialNiveles]);
+    const operacionesChanged =
+      autoWhatsAppAbono !== initialAutoWhatsAppAbono ||
+      autoEmailComprobante !== initialAutoEmailComprobante ||
+      margenGanancia !== initialMargenGanancia;
+    return configChanged || nivelesChanged || operacionesChanged;
+  }, [
+    config,
+    initialConfig,
+    nivelesCredito,
+    initialNiveles,
+    autoWhatsAppAbono,
+    initialAutoWhatsAppAbono,
+    autoEmailComprobante,
+    initialAutoEmailComprobante,
+    margenGanancia,
+    initialMargenGanancia,
+  ]);
 
   const handleSave = async (e?: React.FormEvent, specificTabLabel?: string) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -699,6 +744,19 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
       setInitialConfig({ ...config, logoUrl: finalLogoUrl });
       setInitialNiveles([...nivelesCredito]);
+
+      // Persistencia diferida de Operaciones & Logística (solo al hacer clic en Guardar)
+      if (typeof window !== "undefined") {
+        localStorage.setItem("nexora_auto_whatsapp_abono", String(autoWhatsAppAbono));
+        localStorage.setItem("nexora_auto_whatsapp_comprobante", String(autoWhatsAppAbono));
+        localStorage.setItem("nexora_auto_email_comprobante", String(autoEmailComprobante));
+        localStorage.setItem("nexora-margen-ganancia", String(margenGanancia));
+        setInitialAutoWhatsAppAbono(autoWhatsAppAbono);
+        setInitialAutoEmailComprobante(autoEmailComprobante);
+        setInitialMargenGanancia(margenGanancia);
+        window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+        window.dispatchEvent(new CustomEvent("nexora:margin-changed", { detail: { marginPct: margenGanancia } }));
+      }
 
       const successMsg = `Los cambios en "${label}" se guardaron y sincronizaron correctamente.`;
       setSuccess(successMsg);
@@ -1314,16 +1372,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
               </div>
 
               {(() => {
-                const currentMargin = (() => {
-                  if (typeof window === "undefined") return 30;
-                  const stored = localStorage.getItem("nexora-margen-ganancia");
-                  if (stored) {
-                    const val = parseFloat(stored);
-                    if (!isNaN(val) && val > 0 && val < 100) return val;
-                  }
-                  return 30;
-                })();
-
+                const currentMargin = margenGanancia;
                 const exampleCost = 10;
                 const examplePrice = (exampleCost / (1 - currentMargin / 100)).toFixed(2);
                 const exampleProfit = (parseFloat(examplePrice) - exampleCost).toFixed(2);
@@ -1343,10 +1392,8 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                             step="1"
                             value={currentMargin}
                             onChange={(e) => {
-                              const val = parseInt(e.target.value);
-                              localStorage.setItem("nexora-margen-ganancia", String(val));
-                              window.dispatchEvent(new CustomEvent("nexora:margin-changed", { detail: { marginPct: val } }));
-                              setConfig(prev => ({ ...prev }));
+                              const val = parseInt(e.target.value) || 30;
+                              setMargenGanancia(val);
                             }}
                             className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-emerald-500"
                           />
@@ -1359,9 +1406,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                               value={currentMargin}
                               onChange={(e) => {
                                 const val = Math.min(80, Math.max(5, parseInt(e.target.value) || 30));
-                                localStorage.setItem("nexora-margen-ganancia", String(val));
-                                window.dispatchEvent(new CustomEvent("nexora:margin-changed", { detail: { marginPct: val } }));
-                                setConfig(prev => ({ ...prev }));
+                                setMargenGanancia(val);
                               }}
                               className="w-16 px-2 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-lg text-sm font-bold text-center focus:outline-none focus:border-emerald-500"
                             />
@@ -1369,7 +1414,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                           </div>
                         </div>
                         <p className="text-[10px] text-[var(--muted-foreground)]">
-                          Valor por defecto: 30%. Rango permitido: 5% - 80%.
+                          Valor por defecto: 30%. Rango permitido: 5% - 80%. (Se aplicará al guardar).
                         </p>
                       </div>
 
@@ -1432,11 +1477,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     type="checkbox"
                     checked={autoWhatsAppAbono}
                     onChange={(e) => {
-                      const checked = e.target.checked;
-                      setAutoWhatsAppAbono(checked);
-                      localStorage.setItem("nexora_auto_whatsapp_abono", String(checked));
-                      localStorage.setItem("nexora_auto_whatsapp_comprobante", String(checked));
-                      window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+                      setAutoWhatsAppAbono(e.target.checked);
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
                   />
@@ -1459,10 +1500,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     type="checkbox"
                     checked={autoEmailComprobante}
                     onChange={(e) => {
-                      const checked = e.target.checked;
-                      setAutoEmailComprobante(checked);
-                      localStorage.setItem("nexora_auto_email_comprobante", String(checked));
-                      window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+                      setAutoEmailComprobante(e.target.checked);
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
                   />

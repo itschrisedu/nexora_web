@@ -272,6 +272,7 @@ export interface PedidoClienteComprobanteData {
     ruc?: string;
     direccion?: string;
     telefono?: string;
+    email?: string;
   };
   lineas: Array<{
     modelo: string;

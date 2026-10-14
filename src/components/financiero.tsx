@@ -1038,13 +1038,22 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     const numRecibo = `REC-${hoy.getFullYear()}${(hoy.getMonth() + 1).toString().padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    const targetSucursalId = (cartera.cobros[0] as any)?.sucursalId || selectedSucursalCobroId || activeSucursalId;
+    const sucEmisor = (sucursalesEmpresa || []).find((s: any) => s.id === targetSucursalId) ||
+                      (sucursales || []).find((s: any) => s.id === targetSucursalId);
+    const emisorNombre = sucEmisor?.name || businessConfig?.nombre || 'CALZADO DE CUERO';
+    const emisorRuc = sucEmisor?.ruc || businessConfig?.ruc || '1804884664001';
+    const emisorDireccion = sucEmisor?.direccion || businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador';
+    const emisorTelefono = sucEmisor?.telefono || businessConfig?.telefono || (businessConfig as any)?.whatsappContacto || '';
+    const emisorEmail = sucEmisor?.email || businessConfig?.email || '';
+
     return {
       emisor: {
-        nombre: businessConfig?.nombre || 'CALZADO DE CUERO',
-        ruc: businessConfig?.ruc || '1804884664001',
-        direccion: businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador',
-        telefono: businessConfig?.telefono || '',
-        email: businessConfig?.email || '',
+        nombre: emisorNombre,
+        ruc: emisorRuc,
+        direccion: emisorDireccion,
+        telefono: emisorTelefono,
+        email: emisorEmail,
       },
       comprobante: {
         numero: numRecibo,
@@ -1119,7 +1128,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         const urlRecibo = await generarUrlPublicaAbono(dataAbono);
         ApiService.post('/notificaciones/email-comprobante', {
           destinatario: emailDestino,
-          asunto: `Comprobante de Abono — $${Number(abonoInfo.monto).toFixed(2)} — NEXORA`,
+          asunto: `Comprobante de Abono — $${Number(abonoInfo.monto).toFixed(2)} — ${dataAbono.emisor?.nombre || 'Calzado'}`,
           tipo: 'ABONO',
           detalles: {
             mensaje: msgTexto,
@@ -1336,7 +1345,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         const urlRecibo = await generarUrlPublicaAbono(dataAbono);
         ApiService.post('/notificaciones/email-comprobante', {
           destinatario: emailDestino,
-          asunto: `Comprobante de Abono — $${valor.toFixed(2)} — NEXORA`,
+          asunto: `Comprobante de Abono — $${valor.toFixed(2)} — ${dataAbono.emisor?.nombre || 'Calzado'}`,
           tipo: 'ABONO',
           detalles: { 
             mensaje: msgTexto,
