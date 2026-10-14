@@ -1966,7 +1966,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     }
   };
 
-  const saldoTotalGeneral = cobros.reduce((acc, c) => acc + Number(c.saldoPendiente), 0);
+  const saldoTotalGeneral = cobrosFiltradosPorSucursal.reduce((acc, c) => acc + Number(c.saldoPendiente), 0);
 
   // Filtrado de Cartera Consolidada
   const clientesFiltrados = clientesCartera.filter((c) => {

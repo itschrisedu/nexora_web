@@ -1766,7 +1766,14 @@ function MainApp() {
               userRole={user?.rol}
             />
           )}
-          {vistaActual === 'proveedores' && <ProveedoresComponent online={online} userRole={user?.rol} />}
+          {vistaActual === 'proveedores' && (
+            <ProveedoresComponent
+              online={online}
+              userRole={user?.rol}
+              activeSucursalId={activeSucursalId}
+              sucursales={sucursales}
+            />
+          )}
           {vistaActual === 'usuarios' && <UsuariosComponent online={online} currentUser={user} />}
           {vistaActual === 'super-admin' && <SuperAdminComponent online={online} />}
           {vistaActual === 'sri' && <SriComponent />}

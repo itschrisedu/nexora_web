@@ -32,6 +32,8 @@ import {
   DollarSign,
   Layers,
   UserPlus,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -210,6 +212,38 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [clienteSeleccionado, setClienteSeleccionado] = useState<any | null>(null);
   const [showNuevoClienteModal, setShowNuevoClienteModal] = useState(false);
 
+  // Alerta de pedido duplicado por cliente (Fase 2B)
+  const [alertaPedidoDuplicado, setAlertaPedidoDuplicado] = useState<{
+    cliente: any;
+    pedidoExistente: Pedido;
+  } | null>(null);
+  const [ignoroAlertaDuplicado, setIgnoroAlertaDuplicado] = useState(false);
+
+  const verificarPedidoActivoCliente = useCallback((clienteObj: any) => {
+    if (!clienteObj || !clienteObj.id) {
+      setAlertaPedidoDuplicado(null);
+      setIgnoroAlertaDuplicado(false);
+      return;
+    }
+    const pedidoActivo = pedidos.find(
+      (p) =>
+        p.clientId === clienteObj.id &&
+        ['PENDIENTE', 'EN_PREPARACION', 'EN_ESPERA_STOCK', 'EN_TRANSITO'].includes(p.estado) &&
+        (!editingOrderId || p.id !== editingOrderId)
+    );
+
+    if (pedidoActivo) {
+      setAlertaPedidoDuplicado({
+        cliente: clienteObj,
+        pedidoExistente: pedidoActivo,
+      });
+      setIgnoroAlertaDuplicado(false);
+    } else {
+      setAlertaPedidoDuplicado(null);
+      setIgnoroAlertaDuplicado(false);
+    }
+  }, [pedidos, editingOrderId]);
+
   const handleClienteCreadoRapido = (nuevoCliente: any) => {
     setListaClientes((prev) => [nuevoCliente, ...prev.filter((c) => c.id !== nuevoCliente.id)]);
     setClientId(nuevoCliente.id);
@@ -217,6 +251,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setBusquedaCliente('');
     setBusquedaDebounced('');
     setShowDropdownCliente(false);
+    verificarPedidoActivoCliente(nuevoCliente);
     showToast(`¡Cliente ${nuevoCliente.nombre} registrado y seleccionado para el pedido!`, 'success');
     loadListaClientes();
   };
@@ -365,6 +400,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setMetodoAdelanto('EFECTIVO');
     setReferenciaAdelanto('');
     setSerieFiltroBuscador('TODAS');
+    setAlertaPedidoDuplicado(null);
+    setIgnoroAlertaDuplicado(false);
   };
 
   const isDirtyOrder = useCallback(() => {
@@ -1524,6 +1561,25 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       return;
     }
 
+    // Advertencia de calzados ya solicitados en pedido vigente del cliente (Fase 2B)
+    if (alertaPedidoDuplicado?.pedidoExistente?.lines && alertaPedidoDuplicado.pedidoExistente.lines.length > 0) {
+      const lineasExistentes = alertaPedidoDuplicado.pedidoExistente.lines;
+      const coincidentes = lineasAgregadas.filter((nueva) =>
+        lineasExistentes.some(
+          (ex: any) =>
+            (ex.productId === nueva.productId || ex.modelName === nueva.modelName) &&
+            (ex.tallaId === nueva.tallaId || Number(ex.numeroTalla || ex.tallaNumero) === Number(nueva.numeroTalla))
+        )
+      );
+      if (coincidentes.length > 0) {
+        const tallasNombres = coincidentes.map((c) => `T${c.numeroTalla}`).join(', ');
+        showToast(
+          `⚠️ Advertencia: ${prodObj.modelName} (${tallasNombres}) ya consta en el pedido vigente ${getNumeroPedido(alertaPedidoDuplicado.pedidoExistente)} de este cliente. Verifica si no se trata de un pedido duplicado.`,
+          'warning'
+        );
+      }
+    }
+
     setLineasPedido([...lineasPedido, ...lineasAgregadas]);
     showToast(`¡${prodObj.modelName} agregado al pedido!`, 'success');
 
@@ -1932,6 +1988,12 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   };
 
   const handleAbrirEntrega = async (p: Pedido) => {
+    const pedidoTenantId = (p as any).tenantId || (p as any).sucursalId;
+    if (pedidoTenantId && miLocalId && pedidoTenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
+      showToast(`Solo la sucursal asignada a este pedido (${p.sucursalNombre || 'sucursal propietaria'}) puede registrar la entrega física de la mercadería.`, 'warning');
+      return;
+    }
+
     let orderToUse = p;
     try {
       if (online) {
@@ -2104,22 +2166,38 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     return miLocalItem ? [miLocalItem, ...otrasSucursales] : otrasSucursales;
   }, [sucursalesEmpresa, sucursales, pedidos, miLocalId]);
 
-  const pedidosFiltrados = useMemo(() => {
+  const pedidosDeSucursal = useMemo(() => {
+    if (!selectedSucursalPedidoId) return pedidos;
+    const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
+    const esMiLocal = miLocalId && selectedSucursalPedidoId === miLocalId;
+    const esSuperAdminSinLocal = userRole === 'ROL_SUPER_ADMIN' && (!miLocalId || activeSucursalId === 'TODAS');
+
     return pedidos.filter((p) => {
-      const cumpleEstado = filtroEstado === 'TODOS' || p.estado === filtroEstado;
-      let cumpleSucursal = true;
-      if (selectedSucursalPedidoId) {
-        const pTenant = (p as any).tenantId || (p as any).sucursalId;
-        const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
-        if (targetSuc?.isMatriz) {
-          cumpleSucursal = pTenant === selectedSucursalPedidoId || !pTenant;
-        } else {
-          cumpleSucursal = pTenant === selectedSucursalPedidoId;
-        }
+      const pTenant = (p as any).tenantId || (p as any).sucursalId;
+      const perteneceATarget = targetSuc?.isMatriz
+        ? (pTenant === selectedSucursalPedidoId || !pTenant)
+        : (pTenant === selectedSucursalPedidoId);
+
+      if (!perteneceATarget) return false;
+
+      // REGLA FASE 2B:
+      // Si estoy viendo mi propio local o soy SuperAdmin global, veo todos los pedidos del local.
+      if (esMiLocal || esSuperAdminSinLocal) {
+        return true;
       }
-      return cumpleEstado && cumpleSucursal;
+
+      // Si estoy en la pestaña de OTRA sucursal:
+      // ÚNICAMENTE puedo ver los pedidos que MI LOCAL creó en esta otra sucursal.
+      const pCreadorTenant = (p as any).creadoPorSucursalId;
+      return pCreadorTenant && pCreadorTenant === miLocalId;
     });
-  }, [pedidos, filtroEstado, selectedSucursalPedidoId, listaSucursalesDisponibles]);
+  }, [pedidos, selectedSucursalPedidoId, listaSucursalesDisponibles, miLocalId, userRole, activeSucursalId]);
+
+  const pedidosFiltrados = useMemo(() => {
+    return pedidosDeSucursal.filter((p) => {
+      return filtroEstado === 'TODOS' || p.estado === filtroEstado;
+    });
+  }, [pedidosDeSucursal, filtroEstado]);
 
   const getNumeroPedido = (p: Pedido, index?: number) => {
     if (p.numeroCodigo) return p.numeroCodigo;
@@ -2186,7 +2264,19 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 const isMiLocal = miLocalId === suc.id;
                 const countPedidos = pedidos.filter((p) => {
                   const pTenant = (p as any).tenantId || (p as any).sucursalId;
-                  return pTenant === suc.id || (!pTenant && suc.isMatriz);
+                  const perteneceATarget = suc.isMatriz
+                    ? (pTenant === suc.id || !pTenant)
+                    : (pTenant === suc.id);
+
+                  if (!perteneceATarget) return false;
+
+                  if (isMiLocal || (userRole === 'ROL_SUPER_ADMIN' && (!miLocalId || activeSucursalId === 'TODAS'))) {
+                    return true;
+                  }
+
+                  // Pestaña ajena: solo cuenta los pedidos creados por mi local
+                  const pCreadorTenant = (p as any).creadoPorSucursalId;
+                  return pCreadorTenant && pCreadorTenant === miLocalId;
                 }).length;
                 const esOtra = !isMiLocal;
 
@@ -2240,11 +2330,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
             }`}
           >
-            Todos ({pedidos.length})
+            Todos ({pedidosDeSucursal.length})
           </button>
           {(['PENDIENTE', 'EN_PREPARACION', 'EN_ESPERA_STOCK', 'ENTREGADO_PARCIAL', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
             const cfg = ESTADO_CONFIG[st];
-            const count = pedidos.filter((p) => p.estado === st).length;
+            const count = pedidosDeSucursal.filter((p) => p.estado === st).length;
             const active = filtroEstado === st;
             return (
               <button
@@ -2265,6 +2355,27 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
         </div>
       </div>
 
+      {/* Banner Informativo de Visibilidad Inter-Sucursal Restringida (Fase 2B) */}
+      {(() => {
+        const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
+        const miSucNombre = listaSucursalesDisponibles.find((s) => s.id === miLocalId)?.name || 'Mi Local';
+        const esOtra = miLocalId && selectedSucursalPedidoId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN';
+
+        if (!esOtra || !targetSuc) return null;
+
+        return (
+          <div className="flex items-center gap-3 p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-200">
+            <Building size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="flex-1">
+              <span className="font-extrabold">Vista inter-sucursal restringida: </span>
+              <span>
+                Estás consultando la sucursal <strong>{targetSuc.name}</strong>. Por política de privacidad operativa, únicamente se muestran los pedidos que tu local (<strong>{miSucNombre}</strong>) ha solicitado o creado en este establecimiento.
+              </span>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Tabla de Pedidos */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 text-[var(--muted-foreground)]">
@@ -2272,8 +2383,23 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
           <span className="text-sm">Cargando pedidos...</span>
         </div>
       ) : pedidosFiltrados.length === 0 ? (
-        <div className="p-12 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
-          No hay pedidos registrados con este estado.
+        <div className="p-12 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-1">
+          <p className="font-bold text-sm text-[var(--foreground)]">
+            {(() => {
+              const esOtra = miLocalId && selectedSucursalPedidoId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN';
+              const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
+              const miSucNombre = listaSucursalesDisponibles.find((s) => s.id === miLocalId)?.name || 'Tu sucursal';
+              if (esOtra && targetSuc) {
+                return `${miSucNombre} aún no registra pedidos realizados en ${targetSuc.name}.`;
+              }
+              return 'No hay pedidos registrados con este estado.';
+            })()}
+          </p>
+          <p className="text-xs">
+            {miLocalId && selectedSucursalPedidoId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN'
+              ? 'Cuando crees un pedido asignando como destino esta sucursal, aparecerá registrado en este panel.'
+              : 'Prueba cambiando el filtro de estado o registrando un nuevo pedido.'}
+          </p>
         </div>
       ) : (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
@@ -2449,13 +2575,29 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                     <Building size={12} /> Pedir a Otra Sucursal
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => handleAbrirEntrega(p)}
-                                  className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1"
-                                  title="Entregar pares disponibles en bodega con descuento de inventario"
-                                >
-                                  <PackageCheck size={12} /> Entregar
-                                </button>
+                                {(() => {
+                                  const pTenant = (p as any).tenantId || (p as any).sucursalId;
+                                  const esDeMiSucursal = !pTenant || !miLocalId || pTenant === miLocalId || userRole === 'ROL_SUPER_ADMIN';
+                                  if (esDeMiSucursal) {
+                                    return (
+                                      <button
+                                        onClick={() => handleAbrirEntrega(p)}
+                                        className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-emerald-600/20 flex items-center gap-1 cursor-pointer"
+                                        title="Entregar pares disponibles en bodega con descuento de inventario"
+                                      >
+                                        <PackageCheck size={12} /> Entregar
+                                      </button>
+                                    );
+                                  }
+                                  return (
+                                    <span
+                                      className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-not-allowed opacity-75"
+                                      title={`Solo la sucursal asignada (${p.sucursalNombre || 'otra sucursal'}) puede registrar la entrega física de este pedido`}
+                                    >
+                                      <Lock size={11} /> Entrega en sucursal
+                                    </span>
+                                  );
+                                })()}
                                 {p.estado === 'ENTREGADO_PARCIAL' && (
                                   <button
                                     onClick={(e) => {
@@ -2826,6 +2968,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                 setClientId('');
                                 setBusquedaCliente('');
                                 setBusquedaDebounced('');
+                                setAlertaPedidoDuplicado(null);
+                                setIgnoroAlertaDuplicado(false);
                               }}
                               className="text-xs font-semibold text-red-500 hover:underline"
                             >
@@ -2849,6 +2993,66 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                               </div>
                             )}
                           </div>
+
+                          {/* Alerta de Pedido Activo / Duplicado en Curso (Fase 2B) */}
+                          {alertaPedidoDuplicado && (
+                            <div className={`p-3.5 rounded-xl border flex flex-col gap-2.5 text-xs transition-all ${
+                              ignoroAlertaDuplicado
+                                ? 'bg-amber-500/5 border-amber-500/20 text-amber-800 dark:text-amber-300'
+                                : 'bg-amber-500/15 border-amber-500/40 text-amber-950 dark:text-amber-100 shadow-sm'
+                            }`}>
+                              <div className="flex items-start gap-2.5">
+                                <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                <div className="space-y-1 flex-1">
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <span className="font-black text-amber-900 dark:text-amber-200 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                                      ⚠️ Pedido Vigente en Proceso Detectado
+                                    </span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${ESTADO_CONFIG[alertaPedidoDuplicado.pedidoExistente.estado]?.color || 'bg-amber-100 text-amber-800'}`}>
+                                      {ESTADO_CONFIG[alertaPedidoDuplicado.pedidoExistente.estado]?.label || alertaPedidoDuplicado.pedidoExistente.estado}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] leading-relaxed text-[var(--foreground)]">
+                                    El cliente <strong>{alertaPedidoDuplicado.cliente.nombre}</strong> ya tiene el pedido <strong>{getNumeroPedido(alertaPedidoDuplicado.pedidoExistente)}</strong> registrado el {new Date(alertaPedidoDuplicado.pedidoExistente.createdAt).toLocaleDateString()} ({alertaPedidoDuplicado.pedidoExistente.sucursalNombre ? `en ${alertaPedidoDuplicado.pedidoExistente.sucursalNombre}` : 'en el local'}) por <strong>${Number(alertaPedidoDuplicado.pedidoExistente.montoTotal || 0).toFixed(2)}</strong>.
+                                  </p>
+                                  <p className="text-[10px] text-[var(--muted-foreground)]">
+                                    {ignoroAlertaDuplicado
+                                      ? '✓ Continuaste con la creación de un nuevo pedido independiente. Si agregas los mismos modelos o tallas, recibirás una advertencia.'
+                                      : 'Si el cliente desea pares adicionales, es recomendable añadirlos a este pedido existente para evitar duplicar comprobantes o envíos.'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {!ignoroAlertaDuplicado && (
+                                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-500/25">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const pedidoAEditar = alertaPedidoDuplicado.pedidoExistente;
+                                      setAlertaPedidoDuplicado(null);
+                                      setIgnoroAlertaDuplicado(false);
+                                      handleAbrirEditarPedido(pedidoAEditar);
+                                      showToast(`Cargado pedido ${getNumeroPedido(pedidoAEditar)} para añadir calzado adicional.`, 'info');
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer transition-all"
+                                  >
+                                    <ExternalLink size={13} />
+                                    <span>Ver / Añadir a este pedido existente</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIgnoroAlertaDuplicado(true);
+                                      showToast('Continuando con la creación de un nuevo pedido independiente.', 'info');
+                                    }}
+                                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 border border-amber-500/30 rounded-lg font-bold text-xs cursor-pointer transition-all"
+                                  >
+                                    Crear pedido nuevo independiente
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           {/* Sugerencia de Venta al Contado por Historial de Mora */}
                           {(repSel.tipo === 'MOROSO' || repSel.tipo === 'RIESGO' || (clienteSeleccionado.atrasoConsecutivo ?? 0) > 0) && (
@@ -2925,6 +3129,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                       setClientId(c.id);
                                       setClienteSeleccionado(c);
                                       setShowDropdownCliente(false);
+                                      verificarPedidoActivoCliente(c);
                                     }}
                                     className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex justify-between items-center gap-2"
                                   >

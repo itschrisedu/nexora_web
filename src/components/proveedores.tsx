@@ -51,6 +51,7 @@ import {
   RotateCcw,
   ShieldAlert,
   Sparkles,
+  Lock,
 } from 'lucide-react';
 import ConfirmModal from './ui/confirm-modal';
 import { useToast } from './ui/toast';
@@ -72,6 +73,8 @@ import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 interface ProveedoresProps {
   online: boolean;
   userRole?: string;
+  activeSucursalId?: string;
+  sucursales?: any[];
 }
 
 interface Proveedor {
@@ -347,7 +350,7 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
   return Array.from(map.values());
 }
 
-export default function ProveedoresComponent({ online, userRole }: ProveedoresProps) {
+export default function ProveedoresComponent({ online, userRole, activeSucursalId, sucursales }: ProveedoresProps) {
   const { showToast } = useToast();
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([]);
@@ -682,7 +685,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
 
   useEffect(() => {
     loadData();
-  }, [online]);
+  }, [online, activeSucursalId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -700,9 +703,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
       setProductos(prods || []);
 
       if (online) {
+        const querySucursal = activeSucursalId && activeSucursalId !== 'TODAS' ? `?sucursalId=${activeSucursalId}` : '';
         const [prvs, ords, pgs, ents, clis, pends, devs] = await Promise.all([
           ApiService.get('/proveedores').catch((e) => { console.warn('Error cargando proveedores:', e); return []; }),
-          ApiService.get('/proveedores/ordenes-compra').catch((e) => { console.warn('Error cargando ordenes:', e); return []; }),
+          ApiService.get(`/proveedores/ordenes-compra${querySucursal}`).catch((e) => { console.warn('Error cargando ordenes:', e); return []; }),
           ApiService.get('/proveedores/pagos/todos').catch((e) => { console.warn('Error cargando pagos:', e); return []; }),
           ApiService.get('/proveedores/entradas').catch((e) => { console.warn('Error cargando entradas:', e); return []; }),
           ApiService.get('/clientes').catch(() => []),
@@ -1327,6 +1331,10 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
   };
 
   const handleIrARecepcionDesdeOrden = (order: OrdenCompra) => {
+    if (order.tenantId && miLocalId && order.tenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
+      showToast('Solo la sucursal propietaria de esta orden puede realizar la recepción en bodega.', 'warning');
+      return;
+    }
     setShowOrderDetailModal(false);
     setActiveTab('ingreso');
     setEntrySupplierId(order.supplierId);
@@ -1786,9 +1794,38 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
     );
   }, [proveedores, searchQuery]);
 
+  const miLocalId = useMemo(() => {
+    if (activeSucursalId && activeSucursalId !== 'TODAS') return activeSucursalId;
+    if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u.tenantId || '';
+      } catch {
+        return '';
+      }
+    }
+    return '';
+  }, [activeSucursalId]);
+
+  const ordenesDeSucursal = useMemo(() => {
+    if (!activeSucursalId || activeSucursalId === 'TODAS') {
+      if (miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
+        return ordenes.filter((o: any) => o.tenantId === miLocalId || !o.tenantId);
+      }
+      return ordenes;
+    }
+    return ordenes.filter((o: any) => {
+      const targetSuc = sucursales?.find((s) => s.id === activeSucursalId);
+      if (targetSuc?.isMatriz) {
+        return o.tenantId === activeSucursalId || !o.tenantId;
+      }
+      return o.tenantId === activeSucursalId;
+    });
+  }, [ordenes, activeSucursalId, miLocalId, userRole, sucursales]);
+
   // Pestañas de Órdenes
   const ordenesFiltradas = useMemo(() => {
-    return ordenes.filter((o) => {
+    return ordenesDeSucursal.filter((o) => {
       let matchEstado = true;
       if (filtroEstadoOrden === 'BORRADOR') matchEstado = o.estado === 'BORRADOR';
       else if (filtroEstadoOrden === 'PENDIENTE') matchEstado = o.estado === 'PENDIENTE';
@@ -1807,7 +1844,7 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
         o.observaciones?.toLowerCase().includes(searchQuery.toLowerCase());
       return matchEstado && matchSearch;
     });
-  }, [ordenes, filtroEstadoOrden, searchQuery]);
+  }, [ordenesDeSucursal, filtroEstadoOrden, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -2122,13 +2159,13 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
           {/* Barra de Filtros: Separación clara de Pendientes por Pedir y Enviadas */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {[
-              { key: 'BORRADOR', label: '⏳ Pendientes por Pedir', count: ordenes.filter((o) => o.estado === 'BORRADOR').length },
-              { key: 'PENDIENTE', label: '📤 En Tránsito (Esperando Entrega)', count: ordenes.filter((o) => o.estado === 'PENDIENTE').length },
-              { key: 'ENVIADAS_HISTORIAL', label: '🚚 Historial de Enviadas', count: ordenes.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL' || o.estado === 'RECIBIDA').length },
-              { key: 'RECIBIDA_PARCIAL', label: '📦 Parciales (Con Faltantes)', count: ordenes.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
-              { key: 'RECIBIDA', label: '✅ Recibidas en Bodega', count: ordenes.filter((o) => o.estado === 'RECIBIDA').length },
-              { key: 'CANCELADA', label: '🚫 Canceladas', count: ordenes.filter((o) => o.estado === 'CANCELADA').length },
-              { key: 'TODOS', label: '📋 Todas las Órdenes', count: ordenes.length },
+              { key: 'BORRADOR', label: '⏳ Pendientes por Pedir', count: ordenesDeSucursal.filter((o) => o.estado === 'BORRADOR').length },
+              { key: 'PENDIENTE', label: '📤 En Tránsito (Esperando Entrega)', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE').length },
+              { key: 'ENVIADAS_HISTORIAL', label: '🚚 Historial de Enviadas', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL' || o.estado === 'RECIBIDA').length },
+              { key: 'RECIBIDA_PARCIAL', label: '📦 Parciales (Con Faltantes)', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
+              { key: 'RECIBIDA', label: '✅ Recibidas en Bodega', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA').length },
+              { key: 'CANCELADA', label: '🚫 Canceladas', count: ordenesDeSucursal.filter((o) => o.estado === 'CANCELADA').length },
+              { key: 'TODOS', label: '📋 Todas las Órdenes', count: ordenesDeSucursal.length },
             ].map((st) => (
               <button
                 key={st.key}
@@ -2290,14 +2327,23 @@ export default function ProveedoresComponent({ online, userRole }: ProveedoresPr
                                 </button>
                               )}
                               {(o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL') && (
-                                <button
-                                  onClick={() => handleIrARecepcionDesdeOrden(o)}
-                                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg transition-all text-xs font-bold shadow-2xs cursor-pointer"
-                                  title="Recibir Mercancía en Bodega"
-                                >
-                                  <PackageCheck size={13} />
-                                  <span>Recibir</span>
-                                </button>
+                                o.tenantId && miLocalId && o.tenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN' ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-not-allowed opacity-75"
+                                    title="Solo la sucursal propietaria de esta orden puede realizar la recepción de mercadería"
+                                  >
+                                    <Lock size={11} /> Otra sucursal
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleIrARecepcionDesdeOrden(o)}
+                                    className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg transition-all text-xs font-bold shadow-2xs cursor-pointer"
+                                    title="Recibir Mercancía en Bodega"
+                                  >
+                                    <PackageCheck size={13} />
+                                    <span>Recibir</span>
+                                  </button>
+                                )
                               )}
                               {o.estado === 'RECIBIDA' && (
                                 <span
