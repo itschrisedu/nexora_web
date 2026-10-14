@@ -1250,10 +1250,10 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Hora de Envío Automático Diario
+                    Hora de Inicio / Apertura
                   </label>
                   <input
                     type="time"
@@ -1261,11 +1261,25 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     onChange={(e) => setConfig(prev => ({ ...prev, horaInicioOperativa: e.target.value }))}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
                   />
+                  <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">Apertura de jornada laboral</span>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Duración de Sesión de Usuario
+                    Hora de Fin / Cierre
+                  </label>
+                  <input
+                    type="time"
+                    value={config.horaFinOperativa || "19:00"}
+                    onChange={(e) => setConfig(prev => ({ ...prev, horaFinOperativa: e.target.value }))}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                  />
+                  <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">Cierre de operaciones del local</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Duración de Sesión
                   </label>
                   <select
                     value={config.duracionSesionHoras || 24}
@@ -1277,7 +1291,13 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     <option value={24}>24 Horas (Todo el día)</option>
                     <option value={168}>7 Días (Semana completa)</option>
                   </select>
+                  <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">Tiempo de expiración de token</span>
                 </div>
+              </div>
+
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900 dark:text-amber-200">
+                <span className="font-bold">Política de Seguridad Laboral: </span>
+                <span>Los vendedores y bodegueros tienen acceso permitido únicamente dentro del horario establecido ({config.horaInicioOperativa || "08:00"} a {config.horaFinOperativa || "19:00"}). Los administradores mantienen acceso irrestricto 24/7.</span>
               </div>
             </div>
 

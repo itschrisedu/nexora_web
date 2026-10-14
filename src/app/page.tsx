@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { SyncService } from '@/services/sync.service';
 import { ApiService } from '@/services/api.service';
@@ -41,6 +41,7 @@ import {
   Receipt,
   ShieldAlert,
   KeyRound,
+  Clock,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import UserAvatar from '@/components/ui/UserAvatar';
@@ -149,6 +150,58 @@ function MainApp() {
   const [unsavedDetail, setUnsavedDetail] = useState<UnsavedChangesDetail>({ hasChanges: false });
   const [pendingVista, setPendingVista] = useState<Vista | null>(null);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+
+  // ── Control de Horario Operativo de Sucursal (Fase 3) ──
+  const [fueraDeHorario, setFueraDeHorario] = useState<{
+    bloqueado: boolean;
+    horaInicio: string;
+    horaFin: string;
+  }>({ bloqueado: false, horaInicio: '08:00', horaFin: '19:00' });
+
+  const checkHorarioLaboral = useCallback(() => {
+    if (!user) return;
+    const esAdmin = user.rol === 'ROL_ADMIN' || user.rol === 'ROL_SUPER_ADMIN' || Boolean(user.isSuperAdmin);
+    if (esAdmin) {
+      setFueraDeHorario((prev) => (prev.bloqueado ? { ...prev, bloqueado: false } : prev));
+      return;
+    }
+
+    const horaInicio = user.horarioAtencion?.horaInicio || '08:00';
+    const horaFin = user.horarioAtencion?.horaFin || '19:00';
+
+    const [hIni, mIni] = horaInicio.split(':').map(Number);
+    const [hFin, mFin] = horaFin.split(':').map(Number);
+
+    const ahora = new Date();
+    const minutosAhora = ahora.getHours() * 60 + ahora.getMinutes();
+    const minutosInicio = (isNaN(hIni) ? 8 : hIni) * 60 + (isNaN(mIni) ? 0 : mIni);
+    const minutosFin = (isNaN(hFin) ? 19 : hFin) * 60 + (isNaN(mFin) ? 0 : mFin);
+
+    let estaEnHorario = false;
+    if (minutosInicio <= minutosFin) {
+      estaEnHorario = minutosAhora >= minutosInicio && minutosAhora <= minutosFin;
+    } else {
+      estaEnHorario = minutosAhora >= minutosInicio || minutosAhora <= minutosFin;
+    }
+
+    if (!estaEnHorario) {
+      setFueraDeHorario({
+        bloqueado: true,
+        horaInicio,
+        horaFin,
+      });
+    } else {
+      setFueraDeHorario((prev) => (prev.bloqueado ? { ...prev, bloqueado: false } : prev));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      checkHorarioLaboral();
+      const interval = setInterval(checkHorarioLaboral, 30000); // Chequeo cada 30 segundos
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn, user, checkHorarioLaboral]);
 
   // ── Estado y Control Inteligente de Navbar Móvil (Ocultar al bajar, mostrar de inmediato al subir) ──
   const [showHeaderMobile, setShowHeaderMobile] = useState(true);
@@ -618,6 +671,9 @@ function MainApp() {
   // ── Navegación Segura: verificar cambios sin guardar antes de cambiar de vista ──
   const navigateToView = (target: Vista) => {
     if (target === vistaActual) return;
+    if (target === 'auditoria' && (user?.rol === 'ROL_VENDEDOR' || user?.rol === 'ROL_BODEGUERO')) {
+      return;
+    }
     const current = getUnsavedChanges();
     if (current.hasChanges) {
       setUnsavedDetail(current);
@@ -1317,10 +1373,10 @@ function MainApp() {
       }
       if (user.rol === 'ROL_ADMIN') return item.id !== 'super-admin';
       if (user.rol === 'ROL_VENDEDOR') {
-        return !['finanzas', 'proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
+        return !['finanzas', 'proveedores', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones', 'auditoria'].includes(item.id);
       }
       if (user.rol === 'ROL_BODEGUERO') {
-        return !['finanzas', 'clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones'].includes(item.id);
+        return !['finanzas', 'clientes', 'financiero', 'usuarios', 'modelos', 'super-admin', 'personalizacion', 'sri', 'ubicaciones', 'auditoria'].includes(item.id);
       }
       return !['modelos', 'super-admin'].includes(item.id);
     });
@@ -1781,7 +1837,17 @@ function MainApp() {
 
           {vistaActual === 'pos' && <PosComponent />}
           {vistaActual === 'prediccion-ml' && <PrediccionDemandaComponent />}
-          {vistaActual === 'auditoria' && <AuditoriaComponent />}
+          {vistaActual === 'auditoria' && (
+            user?.rol === 'ROL_ADMIN' || isSuperAdmin ? (
+              <AuditoriaComponent />
+            ) : (
+              <div className="p-8 text-center bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-md mx-auto space-y-3">
+                <ShieldAlert size={36} className="mx-auto text-amber-500" />
+                <h3 className="font-extrabold text-base text-[var(--foreground)]">Acceso Restringido</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">El módulo de auditoría es de uso exclusivo para perfiles administrativos.</p>
+              </div>
+            )
+          )}
           {vistaActual === 'ubicaciones' && <UbicacionesComponent online={online} />}
 
           {/* Espaciador de seguridad para móvil: garantiza que la barra de navegación inferior fija no tape contenido al hacer scroll */}
@@ -1944,6 +2010,58 @@ function MainApp() {
         onDiscardAndLeave={handleUnsavedDiscard}
         onSaveSuccessAndLeave={handleUnsavedSaveAndLeave}
       />
+
+      {/* ─── PANTALLA BLOQUEANTE: FUERA DE HORARIO OPERATIVO (FASE 3) ─── */}
+      {isLoggedIn && user && fueraDeHorario.bloqueado && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-500 flex items-center justify-center shadow-inner">
+              <Clock size={34} className="animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                Fuera de Línea • Fuera de Horario
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-[var(--foreground)] tracking-tight">
+                Sistema Fuera de Horario Operativo
+              </h2>
+              <p className="text-xs sm:text-sm text-[var(--muted-foreground)] leading-relaxed">
+                El acceso para su perfil está habilitado únicamente durante la jornada laboral establecida para esta sucursal de{' '}
+                <strong className="text-[var(--foreground)] font-bold">{fueraDeHorario.horaInicio} a {fueraDeHorario.horaFin}</strong>.
+              </p>
+            </div>
+
+            <div className="p-4 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl text-left space-y-1.5 text-xs">
+              <div className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-500" />
+                <span>Protocolo de Seguridad Operativa</span>
+              </div>
+              <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                Las transacciones comerciales, despachos y consulta de inventario permanecen protegidos fuera de la jornada laboral. Si requiere acceso extraordinario para recepción de mercadería o inventario, solicite autorización a la administración.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={checkHorarioLaboral}
+                className="flex-1 py-2.5 px-4 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] font-bold text-xs rounded-xl transition-all cursor-pointer border border-[var(--border)]"
+              >
+                Reintentar Verificación
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex-1 py-2.5 px-4 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                Cerrar Sesión Segura
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── MODAL DE CONFIRMACIÓN DE CIERRE DE SESIÓN ─── */}
       {showLogoutModal && (
