@@ -1810,16 +1810,18 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const ordenesDeSucursal = useMemo(() => {
     if (!activeSucursalId || activeSucursalId === 'TODAS') {
       if (miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
-        return ordenes.filter((o: any) => o.tenantId === miLocalId || !o.tenantId);
+        const suc = sucursales?.find((s) => s.id === miLocalId);
+        if (suc?.isMatriz) return ordenes;
+        return ordenes.filter((o: any) => o.tenantId === miLocalId || o.sucursalId === miLocalId || !o.tenantId);
       }
       return ordenes;
     }
     return ordenes.filter((o: any) => {
       const targetSuc = sucursales?.find((s) => s.id === activeSucursalId);
       if (targetSuc?.isMatriz) {
-        return o.tenantId === activeSucursalId || !o.tenantId;
+        return true;
       }
-      return o.tenantId === activeSucursalId;
+      return o.tenantId === activeSucursalId || o.sucursalId === activeSucursalId || !o.tenantId;
     });
   }, [ordenes, activeSucursalId, miLocalId, userRole, sucursales]);
 
