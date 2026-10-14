@@ -4171,8 +4171,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                 disabled={totalParesConfig === 0}
                                 className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                               >
-                                <Plus size={14} />
-                                <span>+ Agregar al Pedido</span>
+                                <span>Agregar al Pedido</span>
                               </button>
                             </div>
                           </div>

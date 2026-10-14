@@ -99,3 +99,47 @@ body {
     transform: scale(1) translateY(0);
   }
 }
+
+/* ==========================================================================
+   COMPATIBILIDAD UNIVERSAL: FALLBACKS PARA NAVEGADORES Y EQUIPOS ANTIGUOS
+   Asegura que selectores con opacidad / color-mix no pierdan color ni fondos
+   ========================================================================== */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  [class*="bg-[var(--muted)]"] {
+    background-color: #f1f5f9 !important;
+  }
+  .dark [class*="bg-[var(--muted)]"] {
+    background-color: #1e293b !important;
+  }
+  [class*="bg-[var(--card)]"] {
+    background-color: #ffffff !important;
+  }
+  .dark [class*="bg-[var(--card)]"] {
+    background-color: #1e293b !important;
+  }
+  [class*="bg-[var(--background)]"] {
+    background-color: #f8fafc !important;
+  }
+  .dark [class*="bg-[var(--background)]"] {
+    background-color: #0f172a !important;
+  }
+  [class*="border-[var(--border)]"] {
+    border-color: #e2e8f0 !important;
+  }
+  .dark [class*="border-[var(--border)]"] {
+    border-color: #334155 !important;
+  }
+  [class*="text-[var(--foreground)]"] {
+    color: #0f172a !important;
+  }
+  .dark [class*="text-[var(--foreground)]"] {
+    color: #f8fafc !important;
+  }
+  [class*="text-[var(--muted-foreground)]"] {
+    color: #464D57 !important;
+  }
+  .dark [class*="text-[var(--muted-foreground)]"] {
+    color: #94a3b8 !important;
+  }
+}
+

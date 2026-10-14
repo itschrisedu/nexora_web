@@ -1572,7 +1572,7 @@ function MainApp() {
           style={{ 
             backgroundColor: 'var(--primary)', 
             color: 'var(--primary-foreground)',
-            borderColor: 'color-mix(in srgb, var(--primary) 80%, black)'
+            borderColor: 'rgba(0, 0, 0, 0.25)'
           }}
         >
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -1598,8 +1598,8 @@ function MainApp() {
               <div 
                 className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs backdrop-blur-sm shadow-xs shrink-0"
                 style={{ 
-                  backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)', 
-                  border: '1px solid color-mix(in srgb, var(--primary-foreground) 25%, transparent)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)', 
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
                   color: 'var(--primary-foreground)'
                 }}
               >
@@ -1638,9 +1638,9 @@ function MainApp() {
               ? <div 
                   className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold backdrop-blur-sm"
                   style={{
-                    backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
                     color: 'var(--primary-foreground)',
-                    border: '1px solid color-mix(in srgb, var(--primary-foreground) 25%, transparent)'
+                    border: '1px solid rgba(255, 255, 255, 0.25)'
                   }}
                 >
                   <Wifi size={13} className="animate-pulse shrink-0" style={{ color: 'var(--primary-foreground)' }} />
@@ -1655,9 +1655,9 @@ function MainApp() {
               <button onClick={handleSyncManual} disabled={loading}
                 className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all disabled:opacity-50"
                 style={{
-                  backgroundColor: 'color-mix(in srgb, var(--primary-foreground) 15%, transparent)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
                   color: 'var(--primary-foreground)',
-                  border: '1px solid color-mix(in srgb, var(--primary-foreground) 30%, transparent)'
+                  border: '1px solid rgba(255, 255, 255, 0.3)'
                 }}
               >
                 <RefreshCw size={13} className={loading ? 'animate-spin shrink-0' : 'shrink-0'} />
@@ -1687,7 +1687,7 @@ function MainApp() {
         <section
           id="nexora-main-content"
           key={`${vistaActual}-${activeSucursalId}`}
-          className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 pb-24 md:pb-8 transition-opacity duration-300"
+          className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 pb-32 md:pb-8 transition-opacity duration-300"
         >
           {/* Alerta de datos offline pendientes */}
           {stats.pendingSyncCount > 0 && (
@@ -1776,6 +1776,9 @@ function MainApp() {
           {vistaActual === 'prediccion-ml' && <PrediccionDemandaComponent />}
           {vistaActual === 'auditoria' && <AuditoriaComponent />}
           {vistaActual === 'ubicaciones' && <UbicacionesComponent online={online} />}
+
+          {/* Espaciador de seguridad para móvil: garantiza que la barra de navegación inferior fija no tape contenido al hacer scroll */}
+          <div className="h-28 md:hidden shrink-0 pointer-events-none" aria-hidden="true" />
         </section>
       </main>
 
