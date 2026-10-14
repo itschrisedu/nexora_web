@@ -19,6 +19,7 @@ import VaultPasswordMeter, { analyzePassword } from "./ui/VaultPasswordMeter";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 import { getStoredPlanPrices, setStoredPlanPrices, calculateYearlyEquivalent } from "../utils/saas-plans";
 import { updateTabFavicon } from "../utils/favicon";
+import { CanalWhatsApp } from "../utils/whatsapp";
 
 interface CreditLevelConfigItem {
   id?: string;
@@ -149,7 +150,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     return stored === null ? true : stored === "true";
   });
 
-  const [canalWhatsAppPref, setCanalWhatsAppPref] = useState<'WEB' | 'APP' | 'PREGUNTAR'>(() => {
+  const [canalWhatsAppPref, setCanalWhatsAppPref] = useState<CanalWhatsApp>(() => {
     if (typeof window === "undefined") return "WEB";
     const stored = localStorage.getItem("nexora_whatsapp_canal_pref");
     return (stored as any) || "WEB";
@@ -1498,55 +1499,76 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 {autoWhatsAppAbono && (
                   <div className="pt-2.5 border-t border-[var(--border)]/60 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-[var(--foreground)]">
-                        Canal / Aplicación de WhatsApp para Envíos:
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-[var(--foreground)]">
+                          Canal de WhatsApp para este Dispositivo:
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-500/10 text-[var(--muted-foreground)]">
+                          {typeof window !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') ? '📱 Celular' : '💻 Computadora'}
+                        </span>
+                      </div>
                       <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                        {canalWhatsAppPref === 'WEB' ? 'WhatsApp Web Activo' : canalWhatsAppPref === 'APP' ? 'App Instalada Activa' : 'Pregunta en cada envío'}
+                        {canalWhatsAppPref === 'BUSINESS_MOVIL' ? 'WhatsApp Business Activo' : canalWhatsAppPref === 'NORMAL_MOVIL' ? 'WhatsApp Normal Activo' : canalWhatsAppPref === 'WEB' ? 'WhatsApp Web Activo' : canalWhatsAppPref === 'DESKTOP' || canalWhatsAppPref === 'APP' ? 'App Escritorio Activa' : 'Pregunta en cada envío'}
                       </span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => {
-                          setCanalWhatsAppPref('WEB');
-                          localStorage.setItem('nexora_whatsapp_canal_pref', 'WEB');
-                          window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                          const nuevoCanal = typeof window !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') ? 'BUSINESS_MOVIL' : 'WEB';
+                          setCanalWhatsAppPref(nuevoCanal);
+                          if (typeof window !== 'undefined') {
+                            if (/android|iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
+                              localStorage.setItem('nexora_whatsapp_pref_movil', 'BUSINESS_MOVIL');
+                            } else {
+                              localStorage.setItem('nexora_whatsapp_pref_pc', 'WEB');
+                            }
+                            localStorage.setItem('nexora_whatsapp_canal_pref', nuevoCanal);
+                            window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                          }
                         }}
-                        className={`text-left p-2.5 rounded-xl border text-xs transition-all ${
-                          canalWhatsAppPref === 'WEB'
+                        className={`text-left p-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
+                          canalWhatsAppPref === 'BUSINESS_MOVIL' || canalWhatsAppPref === 'WEB'
                             ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold shadow-sm'
                             : 'border-[var(--border)] hover:bg-slate-500/5 text-[var(--muted-foreground)]'
                         }`}
                       >
                         <div className="font-bold flex items-center justify-between">
-                          <span>WhatsApp Web</span>
-                          {canalWhatsAppPref === 'WEB' && <span className="text-[10px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2">✓</span>}
+                          <span>{typeof window !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') ? '🏢 WhatsApp Business' : '🌐 WhatsApp Web'}</span>
+                          {(canalWhatsAppPref === 'BUSINESS_MOVIL' || canalWhatsAppPref === 'WEB') && <span className="text-[10px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2">✓</span>}
                         </div>
                         <div className="text-[10px] opacity-80 mt-0.5 leading-tight">
-                          Navegador (Usa la sesión del negocio en PC)
+                          {typeof window !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') ? 'Abre directo la app comercial del local' : 'Navegador (Sesión del negocio en PC)'}
                         </div>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => {
-                          setCanalWhatsAppPref('APP');
-                          localStorage.setItem('nexora_whatsapp_canal_pref', 'APP');
-                          window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                          const nuevoCanal = typeof window !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') ? 'NORMAL_MOVIL' : 'DESKTOP';
+                          setCanalWhatsAppPref(nuevoCanal);
+                          if (typeof window !== 'undefined') {
+                            if (/android|iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
+                              localStorage.setItem('nexora_whatsapp_pref_movil', 'NORMAL_MOVIL');
+                            } else {
+                              localStorage.setItem('nexora_whatsapp_pref_pc', 'DESKTOP');
+                            }
+                            localStorage.setItem('nexora_whatsapp_canal_pref', nuevoCanal);
+                            window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                          }
                         }}
-                        className={`text-left p-2.5 rounded-xl border text-xs transition-all ${
-                          canalWhatsAppPref === 'APP'
+                        className={`text-left p-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
+                          canalWhatsAppPref === 'NORMAL_MOVIL' || canalWhatsAppPref === 'DESKTOP' || canalWhatsAppPref === 'APP'
                             ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold shadow-sm'
                             : 'border-[var(--border)] hover:bg-slate-500/5 text-[var(--muted-foreground)]'
                         }`}
                       >
                         <div className="font-bold flex items-center justify-between">
-                          <span>App Instalada</span>
-                          {canalWhatsAppPref === 'APP' && <span className="text-[10px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2">✓</span>}
+                          <span>{typeof window !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') ? '💬 WhatsApp Normal' : '💻 App de Escritorio'}</span>
+                          {(canalWhatsAppPref === 'NORMAL_MOVIL' || canalWhatsAppPref === 'DESKTOP' || canalWhatsAppPref === 'APP') && <span className="text-[10px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2">✓</span>}
                         </div>
                         <div className="text-[10px] opacity-80 mt-0.5 leading-tight">
-                          App de Windows o Celular
+                          {typeof window !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '') ? 'App de WhatsApp estándar' : 'App instalada en Windows/Mac'}
                         </div>
                       </button>
 
@@ -1554,21 +1576,28 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                         type="button"
                         onClick={() => {
                           setCanalWhatsAppPref('PREGUNTAR');
-                          localStorage.setItem('nexora_whatsapp_canal_pref', 'PREGUNTAR');
-                          window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                          if (typeof window !== 'undefined') {
+                            if (/android|iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
+                              localStorage.setItem('nexora_whatsapp_pref_movil', 'PREGUNTAR');
+                            } else {
+                              localStorage.setItem('nexora_whatsapp_pref_pc', 'PREGUNTAR');
+                            }
+                            localStorage.setItem('nexora_whatsapp_canal_pref', 'PREGUNTAR');
+                            window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                          }
                         }}
-                        className={`text-left p-2.5 rounded-xl border text-xs transition-all ${
+                        className={`text-left p-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
                           canalWhatsAppPref === 'PREGUNTAR'
                             ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold shadow-sm'
                             : 'border-[var(--border)] hover:bg-slate-500/5 text-[var(--muted-foreground)]'
                         }`}
                       >
                         <div className="font-bold flex items-center justify-between">
-                          <span>Preguntar siempre</span>
+                          <span>❓ Preguntar siempre</span>
                           {canalWhatsAppPref === 'PREGUNTAR' && <span className="text-[10px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2">✓</span>}
                         </div>
                         <div className="text-[10px] opacity-80 mt-0.5 leading-tight">
-                          Mostrar selector antes de abrir
+                          Mostrar selector antes de enviar
                         </div>
                       </button>
                     </div>

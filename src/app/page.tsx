@@ -42,6 +42,7 @@ import {
   ShieldAlert,
   KeyRound,
   Clock,
+  MessageSquare,
 } from 'lucide-react';
 import { GeolocationService } from '@/services/geolocation.service';
 import UserAvatar from '@/components/ui/UserAvatar';
@@ -1560,6 +1561,20 @@ function MainApp() {
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('nexora:solicitar-canal-whatsapp', {
+                    detail: { soloConfiguracion: true },
+                  })
+                );
+                if (isMobile) setMobileMenuOpen(false);
+              }}
+              className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+              title="Mi aplicación de WhatsApp (Business / Normal / Web)"
+            >
+              <MessageSquare size={16} />
+            </button>
+            <button
+              onClick={() => {
                 navigateToView('personalizacion');
                 if (isMobile) setMobileMenuOpen(false);
               }}
@@ -1721,6 +1736,20 @@ function MainApp() {
                 <span className="hidden sm:inline">Sincronizar</span> <span>({stats.pendingSyncCount})</span>
               </button>
             )}
+            <button
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('nexora:solicitar-canal-whatsapp', {
+                    detail: { soloConfiguracion: true },
+                  })
+                );
+              }}
+              className="p-1.5 sm:p-2 rounded-lg transition-colors relative hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
+              style={{ color: 'var(--primary-foreground)' }}
+              title="Configurar aplicación de WhatsApp (Business / Web / Personal)"
+            >
+              <MessageSquare size={18} style={{ color: 'var(--primary-foreground)' }} />
+            </button>
             <button 
               onClick={() => setNotificacionesModalOpen(true)}
               className="p-1.5 sm:p-2 rounded-lg transition-colors relative hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
