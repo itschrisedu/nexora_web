@@ -149,6 +149,12 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     return stored === null ? true : stored === "true";
   });
 
+  const [canalWhatsAppPref, setCanalWhatsAppPref] = useState<'WEB' | 'APP' | 'PREGUNTAR'>(() => {
+    if (typeof window === "undefined") return "WEB";
+    const stored = localStorage.getItem("nexora_whatsapp_canal_pref");
+    return (stored as any) || "WEB";
+  });
+
   const [margenGanancia, setMargenGanancia] = useState<number>(() => {
     if (typeof window === "undefined") return 30;
     const stored = localStorage.getItem("nexora-margen-ganancia");
@@ -1462,7 +1468,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-500/5 dark:bg-slate-800/20 border border-[var(--border)] rounded-xl">
+              <div className="p-4 bg-slate-500/5 dark:bg-slate-800/20 border border-[var(--border)] rounded-xl space-y-3">
                 <label className="flex items-center justify-between cursor-pointer select-none gap-4">
                   <div className="space-y-1">
                     <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-2">
@@ -1488,6 +1494,86 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
                   />
                 </label>
+
+                {autoWhatsAppAbono && (
+                  <div className="pt-2.5 border-t border-[var(--border)]/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-[var(--foreground)]">
+                        Canal / Aplicación de WhatsApp para Envíos:
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                        {canalWhatsAppPref === 'WEB' ? 'WhatsApp Web Activo' : canalWhatsAppPref === 'APP' ? 'App Instalada Activa' : 'Pregunta en cada envío'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCanalWhatsAppPref('WEB');
+                          localStorage.setItem('nexora_whatsapp_canal_pref', 'WEB');
+                          window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                        }}
+                        className={`text-left p-2.5 rounded-xl border text-xs transition-all ${
+                          canalWhatsAppPref === 'WEB'
+                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold shadow-sm'
+                            : 'border-[var(--border)] hover:bg-slate-500/5 text-[var(--muted-foreground)]'
+                        }`}
+                      >
+                        <div className="font-bold flex items-center justify-between">
+                          <span>WhatsApp Web</span>
+                          {canalWhatsAppPref === 'WEB' && <span className="text-[10px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2">✓</span>}
+                        </div>
+                        <div className="text-[10px] opacity-80 mt-0.5 leading-tight">
+                          Navegador (Usa la sesión del negocio en PC)
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCanalWhatsAppPref('APP');
+                          localStorage.setItem('nexora_whatsapp_canal_pref', 'APP');
+                          window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                        }}
+                        className={`text-left p-2.5 rounded-xl border text-xs transition-all ${
+                          canalWhatsAppPref === 'APP'
+                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold shadow-sm'
+                            : 'border-[var(--border)] hover:bg-slate-500/5 text-[var(--muted-foreground)]'
+                        }`}
+                      >
+                        <div className="font-bold flex items-center justify-between">
+                          <span>App Instalada</span>
+                          {canalWhatsAppPref === 'APP' && <span className="text-[10px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2">✓</span>}
+                        </div>
+                        <div className="text-[10px] opacity-80 mt-0.5 leading-tight">
+                          App de Windows o Celular
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCanalWhatsAppPref('PREGUNTAR');
+                          localStorage.setItem('nexora_whatsapp_canal_pref', 'PREGUNTAR');
+                          window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+                        }}
+                        className={`text-left p-2.5 rounded-xl border text-xs transition-all ${
+                          canalWhatsAppPref === 'PREGUNTAR'
+                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold shadow-sm'
+                            : 'border-[var(--border)] hover:bg-slate-500/5 text-[var(--muted-foreground)]'
+                        }`}
+                      >
+                        <div className="font-bold flex items-center justify-between">
+                          <span>Preguntar siempre</span>
+                          {canalWhatsAppPref === 'PREGUNTAR' && <span className="text-[10px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2">✓</span>}
+                        </div>
+                        <div className="text-[10px] opacity-80 mt-0.5 leading-tight">
+                          Mostrar selector antes de abrir
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ENVÍO AUTOMÁTICO POR CORREO ELECTRÓNICO */}

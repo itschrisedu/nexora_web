@@ -55,18 +55,57 @@ export function normalizarTelefonoEcuador(telefono?: string | null): string {
   return numLimpio;
 }
 
-export function obtenerUrlWhatsApp(telefono: string | undefined | null, mensaje: string): string {
+export type CanalWhatsApp = 'WEB' | 'APP' | 'PREGUNTAR';
+
+export function obtenerCanalWhatsAppPreferido(): CanalWhatsApp {
+  if (typeof window === 'undefined') return 'WEB';
+  const pref = localStorage.getItem('nexora_whatsapp_canal_pref') as CanalWhatsApp;
+  if (pref === 'WEB' || pref === 'APP' || pref === 'PREGUNTAR') return pref;
+  return 'WEB'; // Por defecto WEB para usar la cuenta del negocio en el navegador y no la app personal de Windows
+}
+
+export function guardarCanalWhatsAppPreferido(canal: CanalWhatsApp): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('nexora_whatsapp_canal_pref', canal);
+    window.dispatchEvent(new CustomEvent('nexora:config-changed'));
+  }
+}
+
+export function obtenerUrlWhatsApp(telefono: string | undefined | null, mensaje: string, canal?: CanalWhatsApp): string {
   const num = formatearNumeroWhatsApp(telefono);
   const textoCodificado = encodeURIComponent(mensaje);
+  const canalFinal = canal || obtenerCanalWhatsAppPreferido();
+
+  if (canalFinal === 'WEB') {
+    // Abre directamente WhatsApp Web en el navegador (donde está iniciada la cuenta del negocio)
+    if (num) {
+      return `https://web.whatsapp.com/send?phone=${num}&text=${textoCodificado}`;
+    }
+    return `https://web.whatsapp.com/send?text=${textoCodificado}`;
+  }
+
+  // Si es 'APP' o universal (activa app nativa o selector de Android)
   if (num) {
     return `https://api.whatsapp.com/send?phone=${num}&text=${textoCodificado}`;
   }
   return `https://api.whatsapp.com/send?text=${textoCodificado}`;
 }
 
-export function abrirWhatsAppUniversal(telefono: string | undefined | null, mensaje: string): boolean {
+export function abrirWhatsAppUniversal(telefono: string | undefined | null, mensaje: string, forzarCanal?: CanalWhatsApp): boolean {
   if (typeof window === 'undefined') return false;
-  const url = obtenerUrlWhatsApp(telefono, mensaje);
+
+  const canal = forzarCanal || obtenerCanalWhatsAppPreferido();
+  if (canal === 'PREGUNTAR') {
+    // Disparar evento para que el modal global pregunte al usuario
+    window.dispatchEvent(
+      new CustomEvent('nexora:solicitar-canal-whatsapp', {
+        detail: { telefono, mensaje },
+      })
+    );
+    return true;
+  }
+
+  const url = obtenerUrlWhatsApp(telefono, mensaje, canal);
   window.open(url, '_blank', 'noopener,noreferrer');
   return true;
 }

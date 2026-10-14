@@ -52,6 +52,7 @@ import UnsavedChangesModal from '@/components/ui/unsaved-changes-modal';
 import { getUnsavedChanges, clearUnsavedChanges, UnsavedChangesDetail } from '@/utils/unsaved-changes';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 import { updateTabFavicon } from '@/utils/favicon';
+import WhatsAppSelectorModal from '@/components/ui/WhatsAppSelectorModal';
 
 // Importaciones dinámicas para evitar SSR con Dexie
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
@@ -2401,6 +2402,7 @@ export default function Home() {
   return (
     <ToastProvider>
       <MainApp />
+      <WhatsAppSelectorModal />
     </ToastProvider>
   );
 }
