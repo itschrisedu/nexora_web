@@ -2669,20 +2669,19 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
             {/* ── Body del Modal (scrollable) ── */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* Saldos Totales */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-500/5 rounded-xl border border-[var(--border)]">
-                  <span className="text-[10px] text-[var(--muted-foreground)] block font-medium">Total Facturado:</span>
-                  <span className="text-sm font-extrabold text-[var(--foreground)]">
-                    ${carteraSeleccionada.montoTotalFacturado.toFixed(2)}
+              {/* Saldo Pendiente */}
+              <div className="p-3.5 bg-red-500/5 dark:bg-red-500/10 rounded-xl border border-red-500/20 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-red-600 dark:text-red-400 block uppercase tracking-wider">
+                    Saldo Pendiente
+                  </span>
+                  <span className="text-[11px] text-[var(--muted-foreground)]">
+                    Monto pendiente por cobrar
                   </span>
                 </div>
-                <div className="p-3 bg-red-500/5 rounded-xl border border-red-500/20">
-                  <span className="text-[10px] text-red-600 block font-semibold">Saldo Deudor Total:</span>
-                  <span className="text-sm font-black text-red-500">
-                    ${carteraSeleccionada.saldoTotalPendiente.toFixed(2)}
-                  </span>
-                </div>
+                <span className="text-base font-black text-red-600 dark:text-red-400 font-mono">
+                  ${carteraSeleccionada.saldoTotalPendiente.toFixed(2)}
+                </span>
               </div>
 
               {/* Badge Saldo a Favor del Cliente */}

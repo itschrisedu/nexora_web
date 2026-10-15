@@ -4269,7 +4269,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <option value="TRANSFERENCIA">Transferencia Bancaria</option>
                   <option value="DEPOSITO">Depósito Bancario</option>
                   <option value="EFECTIVO">Efectivo</option>
-                  <option value="CHEQUE">Cheque</option>
+                  {/* <option value="CHEQUE">Cheque</option> -- Oculto temporalmente para presentación de tesis */}
                 </select>
               </div>
 

@@ -1801,6 +1801,7 @@ function MainApp() {
               <DashboardComponent
                 online={online}
                 userRole={user?.rol}
+                esAdminGeneral={Boolean(user?.esAdminGeneral)}
                 activeSucursalId={activeSucursalId}
                 onSucursalChange={(id) => {
                   setActiveSucursalId(id);
@@ -1810,7 +1811,13 @@ function MainApp() {
               />
             )
           )}
-          {vistaActual === 'reportes' && <ReportesComponent />}
+          {vistaActual === 'reportes' && (
+            <ReportesComponent
+              user={user}
+              activeSucursalId={activeSucursalId}
+              sucursales={sucursales}
+            />
+          )}
           {vistaActual === 'inventario' && (
             <InventarioComponent
               online={online}

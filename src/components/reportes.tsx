@@ -72,8 +72,21 @@ interface Vendedor {
   activo: boolean;
 }
 
-export default function ReportesComponent() {
+interface ReportesComponentProps {
+  user?: any;
+  activeSucursalId?: string;
+  sucursales?: any[];
+}
+
+export default function ReportesComponent({
+  user: propUser,
+  activeSucursalId: propActiveSucursalId,
+  sucursales: propSucursales,
+}: ReportesComponentProps = {}) {
   const { showToast } = useToast();
+
+  // Usuario y Rol del usuario autenticado
+  const [currentUser, setCurrentUser] = useState<any>(propUser || null);
 
   // Estados de Filtros Globales
   const [periodo, setPeriodo] = useState<PeriodoTipo>('MENSUAL');
@@ -87,7 +100,7 @@ export default function ReportesComponent() {
   const [loading, setLoading] = useState(true);
   const [reporteData, setReporteData] = useState<any>(null);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
-  const [sucursales, setSucursales] = useState<any[]>([]);
+  const [sucursales, setSucursales] = useState<any[]>(propSucursales || []);
   const [tabActiva, setTabActiva] = useState<TabReporte>('resumen');
   const [negocioInfo, setNegocioInfo] = useState<any>(null);
 
@@ -135,6 +148,33 @@ export default function ReportesComponent() {
   const [previewTitulo, setPreviewTitulo] = useState('Previsualización de Documento');
   const [previewNombreArchivo, setPreviewNombreArchivo] = useState('reporte-nexora.pdf');
   const [generandoGeneralPdf, setGenerandoGeneralPdf] = useState(false);
+
+  // Inicialización de usuario y permisos por rol
+  useEffect(() => {
+    let activeUser = propUser;
+    if (!activeUser && typeof window !== 'undefined') {
+      const rawUser = localStorage.getItem('user');
+      if (rawUser) {
+        try {
+          activeUser = JSON.parse(rawUser);
+        } catch {}
+      }
+    }
+    if (activeUser) {
+      setCurrentUser(activeUser);
+      const isGlobal = activeUser.rol === 'ROL_SUPER_ADMIN' || (activeUser.rol === 'ROL_ADMIN' && Boolean(activeUser.esAdminGeneral));
+      if (!isGlobal && (activeUser.tenantId || propActiveSucursalId)) {
+        setSucursalSeleccionada(activeUser.tenantId || propActiveSucursalId || '');
+      }
+      if (activeUser.rol === 'ROL_VENDEDOR') {
+        setVendedorSeleccionado(activeUser.id || activeUser.sub || '');
+      }
+    }
+  }, [propUser, propActiveSucursalId]);
+
+  const isSuperAdmin = currentUser?.rol === 'ROL_SUPER_ADMIN';
+  const isGlobalAdmin = isSuperAdmin || (currentUser?.rol === 'ROL_ADMIN' && Boolean(currentUser?.esAdminGeneral));
+  const isVendedor = currentUser?.rol === 'ROL_VENDEDOR';
 
   useEffect(() => {
     cargarSucursales();
@@ -813,23 +853,33 @@ export default function ReportesComponent() {
               2. Sucursal / Sede
             </label>
             <div className="relative">
-              <select
-                value={sucursalSeleccionada}
-                onChange={(e) => setSucursalSeleccionada(e.target.value)}
-                className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
-              >
-                <option value="TODOS">🏢 Todas las Sucursales (Consolidado)</option>
-                <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
-                {sucursales.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    📍 {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+              {isGlobalAdmin ? (
+                <>
+                  <select
+                    value={sucursalSeleccionada}
+                    onChange={(e) => setSucursalSeleccionada(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
+                  >
+                    <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
+                    {sucursales.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        📍 {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                </>
+              ) : (
+                <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
+                  <span>📍 {sucursales.find((s) => s.id === (currentUser?.tenantId || sucursalSeleccionada))?.name || 'Sucursal Asignada'}</span>
+                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Sede Local</span>
+                </div>
+              )}
             </div>
             <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              Filtra por sucursal específica o visualiza la red completa.
+              {isGlobalAdmin
+                ? 'Filtra por sucursal específica o visualiza la red completa.'
+                : 'Reporte delimitado exclusivamente a tu local comercial asignado.'}
             </p>
           </div>
 
@@ -839,22 +889,31 @@ export default function ReportesComponent() {
               3. Trabajador o Vendedor
             </label>
             <div className="relative">
-              <select
-                value={vendedorSeleccionado}
-                onChange={(e) => setVendedorSeleccionado(e.target.value)}
-                className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
-              >
-                <option value="TODOS">Todos los Trabajadores</option>
-                {vendedores.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    👤 {v.nombre} ({v.rol.replace('ROL_', '')})
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+              {isVendedor ? (
+                <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
+                  <span>👤 {currentUser?.nombre || currentUser?.email || 'Mis Ventas'}</span>
+                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">Vendedor</span>
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={vendedorSeleccionado}
+                    onChange={(e) => setVendedorSeleccionado(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A] appearance-none"
+                  >
+                    <option value="TODOS">Todos los Trabajadores</option>
+                    {vendedores.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        👤 {v.nombre} ({v.rol.replace('ROL_', '')})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                </>
+              )}
             </div>
             <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              Productividad individual o grupal del equipo.
+              {isVendedor ? 'Visualizando exclusivamente tus transacciones comerciales.' : 'Productividad individual o grupal del equipo.'}
             </p>
           </div>
 
@@ -980,11 +1039,15 @@ export default function ReportesComponent() {
               </div>
               {/* Tarjetas KPIs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Facturación Total */}
+                {/* 1. Ventas Totales */}
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Facturación Total
+                      {isVendedor
+                        ? 'Mis Ventas Totales'
+                        : isGlobalAdmin && sucursalSeleccionada === 'TODAS'
+                        ? 'Ventas Totales del Negocio'
+                        : 'Ventas de la Sucursal'}
                     </span>
                     <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
                       <DollarSign size={18} />
@@ -995,7 +1058,7 @@ export default function ReportesComponent() {
                       ${kpis.totalIngresos.toFixed(2)}
                     </div>
                     <div className="text-[11px] text-[var(--muted-foreground)] font-semibold mt-1">
-                      {kpis.totalPedidos} pedidos registrados
+                      {isVendedor ? 'Mis transacciones registradas' : `${kpis.totalPedidos} pedidos registrados`}
                     </div>
                   </div>
                 </div>
@@ -1004,7 +1067,7 @@ export default function ReportesComponent() {
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase text-[var(--muted-foreground)] tracking-wider">
-                      Calzado Vendido
+                      {isVendedor ? 'Mis Pares Vendidos' : 'Calzado Vendido'}
                     </span>
                     <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl">
                       <ShoppingBag size={18} />

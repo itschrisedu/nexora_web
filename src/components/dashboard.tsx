@@ -30,6 +30,7 @@ import { useToast } from "@/components/ui/toast";
 interface DashboardProps {
   online: boolean;
   userRole?: string;
+  esAdminGeneral?: boolean;
   activeSucursalId: string;
   onSucursalChange: (sucursalId: string) => void;
   sucursales: { id: string; name: string; isMatriz: boolean }[];
@@ -38,12 +39,15 @@ interface DashboardProps {
 export default function DashboardComponent({
   online,
   userRole = "ROL_VENDEDOR",
+  esAdminGeneral = false,
   activeSucursalId,
   onSucursalChange,
   sucursales,
 }: DashboardProps) {
   const { showToast } = useToast();
-  const isAdmin = userRole === "ROL_ADMIN" || userRole === "ROL_SUPER_ADMIN";
+  const isSuperAdmin = userRole === "ROL_SUPER_ADMIN";
+  const isGlobalAdmin = isSuperAdmin || (userRole === "ROL_ADMIN" && Boolean(esAdminGeneral));
+  const isAdmin = userRole === "ROL_ADMIN" || isSuperAdmin;
   const isVendedor = userRole === "ROL_VENDEDOR";
 
   // Estados de Filtro y Datos
@@ -221,7 +225,7 @@ export default function DashboardComponent({
 
           {/* Filtros de Sucursal & Periodo Compactos */}
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            {isAdmin && sucursales.length > 0 && (
+            {isGlobalAdmin && sucursales.length > 0 ? (
               <select
                 value={activeSucursalId}
                 onChange={(e) => onSucursalChange(e.target.value)}
@@ -234,6 +238,11 @@ export default function DashboardComponent({
                   </option>
                 ))}
               </select>
+            ) : (
+              <span className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-900/90 text-slate-200 border border-slate-700 flex items-center gap-1.5 shadow-inner">
+                <MapPin size={11} className="text-amber-400" />
+                {sucursales.find((s) => s.id === activeSucursalId)?.name || "Sucursal Local"}
+              </span>
             )}
 
             {/* Selector de Periodo */}
@@ -268,9 +277,15 @@ export default function DashboardComponent({
       {/* ─── TARJETAS DE KPIS PRINCIPALES CON MEDIDOR GAUGE DINÁMICO ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCardCompact
-          title={isVendedor ? "Mis Ventas Totales" : "Ventas Totales"}
+          title={
+            isVendedor
+              ? "Mis Ventas Totales"
+              : isGlobalAdmin && activeSucursalId === "TODAS"
+              ? "Ventas Totales del Negocio"
+              : "Ventas de la Sucursal"
+          }
           value={`$${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={isVendedor ? "Mis transacciones" : `${kpis.totalPedidos} transacciones`}
+          subtitle={isVendedor ? "Mis transacciones personales" : `${kpis.totalPedidos} transacciones`}
           icon={<DollarSign size={16} />}
           iconBg="bg-emerald-500/10 text-emerald-500"
           gaugePercent={pctIngresos}
@@ -280,7 +295,13 @@ export default function DashboardComponent({
           trendPositive={kpis.totalFacturado > 0}
         />
         <KpiCardCompact
-          title={isVendedor ? "Mi Calzado Vendido" : "Calzado Vendido"}
+          title={
+            isVendedor
+              ? "Mis Pares Vendidos"
+              : isGlobalAdmin && activeSucursalId === "TODAS"
+              ? "Calzado Vendido Total"
+              : "Calzado Vendido en Sucursal"
+          }
           value={`${kpis.totalParesVendidos} pares`}
           subtitle={isVendedor ? "Mis pares entregados" : "Rotación en stock"}
           icon={<ShoppingBag size={16} />}
