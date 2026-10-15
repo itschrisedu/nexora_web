@@ -35,6 +35,7 @@ import {
   AlertTriangle,
   ExternalLink,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
