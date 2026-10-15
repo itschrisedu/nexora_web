@@ -44,6 +44,7 @@ export default function DashboardComponent({
 }: DashboardProps) {
   const { showToast } = useToast();
   const isAdmin = userRole === "ROL_ADMIN" || userRole === "ROL_SUPER_ADMIN";
+  const isVendedor = userRole === "ROL_VENDEDOR";
 
   // Estados de Filtro y Datos
   const [periodo, setPeriodo] = useState<"SEMANAL" | "MENSUAL" | "ANUAL">("MENSUAL");
@@ -267,9 +268,9 @@ export default function DashboardComponent({
       {/* ─── TARJETAS DE KPIS PRINCIPALES CON MEDIDOR GAUGE DINÁMICO ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCardCompact
-          title="Ventas Totales"
+          title={isVendedor ? "Mis Ventas Totales" : "Ventas Totales"}
           value={`$${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`${kpis.totalPedidos} transacciones`}
+          subtitle={isVendedor ? "Mis transacciones" : `${kpis.totalPedidos} transacciones`}
           icon={<DollarSign size={16} />}
           iconBg="bg-emerald-500/10 text-emerald-500"
           gaugePercent={pctIngresos}
@@ -279,9 +280,9 @@ export default function DashboardComponent({
           trendPositive={kpis.totalFacturado > 0}
         />
         <KpiCardCompact
-          title="Calzado Vendido"
+          title={isVendedor ? "Mi Calzado Vendido" : "Calzado Vendido"}
           value={`${kpis.totalParesVendidos} pares`}
-          subtitle="Rotación en stock"
+          subtitle={isVendedor ? "Mis pares entregados" : "Rotación en stock"}
           icon={<ShoppingBag size={16} />}
           iconBg="bg-blue-500/10 text-blue-500"
           gaugePercent={pctPares}
