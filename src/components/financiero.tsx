@@ -3159,11 +3159,46 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     Registrar Abono
                   </span>
 
-                  {/* Monto */}
+                  {/* Monto con Botones de Sugerencia Rápida */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1">
-                      Monto a Abonar ($) *
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                      <label className="block text-[11px] font-semibold text-[var(--muted-foreground)]">
+                        Monto a Abonar ($) *
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-[var(--muted-foreground)] font-semibold mr-0.5">Sugerir:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = (Number(cobroSeleccionado.saldoPendiente) * 0.25).toFixed(2);
+                            setMontoAbono(val);
+                          }}
+                          className="px-2 py-0.5 bg-[var(--muted)]/50 hover:bg-emerald-500/10 hover:text-emerald-600 text-[10px] font-bold rounded-md border border-[var(--border)] transition-all cursor-pointer"
+                        >
+                          25%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = (Number(cobroSeleccionado.saldoPendiente) * 0.50).toFixed(2);
+                            setMontoAbono(val);
+                          }}
+                          className="px-2 py-0.5 bg-[var(--muted)]/50 hover:bg-emerald-500/10 hover:text-emerald-600 text-[10px] font-bold rounded-md border border-[var(--border)] transition-all cursor-pointer"
+                        >
+                          50%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = Number(cobroSeleccionado.saldoPendiente).toFixed(2);
+                            setMontoAbono(val);
+                          }}
+                          className="px-2 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold rounded-md border border-emerald-500/30 transition-all cursor-pointer"
+                        >
+                          Totalidad (${Number(cobroSeleccionado.saldoPendiente).toFixed(2)})
+                        </button>
+                      </div>
+                    </div>
                     <input
                       type="number"
                       step="0.01"

@@ -374,6 +374,21 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   // Cupones Promocionales (Fase E2)
   const [codigoCuponInput, setCodigoCuponInput] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState<any | null>(null);
+  const [promocionesActivas, setPromocionesActivas] = useState<any[]>([]);
+
+  const loadPromociones = useCallback(async () => {
+    try {
+      const res = await ApiService.get('/clientes/promociones');
+      if (Array.isArray(res)) {
+        const activas = res.filter((p: any) => p.activa !== false && (!p.fechaFin || new Date(p.fechaFin) >= new Date()));
+        setPromocionesActivas(activas);
+      } else {
+        setPromocionesActivas([]);
+      }
+    } catch {
+      setPromocionesActivas([]);
+    }
+  }, []);
 
   // Control de descartes y cierre seguro de modales
   const [showDiscardModal, setShowDiscardModal] = useState(false);
@@ -689,6 +704,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     loadListaProveedores();
     loadTransportes();
     loadSucursales();
+    loadPromociones();
 
     // Por defecto siempre carga en la sucursal a la que pertenece el usuario
     const userLocalId = (activeSucursalId && activeSucursalId !== 'TODAS')
@@ -2319,6 +2335,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
             const targetSuc = selectedSucursalPedidoId || (activeSucursalId !== 'TODAS' ? activeSucursalId : sucursales?.[0]?.id) || '';
             setSelectedOrderSucursalId(targetSuc);
             cargarCatalogo(targetSuc);
+            loadPromociones();
+            setCodigoCuponInput('');
+            setCuponAplicado(null);
             setShowModal(true);
           }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm shrink-0"
@@ -3583,199 +3602,16 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 </div>
               </div>
 
-              {/* 1.1 SECCIÓN LOGÍSTICA DE ENTREGA Y FLETE (Fase E1) */}
+              {/* 2. SECCIÓN AGREGAR PRODUCTO, MODELO Y TALLA */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-                    1.1 Modalidad de Entrega y Logística (Flete)
+                    2. Seleccionar Modelo, Talla y Cantidad
                   </span>
-                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                    tipoEntrega === 'ENVIO' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                  }`}>
-                    {tipoEntrega === 'ENVIO' ? '🚚 Envío / Encomienda' : '🏪 Entrega Presencial en Local'}
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                    <span>👟 Catálogo de Calzado</span>
                   </span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTipoEntrega('PRESENCIAL')}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
-                      tipoEntrega === 'PRESENCIAL'
-                        ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
-                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
-                    }`}
-                  >
-                    <span>🏪 Entrega Presencial (Local)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTipoEntrega('ENVIO')}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
-                      tipoEntrega === 'ENVIO'
-                        ? 'bg-blue-600 text-white border-transparent shadow-xs'
-                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-blue-600'
-                    }`}
-                  >
-                    <Truck size={14} />
-                    <span>🚚 Envío a Domicilio / Encomienda</span>
-                  </button>
-                </div>
-
-                {tipoEntrega === 'ENVIO' && (
-                  <div className="pt-2 border-t border-[var(--border)]/60 space-y-3 animate-in fade-in duration-150">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
-                            Empresa de Transporte / Courier *
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setShowNuevoTransporteModal(true)}
-                            className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-0.5"
-                          >
-                            <Plus size={10} /> Nuevo Transporte
-                          </button>
-                        </div>
-                        <select
-                          value={courier}
-                          onChange={(e) => {
-                            if (e.target.value === '__ADD_NEW__') {
-                              setShowNuevoTransporteModal(true);
-                            } else {
-                              setCourier(e.target.value);
-                            }
-                          }}
-                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
-                        >
-                          {listaTransportes.length > 0 ? (
-                            listaTransportes.map((t: any) => (
-                              <option key={t.id || t.nombre} value={t.nombre}>
-                                {t.nombre === 'Transporte Los Andes' ? '⭐ Transporte Los Andes (Predeterminada)' : t.esPredeterminada ? `⭐ ${t.nombre} (Predeterminada)` : `🚚 ${t.nombre}`}
-                              </option>
-                            ))
-                          ) : (
-                            <>
-                              <option value="Transporte Los Andes">⭐ Transporte Los Andes (Predeterminada)</option>
-                              <option value="Servientrega">📦 Servientrega</option>
-                              <option value="Cooperativa Baños">🚌 Cooperativa Baños</option>
-                              <option value="Cooperativa Cevallos">🚌 Cooperativa Cevallos</option>
-                              <option value="Transportes Santa">🚌 Transportes Santa</option>
-                              <option value="Cooperativa Cita Express">🚌 Cooperativa Cita Express</option>
-                              <option value="Flota Pelileo">🚌 Flota Pelileo</option>
-                              <option value="Urbano Express">🚚 Urbano Express</option>
-                              <option value="Encomienda Provincial / Transporte">🚛 Encomienda Provincial / Transporte</option>
-                            </>
-                          )}
-                          <option value="__ADD_NEW__">➕ + Registrar Nuevo Transporte...</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                          Ciudad de Destino *
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ej: Quito, Guayaquil, Cuenca, Riobamba, Latacunga..."
-                          value={ciudadEnvio}
-                          onChange={(e) => setCiudadEnvio(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                          Dirección de Entrega / Agencia Destino
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ej: Av. 10 de Agosto y Colón / Agencia Terminal Terrestre"
-                          value={direccionEnvio}
-                          onChange={(e) => setDireccionEnvio(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                          N° Guía de Encomienda / Tracking (Opcional)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ej: GUIA-2026-88492"
-                          value={guiaEnvio}
-                          onChange={(e) => setGuiaEnvio(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Quién asume el Flete */}
-                    <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-2">
-                      <span className="text-[11px] font-bold text-blue-900 dark:text-blue-300 block">
-                        Gestión del Costo de Envío (Flete)
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setAsumeFlete('CLIENTE')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
-                              asumeFlete === 'CLIENTE'
-                                ? 'bg-blue-600 text-white border-transparent'
-                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
-                            }`}
-                          >
-                            🔵 Cobro en Destino (Paga Cliente)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setAsumeFlete('EMPRESA')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
-                              asumeFlete === 'EMPRESA'
-                                ? 'bg-emerald-600 text-white border-transparent'
-                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
-                            }`}
-                          >
-                            🟢 Cubre la Empresa (Cortesía)
-                          </button>
-                        </div>
-
-                        {asumeFlete === 'EMPRESA' ? (
-                          <div className="flex items-center gap-2">
-                            <label className="text-xs font-semibold text-emerald-700 whitespace-nowrap">
-                              Gasto Flete ($):
-                            </label>
-                            <input
-                              type="number"
-                              step="0.50"
-                              min="0"
-                              value={costoEnvio}
-                              onChange={(e) => setCostoEnvio(e.target.value)}
-                              className="w-24 px-2.5 py-1 bg-[var(--card)] border border-emerald-500/40 rounded-lg text-xs font-bold text-emerald-800 focus:outline-none focus:border-emerald-600 text-center"
-                            />
-                            <span className="text-[10px] text-emerald-600 italic">
-                              (Registra gasto operativo automático)
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-[var(--muted-foreground)] italic">
-                            El cliente pagará el costo del flete directamente a la empresa de transporte al retirar.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 2. SECCIÓN AGREGAR PRODUCTO, MODELO Y TALLA */}
-              <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">2. Seleccionar Modelo, Talla y Cantidad</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative sm:col-span-2">
                     {/* Header de Selección de Modelo con Píldoras de Filtro por Serie */}
@@ -3912,26 +3748,42 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                       </div>
                     ) : (
                       <div className="relative">
-                        <input
-                          type="text"
-                          placeholder={
-                            serieFiltroBuscador !== 'TODAS'
-                              ? `Serie ${serieFiltroBuscador} seleccionada: escribe el modelo (ej. Mocasín, Botín)...`
-                              : "Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."
-                          }
-                          value={busquedaModelo}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setBusquedaModelo(val);
-                            setShowDropdownModelo(val.trim().length > 0);
-                          }}
-                          onFocus={() => {
-                            if (busquedaModelo.trim().length > 0) {
-                              setShowDropdownModelo(true);
+                        <div className="relative flex items-center">
+                          <Search size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder={
+                              serieFiltroBuscador !== 'TODAS'
+                                ? `Serie ${serieFiltroBuscador} activa: escribe modelo o color...`
+                                : "Buscar calzado por modelo, color o código (ej. Mocasín, Botín, Negro)..."
                             }
-                          }}
-                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                        />
+                            value={busquedaModelo}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setBusquedaModelo(val);
+                              setShowDropdownModelo(val.trim().length > 0);
+                            }}
+                            onFocus={() => {
+                              if (busquedaModelo.trim().length > 0) {
+                                setShowDropdownModelo(true);
+                              }
+                            }}
+                            className="w-full pl-10 pr-9 py-2.5 bg-[var(--card)] border-2 border-[var(--border)] hover:border-[#0F172A] focus:border-[#0F172A] rounded-xl text-xs font-semibold focus:outline-none shadow-xs transition-all"
+                          />
+                          {busquedaModelo.trim().length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBusquedaModelo('');
+                                setShowDropdownModelo(false);
+                              }}
+                              className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-black cursor-pointer p-0.5 rounded-full hover:bg-[var(--muted)]"
+                              title="Limpiar búsqueda"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
 
                         {serieFiltroBuscador !== 'TODAS' && busquedaModelo.trim().length === 0 && (
                           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 font-semibold">
@@ -4712,8 +4564,198 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 </div>
               )}
 
+              {/* MODALIDAD DE ENTREGA Y LOGÍSTICA (FLETE) */}
+              <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                    Modalidad de Entrega y Logística (Flete)
+                  </span>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                    tipoEntrega === 'ENVIO' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  }`}>
+                    {tipoEntrega === 'ENVIO' ? '🚚 Envío / Encomienda' : '🏪 Entrega Presencial en Local'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipoEntrega('PRESENCIAL')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      tipoEntrega === 'PRESENCIAL'
+                        ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
+                    }`}
+                  >
+                    <span>🏪 Entrega Presencial (Local)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoEntrega('ENVIO')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                      tipoEntrega === 'ENVIO'
+                        ? 'bg-blue-600 text-white border-transparent shadow-xs'
+                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-blue-600'
+                    }`}
+                  >
+                    <Truck size={14} />
+                    <span>🚚 Envío a Domicilio / Encomienda</span>
+                  </button>
+                </div>
+
+                {tipoEntrega === 'ENVIO' && (
+                  <div className="pt-2 border-t border-[var(--border)]/60 space-y-3 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
+                            Empresa de Transporte / Courier *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowNuevoTransporteModal(true)}
+                            className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-0.5"
+                          >
+                            <Plus size={10} /> Nuevo Transporte
+                          </button>
+                        </div>
+                        <select
+                          value={courier}
+                          onChange={(e) => {
+                            if (e.target.value === '__ADD_NEW__') {
+                              setShowNuevoTransporteModal(true);
+                            } else {
+                              setCourier(e.target.value);
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        >
+                          {listaTransportes.length > 0 ? (
+                            listaTransportes.map((t: any) => (
+                              <option key={t.id || t.nombre} value={t.nombre}>
+                                {t.nombre === 'Transporte Los Andes' ? '⭐ Transporte Los Andes (Predeterminada)' : t.esPredeterminada ? `⭐ ${t.nombre} (Predeterminada)` : `🚚 ${t.nombre}`}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="Transporte Los Andes">⭐ Transporte Los Andes (Predeterminada)</option>
+                              <option value="Servientrega">📦 Servientrega</option>
+                              <option value="Cooperativa Baños">🚌 Cooperativa Baños</option>
+                              <option value="Cooperativa Cevallos">🚌 Cooperativa Cevallos</option>
+                              <option value="Transportes Santa">🚌 Transportes Santa</option>
+                              <option value="Cooperativa Cita Express">🚌 Cooperativa Cita Express</option>
+                              <option value="Flota Pelileo">🚌 Flota Pelileo</option>
+                              <option value="Urbano Express">🚚 Urbano Express</option>
+                              <option value="Encomienda Provincial / Transporte">🚛 Encomienda Provincial / Transporte</option>
+                            </>
+                          )}
+                          <option value="__ADD_NEW__">➕ + Registrar Nuevo Transporte...</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                          Ciudad de Destino *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Quito, Guayaquil, Cuenca, Riobamba, Latacunga..."
+                          value={ciudadEnvio}
+                          onChange={(e) => setCiudadEnvio(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                          Dirección de Entrega / Agencia Destino
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Av. 10 de Agosto y Colón / Agencia Terminal Terrestre"
+                          value={direccionEnvio}
+                          onChange={(e) => setDireccionEnvio(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                          N° Guía de Encomienda / Tracking (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: GUIA-2026-88492"
+                          value={guiaEnvio}
+                          onChange={(e) => setGuiaEnvio(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quién asume el Flete */}
+                    <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-2">
+                      <span className="text-[11px] font-bold text-blue-900 dark:text-blue-300 block">
+                        Gestión del Costo de Envío (Flete)
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setAsumeFlete('CLIENTE')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                              asumeFlete === 'CLIENTE'
+                                ? 'bg-blue-600 text-white border-transparent'
+                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                            }`}
+                          >
+                            🔵 Cobro en Destino (Paga Cliente)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAsumeFlete('EMPRESA')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                              asumeFlete === 'EMPRESA'
+                                ? 'bg-emerald-600 text-white border-transparent'
+                                : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
+                            }`}
+                          >
+                            🟢 Cubre la Empresa (Cortesía)
+                          </button>
+                        </div>
+
+                        {asumeFlete === 'EMPRESA' ? (
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold text-emerald-700 whitespace-nowrap">
+                              Gasto Flete ($):
+                            </label>
+                            <input
+                              type="number"
+                              step="0.50"
+                              min="0"
+                              value={costoEnvio}
+                              onChange={(e) => setCostoEnvio(e.target.value)}
+                              className="w-24 px-2.5 py-1 bg-[var(--card)] border border-emerald-500/40 rounded-lg text-xs font-bold text-emerald-800 focus:outline-none focus:border-emerald-600 text-center"
+                            />
+                            <span className="text-[10px] text-emerald-600 italic">
+                              (Registra gasto operativo automático)
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-[var(--muted-foreground)] italic">
+                            El cliente pagará el costo del flete directamente a la empresa de transporte al retirar.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* 3. CUPÓN DE DESCUENTO PROMOCIONAL (FASE E2) */}
-              {lineasPedido.length > 0 && (
+              {lineasPedido.length > 0 && promocionesActivas.length > 0 && (
                 <div className="p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
