@@ -2669,7 +2669,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
             {/* ── Body del Modal (scrollable) ── */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* Saldo Pendiente */}
+              {/* 1. Saldo Pendiente */}
               <div className="p-3.5 bg-red-500/5 dark:bg-red-500/10 rounded-xl border border-red-500/20 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-bold text-red-600 dark:text-red-400 block uppercase tracking-wider">
@@ -2684,476 +2684,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 </span>
               </div>
 
-              {/* Badge Saldo a Favor del Cliente */}
-              {carteraSeleccionada.saldoAFavorCliente > 0 && (
-                <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">💰</span>
-                    <div>
-                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 block font-semibold">Saldo a Favor del Cliente</span>
-                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-300">
-                        ${carteraSeleccionada.saldoAFavorCliente.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!cobroSeleccionado || Number(cobroSeleccionado.saldoPendiente) <= 0) {
-                        showToast('Selecciona una nota con saldo pendiente para aplicar el credito.', 'warning');
-                        return;
-                      }
-                      try {
-                        const res = await ApiService.post('/devoluciones/aplicar-saldo-cliente', {
-                          clientId: carteraSeleccionada.clientId,
-                          cobroId: cobroSeleccionado.id,
-                        });
-                        showToast(`Paso aplicado: $${Number(res.montoAplicado || 0).toFixed(2)} descontados. Saldo restante: $${Number(res.saldoRestanteCliente || 0).toFixed(2)}`, 'success');
-                        await loadCobros();
-                      } catch (err: any) {
-                        showToast(err.message || 'Error al aplicar saldo a favor.', 'error');
-                      }
-                    }}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl transition-all shadow-sm"
-                  >
-                    Hacer Paso
-                  </button>
-                </div>
-              )}
-
-              {/* Notice Banner de Cobro Cruzado Inter-Sucursal */}
-              {cobroSeleccionado && activeSucursalId && cobroSeleccionado.tenantId && cobroSeleccionado.tenantId !== activeSucursalId && (
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-amber-800 dark:text-amber-300 text-xs shadow-2xs">
-                  <div className="p-2 bg-amber-500/20 rounded-xl text-amber-600 shrink-0">
-                    <Building size={18} />
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-xs block text-amber-900 dark:text-amber-200">
-                      Aviso de Cobro Cruzado Inter-Sucursal
-                    </span>
-                    <p className="text-[11px] leading-relaxed mt-0.5 opacity-90">
-                      📍 <strong>Abono recibido en:</strong> {sucursales?.find((s) => s.id === activeSucursalId)?.name || 'Tu caja actual'} ➔ <strong>Aplicado a deuda de:</strong> {cobroSeleccionado.sucursalNombre || 'Otra Sucursal'}.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Componente Unificado de Nota Activa y Selector Acordeón */}
-              {cobroSeleccionado && (
-                <div className="border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--card)] shadow-xs">
-                  {/* Tarjeta Principal de la Nota Activa (Auto-seleccionada / Clic para desplegar artículos) */}
-                  <div 
-                    onClick={() => setDetalleNotaModalAbierto(!detalleNotaModalAbierto)}
-                    className="p-3.5 bg-emerald-500/5 hover:bg-emerald-500/10 border-b border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl border border-emerald-500/20 shrink-0">
-                        <FileText size={16} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-extrabold text-xs text-[var(--foreground)]">
-                            {cobroSeleccionado.saleNote?.numero
-                              ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
-                              : `#${cobroSeleccionado.id.slice(0, 8).toUpperCase()}`}
-                          </span>
-                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 rounded text-[9px] font-bold">
-                            Nota Más Antigua (Por orden de llegada)
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDetalleNotaModalAbierto(!detalleNotaModalAbierto);
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 text-[9px] font-extrabold border border-emerald-500/30 transition-colors"
-                          >
-                            <Eye size={10} />
-                            <span>{detalleNotaModalAbierto ? 'Ocultar Artículos' : 'Ver Artículos'}</span>
-                            {detalleNotaModalAbierto ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                          </button>
-                        </div>
-                        <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5 flex items-center gap-2 flex-wrap">
-                          <span>Monto Original: <strong>${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)}</strong> ({cobroSeleccionado.tipo || 'Crédito'})</span>
-                          {cobroSeleccionado.vendedorNombre && (
-                            <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
-                              <User size={10} />
-                              <span>Vendedor: {cobroSeleccionado.vendedorNombre}</span>
-                            </span>
-                          )}
-                          {cobroSeleccionado.sucursalNombre && (
-                            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
-                              <Building size={10} />
-                              <span>Sucursal: {cobroSeleccionado.sucursalNombre}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-end sm:self-center" onClick={(e) => e.stopPropagation()}>
-                      <div className="text-right mr-1">
-                        <span className="text-[9px] text-[var(--muted-foreground)] block font-semibold uppercase">Saldo:</span>
-                        <span className="text-sm font-black text-red-500">
-                          ${Number(cobroSeleccionado.saldoPendiente).toFixed(2)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleAbrirCambiarTipo(cobroSeleccionado)}
-                        className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-700 dark:text-blue-300 font-bold rounded-lg transition-colors border border-blue-500/20 flex items-center gap-1 text-[10px] cursor-pointer"
-                        title={cobroSeleccionado.tipo === 'CONTADO' ? 'Convertir esta nota de contado a crédito' : 'Convertir esta nota a crédito a contado'}
-                      >
-                        {cobroSeleccionado.tipo === 'CONTADO' ? <CreditCard size={11} /> : <DollarSign size={11} />}
-                        <span>{cobroSeleccionado.tipo === 'CONTADO' ? 'Pasar a Crédito' : 'Pasar a Contado'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowCuentaModal(false);
-                          handleAbrirFacturacion(carteraSeleccionada, cobroSeleccionado);
-                        }}
-                        className="px-2.5 py-1 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] font-bold rounded-lg transition-colors border border-[#0F172A]/20 flex items-center gap-1 text-[10px] cursor-pointer"
-                        title="Emitir factura electrónica para esta nota"
-                      >
-                        <Receipt size={11} />
-                        <span>Facturar</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Detalle Desplegable de Logística y Artículos de la Nota Activa */}
-                  {detalleNotaModalAbierto && (
-                    <div className="p-3 bg-[var(--muted)]/15 border-b border-[var(--border)] space-y-2.5 animate-in fade-in duration-200">
-                      {/* Logística de Entrega */}
-                      <div className="p-2.5 rounded-xl border border-blue-500/20 bg-blue-500/5 text-xs text-[var(--foreground)] flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600">
-                            <Truck size={14} />
-                          </div>
-                          <div>
-                            <span className="font-extrabold text-[11px] block text-[var(--foreground)]">
-                              Logística: {cobroSeleccionado.tipoEntrega === 'ENVIO' ? '🚚 Envío a Domicilio / Courier' : '🏪 Entrega Presencial en Local'}
-                            </span>
-                            <span className="text-[10px] text-[var(--muted-foreground)]">
-                              {cobroSeleccionado.tipoEntrega === 'ENVIO'
-                                ? `${cobroSeleccionado.courier || 'Transporte'}${cobroSeleccionado.guiaEnvio ? ` · Guía: ${cobroSeleccionado.guiaEnvio}` : ''}${cobroSeleccionado.ciudadEnvio ? ` · Destino: ${cobroSeleccionado.ciudadEnvio}` : ''}${cobroSeleccionado.direccionEnvio ? ` (${cobroSeleccionado.direccionEnvio})` : ''}`
-                                : 'El cliente retiró directamente en el mostrador del local comercial.'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Header de Artículos Solicitados */}
-                      <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-extrabold text-xs text-[var(--foreground)] flex items-center gap-1.5">
-                            <Package size={13} className="text-[#0F172A]" />
-                            <span>
-                              Detalle de Artículos — {cobroSeleccionado.saleNote?.numero
-                                ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
-                                : cobroSeleccionado.numeroCobro || ''}
-                            </span>
-                          </span>
-                          {cobroSeleccionado.vendedorNombre && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[10px] font-semibold">
-                              <User size={10} />
-                              <span>Vendedor: {cobroSeleccionado.vendedorNombre}</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Botón directo para iniciar devolución si lo requiere */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCuentaModal(false);
-                            handleAbrirDevolucion(carteraSeleccionada);
-                          }}
-                          className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-[10px] font-bold border border-amber-500/30 transition-colors flex items-center gap-1"
-                          title="Hacer devolución de calzado por fallas o cambio de talla"
-                        >
-                          <ArrowDownRight size={11} />
-                          <span>Hacer Devolución</span>
-                        </button>
-                      </div>
-
-                      {/* Tarjetas agrupadas por modelo con fotos y pastillas de tallas */}
-                      {(() => {
-                        const grupos = agruparLineasPorModelo(cobroSeleccionado.lines || [], catalogoProductos);
-                        if (grupos.length === 0) {
-                          return (
-                            <div className="p-3 bg-[var(--card)] rounded-xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--muted-foreground)] italic">
-                              No hay artículos detallados registrados para esta nota.
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className={`grid gap-3 ${grupos.length === 1 ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-2'}`}>
-                            {grupos.map((g) => {
-                              const serieTexto = getNombreSerie(g.serieNombre, g.tallas);
-                              return (
-                                <div
-                                  key={g.key}
-                                  className="p-3.5 sm:p-4 bg-[var(--card)] dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-start gap-3.5 sm:gap-4 shadow-sm hover:border-slate-400 dark:hover:border-slate-600 transition-all w-full"
-                                >
-                                  {/* Miniatura del calzado */}
-                                  <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center shadow-inner">
-                                    {g.imageUrl ? (
-                                      <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <Package className="text-slate-400" size={28} />
-                                    )}
-                                  </div>
-
-                                  {/* Detalle del modelo y pastillas de tallas */}
-                                  <div className="flex-1 min-w-0">
-                                    {/* Fila 1: Nombre del Modelo + Badge de Volumen */}
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="min-w-0 flex-1">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-0.5">
-                                          Modelo
-                                        </span>
-                                        <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white leading-snug break-words">
-                                          {g.modelName}
-                                        </h4>
-                                      </div>
-
-                                      {/* Badge de Volumen */}
-                                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black shrink-0 ${
-                                        g.totalPares >= 6
-                                          ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30'
-                                          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
-                                      }`}>
-                                        {g.etiquetaVolumen}
-                                      </span>
-                                    </div>
-
-                                    {/* Fila 2: Serie y Color destacados */}
-                                    <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
-                                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-blue-700 dark:text-blue-300 bg-blue-500/10 dark:bg-blue-500/20 px-2 py-0.5 rounded-md border border-blue-500/30">
-                                        <span>Serie:</span>
-                                        <span>{serieTexto}</span>
-                                      </span>
-                                      {g.color && (
-                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
-                                          🎨 {g.color}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {/* Fila 3: Pastillas de tallas estilo inventario */}
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                      {g.tallas.map((t) => (
-                                        <span
-                                          key={t.numero}
-                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-200/90 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-[10px] font-black"
-                                        >
-                                          <span>T{t.numero}:</span>
-                                          <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
-                                        </span>
-                                      ))}
-                                    </div>
-
-                                    {/* Fila 4: Subtotal del modelo */}
-                                    <div className="mt-2.5 pt-1.5 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs">
-                                      <span className="text-slate-500 dark:text-slate-400 font-semibold">
-                                        ${g.precioUnitario.toFixed(2)} c/u
-                                      </span>
-                                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
-                                        Total: ${g.subtotal.toFixed(2)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                  {/* Toggle para cambiar a otra nota si el cliente tiene más de 1 nota */}
-                  {carteraSeleccionada.cobros.length > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setAcordeonNotasAbierto(!acordeonNotasAbierto)}
-                        className="w-full px-3.5 py-2 flex items-center justify-between bg-[var(--muted)]/20 hover:bg-[var(--muted)]/40 text-left transition-colors cursor-pointer"
-                      >
-                        <span className="text-[11px] font-bold text-[var(--muted-foreground)] flex items-center gap-1.5">
-                          <Layers size={12} />
-                          <span>{acordeonNotasAbierto ? 'Ocultar lista de notas' : `Cambiar nota (${carteraSeleccionada.cobros.length} notas disponibles)`}</span>
-                        </span>
-                        <div className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A]">
-                          <span>{acordeonNotasAbierto ? 'Cerrar' : 'Ver todas'}</span>
-                          {acordeonNotasAbierto ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                        </div>
-                      </button>
-
-                      {acordeonNotasAbierto && (
-                        <div className="p-2.5 space-y-1.5 border-t border-[var(--border)] max-h-44 overflow-y-auto pr-1 bg-[var(--card)] animate-in fade-in">
-                          {carteraSeleccionada.cobros.map((cobroItem) => {
-                            const cCfg = getCobroConfig(cobroItem.estado);
-                            const numNota = cobroItem.saleNote?.numero
-                              ? `NOTA #${String(cobroItem.saleNote.numero).padStart(4, '0')}`
-                              : cobroItem.numeroCobro || `#${cobroItem.id.slice(0, 8).toUpperCase()}`;
-                            const montoOrig = Number(cobroItem.montoOriginal ?? cobroItem.montoTotal ?? 0);
-                            const isActive = cobroSeleccionadoId === cobroItem.id;
-
-                            return (
-                              <button
-                                key={cobroItem.id}
-                                type="button"
-                                onClick={() => {
-                                  setCobroSeleccionadoId(cobroItem.id);
-                                  setAcordeonNotasAbierto(false);
-                                }}
-                                className={`w-full p-2 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
-                                  isActive
-                                    ? 'bg-emerald-500/10 border-emerald-500/50 shadow-xs ring-1 ring-emerald-500/20'
-                                    : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <FileText size={13} className={isActive ? 'text-emerald-600' : 'text-[var(--muted-foreground)]'} />
-                                  <div>
-                                    <div className="font-bold text-[11px] text-[var(--foreground)] flex items-center gap-1.5">
-                                      <span>{numNota}</span>
-                                      <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold ${cCfg.color}`}>{cCfg.label}</span>
-                                      {isActive && (
-                                        <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[8px] font-extrabold uppercase">
-                                          Activa
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="text-[9px] text-[var(--muted-foreground)]">
-                                      {cobroItem.tipo || 'Crédito'} — {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <div className="text-[9px] text-[var(--muted-foreground)]">${montoOrig.toFixed(2)}</div>
-                                  <div className={`text-[10px] font-black ${Number(cobroItem.saldoPendiente) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                                    ${Number(cobroItem.saldoPendiente).toFixed(2)}
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Últimos Abonos Realizados */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-bold text-[var(--foreground)] block flex items-center gap-1.5">
-                  <ArrowDownRight size={12} className="text-emerald-600" />
-                  Abonos registrados a esta nota:
-                </span>
-                {cobroSeleccionado?.abonos && cobroSeleccionado.abonos.length > 0 ? (
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                    {cobroSeleccionado.abonos.map((a) => (
-                      <div
-                        key={a.id}
-                        className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs gap-2"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-extrabold text-emerald-600">${Number(a.monto).toFixed(2)}</span>
-                            <span className="text-[10px] text-[var(--muted-foreground)] font-semibold px-1.5 py-0.5 bg-emerald-500/10 rounded">
-                              {a.metodo}
-                            </span>
-                            <span className="text-[10px] text-[var(--muted-foreground)]">
-                              {new Date(a.createdAt).toLocaleDateString('es-EC')}
-                            </span>
-                            {a.usuarioNombre && (
-                              <span className="inline-flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
-                                <User size={10} />
-                                <span>Cobrado por: <strong className="font-semibold capitalize">{capitalizarNombreCompleto(a.usuarioNombre)}</strong></span>
-                                {a.esCobroOtraSucursal && a.usuarioSucursal && (
-                                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                                    📍 Sucursal: {a.usuarioSucursal}
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </div>
-                          {a.notas && <p className="text-[9px] text-[var(--muted-foreground)] italic mt-0.5 truncate">{a.notas}</p>}
-                        </div>
-
-                        {/* Botones de acción individual por abono: Descargar PDF y Enviar WhatsApp */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const dataAbono = armarDatosComprobanteAbono(carteraSeleccionada, {
-                                monto: Number(a.monto),
-                                metodo: a.metodo,
-                                fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
-                                notas: a.notas,
-                                numeroNota: cobroSeleccionado.saleNote?.numero
-                                  ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
-                                  : cobroSeleccionado.numeroCobro,
-                                usuarioNombre: a.usuarioNombre,
-                                sucursalNombre: cobroSeleccionado.sucursalNombre,
-                              });
-                              descargarComprobanteAbonoPdf(dataAbono);
-                              showToast('Comprobante de abono PDF descargado.', 'success');
-                            }}
-                            className="p-1.5 rounded-lg bg-[var(--card)] hover:bg-emerald-500/10 text-emerald-600 border border-[var(--border)] hover:border-emerald-500/30 transition-colors cursor-pointer shadow-2xs"
-                            title="Descargar Comprobante PDF"
-                          >
-                            <Download size={13} />
-                          </button>
-
-                          {(carteraSeleccionada.clienteTelefono || carteraSeleccionada.clienteEmail) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleEnviarComprobanteAbono(
-                                  carteraSeleccionada,
-                                  {
-                                    monto: Number(a.monto),
-                                    metodo: a.metodo,
-                                    fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
-                                    notas: a.notas,
-                                    numeroNota: cobroSeleccionado.saleNote?.numero
-                                      ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
-                                      : cobroSeleccionado.numeroCobro,
-                                    usuarioNombre: a.usuarioNombre,
-                                    sucursalNombre: cobroSeleccionado.sucursalNombre,
-                                  },
-                                  formatoEnvioAbono
-                                );
-                              }}
-                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
-                              title="Enviar Comprobante por WhatsApp y Correo Electrónico"
-                            >
-                              <Send size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-[var(--muted-foreground)] italic p-3 bg-[var(--muted)]/10 rounded-xl border border-dashed border-[var(--border)]">
-                    No registra abonos previos en esta nota.
-                  </p>
-                )}
-              </div>
-
-
-              {/* Formulario para Registrar Nuevo Abono */}
+              {/* 2. Formulario para Registrar Nuevo Abono (debajo del saldo pendiente) */}
               {cobroSeleccionado && Number(cobroSeleccionado.saldoPendiente) > 0 && (
-                <div className="space-y-3 pt-3 border-t border-[var(--border)]">
+                <div className="space-y-3 pt-1">
                   <span className="text-xs font-bold text-[var(--foreground)] block flex items-center gap-1.5">
                     <ArrowUpRight size={13} className="text-emerald-600" />
                     Registrar Abono
@@ -3252,31 +2785,501 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       />
                     </div>
                   )}
-
-                  {/* Botón de Confirmación del Abono */}
-
-                  <button
-                    onClick={handleRegistrarAbono}
-                    disabled={savingAbono || !montoAbono || !online}
-                    className={`w-full py-3 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer ${
-                      metodoAbono === 'DESCUENTO_COMERCIAL'
-                        ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 shadow-amber-500/20'
-                        : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 shadow-emerald-500/20'
-                    }`}
-                  >
-                    {savingAbono ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                    <span>
-                      {savingAbono
-                        ? 'Procesando...'
-                        : (metodoAbono === 'DESCUENTO_COMERCIAL' ? 'Aplicar Descuento a la Deuda' : 'Confirmar Abono')}
-                    </span>
-                  </button>
                 </div>
               )}
+
+              {/* 3. Últimos Abonos Realizados (debajo de registrar abono) */}
+              <div className="space-y-2 pt-3 border-t border-[var(--border)]">
+                <span className="text-[11px] font-bold text-[var(--foreground)] block flex items-center gap-1.5">
+                  <ArrowDownRight size={12} className="text-emerald-600" />
+                  Abonos registrados a esta nota:
+                </span>
+                {cobroSeleccionado?.abonos && cobroSeleccionado.abonos.length > 0 ? (
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {cobroSeleccionado.abonos.map((a) => (
+                      <div
+                        key={a.id}
+                        className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs gap-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-extrabold text-emerald-600">${Number(a.monto).toFixed(2)}</span>
+                            <span className="text-[10px] text-[var(--muted-foreground)] font-semibold px-1.5 py-0.5 bg-emerald-500/10 rounded">
+                              {a.metodo}
+                            </span>
+                            <span className="text-[10px] text-[var(--muted-foreground)]">
+                              {new Date(a.createdAt).toLocaleDateString('es-EC')}
+                            </span>
+                            {a.usuarioNombre && (
+                              <span className="inline-flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                                <User size={10} />
+                                <span>Cobrado por: <strong className="font-semibold capitalize">{capitalizarNombreCompleto(a.usuarioNombre)}</strong></span>
+                                {a.esCobroOtraSucursal && a.usuarioSucursal && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                    📍 Sucursal: {a.usuarioSucursal}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </div>
+                          {a.notas && <p className="text-[9px] text-[var(--muted-foreground)] italic mt-0.5 truncate">{a.notas}</p>}
+                        </div>
+
+                        {/* Botones de acción individual por abono: Descargar PDF y Enviar WhatsApp */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const dataAbono = armarDatosComprobanteAbono(carteraSeleccionada, {
+                                monto: Number(a.monto),
+                                metodo: a.metodo,
+                                fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
+                                notas: a.notas,
+                                numeroNota: cobroSeleccionado.saleNote?.numero
+                                  ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+                                  : cobroSeleccionado.numeroCobro,
+                                usuarioNombre: a.usuarioNombre,
+                                sucursalNombre: cobroSeleccionado.sucursalNombre,
+                              });
+                              descargarComprobanteAbonoPdf(dataAbono);
+                              showToast('Comprobante de abono PDF descargado.', 'success');
+                            }}
+                            className="p-1.5 rounded-lg bg-[var(--card)] hover:bg-emerald-500/10 text-emerald-600 border border-[var(--border)] hover:border-emerald-500/30 transition-colors cursor-pointer shadow-2xs"
+                            title="Descargar Comprobante PDF"
+                          >
+                            <Download size={13} />
+                          </button>
+
+                          {(carteraSeleccionada.clienteTelefono || carteraSeleccionada.clienteEmail) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleEnviarComprobanteAbono(
+                                  carteraSeleccionada,
+                                  {
+                                    monto: Number(a.monto),
+                                    metodo: a.metodo,
+                                    fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
+                                    notas: a.notas,
+                                    numeroNota: cobroSeleccionado.saleNote?.numero
+                                      ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+                                      : cobroSeleccionado.numeroCobro,
+                                    usuarioNombre: a.usuarioNombre,
+                                    sucursalNombre: cobroSeleccionado.sucursalNombre,
+                                  },
+                                  formatoEnvioAbono
+                                );
+                              }}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                              title="Enviar Comprobante por WhatsApp y Correo Electrónico"
+                            >
+                              <Send size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--muted-foreground)] italic p-3 bg-[var(--muted)]/10 rounded-xl border border-dashed border-[var(--border)]">
+                    No registra abonos previos en esta nota.
+                  </p>
+                )}
+              </div>
+
+              {/* 4. Nota de Crédito / Venta activa (debajo de los abonos registrados) */}
+              <div className="space-y-3 pt-3 border-t border-[var(--border)]">
+                {/* Badge Saldo a Favor del Cliente */}
+                {carteraSeleccionada.saldoAFavorCliente > 0 && (
+                  <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">💰</span>
+                      <div>
+                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 block font-semibold">Saldo a Favor del Cliente</span>
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-300">
+                          ${carteraSeleccionada.saldoAFavorCliente.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!cobroSeleccionado || Number(cobroSeleccionado.saldoPendiente) <= 0) {
+                          showToast('Selecciona una nota con saldo pendiente para aplicar el credito.', 'warning');
+                          return;
+                        }
+                        try {
+                          const res = await ApiService.post('/devoluciones/aplicar-saldo-cliente', {
+                            clientId: carteraSeleccionada.clientId,
+                            cobroId: cobroSeleccionado.id,
+                          });
+                          showToast(`Paso aplicado: $${Number(res.montoAplicado || 0).toFixed(2)} descontados. Saldo restante: $${Number(res.saldoRestanteCliente || 0).toFixed(2)}`, 'success');
+                          await loadCobros();
+                        } catch (err: any) {
+                          showToast(err.message || 'Error al aplicar saldo a favor.', 'error');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-xl transition-all shadow-sm"
+                    >
+                      Hacer Paso
+                    </button>
+                  </div>
+                )}
+
+                {/* Notice Banner de Cobro Cruzado Inter-Sucursal */}
+                {cobroSeleccionado && activeSucursalId && cobroSeleccionado.tenantId && cobroSeleccionado.tenantId !== activeSucursalId && (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-amber-800 dark:text-amber-300 text-xs shadow-2xs">
+                    <div className="p-2 bg-amber-500/20 rounded-xl text-amber-600 shrink-0">
+                      <Building size={18} />
+                    </div>
+                    <div>
+                      <span className="font-extrabold text-xs block text-amber-900 dark:text-amber-200">
+                        Aviso de Cobro Cruzado Inter-Sucursal
+                      </span>
+                      <p className="text-[11px] leading-relaxed mt-0.5 opacity-90">
+                        📍 <strong>Abono recibido en:</strong> {sucursales?.find((s) => s.id === activeSucursalId)?.name || 'Tu caja actual'} ➔ <strong>Aplicado a deuda de:</strong> {cobroSeleccionado.sucursalNombre || 'Otra Sucursal'}.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Componente Unificado de Nota Activa y Selector Acordeón */}
+                {cobroSeleccionado && (
+                  <div className="border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--card)] shadow-xs">
+                    {/* Tarjeta Principal de la Nota Activa (Auto-seleccionada / Clic para desplegar artículos) */}
+                    <div 
+                      onClick={() => setDetalleNotaModalAbierto(!detalleNotaModalAbierto)}
+                      className="p-3.5 bg-emerald-500/5 hover:bg-emerald-500/10 border-b border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl border border-emerald-500/20 shrink-0">
+                          <FileText size={16} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-extrabold text-xs text-[var(--foreground)]">
+                              {cobroSeleccionado.saleNote?.numero
+                                ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+                                : `#${cobroSeleccionado.id.slice(0, 8).toUpperCase()}`}
+                            </span>
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 rounded text-[9px] font-bold">
+                              Nota Más Antigua (Por orden de llegada)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDetalleNotaModalAbierto(!detalleNotaModalAbierto);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 text-[9px] font-extrabold border border-emerald-500/30 transition-colors"
+                            >
+                              <Eye size={10} />
+                              <span>{detalleNotaModalAbierto ? 'Ocultar Artículos' : 'Ver Artículos'}</span>
+                              {detalleNotaModalAbierto ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                            </button>
+                          </div>
+                          <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5 flex items-center gap-2 flex-wrap">
+                            <span>Monto Original: <strong>${Number(cobroSeleccionado.montoOriginal ?? cobroSeleccionado.montoTotal ?? 0).toFixed(2)}</strong> ({cobroSeleccionado.tipo || 'Crédito'})</span>
+                            {cobroSeleccionado.vendedorNombre && (
+                              <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                                <User size={10} />
+                                <span>Vendedor: {cobroSeleccionado.vendedorNombre}</span>
+                              </span>
+                            )}
+                            {cobroSeleccionado.sucursalNombre && (
+                              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                                <Building size={10} />
+                                <span>Sucursal: {cobroSeleccionado.sucursalNombre}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="text-right mr-1">
+                          <span className="text-[9px] text-[var(--muted-foreground)] block font-semibold uppercase">Saldo:</span>
+                          <span className="text-sm font-black text-red-500">
+                            ${Number(cobroSeleccionado.saldoPendiente).toFixed(2)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAbrirCambiarTipo(cobroSeleccionado)}
+                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-700 dark:text-blue-300 font-bold rounded-lg transition-colors border border-blue-500/20 flex items-center gap-1 text-[10px] cursor-pointer"
+                          title={cobroSeleccionado.tipo === 'CONTADO' ? 'Convertir esta nota de contado a crédito' : 'Convertir esta nota a crédito a contado'}
+                        >
+                          {cobroSeleccionado.tipo === 'CONTADO' ? <CreditCard size={11} /> : <DollarSign size={11} />}
+                          <span>{cobroSeleccionado.tipo === 'CONTADO' ? 'Pasar a Crédito' : 'Pasar a Contado'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCuentaModal(false);
+                            handleAbrirFacturacion(carteraSeleccionada, cobroSeleccionado);
+                          }}
+                          className="px-2.5 py-1 bg-[#0F172A]/10 hover:bg-[#0F172A] hover:text-white text-[#0F172A] font-bold rounded-lg transition-colors border border-[#0F172A]/20 flex items-center gap-1 text-[10px] cursor-pointer"
+                          title="Emitir factura electrónica para esta nota"
+                        >
+                          <Receipt size={11} />
+                          <span>Facturar</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Detalle Desplegable de Logística y Artículos de la Nota Activa */}
+                    {detalleNotaModalAbierto && (
+                      <div className="p-3 bg-[var(--muted)]/15 border-b border-[var(--border)] space-y-2.5 animate-in fade-in duration-200">
+                        {/* Logística de Entrega */}
+                        <div className="p-2.5 rounded-xl border border-blue-500/20 bg-blue-500/5 text-xs text-[var(--foreground)] flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600">
+                              <Truck size={14} />
+                            </div>
+                            <div>
+                              <span className="font-extrabold text-[11px] block text-[var(--foreground)]">
+                                Logística: {cobroSeleccionado.tipoEntrega === 'ENVIO' ? '🚚 Envío a Domicilio / Courier' : '🏪 Entrega Presencial en Local'}
+                              </span>
+                              <span className="text-[10px] text-[var(--muted-foreground)]">
+                                {cobroSeleccionado.tipoEntrega === 'ENVIO'
+                                  ? `${cobroSeleccionado.courier || 'Transporte'}${cobroSeleccionado.guiaEnvio ? ` · Guía: ${cobroSeleccionado.guiaEnvio}` : ''}${cobroSeleccionado.ciudadEnvio ? ` · Destino: ${cobroSeleccionado.ciudadEnvio}` : ''}${cobroSeleccionado.direccionEnvio ? ` (${cobroSeleccionado.direccionEnvio})` : ''}`
+                                  : 'El cliente retiró directamente en el mostrador del local comercial.'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Header de Artículos Solicitados */}
+                        <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-xs text-[var(--foreground)] flex items-center gap-1.5">
+                              <Package size={13} className="text-[#0F172A]" />
+                              <span>
+                                Detalle de Artículos — {cobroSeleccionado.saleNote?.numero
+                                  ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+                                  : cobroSeleccionado.numeroCobro || ''}
+                              </span>
+                            </span>
+                            {cobroSeleccionado.vendedorNombre && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[10px] font-semibold">
+                                <User size={10} />
+                                <span>Vendedor: {cobroSeleccionado.vendedorNombre}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Botón directo para iniciar devolución si lo requiere */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCuentaModal(false);
+                              handleAbrirDevolucion(carteraSeleccionada);
+                            }}
+                            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-[10px] font-bold border border-amber-500/30 transition-colors flex items-center gap-1"
+                            title="Hacer devolución de calzado por fallas o cambio de talla"
+                          >
+                            <ArrowDownRight size={11} />
+                            <span>Hacer Devolución</span>
+                          </button>
+                        </div>
+
+                        {/* Tarjetas agrupadas por modelo con fotos y pastillas de tallas */}
+                        {(() => {
+                          const grupos = agruparLineasPorModelo(cobroSeleccionado.lines || [], catalogoProductos);
+                          if (grupos.length === 0) {
+                            return (
+                              <div className="p-3 bg-[var(--card)] rounded-xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--muted-foreground)] italic">
+                                No hay artículos detallados registrados para esta nota.
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className={`grid gap-3 ${grupos.length === 1 ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-2'}`}>
+                              {grupos.map((g) => {
+                                const serieTexto = getNombreSerie(g.serieNombre, g.tallas);
+                                return (
+                                  <div
+                                    key={g.key}
+                                    className="p-3.5 sm:p-4 bg-[var(--card)] dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-start gap-3.5 sm:gap-4 shadow-sm hover:border-slate-400 dark:hover:border-slate-600 transition-all w-full"
+                                  >
+                                    {/* Miniatura del calzado */}
+                                    <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center shadow-inner">
+                                      {g.imageUrl ? (
+                                        <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <Package className="text-slate-400" size={28} />
+                                      )}
+                                    </div>
+
+                                    {/* Detalle del modelo y pastillas de tallas */}
+                                    <div className="flex-1 min-w-0">
+                                      {/* Fila 1: Nombre del Modelo + Badge de Volumen */}
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-0.5">
+                                            Modelo
+                                          </span>
+                                          <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white leading-snug break-words">
+                                            {g.modelName}
+                                          </h4>
+                                        </div>
+
+                                        {/* Badge de Volumen */}
+                                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black shrink-0 ${
+                                          g.totalPares >= 6
+                                            ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+                                            : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                                        }`}>
+                                          {g.etiquetaVolumen}
+                                        </span>
+                                      </div>
+
+                                      {/* Fila 2: Serie y Color destacados */}
+                                      <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-blue-700 dark:text-blue-300 bg-blue-500/10 dark:bg-blue-500/20 px-2 py-0.5 rounded-md border border-blue-500/30">
+                                          <span>Serie:</span>
+                                          <span>{serieTexto}</span>
+                                        </span>
+                                        {g.color && (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                                            🎨 {g.color}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Fila 3: Pastillas de tallas estilo inventario */}
+                                      <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {g.tallas.map((t) => (
+                                          <span
+                                            key={t.numero}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-rose-200/90 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-[10px] font-black"
+                                          >
+                                            <span>T{t.numero}:</span>
+                                            <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
+                                          </span>
+                                        ))}
+                                      </div>
+
+                                      {/* Fila 4: Subtotal del modelo */}
+                                      <div className="mt-2.5 pt-1.5 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs">
+                                        <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                                          ${g.precioUnitario.toFixed(2)} c/u
+                                        </span>
+                                        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
+                                          Total: ${g.subtotal.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Toggle para cambiar a otra nota si el cliente tiene más de 1 nota */}
+                    {carteraSeleccionada.cobros.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setAcordeonNotasAbierto(!acordeonNotasAbierto)}
+                          className="w-full px-3.5 py-2 flex items-center justify-between bg-[var(--muted)]/20 hover:bg-[var(--muted)]/40 text-left transition-colors cursor-pointer"
+                        >
+                          <span className="text-[11px] font-bold text-[var(--muted-foreground)] flex items-center gap-1.5">
+                            <Layers size={12} />
+                            <span>{acordeonNotasAbierto ? 'Ocultar lista de notas' : `Cambiar nota (${carteraSeleccionada.cobros.length} notas disponibles)`}</span>
+                          </span>
+                          <div className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A]">
+                            <span>{acordeonNotasAbierto ? 'Cerrar' : 'Ver todas'}</span>
+                            {acordeonNotasAbierto ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          </div>
+                        </button>
+
+                        {acordeonNotasAbierto && (
+                          <div className="p-2.5 space-y-1.5 border-t border-[var(--border)] max-h-44 overflow-y-auto pr-1 bg-[var(--card)] animate-in fade-in">
+                            {carteraSeleccionada.cobros.map((cobroItem) => {
+                              const cCfg = getCobroConfig(cobroItem.estado);
+                              const numNota = cobroItem.saleNote?.numero
+                                ? `NOTA #${String(cobroItem.saleNote.numero).padStart(4, '0')}`
+                                : cobroItem.numeroCobro || `#${cobroItem.id.slice(0, 8).toUpperCase()}`;
+                              const montoOrig = Number(cobroItem.montoOriginal ?? cobroItem.montoTotal ?? 0);
+                              const isActive = cobroSeleccionadoId === cobroItem.id;
+
+                              return (
+                                <button
+                                  key={cobroItem.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setCobroSeleccionadoId(cobroItem.id);
+                                    setAcordeonNotasAbierto(false);
+                                  }}
+                                  className={`w-full p-2 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                                    isActive
+                                      ? 'bg-emerald-500/10 border-emerald-500/50 shadow-xs ring-1 ring-emerald-500/20'
+                                      : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <FileText size={13} className={isActive ? 'text-emerald-600' : 'text-[var(--muted-foreground)]'} />
+                                    <div>
+                                      <div className="font-bold text-[11px] text-[var(--foreground)] flex items-center gap-1.5">
+                                        <span>{numNota}</span>
+                                        <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold ${cCfg.color}`}>{cCfg.label}</span>
+                                        {isActive && (
+                                          <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[8px] font-extrabold uppercase">
+                                            Activa
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[9px] text-[var(--muted-foreground)]">
+                                        {cobroItem.tipo || 'Crédito'} — {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <div className="text-[9px] text-[var(--muted-foreground)]">${montoOrig.toFixed(2)}</div>
+                                    <div className={`text-[10px] font-black ${Number(cobroItem.saldoPendiente) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                      ${Number(cobroItem.saldoPendiente).toFixed(2)}
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* ── Footer del Modal ── */}
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col gap-2">
+            {/* ── Footer del Modal (Estático al final del modal) ── */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col gap-2 shrink-0">
+              {/* Botón de Confirmación del Abono (estático en el footer) */}
+              {cobroSeleccionado && Number(cobroSeleccionado.saldoPendiente) > 0 && (
+                <button
+                  onClick={handleRegistrarAbono}
+                  disabled={savingAbono || !montoAbono || !online}
+                  className={`w-full py-3 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer ${
+                    metodoAbono === 'DESCUENTO_COMERCIAL'
+                      ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 shadow-amber-500/20'
+                      : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 shadow-emerald-500/20'
+                  }`}
+                >
+                  {savingAbono ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                  <span>
+                    {savingAbono
+                      ? 'Procesando...'
+                      : (metodoAbono === 'DESCUENTO_COMERCIAL' ? 'Aplicar Descuento a la Deuda' : 'Confirmar Abono')}
+                  </span>
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   setShowCuentaModal(false);
@@ -3301,7 +3304,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 </button>
                 <button
                   onClick={() => setShowCuentaModal(false)}
-                  className="flex-1 py-2 bg-[var(--muted)] text-[var(--foreground)] font-semibold text-[11px] rounded-xl transition-colors hover:bg-[var(--muted)]/80 border border-[var(--border)]"
+                  className="flex-1 py-2 bg-[var(--muted)] text-[var(--foreground)] font-semibold text-[11px] rounded-xl transition-colors hover:bg-[var(--muted)]/80 border border-[var(--border)] cursor-pointer"
                 >
                   Cerrar
                 </button>
