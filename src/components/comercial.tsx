@@ -34,6 +34,7 @@ import {
   UserPlus,
   AlertTriangle,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -488,14 +489,13 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const ventasPorVarianteMap = useMemo(() => {
     const map = new Map<string, number>();
     pedidos.forEach((ped) => {
-      if (ped.estado === 'CANCELADO') return;
+      const estadoUpper = String(ped.estado || '').toUpperCase();
+      if (estadoUpper === 'CANCELADO') return;
       (ped.lines || []).forEach((l: any) => {
         const cant = Number(l.cantidad) || 1;
         if (l.productId) {
           map.set(l.productId, (map.get(l.productId) || 0) + cant);
         }
-        const modelKey = `${(l.modelName || '').toLowerCase().trim()}_${(l.color || '').toLowerCase().trim()}`;
-        map.set(modelKey, (map.get(modelKey) || 0) + cant);
       });
     });
     return map;
@@ -659,6 +659,13 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const [interSucursalModalidad, setInterSucursalModalidad] = useState<'DEVOLUCION_MERCADERIA' | 'PAGO_INTERNO'>('DEVOLUCION_MERCADERIA');
   const [interSucursalNotas, setInterSucursalNotas] = useState('');
   const [loadingInterSucursalPedido, setLoadingInterSucursalPedido] = useState(false);
+  const [verificandoStockInterSucursal, setVerificandoStockInterSucursal] = useState(false);
+  const [resultadoVerificacionStock, setResultadoVerificacionStock] = useState<any | null>(null);
+
+  // Modal: Cancelar / Anular Pedido con sincronización automática
+  const [pedidoParaCancelar, setPedidoParaCancelar] = useState<any | null>(null);
+  const [motivoCancelacion, setMotivoCancelacion] = useState('');
+  const [loadingCancelacion, setLoadingCancelacion] = useState(false);
 
   const loadSucursales = async () => {
     try {
@@ -1940,6 +1947,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   const handleAbrirInterSucursal = (pedido: any) => {
     setPedidoInterSucursal(pedido);
     setInterSucursalOrigenId('');
+    setResultadoVerificacionStock(null);
+    setVerificandoStockInterSucursal(false);
     setInterSucursalModalidad('DEVOLUCION_MERCADERIA');
     setInterSucursalNotas('');
     if (!sucursalesEmpresa || sucursalesEmpresa.length === 0) {
@@ -1948,10 +1957,33 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
     setModalInterSucursalPedido(true);
   };
 
+  // Handler: Seleccionar sucursal de origen y verificar stock en tiempo real
+  const handleSeleccionarSucursalInter = async (sucursalId: string) => {
+    setInterSucursalOrigenId(sucursalId);
+    setResultadoVerificacionStock(null);
+    if (!sucursalId || !pedidoInterSucursal) return;
+
+    setVerificandoStockInterSucursal(true);
+    try {
+      const res = await ApiService.get(
+        `/pedidos/${pedidoInterSucursal.id}/verificar-stock-inter-sucursal/${sucursalId}`
+      );
+      setResultadoVerificacionStock(res);
+    } catch (err: any) {
+      showToast(err.message || 'Error al verificar existencias en la sucursal seleccionada', 'error');
+    } finally {
+      setVerificandoStockInterSucursal(false);
+    }
+  };
+
   // Handler: Confirmar y ejecutar préstamo inter-sucursal
   const handleConfirmarInterSucursal = async () => {
     if (!pedidoInterSucursal || !interSucursalOrigenId) {
       showToast('Selecciona la sucursal de origen para el préstamo de mercadería.', 'warning');
+      return;
+    }
+    if (resultadoVerificacionStock && !resultadoVerificacionStock.tieneStockCompleto) {
+      showToast('La sucursal seleccionada no dispone del stock suficiente para este calzado.', 'error');
       return;
     }
     setLoadingInterSucursalPedido(true);
@@ -1964,11 +1996,44 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
       showToast(res.message || 'Préstamo inter-sucursal registrado con éxito. El pedido avanzó a Preparación.', 'success');
       setModalInterSucursalPedido(false);
       setPedidoInterSucursal(null);
+      setResultadoVerificacionStock(null);
       await loadPedidos();
     } catch (err: any) {
       showToast(err.message || 'Error al solicitar stock inter-sucursal', 'error');
     } finally {
       setLoadingInterSucursalPedido(false);
+    }
+  };
+
+  // Handler: Abrir modal de cancelación sincronizada
+  const handleAbrirCancelarPedido = (p: any) => {
+    setPedidoParaCancelar(p);
+    setMotivoCancelacion('');
+  };
+
+  // Handler: Confirmar anulación y revertir préstamos/reservas de forma sincronizada
+  const handleConfirmarCancelarPedido = async () => {
+    if (!pedidoParaCancelar) return;
+    setLoadingCancelacion(true);
+    try {
+      await ApiService.put(`/pedidos/${pedidoParaCancelar.id}/estado`, {
+        estado: 'CANCELADO',
+        motivo: motivoCancelacion.trim() || 'Cancelado por el cliente/usuario',
+      });
+      const teniaPrestamo = pedidoParaCancelar.notas?.includes('[Préstamo Inter-Sucursal]');
+      showToast(
+        teniaPrestamo
+          ? 'Pedido cancelado. El préstamo fue revertido y el stock sincronizado en la sucursal prestamista.'
+          : 'Pedido anulado exitosamente.',
+        'success'
+      );
+      setPedidoParaCancelar(null);
+      setMotivoCancelacion('');
+      await loadPedidos();
+    } catch (err: any) {
+      showToast(err.message || 'Error al anular pedido', 'error');
+    } finally {
+      setLoadingCancelacion(false);
     }
   };
 
@@ -2633,8 +2698,9 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => handleCambiarEstado(p.id, 'CANCELADO')}
-                                  className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1"
+                                  onClick={() => handleAbrirCancelarPedido(p)}
+                                  className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
+                                  title="Anular pedido y revertir automáticamente préstamos o reservas"
                                 >
                                   <XCircle size={12} /> Anular
                                 </button>
@@ -3898,11 +3964,8 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                               if (cmpModelo !== 0) return cmpModelo;
 
                               // 2. Si son variantes del mismo modelo, ordenar de más vendidas a menos vendidas
-                              const ventasA = (ventasPorVarianteMap.get(a.id) || 0) +
-                                (ventasPorVarianteMap.get(`${(a.modelName || '').toLowerCase().trim()}_${(a.color || '').toLowerCase().trim()}`) || 0);
-
-                              const ventasB = (ventasPorVarianteMap.get(b.id) || 0) +
-                                (ventasPorVarianteMap.get(`${(b.modelName || '').toLowerCase().trim()}_${(b.color || '').toLowerCase().trim()}`) || 0);
+                              const ventasA = ventasPorVarianteMap.get(a.id) || 0;
+                              const ventasB = ventasPorVarianteMap.get(b.id) || 0;
 
                               if (ventasB !== ventasA) {
                                 return ventasB - ventasA; // Más vendidas primero
@@ -3922,8 +3985,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   );
                                   const docenas = Math.floor(totalPares / 12);
                                   const mediasDocenas = Math.floor(totalPares / 6);
-                                  const ventasTotal = (ventasPorVarianteMap.get(p.id) || 0) +
-                                    (ventasPorVarianteMap.get(`${(p.modelName || '').toLowerCase().trim()}_${(p.color || '').toLowerCase().trim()}`) || 0);
+                                  const ventasTotal = ventasPorVarianteMap.get(p.id) || 0;
 
                                   return (
                                     <button
@@ -6248,7 +6310,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 </label>
                 <select
                   value={interSucursalOrigenId}
-                  onChange={(e) => setInterSucursalOrigenId(e.target.value)}
+                  onChange={(e) => handleSeleccionarSucursalInter(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer"
                 >
                   <option value="">-- Seleccionar sucursal de origen --</option>
@@ -6266,6 +6328,42 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                   </p>
                 )}
               </div>
+
+              {/* Indicador de Estado de Disponibilidad de Stock en Origen */}
+              {verificandoStockInterSucursal && (
+                <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-xs flex items-center gap-2.5 text-purple-700 dark:text-purple-300 animate-pulse">
+                  <Loader2 size={16} className="animate-spin text-purple-600 shrink-0" />
+                  <span className="font-semibold">Verificando existencias y variantes en tiempo real en la sucursal seleccionada...</span>
+                </div>
+              )}
+
+              {!verificandoStockInterSucursal && resultadoVerificacionStock && (
+                resultadoVerificacionStock.tieneStockCompleto ? (
+                  <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs flex items-start gap-2.5 text-emerald-800 dark:text-emerald-300">
+                    <CheckCircle size={18} className="shrink-0 text-emerald-600 mt-0.5" />
+                    <div>
+                      <div className="font-extrabold text-xs">
+                        Stock disponible confirmado en {resultadoVerificacionStock.sucursalOrigenNombre}
+                      </div>
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 leading-relaxed">
+                        Esta sucursal cuenta con los <strong>{resultadoVerificacionStock.totalParesRequeridos} pares requeridos</strong> listos para ser transferidos a este pedido.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs flex items-start gap-2.5 text-rose-800 dark:text-rose-300">
+                    <AlertTriangle size={18} className="shrink-0 text-rose-600 mt-0.5" />
+                    <div>
+                      <div className="font-extrabold text-xs">
+                        Sin stock suficiente en {resultadoVerificacionStock.sucursalOrigenNombre}
+                      </div>
+                      <div className="text-[11px] text-rose-700 dark:text-rose-400 mt-0.5 leading-relaxed">
+                        Faltan <strong>{resultadoVerificacionStock.totalFaltante} de los {resultadoVerificacionStock.totalParesRequeridos} pares solicitados</strong>. No es posible solicitar el préstamo a esta sucursal porque no dispone de la mercadería requerida.
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
 
               {/* Modalidad de Compensación */}
               <div>
@@ -6304,27 +6402,56 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 </div>
               </div>
 
-              {/* Resumen de Artículos Solicitados en el Pedido */}
+              {/* Resumen de Artículos Solicitados en el Pedido con Validación por Talla */}
               <div>
                 <label className="block text-xs font-bold text-[var(--foreground)] mb-1.5">
                   Artículos que se solicitarán en préstamo:
                 </label>
-                <div className="border border-[var(--border)] rounded-xl p-3 bg-[var(--muted)]/10 space-y-2 max-h-48 overflow-y-auto">
+                <div className="border border-[var(--border)] rounded-xl p-3 bg-[var(--muted)]/10 space-y-2.5 max-h-56 overflow-y-auto">
                   {pedidoInterSucursal.lines && pedidoInterSucursal.lines.length > 0 ? (
                     agruparLineasPorModelo(pedidoInterSucursal.lines).map((g) => (
-                      <div key={g.key} className="flex items-center justify-between text-xs py-1 border-b border-[var(--border)]/40 last:border-0">
-                        <div>
+                      <div key={g.key} className="flex items-start justify-between text-xs py-1.5 border-b border-[var(--border)]/40 last:border-0 gap-2">
+                        <div className="flex-1 min-w-0">
                           <span className="font-bold text-[var(--foreground)]">{g.modelName}</span>
                           <span className="text-[var(--muted-foreground)] ml-1">({g.color || 'Estándar'})</span>
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {g.tallas.map((t) => (
-                              <span key={t.numero} className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300 text-[10px] font-bold">
-                                T{t.numero}: {t.cantidad}p
-                              </span>
-                            ))}
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {g.tallas.map((t) => {
+                              // Buscar disponibilidad de esta talla en resultadoVerificacionStock
+                              const matchItem = resultadoVerificacionStock?.desgloseLineas?.find(
+                                (d: any) =>
+                                  String(d.tallaNumero) === String(t.numero) &&
+                                  (d.color === g.color || d.modelName === g.modelName)
+                              );
+
+                              if (!resultadoVerificacionStock || matchItem === undefined) {
+                                return (
+                                  <span key={t.numero} className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300 text-[10px] font-bold">
+                                    T{t.numero}: {t.cantidad}p
+                                  </span>
+                                );
+                              }
+
+                              const tieneDisp = matchItem.stockDisponible >= t.cantidad;
+
+                              return (
+                                <span
+                                  key={t.numero}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 ${
+                                    tieneDisp
+                                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                                      : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300'
+                                  }`}
+                                  title={tieneDisp ? `Stock disponible en origen: ${matchItem.stockDisponible} pares` : `Stock insuficiente en origen: solo hay ${matchItem.stockDisponible} pares (faltan ${matchItem.faltante})`}
+                                >
+                                  <span>T{t.numero}: {t.cantidad}p</span>
+                                  <span className="font-normal opacity-85">({tieneDisp ? `disp: ${matchItem.stockDisponible}` : 'Sin stock'})</span>
+                                  <span>{tieneDisp ? '✓' : '✗'}</span>
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
-                        <span className="font-extrabold text-purple-600 shrink-0">
+                        <span className="font-extrabold text-purple-600 shrink-0 text-xs">
                           {g.totalPares} pares
                         </span>
                       </div>
@@ -6357,6 +6484,7 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                 onClick={() => {
                   setModalInterSucursalPedido(false);
                   setPedidoInterSucursal(null);
+                  setResultadoVerificacionStock(null);
                 }}
                 disabled={loadingInterSucursalPedido}
                 className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
@@ -6366,18 +6494,129 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
               <button
                 type="button"
                 onClick={handleConfirmarInterSucursal}
-                disabled={!interSucursalOrigenId || loadingInterSucursalPedido}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                disabled={
+                  !interSucursalOrigenId ||
+                  loadingInterSucursalPedido ||
+                  verificandoStockInterSucursal ||
+                  Boolean(resultadoVerificacionStock && !resultadoVerificacionStock.tieneStockCompleto)
+                }
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
+                  resultadoVerificacionStock && !resultadoVerificacionStock.tieneStockCompleto
+                    ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 cursor-not-allowed opacity-80'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed'
+                }`}
               >
                 {loadingInterSucursalPedido ? (
                   <>
                     <Loader2 size={13} className="animate-spin" />
                     Procesando Préstamo...
                   </>
+                ) : verificandoStockInterSucursal ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    Verificando Existencias...
+                  </>
+                ) : resultadoVerificacionStock && !resultadoVerificacionStock.tieneStockCompleto ? (
+                  <>
+                    <XCircle size={13} />
+                    Sin Stock en Sucursal Seleccionada
+                  </>
                 ) : (
                   <>
                     <Building size={13} />
                     Confirmar Préstamo y Preparar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación y Sincronización Automática para Anular Pedido */}
+      {pedidoParaCancelar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">
+            {/* Cabecera */}
+            <div className="p-4 bg-gradient-to-r from-rose-950 via-slate-900 to-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/30">
+                  <XCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm">Anular Pedido #{getNumeroPedido(pedidoParaCancelar)}</h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Cliente: <span className="font-bold text-white">{pedidoParaCancelar.clienteNombre || 'Consumidor'}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPedidoParaCancelar(null)}
+                disabled={loadingCancelacion}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-5 space-y-4">
+              {pedidoParaCancelar.notas?.includes('[Préstamo Inter-Sucursal]') ? (
+                <div className="p-3.5 bg-purple-500/10 border border-purple-500/30 rounded-xl text-xs text-purple-900 dark:text-purple-300 flex items-start gap-2.5">
+                  <RefreshCw size={18} className="shrink-0 text-purple-600 mt-0.5" />
+                  <div>
+                    <div className="font-black text-xs">🔄 Sincronización Automática con Sucursal Prestamista</div>
+                    <div className="text-[11px] text-purple-700 dark:text-purple-400 mt-1 leading-relaxed">
+                      Este pedido cuenta con un préstamo inter-sucursal activo. Al cancelarlo, <strong>los pares prestados serán devueltos y sincronizados de inmediato en el inventario de la sucursal de origen</strong>.
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-slate-500/10 border border-[var(--border)] rounded-xl text-xs text-[var(--muted-foreground)] leading-relaxed">
+                  Al anular este pedido, cualquier reserva de inventario físico será liberada de inmediato y las órdenes de compra asociadas serán ajustadas o canceladas de forma automática.
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
+                  Motivo de Anulación (Opcional)
+                </label>
+                <textarea
+                  value={motivoCancelacion}
+                  onChange={(e) => setMotivoCancelacion(e.target.value)}
+                  placeholder="Ej: Cliente canceló por cambio de modelo o falta de tiempo..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-hidden focus:ring-2 focus:ring-rose-500 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Pie */}
+            <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPedidoParaCancelar(null)}
+                disabled={loadingCancelacion}
+                className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+              >
+                Regresar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarCancelarPedido}
+                disabled={loadingCancelacion}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {loadingCancelacion ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    Anulando y Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={13} />
+                    Confirmar Anulación y Sincronizar
                   </>
                 )}
               </button>
