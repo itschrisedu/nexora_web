@@ -24,9 +24,29 @@ import {
   Building2,
   X,
   Search,
+  Palette,
+  ZoomIn,
+  Eye,
+  ImageIcon,
+  ChevronRight,
+  Boxes,
 } from "lucide-react";
 import { useToast } from "./ui/toast";
 import { formatearNombreSerie } from "@/utils/text-formatters";
+import ImageLightboxModal from "./ui/image-lightbox-modal";
+
+interface VarianteInfo {
+  id: string;
+  codigo?: string;
+  color?: string;
+  imageUrl?: string | null;
+  fotoUrl?: string | null;
+  precioCosto?: number;
+  precioVenta?: number;
+  serie?: string;
+  stockTotal?: number;
+  tallas?: { numero: number; stock: number }[];
+}
 
 interface ItemPrediccion {
   modelo: string;
@@ -42,6 +62,11 @@ interface ItemPrediccion {
   precio_venta?: number;
   inversion_reorden_estimada?: number;
   productId?: string;
+  modelId?: string;
+  imageUrl?: string | null;
+  fotoUrl?: string | null;
+  color?: string;
+  variantes?: VarianteInfo[];
   confianza: number;
   tendencia: string;
   sugerencia_reorden: number;
@@ -138,6 +163,26 @@ export default function PrediccionDemandaComponent() {
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [busqueda, setBusqueda] = useState<string>("");
 
+  // Modal de Variantes del Modelo
+  const [modalVariantes, setModalVariantes] = useState<{
+    modelo: string;
+    variantes: VarianteInfo[];
+    itemActual?: ItemPrediccion;
+    brand?: string;
+  } | null>(null);
+
+  // Modal Lightbox para foto en grande
+  const [lightbox, setLightbox] = useState<{
+    isOpen: boolean;
+    imageUrl?: string | null;
+    title?: string;
+    subtitle?: string;
+    badge?: string;
+  }>({ isOpen: false });
+
+  // Map de modelos del inventario para enriquecimiento local
+  const [modelosInventarioMap, setModelosInventarioMap] = useState<Map<string, any>>(new Map());
+
   // Modal para ordenar reabastecimiento rápido a proveedor/taller
   const [pedidoModalItem, setPedidoModalItem] = useState<ItemPrediccion | null>(null);
   const [pedidoCantidad, setPedidoCantidad] = useState<number>(12);
@@ -146,21 +191,102 @@ export default function PrediccionDemandaComponent() {
   useEffect(() => {
     cargarPrediccion(horizonte, temporadaActiva);
     cargarEstadoModelo();
+    cargarModelosCatalogo();
   }, [horizonte, temporadaActiva]);
+
+  const cargarModelosCatalogo = async () => {
+    try {
+      const data = await ApiService.get("/inventario/modelos");
+      if (Array.isArray(data)) {
+        const map = new Map<string, any>();
+        data.forEach((m: any) => {
+          const key = (m.name || "").toLowerCase().trim();
+          const variantes: VarianteInfo[] = (m.products || []).map((p: any) => ({
+            id: p.id,
+            codigo: p.codigo || p.code,
+            color: p.color,
+            imageUrl: p.fotoUrl || p.imageUrl || null,
+            fotoUrl: p.fotoUrl || p.imageUrl || null,
+            precioCosto: Number(p.precioCosto || p.costPrice) || 22,
+            precioVenta: Number(p.precioVenta || p.salePrice) || 35,
+            serie: p.serie?.nombre || "",
+            stockTotal: (p.tallas || []).reduce((acc: number, t: any) => acc + (t.cantidad ?? t.stock ?? 0), 0),
+            tallas: (p.tallas || []).map((t: any) => ({
+              numero: t.numero,
+              stock: t.cantidad ?? t.stock ?? 0,
+            })),
+          }));
+          const primaryImg = variantes.find((v) => v.imageUrl)?.imageUrl || null;
+          map.set(key, {
+            id: m.id,
+            name: m.name,
+            brand: m.brand,
+            primaryImageUrl: primaryImg,
+            variantes,
+          });
+        });
+        setModelosInventarioMap(map);
+      }
+    } catch (e) {
+      // Ignorar si el endpoint no está disponible
+    }
+  };
+
+  // Helper para correlacionar datos de modelo, variantes e imagen
+  const obtenerDatosModelo = (item: ItemPrediccion) => {
+    const key = (item.modelo || "").toLowerCase().trim();
+    const local = modelosInventarioMap.get(key);
+    const variantes: VarianteInfo[] =
+      item.variantes && item.variantes.length > 0
+        ? item.variantes
+        : local?.variantes || [];
+
+    let img: string | null = null;
+    if (item.color) {
+      const matchColor = variantes.find(
+        (v) => (v.color || "").toLowerCase().trim() === item.color?.toLowerCase().trim() && (v.imageUrl || v.fotoUrl)
+      );
+      if (matchColor) img = matchColor.imageUrl || matchColor.fotoUrl || null;
+    }
+    if (!img) {
+      img =
+        item.imageUrl ||
+        item.fotoUrl ||
+        local?.primaryImageUrl ||
+        variantes.find((v) => v.imageUrl || v.fotoUrl)?.imageUrl ||
+        null;
+    }
+
+    return {
+      imageUrl: img,
+      variantes,
+      brand: local?.brand || "",
+    };
+  };
 
   // Manejador global de la tecla Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== "Escape") return;
+      if (lightbox.isOpen) {
+        e.preventDefault();
+        setLightbox({ isOpen: false });
+        return;
+      }
+      if (modalVariantes) {
+        e.preventDefault();
+        setModalVariantes(null);
+        return;
+      }
       if (pedidoModalItem) {
         e.preventDefault();
         setPedidoModalItem(null);
         return;
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [pedidoModalItem]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [lightbox.isOpen, modalVariantes, pedidoModalItem]);
 
   const cargarPrediccion = async (dias: number, temporada: string) => {
     setLoading(true);
@@ -512,13 +638,103 @@ export default function PrediccionDemandaComponent() {
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {itemsFiltrados.map((item, idx) => {
+                  const infoModelo = obtenerDatosModelo(item);
+                  const imgParaMostrar = infoModelo.imageUrl;
+                  const variantes = infoModelo.variantes;
                   const tieneDeficit = (item.deficit_stock ?? 0) > 0;
                   return (
                     <tr key={idx} className="hover:bg-[var(--muted)]/30 transition-colors">
-                      <td className="px-5 py-3 font-bold text-[var(--foreground)]">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-                          <span className="truncate max-w-[180px]">{item.modelo}</span>
+                      <td className="px-5 py-3.5 font-bold text-[var(--foreground)]">
+                        <div className="flex items-center gap-3">
+                          {/* Miniatura cuadrada con foto del calzado */}
+                          {imgParaMostrar ? (
+                            <div
+                              onClick={() =>
+                                setLightbox({
+                                  isOpen: true,
+                                  imageUrl: imgParaMostrar,
+                                  title: item.modelo,
+                                  subtitle: `${formatearNombreSerie(item.serie)} · Talla ${item.talla}${item.color ? ` · Color: ${item.color}` : ""}`,
+                                  badge: item.color || "Calzado",
+                                })
+                              }
+                              className="w-12 h-12 rounded-xl border border-[var(--border)] overflow-hidden shrink-0 bg-[var(--muted)]/40 relative group cursor-pointer shadow-xs hover:ring-2 hover:ring-amber-500/50 transition-all"
+                              title="Clic para ver foto en tamaño completo"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={imgParaMostrar}
+                                alt={item.modelo}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <ZoomIn size={14} className="text-white drop-shadow" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className="w-12 h-12 rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 flex flex-col items-center justify-center shrink-0 text-[var(--muted-foreground)]"
+                              title="Sin foto registrada"
+                            >
+                              <Package size={20} className="opacity-50" />
+                            </div>
+                          )}
+
+                          {/* Nombre del Modelo, Color y Selector de Variantes */}
+                          <div className="min-w-0">
+                            <span className="truncate max-w-[180px] text-xs font-black uppercase text-[var(--foreground)] block tracking-tight">
+                              {item.modelo}
+                            </span>
+
+                            {item.color && (
+                              <span className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-1 font-medium mt-0.5">
+                                <Palette size={10} className="text-amber-500 shrink-0" />
+                                <span className="truncate max-w-[140px]">{item.color}</span>
+                              </span>
+                            )}
+
+                            {/* Botón para ver variantes del modelo */}
+                            {variantes.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setModalVariantes({
+                                    modelo: item.modelo,
+                                    variantes,
+                                    itemActual: item,
+                                    brand: infoModelo.brand,
+                                  })
+                                }
+                                className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer group"
+                                title={`Ver las ${variantes.length} variantes disponibles de ${item.modelo}`}
+                              >
+                                <Layers size={11} className="group-hover:scale-110 transition-transform" />
+                                <span>{variantes.length} {variantes.length === 1 ? "variante" : "variantes"}</span>
+                                <div className="flex items-center -space-x-1 ml-0.5">
+                                  {variantes.slice(0, 3).map((v, vIdx) => (
+                                    <span
+                                      key={vIdx}
+                                      className="w-2 h-2 rounded-full border border-white dark:border-slate-800 shrink-0 shadow-xs"
+                                      style={{
+                                        backgroundColor:
+                                          v.color?.toLowerCase().includes("negro") ? "#1e293b" :
+                                          v.color?.toLowerCase().includes("blanco") ? "#f1f5f9" :
+                                          v.color?.toLowerCase().includes("cafe") || v.color?.toLowerCase().includes("café") ? "#78350f" :
+                                          v.color?.toLowerCase().includes("azul") ? "#1d4ed8" :
+                                          v.color?.toLowerCase().includes("rojo") ? "#b91c1c" :
+                                          v.color?.toLowerCase().includes("vino") ? "#831843" :
+                                          v.color?.toLowerCase().includes("miel") ? "#d97706" :
+                                          "#64748b"
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-3 py-3 text-[var(--muted-foreground)]">
@@ -601,26 +817,62 @@ export default function PrediccionDemandaComponent() {
 
       {/* ══════ MODAL DE REABASTECIMIENTO A TALLER / PROVEEDOR ══════ */}
       {pedidoModalItem && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setPedidoModalItem(null); }}>
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setPedidoModalItem(null);
+          }}
+        >
           <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-white/10 rounded-xl">
-                    <ShoppingCart size={18} className="text-amber-400" />
-                  </div>
+                <div className="flex items-center gap-3">
+                  {/* Miniatura del calzado si tiene foto */}
+                  {(() => {
+                    const infoM = obtenerDatosModelo(pedidoModalItem);
+                    return infoM.imageUrl ? (
+                      <div
+                        onClick={() =>
+                          setLightbox({
+                            isOpen: true,
+                            imageUrl: infoM.imageUrl,
+                            title: pedidoModalItem.modelo,
+                            subtitle: `${formatearNombreSerie(pedidoModalItem.serie)} · Talla ${pedidoModalItem.talla}`,
+                            badge: pedidoModalItem.color || "Calzado",
+                          })
+                        }
+                        className="w-12 h-12 rounded-xl border border-white/20 overflow-hidden shrink-0 bg-white/5 cursor-pointer relative group"
+                        title="Ver foto completa"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={infoM.imageUrl}
+                          alt={pedidoModalItem.modelo}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <ZoomIn size={14} className="text-white" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 bg-white/10 rounded-xl">
+                        <ShoppingCart size={20} className="text-amber-400" />
+                      </div>
+                    );
+                  })()}
                   <div>
                     <h3 className="font-extrabold text-sm text-white">
                       Reabastecimiento para {temporadaInfoActual.nombre}
                     </h3>
                     <p className="text-[11px] text-slate-300">
                       {pedidoModalItem.modelo} · {formatearNombreSerie(pedidoModalItem.serie)} (Talla {pedidoModalItem.talla})
+                      {pedidoModalItem.color && ` · ${pedidoModalItem.color}`}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setPedidoModalItem(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   <X size={16} />
                 </button>
@@ -671,14 +923,14 @@ export default function PrediccionDemandaComponent() {
                 <button
                   type="button"
                   onClick={() => setPedidoModalItem(null)}
-                  className="flex-1 py-2.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] font-semibold rounded-xl transition-all"
+                  className="flex-1 py-2.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] font-semibold rounded-xl transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={pedidoGuardando}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
                 >
                   {pedidoGuardando ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                   Confirmar Pedido
@@ -688,6 +940,229 @@ export default function PrediccionDemandaComponent() {
           </div>
         </div>
       )}
+
+      {/* ══════ MODAL DE VARIANTES DEL MODELO ══════ */}
+      {modalVariantes && (
+        <div
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setModalVariantes(null);
+          }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            {/* Encabezado */}
+            <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-white/10 rounded-xl text-amber-400">
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-black text-base text-white tracking-tight">
+                        {modalVariantes.modelo}
+                      </h3>
+                      {modalVariantes.brand && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-slate-200">
+                          {modalVariantes.brand}
+                        </span>
+                      )}
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                        {modalVariantes.variantes.length}{" "}
+                        {modalVariantes.variantes.length === 1 ? "Variante" : "Variantes"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Catálogo de variantes, colores, fotos y existencias en bodega para este modelo
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalVariantes(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Cerrar (Esc)"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de Variantes */}
+            <div className="p-5 overflow-y-auto space-y-3.5 flex-1">
+              {modalVariantes.variantes.length === 0 ? (
+                <div className="py-12 text-center text-[var(--muted-foreground)]">
+                  <Package size={32} className="mx-auto opacity-40 mb-2" />
+                  <p className="text-xs">No se registraron variantes adicionales para este modelo.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {modalVariantes.variantes.map((v, vIdx) => {
+                    const foto = v.imageUrl || v.fotoUrl;
+                    const stockTotal = v.stockTotal ?? (v.tallas || []).reduce((acc, t) => acc + (t.stock || 0), 0);
+                    return (
+                      <div
+                        key={v.id || vIdx}
+                        className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--muted)]/20 hover:bg-[var(--muted)]/40 transition-all flex flex-col justify-between gap-3 group"
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Miniatura con zoom lightbox */}
+                          {foto ? (
+                            <div
+                              onClick={() =>
+                                setLightbox({
+                                  isOpen: true,
+                                  imageUrl: foto,
+                                  title: `${modalVariantes.modelo} · ${v.color || "Variante"}`,
+                                  subtitle: `Código: ${v.codigo || "S/C"} · ${v.serie ? `Serie: ${v.serie}` : ""}`,
+                                  badge: v.color || "Variante",
+                                })
+                              }
+                              className="w-16 h-16 rounded-xl border border-[var(--border)] overflow-hidden shrink-0 bg-[var(--card)] relative cursor-pointer shadow-xs hover:ring-2 hover:ring-amber-500/50 transition-all"
+                              title="Clic para ver foto en tamaño completo"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={foto}
+                                alt={v.color || modalVariantes.modelo}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <ZoomIn size={14} className="text-white drop-shadow" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-16 h-16 rounded-xl border border-[var(--border)] bg-[var(--muted)]/50 flex flex-col items-center justify-center shrink-0 text-[var(--muted-foreground)]">
+                              <Package size={22} className="opacity-40" />
+                            </div>
+                          )}
+
+                          {/* Info de la variante */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-black text-xs text-[var(--foreground)] uppercase truncate">
+                                {v.color || "Color Estándar"}
+                              </span>
+                            </div>
+                            {v.codigo && (
+                              <span className="font-mono text-[10px] text-[var(--muted-foreground)] block truncate">
+                                Código: {v.codigo}
+                              </span>
+                            )}
+                            {v.serie && (
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                                Serie: {v.serie}
+                              </span>
+                            )}
+
+                            {/* Stock total */}
+                            <div className="mt-1 flex items-center gap-2">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                  stockTotal === 0
+                                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                    : stockTotal <= 4
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                                }`}
+                              >
+                                {stockTotal} {stockTotal === 1 ? "par en bodega" : "pares en bodega"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desglose de tallas de la variante si existen */}
+                        {v.tallas && v.tallas.length > 0 && (
+                          <div className="pt-2 border-t border-[var(--border)]">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block mb-1">
+                              Existencias por Talla:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {v.tallas.map((t, tIdx) => (
+                                <span
+                                  key={tIdx}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                                    t.stock > 0
+                                      ? "bg-[var(--card)] border-[var(--border)] text-[var(--foreground)]"
+                                      : "bg-[var(--muted)]/50 border-transparent text-[var(--muted-foreground)] opacity-50"
+                                  }`}
+                                  title={`Talla ${t.numero}: ${t.stock} pares`}
+                                >
+                                  T{t.numero}:{t.stock}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Precios y Acción de Pedido rápido */}
+                        <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-xs">
+                          <div className="text-[11px]">
+                            <span className="text-[var(--muted-foreground)] text-[10px]">Costo/Venta: </span>
+                            <span className="font-bold font-mono text-[var(--foreground)]">
+                              ${(v.precioCosto || 22).toFixed(2)} / ${(v.precioVenta || 35).toFixed(2)}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const itemBase = modalVariantes.itemActual;
+                              setPedidoModalItem({
+                                modelo: modalVariantes.modelo,
+                                serie: v.serie || itemBase?.serie || "JUVENIL",
+                                talla: itemBase?.talla || (v.tallas?.[0]?.numero ?? 38),
+                                demanda_estimada: itemBase?.demanda_estimada || 12,
+                                stock_actual: stockTotal,
+                                deficit_stock: Math.max(0, (itemBase?.demanda_estimada || 12) - stockTotal),
+                                precio_costo: v.precioCosto || 22,
+                                precio_venta: v.precioVenta || 35,
+                                productId: v.id,
+                                imageUrl: foto,
+                                color: v.color,
+                                sugerencia_reorden: itemBase?.sugerencia_reorden || 12,
+                                confianza: 0.9,
+                                tendencia: "ALZA",
+                              });
+                              setPedidoCantidad(itemBase?.sugerencia_reorden || 12);
+                              setModalVariantes(null);
+                            }}
+                            className="px-2.5 py-1 bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg text-[10px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                          >
+                            <ShoppingCart size={11} /> Pedir Esta
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Pie de modal */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setModalVariantes(null)}
+                className="px-4 py-2 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ MODAL LIGHTBOX PARA ZOOM DE IMAGEN ══════ */}
+      <ImageLightboxModal
+        isOpen={lightbox.isOpen}
+        onClose={() => setLightbox({ isOpen: false })}
+        imageUrl={lightbox.imageUrl}
+        title={lightbox.title}
+        subtitle={lightbox.subtitle}
+        badge={lightbox.badge}
+      />
     </div>
   );
 }
