@@ -1516,12 +1516,45 @@ export default function ModelosComponent({
     setEditProductVenta(String(p.precioVenta));
     setEditProductSupplierId(p.supplierId || (p.supplier as any)?.id || "");
     setEditProductMotivo("");
-    setEditProductSerieId((p.serie as any)?.id || (p as any).serieId || "");
-    const tallasData = (p.tallas || (p as any).stockPorTalla || []).map((t: any) => ({
-      tallaId: t.tallaId || t.id,
-      numero: t.numero,
-      cantidad: t.cantidad ?? t.disponible ?? 0,
-    }));
+    const sid = (p.serie as any)?.id || (p as any).serieId || "";
+    setEditProductSerieId(sid);
+
+    const selectedSerie = series.find(s => s.id === sid);
+    const rawTallas = (p.tallas || (p as any).stockPorTalla || []);
+    const existingMap: Record<number, { tallaId: string; cantidad: number }> = {};
+    rawTallas.forEach((t: any) => {
+      existingMap[t.numero] = {
+        tallaId: t.tallaId || t.id,
+        cantidad: t.cantidad ?? t.disponible ?? 0,
+      };
+    });
+
+    let tallasData: { tallaId: string; numero: number; cantidad: number }[] = [];
+    if (selectedSerie?.tallas) {
+      // Garantizar que TODAS las tallas de la serie base estén presentes siempre en la variante
+      tallasData = selectedSerie.tallas.map(st => ({
+        tallaId: existingMap[st.numero]?.tallaId || st.id,
+        numero: st.numero,
+        cantidad: existingMap[st.numero]?.cantidad ?? 0,
+      }));
+      // Si existían tallas adicionales fuera de la serie base con stock, preservarlas
+      rawTallas.forEach((t: any) => {
+        if (!selectedSerie.tallas!.some(st => st.numero === t.numero)) {
+          tallasData.push({
+            tallaId: t.tallaId || t.id,
+            numero: t.numero,
+            cantidad: t.cantidad ?? t.disponible ?? 0,
+          });
+        }
+      });
+    } else {
+      tallasData = rawTallas.map((t: any) => ({
+        tallaId: t.tallaId || t.id,
+        numero: t.numero,
+        cantidad: t.cantidad ?? t.disponible ?? 0,
+      }));
+    }
+
     setEditProductTallas(tallasData);
     setNewTallaNumeroInput("");
     setError("");
@@ -1533,19 +1566,15 @@ export default function ModelosComponent({
     const selectedSerie = series.find(s => s.id === newSerieId);
     if (selectedSerie && selectedSerie.tallas) {
       const existingMap: Record<number, number> = {};
-      let hasExisting = false;
       editProductTallas.forEach(t => {
-        if (t.cantidad > 0) hasExisting = true;
         existingMap[t.numero] = t.cantidad;
       });
 
-      const curva = getCurvaDocena(selectedSerie.nombre, 'DOCENA');
-      const hasCurva = Object.keys(curva).length > 0;
-
+      const docena = getDocenaBaseParaSerie(selectedSerie);
       const newTallasList = selectedSerie.tallas.map(t => ({
         tallaId: t.id,
         numero: t.numero,
-        cantidad: hasExisting ? (existingMap[t.numero] ?? 0) : (hasCurva ? (curva[t.numero] ?? 2) : 2),
+        cantidad: existingMap[t.numero] !== undefined ? existingMap[t.numero] : (docena[t.numero] ?? 0),
       }));
       setEditProductTallas(newTallasList);
 
@@ -1561,16 +1590,20 @@ export default function ModelosComponent({
     }
   };
 
-  const aplicarCurvaInEditProduct = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
+  const aplicarCurvaInEditProduct = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
     const selectedSerie = series.find(s => s.id === editProductSerieId);
     if (!selectedSerie || !selectedSerie.tallas) return;
-    const curva = getCurvaDocena(selectedSerie.nombre, tipo);
-    const hasCurva = Object.keys(curva).length > 0;
-    const factor = tipo === 'DOCENA' ? 2 : 1;
+    if (tipo === 'NINGUNA') {
+      const serieNums = new Set(selectedSerie.tallas.map(t => t.numero));
+      setEditProductTallas(prev => prev.map(t => serieNums.has(t.numero) ? { ...t, cantidad: 0 } : t));
+      return;
+    }
+    const docena = getDocenaBaseParaSerie(selectedSerie);
+    const curva = tipo === 'DOCENA' ? docena : dividirDocenaEnMediaDocena(docena, tipo, 6);
     setEditProductTallas(selectedSerie.tallas.map(t => ({
       tallaId: t.id,
       numero: t.numero,
-      cantidad: hasCurva ? (curva[t.numero] ?? factor) : factor,
+      cantidad: curva[t.numero] ?? 0,
     })));
   };
 
@@ -4213,61 +4246,72 @@ export default function ModelosComponent({
                   <div className="space-y-1.5 pt-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <button type="button" onClick={() => aplicarCurvaInEditProduct('DOCENA')}
-                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)] cursor-pointer"
                       >Docena (12 pares)</button>
                       <button type="button" onClick={() => aplicarCurvaInEditProduct('MEDIA_A')}
-                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)] cursor-pointer"
                       >Media Docena A (6 pares)</button>
                       <button type="button" onClick={() => aplicarCurvaInEditProduct('MEDIA_B')}
-                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)] cursor-pointer"
                       >Media Docena B (6 pares)</button>
+                      <button type="button" onClick={() => aplicarCurvaInEditProduct('NINGUNA')}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-300 dark:border-rose-900/50 bg-[var(--card)] hover:bg-rose-500/10 transition-colors text-rose-600 cursor-pointer"
+                      >Sin Stock (0 pares)</button>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <button type="button"
                         onClick={() => {
                           const selectedSerie = series.find(s => s.id === editProductSerieId);
-                          const curva = getCurvaDocena(selectedSerie?.nombre || '', 'MEDIA_A');
-                          const hasCurva = Object.keys(curva).length > 0;
-                          setEditProductTallas(prev => prev.map(t => {
-                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
-                            return { ...t, cantidad: t.cantidad + qty };
-                          }));
+                          if (selectedSerie?.tallas) {
+                            const docena = getDocenaBaseParaSerie(selectedSerie);
+                            const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_A', 6);
+                            setEditProductTallas(prev => prev.map(t => {
+                              const qty = curva[t.numero] ?? 0;
+                              return { ...t, cantidad: t.cantidad + qty };
+                            }));
+                          }
                         }}
                         className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors cursor-pointer"
                       >+ ½ Doc A</button>
                       <button type="button"
                         onClick={() => {
                           const selectedSerie = series.find(s => s.id === editProductSerieId);
-                          const curva = getCurvaDocena(selectedSerie?.nombre || '', 'MEDIA_B');
-                          const hasCurva = Object.keys(curva).length > 0;
-                          setEditProductTallas(prev => prev.map(t => {
-                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
-                            return { ...t, cantidad: t.cantidad + qty };
-                          }));
+                          if (selectedSerie?.tallas) {
+                            const docena = getDocenaBaseParaSerie(selectedSerie);
+                            const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_B', 6);
+                            setEditProductTallas(prev => prev.map(t => {
+                              const qty = curva[t.numero] ?? 0;
+                              return { ...t, cantidad: t.cantidad + qty };
+                            }));
+                          }
                         }}
                         className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-700 hover:bg-teal-500/20 transition-colors cursor-pointer"
                       >+ ½ Doc B</button>
                       <button type="button"
                         onClick={() => {
                           const selectedSerie = series.find(s => s.id === editProductSerieId);
-                          const curva = getCurvaDocena(selectedSerie?.nombre || '', 'MEDIA_A');
-                          const hasCurva = Object.keys(curva).length > 0;
-                          setEditProductTallas(prev => prev.map(t => {
-                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
-                            return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
-                          }));
+                          if (selectedSerie?.tallas) {
+                            const docena = getDocenaBaseParaSerie(selectedSerie);
+                            const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_A', 6);
+                            setEditProductTallas(prev => prev.map(t => {
+                              const qty = curva[t.numero] ?? 0;
+                              return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
+                            }));
+                          }
                         }}
                         className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors cursor-pointer"
                       >− ½ Doc A</button>
                       <button type="button"
                         onClick={() => {
                           const selectedSerie = series.find(s => s.id === editProductSerieId);
-                          const curva = getCurvaDocena(selectedSerie?.nombre || '', 'MEDIA_B');
-                          const hasCurva = Object.keys(curva).length > 0;
-                          setEditProductTallas(prev => prev.map(t => {
-                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
-                            return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
-                          }));
+                          if (selectedSerie?.tallas) {
+                            const docena = getDocenaBaseParaSerie(selectedSerie);
+                            const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_B', 6);
+                            setEditProductTallas(prev => prev.map(t => {
+                              const qty = curva[t.numero] ?? 0;
+                              return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
+                            }));
+                          }
                         }}
                         className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-red-500/30 bg-red-500/10 text-red-700 hover:bg-red-500/20 transition-colors cursor-pointer"
                       >− ½ Doc B</button>
@@ -4277,41 +4321,48 @@ export default function ModelosComponent({
 
                 {editProductTallas.length > 0 ? (
                   <div className="flex flex-wrap gap-2 p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl">
-                    {editProductTallas.sort((a, b) => a.numero - b.numero).map((t, i) => (
-                      <div key={t.tallaId || `t-${t.numero}`} className="flex items-center gap-0 bg-[var(--card)] border border-[var(--border)] rounded-lg px-1.5 py-1 shadow-xs">
-                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
-                        <button type="button"
-                          onClick={() => {
-                            setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: Math.max(0, tt.cantidad - 1) } : tt));
-                          }}
-                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors"
-                        >−</button>
-                        <input
-                          type="number"
-                          min="0"
-                          value={t.cantidad}
-                          onChange={e => {
-                            const val = Math.max(0, parseInt(e.target.value) || 0);
-                            setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: val } : tt));
-                          }}
-                          className="w-8 text-center text-sm font-extrabold text-[var(--foreground)] bg-transparent border-0 focus:outline-none"
-                        />
-                        <button type="button"
-                          onClick={() => {
-                            setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: tt.cantidad + 1 } : tt));
-                          }}
-                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors"
-                        >+</button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTallaFromEdit(t.numero)}
-                          className="ml-1 text-slate-400 hover:text-red-500 transition-colors p-1"
-                          title="Quitar esta talla de la variante"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    ))}
+                    {editProductTallas.sort((a, b) => a.numero - b.numero).map((t, i) => {
+                      const selectedSerie = series.find(s => s.id === editProductSerieId);
+                      const isBaseSerieTalla = selectedSerie?.tallas?.some(st => st.numero === t.numero);
+
+                      return (
+                        <div key={t.tallaId || `t-${t.numero}`} className="flex items-center gap-0 bg-[var(--card)] border border-[var(--border)] rounded-lg px-1.5 py-1 shadow-xs">
+                          <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+                          <button type="button"
+                            onClick={() => {
+                              setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: Math.max(0, tt.cantidad - 1) } : tt));
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
+                          >−</button>
+                          <input
+                            type="number"
+                            min="0"
+                            value={t.cantidad}
+                            onChange={e => {
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: val } : tt));
+                            }}
+                            className="w-8 text-center text-sm font-extrabold text-[var(--foreground)] bg-transparent border-0 focus:outline-none"
+                          />
+                          <button type="button"
+                            onClick={() => {
+                              setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: tt.cantidad + 1 } : tt));
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
+                          >+</button>
+                          {!isBaseSerieTalla && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTallaFromEdit(t.numero)}
+                              className="ml-1 text-slate-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
+                              title="Quitar esta talla adicional de la variante"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-xs text-[var(--muted-foreground)] italic p-2 border border-dashed rounded-lg text-center">
