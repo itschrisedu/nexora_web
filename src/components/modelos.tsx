@@ -10,6 +10,7 @@ import {
   Layers, Boxes, Truck, Sparkles, Copy, Building2, PackageCheck, Info, Check
 } from "lucide-react";
 import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
+import { dividirDocenaEnMediaDocena } from "../utils/curvas";
 import {
   generarSiglaProveedor,
   generarCodigoBaseModelo,
@@ -203,7 +204,7 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
 
 // Curvas estándar de distribución por serie
 const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B'): Record<number, number> => {
-  const name = serieName.toUpperCase();
+  const name = (serieName || '').toUpperCase();
   if (name.includes('ADULTO') || name === 'TALLA_GRANDE') {
     if (tipo === 'DOCENA') return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
     if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
@@ -214,20 +215,42 @@ const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B
     if (tipo === 'MEDIA_A') return { 34: 1, 35: 2, 36: 1, 37: 1, 38: 1 };
     return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1 };
   }
-  // Junior, Niño, Bebé: 1 par por talla para media, 2 para docena
-  return {}; // vacío => se usa fallback genérico
+  return {};
+};
+
+// Genera la distribución base de 12 pares (1 docena) para cualquier serie
+const getDocenaBaseParaSerie = (sObj?: SerieConfig | null): Record<number, number> => {
+  if (!sObj || !sObj.tallas || sObj.tallas.length === 0) return {};
+  const std = getCurvaDocena(sObj.nombre || '', 'DOCENA');
+  if (Object.keys(std).length > 0) return std;
+
+  const sorted = [...sObj.tallas].sort((a, b) => a.numero - b.numero);
+  const n = sorted.length;
+  const result: Record<number, number> = {};
+
+  if (n === 6) {
+    // Caso estándar Cevallos: Serie de 6 tallas (ej. 38 a 43) -> 2 pares por número = 12 pares
+    sorted.forEach(t => { result[t.numero] = 2; });
+  } else if (n > 0) {
+    const base = Math.floor(12 / n);
+    let rem = 12 % n;
+    const startRem = Math.floor((n - rem) / 2);
+    sorted.forEach((t, i) => {
+      const extra = (i >= startRem && rem > 0) ? 1 : 0;
+      if (extra) rem--;
+      result[t.numero] = Math.max(1, base + extra);
+    });
+  }
+  return result;
 };
 
 const buildTallaIdsFromCurva = (sObj: SerieConfig, curva: Record<number, number>): string[] => {
   if (!sObj.tallas) return [];
   const result: string[] = [];
   for (const t of sObj.tallas) {
-    const qty = curva[t.numero];
-    if (qty !== undefined) {
-      for (let i = 0; i < qty; i++) result.push(t.id);
-    } else {
-      // fallback: 2 para docena genérica, pero no sabemos tipo aquí
-      // se maneja fuera
+    const qty = curva[t.numero] || 0;
+    for (let i = 0; i < qty; i++) {
+      result.push(t.id);
     }
   }
   return result;
@@ -327,6 +350,8 @@ export default function ModelosComponent({
 
   // Tallas personalizadas seleccionadas por serie: { [serieId]: tallaId[] }
   const [customTallas, setCustomTallas] = useState<Record<string, string[]>>({});
+  // Distribución de docena configurada por serie (para calcular medias docenas o docenas personalizadas)
+  const [docenaPersonalizadaPorSerie, setDocenaPersonalizadaPorSerie] = useState<Record<string, Record<number, number>>>({});
 
   // Modales de Crear / Editar Serie
   const [showCreateSeriesModal, setShowCreateSeriesModal] = useState(false);
@@ -398,6 +423,7 @@ export default function ModelosComponent({
   const [newColorSerieIds, setNewColorSerieIds] = useState<string[]>([]);
   const [newColorSeriesPrices, setNewColorSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [newColorCustomTallas, setNewColorCustomTallas] = useState<Record<string, string[]>>({});
+  const [newColorDocenaPersonalizadaPorSerie, setNewColorDocenaPersonalizadaPorSerie] = useState<Record<string, Record<number, number>>>({});
   const [newColorStockInicial, setNewColorStockInicial] = useState("1");
 
   const [newCosto, setNewCosto] = useState("");
@@ -831,6 +857,37 @@ export default function ModelosComponent({
     setColors(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Helper para obtener la distribución de docena (12 pares) activa para una serie
+  const getDocenaConfigurada = (serieId: string, isNewColor = false): Record<number, number> => {
+    const sObj = series.find(s => s.id === serieId);
+    if (!sObj) return {};
+    const custom = isNewColor
+      ? newColorDocenaPersonalizadaPorSerie[serieId]
+      : docenaPersonalizadaPorSerie[serieId];
+    if (custom && Object.keys(custom).length > 0) {
+      const sum = Object.values(custom).reduce((a, b) => a + b, 0);
+      if (sum === 12) return custom;
+    }
+    return getDocenaBaseParaSerie(sObj);
+  };
+
+  // Registra la distribución si suma exactamente 12 pares (docena personalizada)
+  const registrarSiEsDocena = (serieId: string, arrIds: string[], isNewColor = false) => {
+    const sObj = series.find(s => s.id === serieId);
+    if (!sObj || !sObj.tallas) return;
+    if (arrIds.length === 12) {
+      const dist: Record<number, number> = {};
+      sObj.tallas.forEach(t => {
+        dist[t.numero] = arrIds.filter(id => id === t.id).length;
+      });
+      if (isNewColor) {
+        setNewColorDocenaPersonalizadaPorSerie(prev => ({ ...prev, [serieId]: dist }));
+      } else {
+        setDocenaPersonalizadaPorSerie(prev => ({ ...prev, [serieId]: dist }));
+      }
+    }
+  };
+
   const toggleSerie = (id: string) => {
     setSerieIds(prev => {
       if (prev.includes(id)) {
@@ -848,18 +905,9 @@ export default function ModelosComponent({
       } else {
         const sObj = series.find(s => s.id === id);
         if (sObj) {
-          // Auto-aplicar curva DOCENA estándar por defecto
-          const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
-          const hasCustomCurva = Object.keys(curva).length > 0;
-          if (hasCustomCurva) {
-            const ids = buildTallaIdsFromCurva(sObj, curva);
-            setCustomTallas(ct => ({ ...ct, [id]: ids }));
-          } else {
-            // Fallback genérico: 2 pares por talla (docena genérica)
-            const ids: string[] = [];
-            sObj.tallas?.forEach(t => { ids.push(t.id); ids.push(t.id); });
-            setCustomTallas(ct => ({ ...ct, [id]: ids }));
-          }
+          const docena = getDocenaBaseParaSerie(sObj);
+          const ids = buildTallaIdsFromCurva(sObj, docena);
+          setCustomTallas(ct => ({ ...ct, [id]: ids }));
         } else {
           setCustomTallas(ct => ({ ...ct, [id]: [] }));
         }
@@ -881,14 +929,22 @@ export default function ModelosComponent({
     return `${totalPares} pares`;
   };
 
-  const detectarTipoCurva = (serieId: string, selectedIds: string[]): 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA' | 'CUSTOM' => {
+  const detectarTipoCurva = (
+    serieId: string,
+    selectedIds: string[],
+    isNewColor = false
+  ): 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA' | 'CUSTOM' => {
     if (!selectedIds || selectedIds.length === 0) return 'NINGUNA';
     const sObj = series.find(s => s.id === serieId);
     if (!sObj || !sObj.tallas) return 'CUSTOM';
 
-    const docenaIds = buildTallaIdsFromCurva(sObj, getCurvaDocena(sObj.nombre, 'DOCENA'));
-    const mediaAIds = buildTallaIdsFromCurva(sObj, getCurvaDocena(sObj.nombre, 'MEDIA_A'));
-    const mediaBIds = buildTallaIdsFromCurva(sObj, getCurvaDocena(sObj.nombre, 'MEDIA_B'));
+    const docena = getDocenaConfigurada(serieId, isNewColor);
+    const mediaA = dividirDocenaEnMediaDocena(docena, 'MEDIA_A', 6);
+    const mediaB = dividirDocenaEnMediaDocena(docena, 'MEDIA_B', 6);
+
+    const docenaIds = buildTallaIdsFromCurva(sObj, docena);
+    const mediaAIds = buildTallaIdsFromCurva(sObj, mediaA);
+    const mediaBIds = buildTallaIdsFromCurva(sObj, mediaB);
 
     const sCurrent = [...selectedIds].sort().join(',');
     if (sCurrent === [...docenaIds].sort().join(',')) return 'DOCENA';
@@ -898,7 +954,7 @@ export default function ModelosComponent({
     return 'CUSTOM';
   };
 
-  // Aplicar curva estándar en el formulario de CREACIÓN
+  // Aplicar curva estándar o personalizada en el formulario de CREACIÓN
   const aplicarCurvaEnCreacion = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
     if (tipo === 'NINGUNA') {
       setCustomTallas(ct => ({ ...ct, [serieId]: [] }));
@@ -906,17 +962,17 @@ export default function ModelosComponent({
     }
     const sObj = series.find(s => s.id === serieId);
     if (!sObj || !sObj.tallas) return;
-    const curva = getCurvaDocena(sObj.nombre, tipo);
-    const hasCustomCurva = Object.keys(curva).length > 0;
-    if (hasCustomCurva) {
-      const ids = buildTallaIdsFromCurva(sObj, curva);
-      setCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+
+    const docena = getDocenaConfigurada(serieId, false);
+    let curvaTarget: Record<number, number> = {};
+    if (tipo === 'DOCENA') {
+      curvaTarget = docena;
     } else {
-      const factor = tipo === 'DOCENA' ? 2 : 1;
-      const ids: string[] = [];
-      sObj.tallas.forEach(t => { for (let i = 0; i < factor; i++) ids.push(t.id); });
-      setCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+      curvaTarget = dividirDocenaEnMediaDocena(docena, tipo, 6);
     }
+
+    const ids = buildTallaIdsFromCurva(sObj, curvaTarget);
+    setCustomTallas(ct => ({ ...ct, [serieId]: ids }));
   };
 
   const aplicarCurvaATodasEnCreacion = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
@@ -927,18 +983,18 @@ export default function ModelosComponent({
     setCustomTallas(prev => {
       const current = prev[serieId] || [];
       const count = current.filter(id => id === tallaId).length;
-      if (count > 0) {
-        return { ...prev, [serieId]: current.filter(id => id !== tallaId) };
-      } else {
-        return { ...prev, [serieId]: [...current, tallaId] };
-      }
+      const updated = count > 0 ? current.filter(id => id !== tallaId) : [...current, tallaId];
+      registrarSiEsDocena(serieId, updated, false);
+      return { ...prev, [serieId]: updated };
     });
   };
 
   const addTallaRepeatInSerie = (serieId: string, tallaId: string) => {
     setCustomTallas(prev => {
       const current = prev[serieId] || [];
-      return { ...prev, [serieId]: [...current, tallaId] };
+      const updated = [...current, tallaId];
+      registrarSiEsDocena(serieId, updated, false);
+      return { ...prev, [serieId]: updated };
     });
   };
 
@@ -949,6 +1005,7 @@ export default function ModelosComponent({
       if (idx > -1) {
         const copy = [...current];
         copy.splice(idx, 1);
+        registrarSiEsDocena(serieId, copy, false);
         return { ...prev, [serieId]: copy };
       }
       return prev;
@@ -982,14 +1039,8 @@ export default function ModelosComponent({
       };
       const sObj = series.find(s => s.id === sid);
       if (sObj?.tallas) {
-        const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
-        if (Object.keys(curva).length > 0) {
-          initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, curva);
-        } else {
-          const ids: string[] = [];
-          sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
-          initialCustomTallas[sid] = ids;
-        }
+        const docena = getDocenaBaseParaSerie(sObj);
+        initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, docena);
       }
     });
 
@@ -1089,15 +1140,9 @@ export default function ModelosComponent({
       } else {
         const sObj = series.find(s => s.id === id);
         if (sObj && sObj.tallas) {
-          const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
-          if (Object.keys(curva).length > 0) {
-            const ids = buildTallaIdsFromCurva(sObj, curva);
-            setNewColorCustomTallas(ct => ({ ...ct, [id]: ids }));
-          } else {
-            const ids: string[] = [];
-            sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
-            setNewColorCustomTallas(ct => ({ ...ct, [id]: ids }));
-          }
+          const docena = getDocenaBaseParaSerie(sObj);
+          const ids = buildTallaIdsFromCurva(sObj, docena);
+          setNewColorCustomTallas(ct => ({ ...ct, [id]: ids }));
         }
         setNewColorSeriesPrices(sp => ({
           ...sp,
@@ -1115,17 +1160,17 @@ export default function ModelosComponent({
     }
     const sObj = series.find(s => s.id === serieId);
     if (!sObj || !sObj.tallas) return;
-    const curva = getCurvaDocena(sObj.nombre, tipo);
-    const hasCustomCurva = Object.keys(curva).length > 0;
-    if (hasCustomCurva) {
-      const ids = buildTallaIdsFromCurva(sObj, curva);
-      setNewColorCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+
+    const docena = getDocenaConfigurada(serieId, true);
+    let curvaTarget: Record<number, number> = {};
+    if (tipo === 'DOCENA') {
+      curvaTarget = docena;
     } else {
-      const factor = tipo === 'DOCENA' ? 2 : 1;
-      const ids: string[] = [];
-      sObj.tallas.forEach(t => { for (let i = 0; i < factor; i++) ids.push(t.id); });
-      setNewColorCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+      curvaTarget = dividirDocenaEnMediaDocena(docena, tipo, 6);
     }
+
+    const ids = buildTallaIdsFromCurva(sObj, curvaTarget);
+    setNewColorCustomTallas(ct => ({ ...ct, [serieId]: ids }));
   };
 
   const aplicarCurvaATodasEnNuevoColor = (tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B' | 'NINGUNA') => {
@@ -1136,18 +1181,18 @@ export default function ModelosComponent({
     setNewColorCustomTallas(prev => {
       const current = prev[serieId] || [];
       const count = current.filter(id => id === tallaId).length;
-      if (count > 0) {
-        return { ...prev, [serieId]: current.filter(id => id !== tallaId) };
-      } else {
-        return { ...prev, [serieId]: [...current, tallaId] };
-      }
+      const updated = count > 0 ? current.filter(id => id !== tallaId) : [...current, tallaId];
+      registrarSiEsDocena(serieId, updated, true);
+      return { ...prev, [serieId]: updated };
     });
   };
 
   const addTallaRepeatInNewColorSerie = (serieId: string, tallaId: string) => {
     setNewColorCustomTallas(prev => {
       const current = prev[serieId] || [];
-      return { ...prev, [serieId]: [...current, tallaId] };
+      const updated = [...current, tallaId];
+      registrarSiEsDocena(serieId, updated, true);
+      return { ...prev, [serieId]: updated };
     });
   };
 
@@ -1158,6 +1203,7 @@ export default function ModelosComponent({
       if (idx > -1) {
         const copy = [...current];
         copy.splice(idx, 1);
+        registrarSiEsDocena(serieId, copy, true);
         return { ...prev, [serieId]: copy };
       }
       return prev;
@@ -3155,14 +3201,15 @@ export default function ModelosComponent({
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const docena = getDocenaConfigurada(s.id, false);
+                                        const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_A', 6);
                                         setCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = curva[t.numero] || 0;
                                             for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
+                                          registrarSiEsDocena(s.id, arr, false);
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
@@ -3173,14 +3220,15 @@ export default function ModelosComponent({
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const docena = getDocenaConfigurada(s.id, false);
+                                        const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_B', 6);
                                         setCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = curva[t.numero] || 0;
                                             for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
+                                          registrarSiEsDocena(s.id, arr, false);
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
@@ -3191,17 +3239,18 @@ export default function ModelosComponent({
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const docena = getDocenaConfigurada(s.id, false);
+                                        const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_A', 6);
                                         setCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = curva[t.numero] || 0;
                                             for (let i = 0; i < qty; i++) {
                                               const idx = arr.indexOf(t.id);
                                               if (idx > -1) arr.splice(idx, 1);
                                             }
                                           }
+                                          registrarSiEsDocena(s.id, arr, false);
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
@@ -3212,17 +3261,18 @@ export default function ModelosComponent({
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const docena = getDocenaConfigurada(s.id, false);
+                                        const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_B', 6);
                                         setCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = curva[t.numero] || 0;
                                             for (let i = 0; i < qty; i++) {
                                               const idx = arr.indexOf(t.id);
                                               if (idx > -1) arr.splice(idx, 1);
                                             }
                                           }
+                                          registrarSiEsDocena(s.id, arr, false);
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
@@ -3629,14 +3679,15 @@ export default function ModelosComponent({
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const docena = getDocenaConfigurada(s.id, true);
+                                        const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_A', 6);
                                         setNewColorCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = curva[t.numero] || 0;
                                             for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
+                                          registrarSiEsDocena(s.id, arr, true);
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
@@ -3647,14 +3698,15 @@ export default function ModelosComponent({
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const docena = getDocenaConfigurada(s.id, true);
+                                        const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_B', 6);
                                         setNewColorCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = curva[t.numero] || 0;
                                             for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
+                                          registrarSiEsDocena(s.id, arr, true);
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
@@ -3665,17 +3717,18 @@ export default function ModelosComponent({
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const docena = getDocenaConfigurada(s.id, true);
+                                        const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_A', 6);
                                         setNewColorCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = curva[t.numero] || 0;
                                             for (let i = 0; i < qty; i++) {
                                               const idx = arr.indexOf(t.id);
                                               if (idx > -1) arr.splice(idx, 1);
                                             }
                                           }
+                                          registrarSiEsDocena(s.id, arr, true);
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
@@ -3686,17 +3739,18 @@ export default function ModelosComponent({
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const docena = getDocenaConfigurada(s.id, true);
+                                        const curva = dividirDocenaEnMediaDocena(docena, 'MEDIA_B', 6);
                                         setNewColorCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = curva[t.numero] || 0;
                                             for (let i = 0; i < qty; i++) {
                                               const idx = arr.indexOf(t.id);
                                               if (idx > -1) arr.splice(idx, 1);
                                             }
                                           }
+                                          registrarSiEsDocena(s.id, arr, true);
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
@@ -3714,42 +3768,42 @@ export default function ModelosComponent({
                                   <div className="flex flex-wrap gap-1.5">
                                     <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'MEDIA_A')}
                                       className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
-                                        detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_A'
+                                        detectarTipoCurva(s.id, selectedTallaIds, true) === 'MEDIA_A'
                                           ? "border-amber-500 bg-amber-500 text-white shadow-xs"
                                           : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
                                       }`}
                                     >
-                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_A' && <Check size={11} />}
+                                      {detectarTipoCurva(s.id, selectedTallaIds, true) === 'MEDIA_A' && <Check size={11} />}
                                       Media Docena A (6 pares)
                                     </button>
                                     <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'MEDIA_B')}
                                       className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
-                                        detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_B'
+                                        detectarTipoCurva(s.id, selectedTallaIds, true) === 'MEDIA_B'
                                           ? "border-amber-500 bg-amber-500 text-white shadow-xs"
                                           : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
                                       }`}
                                     >
-                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'MEDIA_B' && <Check size={11} />}
+                                      {detectarTipoCurva(s.id, selectedTallaIds, true) === 'MEDIA_B' && <Check size={11} />}
                                       Media Docena B (6 pares)
                                     </button>
                                     <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'DOCENA')}
                                       className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
-                                        detectarTipoCurva(s.id, selectedTallaIds) === 'DOCENA'
+                                        detectarTipoCurva(s.id, selectedTallaIds, true) === 'DOCENA'
                                           ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
                                           : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
                                       }`}
                                     >
-                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'DOCENA' && <Check size={11} />}
+                                      {detectarTipoCurva(s.id, selectedTallaIds, true) === 'DOCENA' && <Check size={11} />}
                                       1 Docena Completa (12 pares)
                                     </button>
                                     <button type="button" onClick={() => aplicarCurvaEnNuevoColor(s.id, 'NINGUNA')}
                                       className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
-                                        detectarTipoCurva(s.id, selectedTallaIds) === 'NINGUNA'
+                                        detectarTipoCurva(s.id, selectedTallaIds, true) === 'NINGUNA'
                                           ? "border-slate-600 bg-slate-700 text-white shadow-xs"
                                           : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
                                       }`}
                                     >
-                                      {detectarTipoCurva(s.id, selectedTallaIds) === 'NINGUNA' && <Check size={11} />}
+                                      {detectarTipoCurva(s.id, selectedTallaIds, true) === 'NINGUNA' && <Check size={11} />}
                                       Sin Stock Inicial (0 pares)
                                     </button>
                                   </div>
