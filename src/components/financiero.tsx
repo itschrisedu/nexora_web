@@ -2380,12 +2380,18 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                               e.stopPropagation();
                                               setClienteSeleccionadoId(cliente.clientId);
                                               setCobroSeleccionadoId(cobroItem.id);
+                                              setDetalleNotaModalAbierto(true);
+                                              setAcordeonNotasAbierto(false);
+                                              setMontoAbono('');
+                                              setNotasAbono('');
+                                              setShowCuentaModal(true);
                                             }}
-                                            className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all cursor-pointer ${
+                                            className={`group p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all cursor-pointer ${
                                               isCobroActive
-                                                ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs'
-                                                : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40'
+                                                ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs ring-1 ring-[#0F172A]/30'
+                                                : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40 hover:border-blue-400/60 dark:hover:border-blue-500/60 hover:shadow-xs'
                                             }`}
+                                            title={`Abrir directamente ${numNota} y ver sus artículos`}
                                           >
                                             <div className="flex items-center gap-3">
                                               <div className="p-2 rounded-xl bg-slate-500/10 text-slate-700">
@@ -2393,7 +2399,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                               </div>
                                               <div>
                                                 <div className="font-bold text-xs text-[var(--foreground)] flex items-center gap-2 flex-wrap">
-                                                  <span>{numNota}</span>
+                                                  <span className="font-extrabold text-xs text-[var(--foreground)] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-1.5">
+                                                    <span>{numNota}</span>
+                                                    <ExternalLink size={12} className="text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                                  </span>
                                                   {activeSucursalId === 'TODAS' && (
                                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
                                                       <Building size={10} /> {cobroItem.sucursalNombre || 'Matriz'}
@@ -2468,6 +2477,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                                     e.stopPropagation();
                                                     setClienteSeleccionadoId(cliente.clientId);
                                                     setCobroSeleccionadoId(cobroItem.id);
+                                                    setDetalleNotaModalAbierto(true);
+                                                    setAcordeonNotasAbierto(false);
+                                                    setMontoAbono('');
+                                                    setNotasAbono('');
                                                     setShowCuentaModal(true);
                                                   }}
                                                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
@@ -2537,6 +2550,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             onClick={() => {
                               setClienteSeleccionadoId(cobro.clientId);
                               setCobroSeleccionadoId(cobro.id);
+                              setDetalleNotaModalAbierto(true);
+                              setAcordeonNotasAbierto(false);
                               setMontoAbono('');
                               setNotasAbono('');
                               setShowCuentaModal(true);
@@ -2979,9 +2994,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
                                 : `#${cobroSeleccionado.id.slice(0, 8).toUpperCase()}`}
                             </span>
-                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 rounded text-[9px] font-bold">
-                              Nota Más Antigua (Por orden de llegada)
-                            </span>
+                            {cobroSeleccionado.id === notaMasAntiguaPendiente?.id ? (
+                              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded text-[9px] font-bold">
+                                Nota Más Antigua (Por orden de llegada)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded text-[9px] font-bold">
+                                Nota Seleccionada
+                              </span>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => {
