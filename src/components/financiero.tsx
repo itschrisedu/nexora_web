@@ -72,6 +72,7 @@ interface FinancieroProps {
   online: boolean;
   activeSucursalId?: string;
   sucursales?: { id: string; name: string; isMatriz: boolean }[];
+  onNavigateToPedido?: (pedidoId: string, sucursalId?: string) => void;
 }
 
 export interface GastoItem {
@@ -124,6 +125,9 @@ interface Abono {
 interface Cobro {
   id: string;
   numeroCobro?: string;
+  orderId?: string;
+  orderCodigo?: string;
+  orderNumero?: string;
   clientId: string;
   clienteNombre?: string;
   clienteCedula?: string;
@@ -141,6 +145,8 @@ interface Cobro {
   saleNote?: {
     id: string;
     numero: number;
+    orderId?: string;
+    orderCodigo?: string;
     total: number;
     subtotal: number;
     pdfUrl?: string;
@@ -471,7 +477,7 @@ function getCobroConfig(estado?: string) {
   return COBRO_ESTADO[estado || 'PENDIENTE'] || { label: estado || 'Pendiente', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' };
 }
 
-export default function FinancieroComponent({ online, activeSucursalId, sucursales }: FinancieroProps) {
+export default function FinancieroComponent({ online, activeSucursalId, sucursales, onNavigateToPedido }: FinancieroProps) {
   const { showToast } = useToast();
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2370,6 +2376,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                         const numNota = cobroItem.saleNote?.numero
                                           ? `NOTA #${String(cobroItem.saleNote.numero).padStart(4, '0')}`
                                           : cobroItem.numeroCobro || `#${cobroItem.id.slice(0, 8).toUpperCase()}`;
+                                        const orderId = cobroItem.orderId || cobroItem.saleNote?.orderId;
+                                        const orderCodigo = cobroItem.orderCodigo || cobroItem.saleNote?.orderCodigo || (orderId ? `PED-${orderId.slice(0, 4).toUpperCase()}` : null);
                                         const montoOrig = Number(cobroItem.montoOriginal ?? cobroItem.montoTotal ?? 0);
                                         const isCobroActive = (cobroSeleccionadoId === cobroItem.id);
 
@@ -2378,6 +2386,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                             key={cobroItem.id}
                                             onClick={(e) => {
                                               e.stopPropagation();
+                                              if (orderId && onNavigateToPedido) {
+                                                onNavigateToPedido(orderId, cobroItem.tenantId);
+                                                return;
+                                              }
                                               setClienteSeleccionadoId(cliente.clientId);
                                               setCobroSeleccionadoId(cobroItem.id);
                                               setDetalleNotaModalAbierto(true);
@@ -2389,20 +2401,45 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                             className={`group p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all cursor-pointer ${
                                               isCobroActive
                                                 ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs ring-1 ring-[#0F172A]/30'
-                                                : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40 hover:border-blue-400/60 dark:hover:border-blue-500/60 hover:shadow-xs'
+                                                : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--muted)]/40 hover:border-blue-500/60 dark:hover:border-blue-400/60 hover:shadow-xs'
                                             }`}
-                                            title={`Abrir directamente ${numNota} y ver sus artículos`}
+                                            title={
+                                              orderId
+                                                ? `Redirigir al detalle del pedido ${orderCodigo || ''} en la sección de Pedidos`
+                                                : `Abrir directamente ${numNota} y ver sus artículos`
+                                            }
                                           >
                                             <div className="flex items-center gap-3">
-                                              <div className="p-2 rounded-xl bg-slate-500/10 text-slate-700">
+                                              <div className="p-2 rounded-xl bg-slate-500/10 text-slate-700 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                                 <FileText size={16} />
                                               </div>
                                               <div>
                                                 <div className="font-bold text-xs text-[var(--foreground)] flex items-center gap-2 flex-wrap">
                                                   <span className="font-extrabold text-xs text-[var(--foreground)] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-1.5">
                                                     <span>{numNota}</span>
-                                                    <ExternalLink size={12} className="text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
                                                   </span>
+
+                                                  {/* REFERENCIA AL PEDIDO ASOCIADO */}
+                                                  {orderCodigo ? (
+                                                    <span
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (orderId && onNavigateToPedido) {
+                                                          onNavigateToPedido(orderId, cobroItem.tenantId);
+                                                        }
+                                                      }}
+                                                      className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-2xs cursor-pointer"
+                                                      title={`Generado desde el pedido ${orderCodigo} · Clic para ver en Pedidos`}
+                                                    >
+                                                      <Package size={11} />
+                                                      <span>Pedido #${orderCodigo}</span>
+                                                      <ExternalLink size={10} className="opacity-75" />
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-[10px] text-[var(--muted-foreground)] italic">
+                                                      (Registro manual)
+                                                    </span>
+                                                  )}
                                                   {activeSucursalId === 'TODAS' && (
                                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
                                                       <Building size={10} /> {cobroItem.sucursalNombre || 'Matriz'}
@@ -2541,6 +2578,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         const num = cobro.saleNote?.numero
                           ? `NOTA #${String(cobro.saleNote.numero).padStart(4, '0')}`
                           : cobro.numeroCobro || `#${cobro.id.slice(0, 8).toUpperCase()}`;
+                        const orderId = cobro.orderId || cobro.saleNote?.orderId;
+                        const orderCodigo = cobro.orderCodigo || cobro.saleNote?.orderCodigo || (orderId ? `PED-${orderId.slice(0, 4).toUpperCase()}` : null);
                         const montoOrig = Number(cobro.montoOriginal ?? cobro.montoTotal ?? 0);
                         const isSelected = cobroSeleccionadoId === cobro.id;
 
@@ -2548,6 +2587,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                           <tr
                             key={cobro.id}
                             onClick={() => {
+                              if (orderId && onNavigateToPedido) {
+                                onNavigateToPedido(orderId, cobro.tenantId);
+                                return;
+                              }
                               setClienteSeleccionadoId(cobro.clientId);
                               setCobroSeleccionadoId(cobro.id);
                               setDetalleNotaModalAbierto(true);
@@ -2561,9 +2604,24 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             }`}
                           >
                             <td className="px-5 py-4 font-bold text-xs text-[var(--foreground)]">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <Receipt size={14} className="text-[var(--muted-foreground)]" />
                                 <span>{num}</span>
+                                {orderCodigo && (
+                                  <span
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (orderId && onNavigateToPedido) {
+                                        onNavigateToPedido(orderId, cobro.tenantId);
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-all shadow-2xs"
+                                    title={`Ir al pedido ${orderCodigo} en la sección de Pedidos`}
+                                  >
+                                    <Package size={10} />
+                                    <span>#${orderCodigo}</span>
+                                  </span>
+                                )}
                               </div>
                               <span className="text-[10px] text-[var(--muted-foreground)] block font-normal">
                                 Tipo: {cobro.tipo || 'Crédito'}
@@ -3003,6 +3061,29 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 Nota Seleccionada
                               </span>
                             )}
+                            {(() => {
+                              const ordId = cobroSeleccionado.orderId || cobroSeleccionado.saleNote?.orderId;
+                              const ordCod = cobroSeleccionado.orderCodigo || cobroSeleccionado.saleNote?.orderCodigo || (ordId ? `PED-${ordId.slice(0, 4).toUpperCase()}` : null);
+                              if (!ordCod) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowCuentaModal(false);
+                                    if (ordId && onNavigateToPedido) {
+                                      onNavigateToPedido(ordId, cobroSeleccionado.tenantId);
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/15 hover:bg-indigo-600 hover:text-white text-indigo-700 dark:text-indigo-300 text-[9px] font-black border border-indigo-500/30 transition-all cursor-pointer shadow-2xs"
+                                  title={`Ver pedido ${ordCod} en la sección de Pedidos`}
+                                >
+                                  <Package size={10} />
+                                  <span>Ver Pedido #${ordCod}</span>
+                                  <ExternalLink size={9} />
+                                </button>
+                              );
+                            })()}
                             <button
                               type="button"
                               onClick={(e) => {

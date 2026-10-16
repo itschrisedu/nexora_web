@@ -54,6 +54,8 @@ interface ComercialProps {
   userPermissions?: { permiteCambiarPrecio?: boolean; rol?: string };
   activeSucursalId?: string;
   sucursales?: { id: string; name: string; isMatriz: boolean }[];
+  initialPedidoId?: string | null;
+  onClearInitialPedido?: () => void;
 }
 
 type EstadoPedido = 'PENDIENTE' | 'EN_PREPARACION' | 'EN_ESPERA_STOCK' | 'ENTREGADO' | 'ENTREGADO_PARCIAL' | 'CANCELADO';
@@ -172,7 +174,15 @@ const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: 
   CANCELADO:         { label: 'Anulado',            color: 'bg-rose-500/10 text-rose-600 border-rose-500/20',           icon: <XCircle size={12} /> },
 };
 
-export default function ComercialComponent({ online, userRole, userPermissions, activeSucursalId, sucursales }: ComercialProps) {
+export default function ComercialComponent({
+  online,
+  userRole,
+  userPermissions,
+  activeSucursalId,
+  sucursales,
+  initialPedidoId,
+  onClearInitialPedido,
+}: ComercialProps) {
   const { showToast } = useToast();
   const puedeCambiarPrecio = userRole === 'ROL_ADMIN' || userPermissions?.permiteCambiarPrecio === true;
 
@@ -194,6 +204,34 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
   });
   const [selectedOrderSucursalId, setSelectedOrderSucursalId] = useState<string>('');
   const [pedidoExpandidoId, setPedidoExpandidoId] = useState<string | null>(null);
+
+  // Auto-expandir y enfocar el pedido solicitado desde Cobros y Cartera o Notificaciones
+  useEffect(() => {
+    const targetId =
+      initialPedidoId ||
+      (typeof window !== 'undefined' ? localStorage.getItem('comercial_selected_pedido_id') : null);
+    if (!targetId || pedidos.length === 0) return;
+
+    const pedidoEncontrado = pedidos.find(
+      (p) => p.id === targetId || p.numeroCodigo === targetId || String(p.numero) === targetId,
+    );
+    if (pedidoEncontrado) {
+      setPedidoExpandidoId(pedidoEncontrado.id);
+      setFiltroEstado('TODOS');
+      try {
+        localStorage.removeItem('comercial_selected_pedido_id');
+      } catch (e) {}
+      if (onClearInitialPedido) {
+        onClearInitialPedido();
+      }
+      setTimeout(() => {
+        const el = document.getElementById(`pedido-row-${pedidoEncontrado.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    }
+  }, [initialPedidoId, pedidos, onClearInitialPedido]);
 
   // Formulario nuevo pedido
   const [clientId, setClientId] = useState('');
@@ -2532,8 +2570,13 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                   return (
                     <Fragment key={p.id}>
                       <tr
+                        id={`pedido-row-${p.id}`}
                         onClick={() => setPedidoExpandidoId(isExpanded ? null : p.id)}
-                        className={`hover:bg-[var(--muted)]/30 transition-colors cursor-pointer ${isExpanded ? 'bg-[#0F172A]/5' : ''}`}
+                        className={`hover:bg-[var(--muted)]/30 transition-all cursor-pointer ${
+                          isExpanded
+                            ? 'bg-[#0F172A]/5 border-l-4 border-l-blue-600 dark:border-l-blue-400 shadow-2xs'
+                            : ''
+                        }`}
                       >
                         <td className="px-6 py-4 font-bold">
                           <div className="flex items-center gap-2">

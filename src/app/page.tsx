@@ -132,6 +132,7 @@ function MainApp() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showGpsModal, setShowGpsModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [pedidoAExpandirId, setPedidoAExpandirId] = useState<string | null>(null);
 
   // ── Estados para Sesión Única, Transferencia y Desbloqueo con OTP Gyre ──
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -686,6 +687,20 @@ function MainApp() {
       localStorage.setItem('nexora_active_view', target);
     }
   };
+
+  const handleNavigateToPedido = useCallback((pedidoId: string, sucursalId?: string) => {
+    if (pedidoId) {
+      try {
+        localStorage.setItem('comercial_selected_pedido_id', pedidoId);
+      } catch (e) {}
+      setPedidoAExpandirId(pedidoId);
+    }
+    if (sucursalId && sucursalId !== activeSucursalId && sucursalId !== 'TODAS') {
+      setActiveSucursalId(sucursalId);
+    }
+    setVistaActual('comercial');
+    localStorage.setItem('nexora_active_view', 'comercial');
+  }, [activeSucursalId]);
 
   const handleUnsavedStay = () => {
     setShowUnsavedModal(false);
@@ -1842,6 +1857,8 @@ function MainApp() {
               userPermissions={user}
               activeSucursalId={activeSucursalId}
               sucursales={sucursales}
+              initialPedidoId={pedidoAExpandirId}
+              onClearInitialPedido={() => setPedidoAExpandirId(null)}
             />
           )}
           {vistaActual === 'financiero' && (
@@ -1849,6 +1866,7 @@ function MainApp() {
               online={online}
               activeSucursalId={activeSucursalId}
               sucursales={sucursales}
+              onNavigateToPedido={handleNavigateToPedido}
             />
           )}
           {vistaActual === 'finanzas' && (
