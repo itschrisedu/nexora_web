@@ -365,15 +365,57 @@ export default function PrediccionDemandaComponent() {
 
   const temporadaInfoActual = TEMPORADAS_DISPONIBLES.find((t) => t.id === temporadaActiva) || TEMPORADAS_DISPONIBLES[0];
 
-  const itemsFiltrados = (prediccion?.predicciones || []).filter((item) => {
-    if (!busqueda.trim()) return true;
-    const q = busqueda.toLowerCase();
-    return (
-      item.modelo.toLowerCase().includes(q) ||
-      item.serie.toLowerCase().includes(q) ||
-      String(item.talla).includes(q)
-    );
-  });
+  // Orden de prioridad de series: de adulto/grande hacia bebé
+  const SERIE_ORDEN_PREDICCION: Record<string, number> = {
+    TALLA_GRANDE: 1,
+    ADULTO: 2,
+    JUVENIL: 3,
+    NINO: 4,
+    NINO_PEQUENO_A: 5,
+    BEBE: 6,
+  };
+
+  const obtenerOrdenSerie = (serie: string): number => {
+    const s = (serie || '').toUpperCase().replace(/\s+/g, '_');
+    if (SERIE_ORDEN_PREDICCION[s] !== undefined) return SERIE_ORDEN_PREDICCION[s];
+    if (s.includes('GRANDE') || s.includes('ADULT')) return 2;
+    if (s.includes('JUVENIL') || s.includes('CUARTERON')) return 3;
+    if (s.includes('JUNIOR') || s.includes('NINO') || s.includes('NIÑO')) return 4;
+    if (s.includes('BEBE') || s.includes('BEBÉ')) return 6;
+    return 5;
+  };
+
+  const itemsFiltrados = (prediccion?.predicciones || [])
+    .filter((item) => {
+      if (!busqueda.trim()) return true;
+      const q = busqueda.toLowerCase();
+      return (
+        item.modelo.toLowerCase().includes(q) ||
+        item.serie.toLowerCase().includes(q) ||
+        String(item.talla).includes(q)
+      );
+    })
+    .sort((a, b) => {
+      // 1. Agrupar por modelo (alfabéticamente)
+      const modeloA = (a.modelo || '').toLowerCase();
+      const modeloB = (b.modelo || '').toLowerCase();
+      const cmpModelo = modeloA.localeCompare(modeloB, 'es');
+      if (cmpModelo !== 0) return cmpModelo;
+
+      // 2. Dentro del mismo modelo, agrupar por color
+      const colorA = (a.color || '').toLowerCase();
+      const colorB = (b.color || '').toLowerCase();
+      const cmpColor = colorA.localeCompare(colorB, 'es');
+      if (cmpColor !== 0) return cmpColor;
+
+      // 3. Dentro del mismo modelo+color, ordenar por serie (Grande → Adulto → Juvenil → Niño → Bebé)
+      const ordenSerieA = obtenerOrdenSerie(a.serie);
+      const ordenSerieB = obtenerOrdenSerie(b.serie);
+      if (ordenSerieA !== ordenSerieB) return ordenSerieA - ordenSerieB;
+
+      // 4. Dentro de la misma serie, ordenar por talla ascendente
+      return Number(a.talla) - Number(b.talla);
+    });
 
   // Métricas agregadas
   const totalDemandaEstimada = (prediccion?.predicciones || []).reduce((acc, p) => acc + (p.demanda_estimada || 0), 0);
