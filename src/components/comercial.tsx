@@ -398,7 +398,7 @@ export default function ComercialComponent({
   const [showEntregaModal, setShowEntregaModal] = useState(false);
   const [pedidoEntregaSeleccionado, setPedidoEntregaSeleccionado] = useState<Pedido | null>(null);
   const [entregaItemsMap, setEntregaItemsMap] = useState<Record<string, number>>({});
-  const [entregaPreciosMap, setEntregaPreciosMap] = useState<Record<string, number>>({});
+  const [entregaPreciosMap, setEntregaPreciosMap] = useState<Record<string, string>>({});
   const [procesandoEntrega, setProcesandoEntrega] = useState(false);
 
   // ── Modal de Corrección de Precio Post-Venta / Post-Entrega ──
@@ -2153,7 +2153,7 @@ export default function ComercialComponent({
 
     setPedidoEntregaSeleccionado(orderToUse);
     const initialMap: Record<string, number> = {};
-    const initialPrecios: Record<string, number> = {};
+    const initialPrecios: Record<string, string> = {};
     (orderToUse.lines || []).forEach((l: any) => {
       const cantPedida = l.cantidad || 0;
       const cantEntregada = l.cantidadEntregada !== undefined ? l.cantidadEntregada : 0;
@@ -2165,7 +2165,7 @@ export default function ComercialComponent({
       const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
         ? Number(l.precioUnitario)
         : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
-      initialPrecios[l.id] = pUnit;
+      initialPrecios[l.id] = pUnit > 0 ? String(pUnit) : '';
     });
     setEntregaItemsMap(initialMap);
     setEntregaPreciosMap(initialPrecios);
@@ -2179,7 +2179,9 @@ export default function ComercialComponent({
       .map(([lineId, cant]) => ({
         lineId,
         cantidadAEntregar: Number(cant) || 0,
-        precioUnitario: entregaPreciosMap[lineId] !== undefined ? Number(entregaPreciosMap[lineId]) : undefined,
+        precioUnitario: entregaPreciosMap[lineId] !== undefined && entregaPreciosMap[lineId] !== ''
+          ? Number(entregaPreciosMap[lineId])
+          : undefined,
       }))
       .filter((i) => i.cantidadAEntregar > 0);
 
@@ -5945,7 +5947,11 @@ export default function ComercialComponent({
                     const totalParesPedidoModelo = g.lineas.reduce((acc, l) => acc + (l.cantidad || 0), 0);
                     const totalParesEntregadosAntes = g.lineas.reduce((acc, l) => acc + (l.cantidadEntregada || 0), 0);
                     const totalParesADespacharHoy = g.lineas.reduce((acc, l) => acc + (entregaItemsMap[l.id] || 0), 0);
-                    const precioEntregaActual = entregaPreciosMap[g.lineas[0]?.id] !== undefined ? entregaPreciosMap[g.lineas[0]?.id] : g.precioUnitario;
+                    const rawPrecio = entregaPreciosMap[g.lineas[0]?.id];
+                    const valorString = rawPrecio !== undefined
+                      ? rawPrecio
+                      : (g.precioUnitario > 0 ? String(g.precioUnitario) : '');
+                    const precioEntregaActual = parseFloat(valorString) || 0;
                     const subtotalDespachoHoy = totalParesADespacharHoy * precioEntregaActual;
 
                     let formato = `${totalParesADespacharHoy} pares`;
@@ -6170,17 +6176,22 @@ export default function ComercialComponent({
                             <div className="flex items-center justify-end gap-1 mt-0.5">
                               <span className="text-[11px] text-[var(--muted-foreground)] font-medium">$</span>
                               <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={precioEntregaActual}
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0.00"
+                                value={valorString}
                                 onChange={(e) => {
-                                  const val = parseFloat(e.target.value);
-                                  const nuevoP = isNaN(val) ? 0 : val;
+                                  let val = e.target.value;
+                                  val = val.replace(/[^0-9.]/g, '');
+                                  const parts = val.split('.');
+                                  if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                  if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                    val = val.replace(/^0+/, '');
+                                  }
                                   setEntregaPreciosMap((prev) => {
                                     const next = { ...prev };
                                     g.lineas.forEach((l) => {
-                                      next[l.id] = nuevoP;
+                                      next[l.id] = val;
                                     });
                                     return next;
                                   });
