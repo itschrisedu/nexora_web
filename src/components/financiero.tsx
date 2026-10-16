@@ -66,6 +66,7 @@ import { generarUrlPublicaAbono } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
 import { capitalizarNombreCompleto, formatearNombreSerie } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
+import { getCurvaDocena } from '../utils/curvas';
 
 interface FinancieroProps {
   online: boolean;
@@ -1595,6 +1596,22 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       }
       return nuevas;
     });
+  };
+
+  const handleAjustarMediaDocenaDevolucion = (productId: string, serieNombre: string, tipo: 'MEDIA_A' | 'MEDIA_B', delta: 1 | -1) => {
+    const curva = getCurvaDocena(serieNombre || '', tipo);
+    const hasCurva = Object.keys(curva).length > 0;
+    setLineasDevolucion((prev) =>
+      prev.map((l) => {
+        if (l.productId === productId) {
+          const numT = Number(l.numeroTalla);
+          const qty = hasCurva ? (curva[numT] ?? 1) : 1;
+          const newCant = delta > 0 ? l.cantidad + qty : Math.max(1, l.cantidad - qty);
+          return { ...l, cantidad: newCant, subtotal: newCant * l.precioUnitario };
+        }
+        return l;
+      })
+    );
   };
 
   const handleSumarParTodasTallasDevolucion = (productId: string) => {
@@ -4114,21 +4131,35 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 ))}
                               </div>
 
-                              {/* Botones de acción masiva +1 / -1 par c/talla */}
-                              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                              {/* Botones de acción masiva: Media Docena Serie A / B */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
                                 <button
                                   type="button"
-                                  onClick={() => handleSumarParTodasTallasDevolucion(grupo.productId)}
-                                  className="px-3.5 py-1 bg-[#E6F4EA] hover:bg-emerald-100 text-[#0D9488] border border-[#A7F3D0] rounded-full text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                                  onClick={() => handleAjustarMediaDocenaDevolucion(grupo.productId, grupo.serieNombre || '', 'MEDIA_A', 1)}
+                                  className="px-2.5 py-1 bg-[#E6F4EA] hover:bg-emerald-100 text-[#0D9488] border border-[#A7F3D0] rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
                                 >
-                                  +1 par c/talla
+                                  + ½ Doc A
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleRestarParTodasTallasDevolucion(grupo.productId)}
-                                  className="px-3.5 py-1 bg-[#FFE4E6] hover:bg-rose-100 text-[#E11D48] border border-[#FECDD3] rounded-full text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                                  onClick={() => handleAjustarMediaDocenaDevolucion(grupo.productId, grupo.serieNombre || '', 'MEDIA_B', 1)}
+                                  className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
                                 >
-                                  −1 par c/talla
+                                  + ½ Doc B
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAjustarMediaDocenaDevolucion(grupo.productId, grupo.serieNombre || '', 'MEDIA_A', -1)}
+                                  className="px-2.5 py-1 bg-[#FFE4E6] hover:bg-rose-100 text-[#E11D48] border border-[#FECDD3] rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  − ½ Doc A
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAjustarMediaDocenaDevolucion(grupo.productId, grupo.serieNombre || '', 'MEDIA_B', -1)}
+                                  className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  − ½ Doc B
                                 </button>
                                 <span className="text-xs text-slate-600 font-mono font-medium ml-0.5">
                                   = {grupo.totalPares} pares total

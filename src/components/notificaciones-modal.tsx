@@ -890,12 +890,12 @@ export default function NotificacionesModal({
                                     )}
 
                                     {/* Acciones Rápidas Masivas */}
-                                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                                      <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-xl text-[11px] font-bold">
-                                        +1 par c/talla
+                                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                      <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold">
+                                        ½ Doc A
                                       </span>
-                                      <span className="px-2.5 py-1 bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-xl text-[11px] font-bold">
-                                        −1 par c/talla
+                                      <span className="px-2 py-0.5 bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[10px] font-bold">
+                                        ½ Doc B
                                       </span>
                                       <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
                                         = {item.cantidadPedida} pares total
@@ -1078,12 +1078,12 @@ export default function NotificacionesModal({
                                     )}
 
                                     {/* Acciones Rápidas Masivas */}
-                                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                                      <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-xl text-[11px] font-bold">
-                                        +1 par c/talla
+                                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                      <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold">
+                                        ½ Doc A
                                       </span>
-                                      <span className="px-2.5 py-1 bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-xl text-[11px] font-bold">
-                                        −1 par c/talla
+                                      <span className="px-2 py-0.5 bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[10px] font-bold">
+                                        ½ Doc B
                                       </span>
                                       <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
                                         = {item.totalPares || item.cantidad} par(es) total

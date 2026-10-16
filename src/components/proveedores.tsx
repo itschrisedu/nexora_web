@@ -2791,30 +2791,70 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const curva = getCurvaDocena(m.serieNombre || '', 'MEDIA_A');
+                                      const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
-                                        t.cantidadIngresada = (t.cantidadIngresada || 0) + 1;
+                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] ?? 1) : 1;
+                                        t.cantidadIngresada = (t.cantidadIngresada || 0) + qty;
                                         t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
                                       });
                                       setEntryModelos(updated);
                                     }}
                                     className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                   >
-                                    +1 par c/talla
+                                    + ½ Doc A
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const curva = getCurvaDocena(m.serieNombre || '', 'MEDIA_B');
+                                      const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
-                                        t.cantidadIngresada = Math.max(0, (t.cantidadIngresada || 0) - 1);
+                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] ?? 1) : 1;
+                                        t.cantidadIngresada = (t.cantidadIngresada || 0) + qty;
+                                        t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
+                                      });
+                                      setEntryModelos(updated);
+                                    }}
+                                    className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                  >
+                                    + ½ Doc B
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const curva = getCurvaDocena(m.serieNombre || '', 'MEDIA_A');
+                                      const hasCurva = Object.keys(curva).length > 0;
+                                      const updated = [...entryModelos];
+                                      updated[mIdx].tallas.forEach((t) => {
+                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] ?? 1) : 1;
+                                        t.cantidadIngresada = Math.max(0, (t.cantidadIngresada || 0) - qty);
                                         t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
                                       });
                                       setEntryModelos(updated);
                                     }}
                                     className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                   >
-                                    −1 par c/talla
+                                    − ½ Doc A
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const curva = getCurvaDocena(m.serieNombre || '', 'MEDIA_B');
+                                      const hasCurva = Object.keys(curva).length > 0;
+                                      const updated = [...entryModelos];
+                                      updated[mIdx].tallas.forEach((t) => {
+                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] ?? 1) : 1;
+                                        t.cantidadIngresada = Math.max(0, (t.cantidadIngresada || 0) - qty);
+                                        t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
+                                      });
+                                      setEntryModelos(updated);
+                                    }}
+                                    className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                  >
+                                    − ½ Doc B
                                   </button>
                                   {m.tallas.some((t) => t.cantidadEsperada > 0) && (
                                     <button
@@ -3601,7 +3641,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const newTallas = (line.tallasDesglose || []).map(t => ({ ...t, cantidad: t.cantidad + 1 }));
+                                    const serieName = (line as any).serieNombre || (line as any).product?.serie?.nombre || '';
+                                    const curva = getCurvaDocena(serieName, 'MEDIA_A');
+                                    const hasCurva = Object.keys(curva).length > 0;
+                                    const newTallas = (line.tallasDesglose || []).map(t => {
+                                      const qty = hasCurva ? (curva[Number(t.talla)] ?? 1) : 1;
+                                      return { ...t, cantidad: t.cantidad + qty };
+                                    });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
                                     const updatedLines = [...(selectedOrder.lines || [])];
                                     const target = updatedLines.find((l) => l.productId === line.productId);
@@ -3611,15 +3657,21 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     }
                                     setSelectedOrder({ ...selectedOrder, lines: updatedLines });
                                   }}
-                                  className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold transition-colors"
+                                  className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                 >
-                                  +1 par c/talla
+                                  + ½ Doc A
                                 </button>
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const newTallas = (line.tallasDesglose || []).map(t => ({ ...t, cantidad: Math.max(0, t.cantidad - 1) }));
+                                    const serieName = (line as any).serieNombre || (line as any).product?.serie?.nombre || '';
+                                    const curva = getCurvaDocena(serieName, 'MEDIA_B');
+                                    const hasCurva = Object.keys(curva).length > 0;
+                                    const newTallas = (line.tallasDesglose || []).map(t => {
+                                      const qty = hasCurva ? (curva[Number(t.talla)] ?? 1) : 1;
+                                      return { ...t, cantidad: t.cantidad + qty };
+                                    });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
                                     const updatedLines = [...(selectedOrder.lines || [])];
                                     const target = updatedLines.find((l) => l.productId === line.productId);
@@ -3629,9 +3681,57 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     }
                                     setSelectedOrder({ ...selectedOrder, lines: updatedLines });
                                   }}
-                                  className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-colors"
+                                  className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                 >
-                                  −1 par c/talla
+                                  + ½ Doc B
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const serieName = (line as any).serieNombre || (line as any).product?.serie?.nombre || '';
+                                    const curva = getCurvaDocena(serieName, 'MEDIA_A');
+                                    const hasCurva = Object.keys(curva).length > 0;
+                                    const newTallas = (line.tallasDesglose || []).map(t => {
+                                      const qty = hasCurva ? (curva[Number(t.talla)] ?? 1) : 1;
+                                      return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
+                                    });
+                                    const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
+                                    const updatedLines = [...(selectedOrder.lines || [])];
+                                    const target = updatedLines.find((l) => l.productId === line.productId);
+                                    if (target) {
+                                      target.cantidadPedida = newTotal;
+                                      (target as any)._tallasOverride = newTallas;
+                                    }
+                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                                >
+                                  − ½ Doc A
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const serieName = (line as any).serieNombre || (line as any).product?.serie?.nombre || '';
+                                    const curva = getCurvaDocena(serieName, 'MEDIA_B');
+                                    const hasCurva = Object.keys(curva).length > 0;
+                                    const newTallas = (line.tallasDesglose || []).map(t => {
+                                      const qty = hasCurva ? (curva[Number(t.talla)] ?? 1) : 1;
+                                      return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
+                                    });
+                                    const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
+                                    const updatedLines = [...(selectedOrder.lines || [])];
+                                    const target = updatedLines.find((l) => l.productId === line.productId);
+                                    if (target) {
+                                      target.cantidadPedida = newTotal;
+                                      (target as any)._tallasOverride = newTallas;
+                                    }
+                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                  }}
+                                  className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                                >
+                                  − ½ Doc B
                                 </button>
                                 <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
                                   = {line.tallasDesglose?.reduce((s, t) => s + t.cantidad, 0) || 0} pares total
@@ -5700,35 +5800,89 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   ))}
                                 </div>
 
-                                {/* Botones de acción rápida: +1 par c/talla, -1 par c/talla */}
-                                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                {/* Botones de acción rápida: Media Docena Serie A / B */}
+                                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const curva = getCurvaDocena(m.serie || '', 'MEDIA_A');
+                                      const hasCurva = Object.keys(curva).length > 0;
                                       setDevLines((prev) =>
-                                        prev.map((l, i) =>
-                                          m.tallas.some((t) => t.originalIdx === i) ? { ...l, cantidad: l.cantidad + 1 } : l
-                                        )
+                                        prev.map((l, i) => {
+                                          const tMatch = m.tallas.find((t) => t.originalIdx === i);
+                                          if (tMatch) {
+                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] ?? 1) : 1;
+                                            return { ...l, cantidad: l.cantidad + qty };
+                                          }
+                                          return l;
+                                        })
                                       );
                                     }}
                                     className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                   >
-                                    +1 par c/talla
+                                    + ½ Doc A
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const curva = getCurvaDocena(m.serie || '', 'MEDIA_B');
+                                      const hasCurva = Object.keys(curva).length > 0;
                                       setDevLines((prev) =>
-                                        prev.map((l, i) =>
-                                          m.tallas.some((t) => t.originalIdx === i) ? { ...l, cantidad: Math.max(0, l.cantidad - 1) } : l
-                                        )
+                                        prev.map((l, i) => {
+                                          const tMatch = m.tallas.find((t) => t.originalIdx === i);
+                                          if (tMatch) {
+                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] ?? 1) : 1;
+                                            return { ...l, cantidad: l.cantidad + qty };
+                                          }
+                                          return l;
+                                        })
+                                      );
+                                    }}
+                                    className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                  >
+                                    + ½ Doc B
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const curva = getCurvaDocena(m.serie || '', 'MEDIA_A');
+                                      const hasCurva = Object.keys(curva).length > 0;
+                                      setDevLines((prev) =>
+                                        prev.map((l, i) => {
+                                          const tMatch = m.tallas.find((t) => t.originalIdx === i);
+                                          if (tMatch) {
+                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] ?? 1) : 1;
+                                            return { ...l, cantidad: Math.max(0, l.cantidad - qty) };
+                                          }
+                                          return l;
+                                        })
                                       );
                                     }}
                                     className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                   >
-                                    −1 par c/talla
+                                    − ½ Doc A
                                   </button>
-                                  <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const curva = getCurvaDocena(m.serie || '', 'MEDIA_B');
+                                      const hasCurva = Object.keys(curva).length > 0;
+                                      setDevLines((prev) =>
+                                        prev.map((l, i) => {
+                                          const tMatch = m.tallas.find((t) => t.originalIdx === i);
+                                          if (tMatch) {
+                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] ?? 1) : 1;
+                                            return { ...l, cantidad: Math.max(0, l.cantidad - qty) };
+                                          }
+                                          return l;
+                                        })
+                                      );
+                                    }}
+                                    className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                  >
+                                    − ½ Doc B
+                                  </button>
+                                  <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium ml-1">
                                     = {totalParesModelo} pares total
                                   </span>
                                 </div>

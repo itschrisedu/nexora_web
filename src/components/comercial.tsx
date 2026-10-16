@@ -3012,12 +3012,16 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
       {/* MODAL CREAR / EDITAR PEDIDO */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-4xl h-[92vh] max-h-[92vh] sm:h-auto sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder()); }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header Modal Estandarizado */}
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <ShoppingBag size={20} />
                 </div>
                 <div>
@@ -4163,72 +4167,70 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                   </div>
 
                                   {/* Acciones Rápidas */}
-                                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                  {/* Acciones Rápidas: Media Docena Serie A / B */}
+                                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_A');
                                         const newMap: Record<string, number> = { ...tallaCantidadesMap };
                                         tallasList.forEach((t: any) => {
                                           const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
-                                          newMap[key] = (newMap[key] || 0) + 1;
+                                          newMap[key] = (newMap[key] || 0) + (curva[key] || 0);
                                         });
                                         setTallaCantidadesMap(newMap);
                                       }}
                                       className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                     >
-                                      +1 par c/talla
+                                      + ½ Doc A
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_B');
                                         const newMap: Record<string, number> = { ...tallaCantidadesMap };
                                         tallasList.forEach((t: any) => {
                                           const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
-                                          newMap[key] = Math.max(0, (newMap[key] || 0) - 1);
+                                          newMap[key] = (newMap[key] || 0) + (curva[key] || 0);
+                                        });
+                                        setTallaCantidadesMap(newMap);
+                                      }}
+                                      className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                    >
+                                      + ½ Doc B
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_A');
+                                        const newMap: Record<string, number> = { ...tallaCantidadesMap };
+                                        tallasList.forEach((t: any) => {
+                                          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                          newMap[key] = Math.max(0, (newMap[key] || 0) - (curva[key] || 0));
                                         });
                                         setTallaCantidadesMap(newMap);
                                       }}
                                       className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                     >
-                                      −1 par c/talla
+                                      − ½ Doc A
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_B');
+                                        const newMap: Record<string, number> = { ...tallaCantidadesMap };
+                                        tallasList.forEach((t: any) => {
+                                          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                          newMap[key] = Math.max(0, (newMap[key] || 0) - (curva[key] || 0));
+                                        });
+                                        setTallaCantidadesMap(newMap);
+                                      }}
+                                      className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                    >
+                                      − ½ Doc B
                                     </button>
 
-                                    {(tipoVentaItem === 'SERIE_COMPLETA' || tipoVentaItem === 'SERIE_ESPECIAL') && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const newMap = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_A');
-                                            setTallaCantidadesMap(newMap);
-                                          }}
-                                          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                        >
-                                          ½ Docena A (6 pares)
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const newMap = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_B');
-                                            setTallaCantidadesMap(newMap);
-                                          }}
-                                          className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                        >
-                                          ½ Docena B (6 pares)
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const newMap = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'DOCENA');
-                                            setTallaCantidadesMap(newMap);
-                                          }}
-                                          className="px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                        >
-                                          1 Docena (12 pares)
-                                        </button>
-                                      </>
-                                    )}
-
-                                    <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
+                                    <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium ml-1">
                                       = {totalParesConfig} pares total
                                     </span>
                                   </div>
@@ -4445,13 +4447,17 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                     ))}
                                   </div>
 
-                                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_A');
+                                        const hasCurva = Object.keys(curva).length > 0;
                                         const nuevasLineas = lineasPedido.map(item => {
                                           if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
-                                            return { ...item, cantidad: item.cantidad + 1 };
+                                            const num = Number(item.numeroTalla);
+                                            const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                            return { ...item, cantidad: item.cantidad + qty };
                                           }
                                           return item;
                                         });
@@ -4459,14 +4465,37 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                       }}
                                       className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                     >
-                                      +1 par c/talla
+                                      + ½ Doc A
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_B');
+                                        const hasCurva = Object.keys(curva).length > 0;
                                         const nuevasLineas = lineasPedido.map(item => {
                                           if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
-                                            return { ...item, cantidad: Math.max(1, item.cantidad - 1) };
+                                            const num = Number(item.numeroTalla);
+                                            const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                            return { ...item, cantidad: item.cantidad + qty };
+                                          }
+                                          return item;
+                                        });
+                                        setLineasPedido(nuevasLineas);
+                                      }}
+                                      className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                    >
+                                      + ½ Doc B
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_A');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const nuevasLineas = lineasPedido.map(item => {
+                                          if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                            const num = Number(item.numeroTalla);
+                                            const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                            return { ...item, cantidad: Math.max(1, item.cantidad - qty) };
                                           }
                                           return item;
                                         });
@@ -4474,9 +4503,28 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                       }}
                                       className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                     >
-                                      −1 par c/talla
+                                      − ½ Doc A
                                     </button>
-                                    <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_B');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const nuevasLineas = lineasPedido.map(item => {
+                                          if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                            const num = Number(item.numeroTalla);
+                                            const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                            return { ...item, cantidad: Math.max(1, item.cantidad - qty) };
+                                          }
+                                          return item;
+                                        });
+                                        setLineasPedido(nuevasLineas);
+                                      }}
+                                      className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                    >
+                                      − ½ Doc B
+                                    </button>
+                                    <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium ml-1">
                                       = {totalPares} pares total
                                     </span>
                                   </div>
@@ -5702,7 +5750,11 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
 
       {/* Modal de Entrega Parcial / Total */}
       {showEntregaModal && pedidoEntregaSeleccionado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEntregaModal(false); setPedidoEntregaSeleccionado(null); setEntregaItemsMap({}); }, isDirtyEntrega()); }}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEntregaModal(false); setPedidoEntregaSeleccionado(null); setEntregaItemsMap({}); }, isDirtyEntrega()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEntregaModal(false); setPedidoEntregaSeleccionado(null); setEntregaItemsMap({}); }, isDirtyEntrega()); }}
+        >
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
             {/* Cabecera */}
             <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white flex items-center justify-between">
@@ -5940,40 +5992,87 @@ export default function ComercialComponent({ online, userRole, userPermissions, 
                                 })}
                               </div>
 
-                              {/* Botones de acción rápida: +1 par c/talla, -1 par c/talla */}
-                              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                              {/* Botones de acción rápida: Media Docena Serie A / B */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    const curva = getCurvaDocena(g.serieNombre || '', 'MEDIA_A');
+                                    const hasCurva = Object.keys(curva).length > 0;
                                     const nextMap = { ...entregaItemsMap };
                                     sortedTallas.forEach((l) => {
                                       const cantPendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, (l.cantidad || 0) - (l.cantidadEntregada || 0));
                                       const stockDisp = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : cantPendiente);
                                       const maxPermitido = Math.min(cantPendiente, Math.max(0, stockDisp));
                                       const actual = nextMap[l.id] ?? 0;
-                                      nextMap[l.id] = Math.min(maxPermitido, actual + 1);
+                                      const num = Number(l.talla?.numero ?? l.tallaNumero);
+                                      const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                      nextMap[l.id] = Math.min(maxPermitido, actual + qty);
                                     });
                                     setEntregaItemsMap(nextMap);
                                   }}
                                   className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                 >
-                                  +1 par c/talla
+                                  + ½ Doc A
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    const curva = getCurvaDocena(g.serieNombre || '', 'MEDIA_B');
+                                    const hasCurva = Object.keys(curva).length > 0;
+                                    const nextMap = { ...entregaItemsMap };
+                                    sortedTallas.forEach((l) => {
+                                      const cantPendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, (l.cantidad || 0) - (l.cantidadEntregada || 0));
+                                      const stockDisp = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : cantPendiente);
+                                      const maxPermitido = Math.min(cantPendiente, Math.max(0, stockDisp));
+                                      const actual = nextMap[l.id] ?? 0;
+                                      const num = Number(l.talla?.numero ?? l.tallaNumero);
+                                      const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                      nextMap[l.id] = Math.min(maxPermitido, actual + qty);
+                                    });
+                                    setEntregaItemsMap(nextMap);
+                                  }}
+                                  className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                >
+                                  + ½ Doc B
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const curva = getCurvaDocena(g.serieNombre || '', 'MEDIA_A');
+                                    const hasCurva = Object.keys(curva).length > 0;
                                     const nextMap = { ...entregaItemsMap };
                                     sortedTallas.forEach((l) => {
                                       const actual = nextMap[l.id] ?? 0;
-                                      nextMap[l.id] = Math.max(0, actual - 1);
+                                      const num = Number(l.talla?.numero ?? l.tallaNumero);
+                                      const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                      nextMap[l.id] = Math.max(0, actual - qty);
                                     });
                                     setEntregaItemsMap(nextMap);
                                   }}
                                   className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                 >
-                                  −1 par c/talla
+                                  − ½ Doc A
                                 </button>
-                                <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const curva = getCurvaDocena(g.serieNombre || '', 'MEDIA_B');
+                                    const hasCurva = Object.keys(curva).length > 0;
+                                    const nextMap = { ...entregaItemsMap };
+                                    sortedTallas.forEach((l) => {
+                                      const actual = nextMap[l.id] ?? 0;
+                                      const num = Number(l.talla?.numero ?? l.tallaNumero);
+                                      const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                      nextMap[l.id] = Math.max(0, actual - qty);
+                                    });
+                                    setEntregaItemsMap(nextMap);
+                                  }}
+                                  className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                >
+                                  − ½ Doc B
+                                </button>
+                                <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium ml-1">
                                   = {totalParesADespacharHoy} pares a entregar hoy
                                 </span>
                               </div>

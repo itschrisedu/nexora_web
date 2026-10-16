@@ -2180,8 +2180,8 @@ export default function ModelosComponent({
                       </div>
 
                       {/* Acciones principales */}
-                      <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
-                        <div className="text-left md:text-right">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between md:justify-end gap-3 sm:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+                        <div className="text-left sm:text-right flex sm:block items-center justify-between">
                           <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Precios Variantes</span>
                           <span className="text-sm font-black text-slate-900 dark:text-white block">
                             {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
@@ -2193,14 +2193,14 @@ export default function ModelosComponent({
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {online && isAdmin && (
                             <>
                               <button
                                 type="button"
                                 onClick={() => openEditModel(m)}
                                 title="Editar nombre, marca, código base o material del modelo"
-                                className="px-3 py-2 text-xs font-bold rounded-xl bg-blue-600/10 text-blue-600 border border-blue-600/20 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                                className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-blue-600/10 text-blue-600 border border-blue-600/20 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
                               >
                                 <Edit2 size={13} />
                                 <span>Editar</span>
@@ -2209,7 +2209,7 @@ export default function ModelosComponent({
                                 type="button"
                                 onClick={() => openAddColorModal(m)}
                                 title="Añadir un nuevo color a este modelo"
-                                className="px-3 py-2 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                                className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm cursor-pointer"
                               >
                                 <Plus size={13} />
                                 <span>Añadir Color</span>
@@ -2217,7 +2217,7 @@ export default function ModelosComponent({
                               <button
                                 type="button"
                                 onClick={() => handleToggleModel(m.id, m.name, m.active)}
-                                className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+                                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
                                   m.active
                                     ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
                                     : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
@@ -2229,7 +2229,7 @@ export default function ModelosComponent({
                                 type="button"
                                 onClick={() => handleDeleteModel(m.id, m.name)}
                                 title="Eliminar modelo de este local comercial"
-                                className="px-3 py-2 text-xs font-semibold rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                                className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
                               >
                                 <Trash2 size={13} />
                                 <span>Eliminar</span>
@@ -2238,7 +2238,7 @@ export default function ModelosComponent({
                           )}
                           <button
                             onClick={() => toggleExpandModel(m.id)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-[11px] sm:text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                           >
                             {isExpanded ? (
                               <><span>Ocultar Variantes</span><ChevronUp size={14} /></>
@@ -2645,13 +2645,14 @@ export default function ModelosComponent({
       {/* ═════════════════════════════════════════════════════════ */}
       {importModalData.isOpen && importModalData.model && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
           onMouseDown={e => { if (e.target === e.currentTarget) setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] }); }}
+          onClick={e => { if (e.target === e.currentTarget) setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] }); }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Sparkles size={20} />
                 </div>
                 <div>
@@ -2664,13 +2665,13 @@ export default function ModelosComponent({
               <button
                 type="button"
                 onClick={() => setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] })}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="flex items-center justify-between bg-[var(--muted)]/20 border border-[var(--border)] p-3 rounded-xl text-xs">
                 <div>
                   <span className="text-[var(--muted-foreground)]">Origen: </span>
@@ -2793,11 +2794,15 @@ export default function ModelosComponent({
 
       {/* MODAL CREAR MASIVO */}
       {showCreate && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowCreate(false); resetForm(); }, isDirtyCreate()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowCreate(false); resetForm(); }, isDirtyCreate()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowCreate(false); resetForm(); }, isDirtyCreate()); }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Plus size={20} />
                 </div>
                 <div>
@@ -2807,13 +2812,13 @@ export default function ModelosComponent({
               </div>
               <button
                 onClick={() => { setShowCreate(false); resetForm(); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreate} className="p-5 space-y-5 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleCreate} className="p-4 sm:p-5 space-y-5 overflow-y-auto flex-1 min-h-0">
               
               {/* Opción para Sucursales: Adoptar Modelo Base de la Matriz */}
               {!isMatrizTenant && modelosMatrizDisponibles.length > 0 && (
@@ -3144,34 +3149,86 @@ export default function ModelosComponent({
                                   })}
                                 </div>
 
-                                {/* Botones rápidos: +1/-1 par c/talla */}
-                                <div className="flex flex-wrap items-center gap-2">
+                                {/* Botones rápidos: Media Docena Serie A / B */}
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   <button type="button"
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const ids = sObj2.tallas.map(t => t.id);
-                                        setCustomTallas(ct => ({ ...ct, [s.id]: [...(ct[s.id] || []), ...ids] }));
-                                      }
-                                    }}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors"
-                                  >+1 par c/talla</button>
-                                  <button type="button"
-                                    onClick={() => {
-                                      const sObj2 = series.find(sx => sx.id === s.id);
-                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
+                                        const hasCurva = Object.keys(curva).length > 0;
                                         setCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const idx = arr.indexOf(t.id);
-                                            if (idx > -1) arr.splice(idx, 1);
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
                                     }}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
-                                  >−1 par c/talla</button>
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                                  >+ ½ Doc A</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) arr.push(t.id);
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-700 hover:bg-teal-500/20 transition-colors cursor-pointer"
+                                  >+ ½ Doc B</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) {
+                                              const idx = arr.indexOf(t.id);
+                                              if (idx > -1) arr.splice(idx, 1);
+                                            }
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                                  >− ½ Doc A</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) {
+                                              const idx = arr.indexOf(t.id);
+                                              if (idx > -1) arr.splice(idx, 1);
+                                            }
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-red-500/30 bg-red-500/10 text-red-700 hover:bg-red-500/20 transition-colors cursor-pointer"
+                                  >− ½ Doc B</button>
                                   <span className="text-[10px] text-[var(--muted-foreground)] font-medium font-mono">= {selectedTallaIds.length} pares ({getDocenaLabelExt(selectedTallaIds.length)})</span>
                                 </div>
 
@@ -3301,11 +3358,15 @@ export default function ModelosComponent({
 
       {/* ── MODAL AÑADIR NUEVO COLOR A MODELO EXISTENTE ── */}
       {showAddColorModal && selectedModelForColor && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowAddColorModal(false); setSelectedModelForColor(null); }, isDirtyAddColor()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowAddColorModal(false); setSelectedModelForColor(null); }, isDirtyAddColor()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowAddColorModal(false); setSelectedModelForColor(null); }, isDirtyAddColor()); }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <Palette size={20} />
                 </div>
                 <div>
@@ -3317,14 +3378,14 @@ export default function ModelosComponent({
               </div>
               <button
                 onClick={() => { setShowAddColorModal(false); setSelectedModelForColor(null); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateNewColor} className="p-5 space-y-5 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleCreateNewColor} className="p-4 sm:p-5 space-y-5 overflow-y-auto flex-1 min-h-0">
               {/* Sección 1: Detalle del Color */}
               <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
                 <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
@@ -3562,34 +3623,86 @@ export default function ModelosComponent({
                                   })}
                                 </div>
 
-                                {/* Botones rápidos: +1/-1 par c/talla */}
-                                <div className="flex flex-wrap items-center gap-2">
+                                {/* Botones rápidos: Media Docena Serie A / B */}
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   <button type="button"
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const ids = sObj2.tallas.map(t => t.id);
-                                        setNewColorCustomTallas(ct => ({ ...ct, [s.id]: [...(ct[s.id] || []), ...ids] }));
-                                      }
-                                    }}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors"
-                                  >+1 par c/talla</button>
-                                  <button type="button"
-                                    onClick={() => {
-                                      const sObj2 = series.find(sx => sx.id === s.id);
-                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
+                                        const hasCurva = Object.keys(curva).length > 0;
                                         setNewColorCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const idx = arr.indexOf(t.id);
-                                            if (idx > -1) arr.splice(idx, 1);
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
                                     }}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
-                                  >−1 par c/talla</button>
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                                  >+ ½ Doc A</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setNewColorCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) arr.push(t.id);
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-700 hover:bg-teal-500/20 transition-colors cursor-pointer"
+                                  >+ ½ Doc B</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setNewColorCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) {
+                                              const idx = arr.indexOf(t.id);
+                                              if (idx > -1) arr.splice(idx, 1);
+                                            }
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                                  >− ½ Doc A</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setNewColorCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) {
+                                              const idx = arr.indexOf(t.id);
+                                              if (idx > -1) arr.splice(idx, 1);
+                                            }
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-red-500/30 bg-red-500/10 text-red-700 hover:bg-red-500/20 transition-colors cursor-pointer"
+                                  >− ½ Doc B</button>
                                   <span className="text-[10px] text-[var(--muted-foreground)] font-medium font-mono">= {selectedTallaIds.length} pares ({getDocenaLabelExt(selectedTallaIds.length)})</span>
                                 </div>
 
@@ -3942,11 +4055,15 @@ export default function ModelosComponent({
 
       {/* ── MODAL EDITAR VARIANTE INTEGRAL ── */}
       {showEditProduct && editProduct && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditProduct(false); setEditProduct(null); }, isDirtyEditProduct()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditProduct(false); setEditProduct(null); }, isDirtyEditProduct()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditProduct(false); setEditProduct(null); }, isDirtyEditProduct()); }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Boxes size={20} />
                 </div>
                 <div>
@@ -3958,13 +4075,13 @@ export default function ModelosComponent({
               </div>
               <button
                 onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateProduct} className="p-5 space-y-4 overflow-y-auto flex-1">
+            <form onSubmit={handleUpdateProduct} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               {error && (
                 <div className="flex items-start justify-between gap-2.5 p-3.5 bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 text-xs rounded-2xl font-bold animate-in fade-in duration-150">
                   <div className="flex items-start gap-2">
@@ -4051,15 +4168,55 @@ export default function ModelosComponent({
                         className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 transition-colors text-[var(--foreground)]"
                       >Media Docena B (6 pares)</button>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button type="button"
-                        onClick={() => setEditProductTallas(prev => prev.map(t => ({ ...t, cantidad: t.cantidad + 1 })))}
-                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors"
-                      >+1 par c/talla</button>
+                        onClick={() => {
+                          const selectedSerie = series.find(s => s.id === editProductSerieId);
+                          const curva = getCurvaDocena(selectedSerie?.nombre || '', 'MEDIA_A');
+                          const hasCurva = Object.keys(curva).length > 0;
+                          setEditProductTallas(prev => prev.map(t => {
+                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                            return { ...t, cantidad: t.cantidad + qty };
+                          }));
+                        }}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                      >+ ½ Doc A</button>
                       <button type="button"
-                        onClick={() => setEditProductTallas(prev => prev.map(t => ({ ...t, cantidad: Math.max(0, t.cantidad - 1) })))}
-                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
-                      >−1 par c/talla</button>
+                        onClick={() => {
+                          const selectedSerie = series.find(s => s.id === editProductSerieId);
+                          const curva = getCurvaDocena(selectedSerie?.nombre || '', 'MEDIA_B');
+                          const hasCurva = Object.keys(curva).length > 0;
+                          setEditProductTallas(prev => prev.map(t => {
+                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                            return { ...t, cantidad: t.cantidad + qty };
+                          }));
+                        }}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-700 hover:bg-teal-500/20 transition-colors cursor-pointer"
+                      >+ ½ Doc B</button>
+                      <button type="button"
+                        onClick={() => {
+                          const selectedSerie = series.find(s => s.id === editProductSerieId);
+                          const curva = getCurvaDocena(selectedSerie?.nombre || '', 'MEDIA_A');
+                          const hasCurva = Object.keys(curva).length > 0;
+                          setEditProductTallas(prev => prev.map(t => {
+                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                            return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
+                          }));
+                        }}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                      >− ½ Doc A</button>
+                      <button type="button"
+                        onClick={() => {
+                          const selectedSerie = series.find(s => s.id === editProductSerieId);
+                          const curva = getCurvaDocena(selectedSerie?.nombre || '', 'MEDIA_B');
+                          const hasCurva = Object.keys(curva).length > 0;
+                          setEditProductTallas(prev => prev.map(t => {
+                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                            return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
+                          }));
+                        }}
+                        className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-red-500/30 bg-red-500/10 text-red-700 hover:bg-red-500/20 transition-colors cursor-pointer"
+                      >− ½ Doc B</button>
                     </div>
                   </div>
                 )}
@@ -4313,11 +4470,15 @@ export default function ModelosComponent({
 
       {/* ── MODAL EDITAR MODELO BASE ── */}
       {showEditModel && editModel && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModel(false); setEditModel(null); }, isDirtyEditModel()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModel(false); setEditModel(null); }, isDirtyEditModel()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModel(false); setEditModel(null); }, isDirtyEditModel()); }}
+        >
+          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-blue-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-blue-400 font-bold shrink-0">
                   <Edit3 size={20} />
                 </div>
                 <div>
@@ -4327,13 +4488,13 @@ export default function ModelosComponent({
               </div>
               <button
                 onClick={() => { setShowEditModel(false); setEditModel(null); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateModel} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleUpdateModel} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <Lbl t="Nombre del Modelo" req />
                 <input type="text" value={editModelName} onChange={e => setEditModelName(e.target.value)}
@@ -4549,35 +4710,87 @@ export default function ModelosComponent({
                                   })}
                                 </div>
 
-                                {/* Botones rápidos: +1/-1 par c/talla */}
-                                <div className="flex flex-wrap items-center gap-2">
+                                {/* Botones rápidos: Media Docena Serie A / B */}
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   <button type="button"
                                     onClick={() => {
                                       const sObj2 = series.find(sx => sx.id === s.id);
                                       if (sObj2?.tallas) {
-                                        const ids = sObj2.tallas.map(t => t.id);
-                                        setEditModelCustomTallas(ct => ({ ...ct, [s.id]: [...(ct[s.id] || []), ...ids] }));
-                                      }
-                                    }}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors"
-                                  >+1 par c/talla</button>
-                                  <button type="button"
-                                    onClick={() => {
-                                      const sObj2 = series.find(sx => sx.id === s.id);
-                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
+                                        const hasCurva = Object.keys(curva).length > 0;
                                         setEditModelCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const idx = arr.indexOf(t.id);
-                                            if (idx > -1) arr.splice(idx, 1);
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
                                           return { ...ct, [s.id]: arr };
                                         });
                                       }
                                     }}
-                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors"
-                                  >−1 par c/talla</button>
-                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium">= {selectedTallaIds.length} pares total</span>
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                                  >+ ½ Doc A</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setEditModelCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) arr.push(t.id);
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-teal-500/30 bg-teal-500/10 text-teal-700 hover:bg-teal-500/20 transition-colors cursor-pointer"
+                                  >+ ½ Doc B</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_A');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setEditModelCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) {
+                                              const idx = arr.indexOf(t.id);
+                                              if (idx > -1) arr.splice(idx, 1);
+                                            }
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                                  >− ½ Doc A</button>
+                                  <button type="button"
+                                    onClick={() => {
+                                      const sObj2 = series.find(sx => sx.id === s.id);
+                                      if (sObj2?.tallas) {
+                                        const curva = getCurvaDocena(sObj2.nombre || '', 'MEDIA_B');
+                                        const hasCurva = Object.keys(curva).length > 0;
+                                        setEditModelCustomTallas(ct => {
+                                          let arr = [...(ct[s.id] || [])];
+                                          for (const t of sObj2.tallas!) {
+                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            for (let i = 0; i < qty; i++) {
+                                              const idx = arr.indexOf(t.id);
+                                              if (idx > -1) arr.splice(idx, 1);
+                                            }
+                                          }
+                                          return { ...ct, [s.id]: arr };
+                                        });
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg border border-red-500/30 bg-red-500/10 text-red-700 hover:bg-red-500/20 transition-colors cursor-pointer"
+                                  >− ½ Doc B</button>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium font-mono">= {selectedTallaIds.length} pares total</span>
                                 </div>
 
                                 {/* Preset de Curvas */}
