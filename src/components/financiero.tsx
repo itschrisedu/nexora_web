@@ -523,6 +523,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [metodoAbono, setMetodoAbono] = useState('EFECTIVO');
   const [notasAbono, setNotasAbono] = useState('');
   const [savingAbono, setSavingAbono] = useState(false);
+  const [showConfirmAbonoModal, setShowConfirmAbonoModal] = useState(false);
   const [formatoEnvioAbono, setFormatoEnvioAbono] = useState<'PDF' | 'TEXTO'>('PDF'); // Por defecto PDF como pidió el usuario
   const [autoEnviarWhatsAppAbono, setAutoEnviarWhatsAppAbono] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -668,6 +669,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (showDiscardModal) return;
+      if (showConfirmAbonoModal) {
+        e.preventDefault();
+        setShowConfirmAbonoModal(false);
+        return;
+      }
       if (confirmModal.isOpen) {
         e.preventDefault();
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -696,7 +702,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showDiscardModal, confirmModal.isOpen, showFacturaModal, showDevolucionModal, showHistorialModal, showCuentaModal, safeDismiss, isDirtyFactura, isDirtyDevolucion, isDirtyAbono]);
+  }, [showDiscardModal, showConfirmAbonoModal, confirmModal.isOpen, showFacturaModal, showDevolucionModal, showHistorialModal, showCuentaModal, safeDismiss, isDirtyFactura, isDirtyDevolucion, isDirtyAbono]);
 
   const loadSucursales = async () => {
     try {
@@ -1258,6 +1264,23 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
   };
 
+  const handleSolicitarConfirmacionAbono = () => {
+    if (!carteraSeleccionada || !montoAbono) {
+      showToast('Por favor, ingresa el monto del abono.', 'warning');
+      return;
+    }
+    const valor = parseFloat(montoAbono);
+    if (isNaN(valor) || valor <= 0) {
+      showToast('Ingresa un monto válido mayor a $0.00', 'warning');
+      return;
+    }
+    if (valor > Number(carteraSeleccionada.saldoTotalPendiente)) {
+      showToast(`El monto no puede superar el saldo total adeudado por el cliente ($${Number(carteraSeleccionada.saldoTotalPendiente).toFixed(2)})`, 'warning');
+      return;
+    }
+    setShowConfirmAbonoModal(true);
+  };
+
   const handleRegistrarAbono = async () => {
     if (!carteraSeleccionada || !montoAbono) {
       showToast('Ingresa el monto del abono.', 'warning');
@@ -1272,6 +1295,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       showToast(`El monto no puede superar el saldo total adeudado por el cliente ($${Number(carteraSeleccionada.saldoTotalPendiente).toFixed(2)})`, 'warning');
       return;
     }
+
+    setShowConfirmAbonoModal(false);
 
     // ─── PRE-APERTURA SÍNCRONA DE VENTANA (SOLO MODO TEXTO) ────────────
     // Para modo TEXTO pre-abrimos la ventana para evitar bloqueos del navegador.
@@ -1317,7 +1342,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         }
       }
 
-      showToast(`¡Abono de $${valor.toFixed(2)} registrado exitosamente vía ${metodoAbono}!`, 'success');
+      showToast(`Abono de $${valor.toFixed(2)} registrado exitosamente. La cuenta comercial ha sido actualizada.`, 'success');
 
       // Nombre o número de nota asociada
       const numNotaRef = cobroSeleccionado?.saleNote?.numero
@@ -1367,6 +1392,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       setMontoAbono('');
       setNotasAbono('');
+      setShowCuentaModal(false);
+      setCobroSeleccionadoId(null);
       await loadCobros();
     } catch (err: any) {
       showToast(err.message || 'Error al registrar abono.', 'error');
@@ -3382,7 +3409,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               {/* Botón de Confirmación del Abono (estático en el footer) */}
               {cobroSeleccionado && Number(cobroSeleccionado.saldoPendiente) > 0 && (
                 <button
-                  onClick={handleRegistrarAbono}
+                  onClick={handleSolicitarConfirmacionAbono}
                   disabled={savingAbono || !montoAbono || !online}
                   className={`w-full py-3 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer ${
                     metodoAbono === 'DESCUENTO_COMERCIAL'
@@ -3428,6 +3455,128 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   Cerrar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Confirmación de Abono (Web y Móvil) ── */}
+      {showConfirmAbonoModal && carteraSeleccionada && (
+        <div
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !savingAbono) setShowConfirmAbonoModal(false);
+          }}
+        >
+          <div
+            className="bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Encabezado */}
+            <div className="p-5 border-b border-[var(--border)] bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                <CheckCircle size={20} />
+              </div>
+              <div className="flex-1 min-w-0 pr-2">
+                <h3 className="font-extrabold text-base text-[var(--foreground)] tracking-tight">
+                  Confirmar Registro de Abono
+                </h3>
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5 leading-relaxed">
+                  Verifique los detalles antes de registrar la transacción
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!savingAbono) setShowConfirmAbonoModal(false);
+                }}
+                className="p-1 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-5 space-y-4">
+              {/* Tarjeta destacada con el valor */}
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider block">
+                  Valor a Abonar
+                </span>
+                <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight mt-0.5 block font-mono">
+                  ${parseFloat(montoAbono || '0').toFixed(2)}
+                </span>
+                <span className="text-[11px] text-[var(--muted-foreground)] mt-1 block font-medium">
+                  Método:{' '}
+                  {metodoAbono === 'DESCUENTO_COMERCIAL'
+                    ? 'Descuento Comercial'
+                    : capitalizarNombreCompleto(metodoAbono.replace(/_/g, ' '))}
+                </span>
+              </div>
+
+              {/* Pregunta clara y formal */}
+              <p className="text-xs text-[var(--foreground)] leading-relaxed">
+                ¿Está seguro de que desea registrar un abono por{' '}
+                <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">
+                  ${parseFloat(montoAbono || '0').toFixed(2)}
+                </strong>{' '}
+                a la cuenta comercial del cliente{' '}
+                <strong className="text-[var(--foreground)] font-extrabold">
+                  {carteraSeleccionada.clienteNombre}
+                </strong>?
+              </p>
+
+              {/* Detalle informativo de saldos */}
+              <div className="p-3 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-2 text-xs">
+                <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                  <span>Saldo adeudado actual:</span>
+                  <span className="font-bold text-[var(--foreground)] font-mono">
+                    ${Number(carteraSeleccionada.saldoTotalPendiente).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-[var(--border)] pt-2 font-bold">
+                  <span className="text-[var(--foreground)]">Saldo restante tras el abono:</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold font-mono">
+                    ${Math.max(0, Number(carteraSeleccionada.saldoTotalPendiente) - (parseFloat(montoAbono) || 0)).toFixed(2)}
+                  </span>
+                </div>
+                {notasAbono.trim() && (
+                  <div className="border-t border-[var(--border)] pt-2 text-[11px] text-[var(--muted-foreground)] flex items-start gap-1">
+                    <span className="font-semibold text-[var(--foreground)] shrink-0">Nota:</span>
+                    <span className="italic truncate">{notasAbono.trim()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Botones de acción (responsivos: mobile apilados / desktop en fila) */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowConfirmAbonoModal(false)}
+                disabled={savingAbono}
+                className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer text-center"
+              >
+                No, Corregir Monto
+              </button>
+              <button
+                type="button"
+                onClick={handleRegistrarAbono}
+                disabled={savingAbono}
+                className="w-full sm:w-auto px-5 py-2.5 text-xs font-extrabold rounded-xl transition-all shadow-md bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {savingAbono ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Registrando...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} />
+                    <span>Sí, Confirmar Abono</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
