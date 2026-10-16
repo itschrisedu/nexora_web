@@ -404,7 +404,7 @@ export default function ComercialComponent({
   // ── Modal de Corrección de Precio Post-Venta / Post-Entrega ──
   const [showCorregirPrecioModal, setShowCorregirPrecioModal] = useState(false);
   const [pedidoACorregir, setPedidoACorregir] = useState<Pedido | null>(null);
-  const [preciosCorregirMap, setPreciosCorregirMap] = useState<Record<string, number>>({});
+  const [preciosCorregirMap, setPreciosCorregirMap] = useState<Record<string, string>>({});
   const [guardandoCorreccionPrecio, setGuardandoCorreccionPrecio] = useState(false);
 
   // Visor Lightbox de Foto de Calzado
@@ -660,6 +660,7 @@ export default function ComercialComponent({
 
   const [ultimoPrecioCliente, setUltimoPrecioCliente] = useState<number | null>(null);
   const [fechaUltimaVenta, setFechaUltimaVenta] = useState<string | null>(null);
+  const [sucursalUltimaVenta, setSucursalUltimaVenta] = useState<string | null>(null);
 
   // Debounce de 3 segundos para la búsqueda de clientes (como solicitó el usuario)
   useEffect(() => {
@@ -677,19 +678,24 @@ export default function ComercialComponent({
     return () => clearTimeout(timer);
   }, [busquedaCliente]);
 
-  // Consultar último precio al cliente cuando cambia el producto seleccionado o el cliente
+  // Consultar último precio al cliente cuando cambia el producto seleccionado o el cliente (busca a nivel de MODELO en toda la red)
   useEffect(() => {
     const fetchUltimoPrecio = async () => {
       if (!clientId || !selectedProductId || !online) {
         setUltimoPrecioCliente(null);
         setFechaUltimaVenta(null);
+        setSucursalUltimaVenta(null);
         return;
       }
       try {
-        const data = await ApiService.get(`/pedidos/ultimo-precio?clientId=${clientId}&productId=${selectedProductId}`);
+        const mId = productoSeleccionadoObj?.modelId || productoSeleccionadoObj?.modeloId || '';
+        const data = await ApiService.get(
+          `/pedidos/ultimo-precio?clientId=${clientId}&productId=${selectedProductId}${mId ? `&modelId=${mId}` : ''}`
+        );
         const precioAnterior = data.precioAnterior ? Number(data.precioAnterior) : null;
         setUltimoPrecioCliente(precioAnterior);
         setFechaUltimaVenta(data.fechaUltimaVenta ? new Date(data.fechaUltimaVenta).toLocaleDateString('es-EC') : null);
+        setSucursalUltimaVenta(data.sucursalNombre || null);
         // Auto-aplicar el último precio del cliente como precio por defecto
         if (precioAnterior && precioAnterior > 0) {
           setPrecioItem(precioAnterior);
@@ -698,10 +704,11 @@ export default function ComercialComponent({
       } catch {
         setUltimoPrecioCliente(null);
         setFechaUltimaVenta(null);
+        setSucursalUltimaVenta(null);
       }
     };
     fetchUltimoPrecio();
-  }, [clientId, selectedProductId, online]);
+  }, [clientId, selectedProductId, productoSeleccionadoObj, online]);
 
   const [businessConfig, setBusinessConfig] = useState<any | null>(null);
   const [sucursalesEmpresa, setSucursalesEmpresa] = useState<any[]>([]);
@@ -2216,14 +2223,14 @@ export default function ComercialComponent({
     } catch (e) {}
 
     setPedidoACorregir(orderToUse);
-    const mapPrecios: Record<string, number> = {};
+    const mapPrecios: Record<string, string> = {};
     (orderToUse.lines || []).forEach((l: any) => {
       const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
         ? Number(l.precioUnitario)
         : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
       const key = l.productId || l.id;
       if (mapPrecios[key] === undefined) {
-        mapPrecios[key] = pUnit;
+        mapPrecios[key] = pUnit > 0 ? String(pUnit) : '';
       }
     });
     setPreciosCorregirMap(mapPrecios);
@@ -4334,7 +4341,10 @@ export default function ComercialComponent({
                                     disabled={!puedeCambiarPrecio}
                                     value={precioItemInput}
                                     onChange={(e) => {
-                                      const valStr = e.target.value;
+                                      let valStr = e.target.value;
+                                      if (valStr.length > 1 && valStr.startsWith('0') && valStr[1] !== '.') {
+                                        valStr = valStr.replace(/^0+/, '');
+                                      }
                                       setPrecioItemInput(valStr);
                                       const parsed = parseFloat(valStr);
                                       setPrecioItem(isNaN(parsed) ? 0 : parsed);
@@ -4365,12 +4375,25 @@ export default function ComercialComponent({
 
                           {/* Info de último precio al cliente si aplica */}
                           {ultimoPrecioCliente !== null && selectedProductId && clientId && (
-                            <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-xs">
-                              <span className="text-emerald-600 text-sm">✅</span>
-                              <div>
-                                <span className="font-bold text-emerald-700 dark:text-emerald-300">Precio del historial del cliente: </span>
-                                <span className="font-black text-emerald-800 dark:text-emerald-200">${ultimoPrecioCliente.toFixed(2)}</span>
-                                {fechaUltimaVenta && <span className="text-emerald-600 ml-1">({fechaUltimaVenta})</span>}
+                            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center gap-2 text-xs animate-in fade-in duration-200">
+                              <span className="text-emerald-600 text-sm shrink-0">💡</span>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-bold text-emerald-800 dark:text-emerald-200">
+                                  Último precio aplicado:
+                                </span>
+                                <span className="font-black text-emerald-700 dark:text-emerald-300 font-mono text-sm">
+                                  ${ultimoPrecioCliente.toFixed(2)}
+                                </span>
+                                {sucursalUltimaVenta && (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 font-bold text-[10px]">
+                                    · {sucursalUltimaVenta}
+                                  </span>
+                                )}
+                                {fechaUltimaVenta && (
+                                  <span className="text-emerald-600/80 dark:text-emerald-400/80 font-mono text-[11px]">
+                                    ({fechaUltimaVenta})
+                                  </span>
+                                )}
                               </div>
                             </div>
                           )}
@@ -6346,10 +6369,11 @@ export default function ComercialComponent({
                 return (
                   <div className="space-y-3">
                     {list.map((prod) => {
-                      const precioEditado = preciosCorregirMap[prod.productId] !== undefined
+                      const valorString = preciosCorregirMap[prod.productId] !== undefined
                         ? preciosCorregirMap[prod.productId]
-                        : prod.precioActual;
-                      const nuevoSubtotal = prod.totalPares * precioEditado;
+                        : (prod.precioActual > 0 ? String(prod.precioActual) : '');
+                      const precioEditadoNum = parseFloat(valorString) || 0;
+                      const nuevoSubtotal = prod.totalPares * precioEditadoNum;
 
                       return (
                         <div
@@ -6393,29 +6417,35 @@ export default function ComercialComponent({
                               <div className="flex items-center gap-1 mt-0.5 justify-end">
                                 <span className="text-xs font-bold text-[var(--muted-foreground)]">$</span>
                                 <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  value={precioEditado}
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="0.00"
+                                  value={valorString}
                                   onChange={(e) => {
-                                    const val = parseFloat(e.target.value);
+                                    let val = e.target.value;
+                                    val = val.replace(/[^0-9.]/g, '');
+                                    const parts = val.split('.');
+                                    if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                    if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                      val = val.replace(/^0+/, '');
+                                    }
                                     setPreciosCorregirMap((prev) => ({
                                       ...prev,
-                                      [prod.productId]: isNaN(val) ? 0 : val,
+                                      [prod.productId]: val,
                                     }));
                                   }}
                                   className="w-20 h-7 px-1.5 text-right text-xs font-bold bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-hidden focus:border-purple-600 font-mono"
                                 />
                               </div>
-                              <div className="text-[10px] font-extrabold text-emerald-600 mt-0.5">
+                              <div className="text-[10px] font-extrabold text-emerald-600 mt-0.5 font-mono">
                                 Total: ${nuevoSubtotal.toFixed(2)}
                               </div>
                             </div>
 
                             <button
                               type="button"
-                              disabled={guardandoCorreccionPrecio || precioEditado <= 0}
-                              onClick={() => handleGuardarCorreccionPrecio(prod.productId, precioEditado)}
+                              disabled={guardandoCorreccionPrecio || precioEditadoNum <= 0}
+                              onClick={() => handleGuardarCorreccionPrecio(prod.productId, precioEditadoNum)}
                               className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
                             >
                               {guardandoCorreccionPrecio ? (
