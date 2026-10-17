@@ -1638,7 +1638,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       prev.map((l) => {
         if (l.productId === productId) {
           const numT = Number(l.numeroTalla);
-          const qty = hasCurva ? (curva[numT] ?? 1) : 1;
+          const qty = hasCurva ? (curva[numT] || 0) : 0;
           const newCant = delta > 0 ? l.cantidad + qty : Math.max(1, l.cantidad - qty);
           return { ...l, cantidad: newCant, subtotal: newCant * l.precioUnitario };
         }

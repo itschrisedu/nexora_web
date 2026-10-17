@@ -42,7 +42,7 @@ import { useToast } from './ui/toast';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
 import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
-import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock } from '../utils/curvas';
+import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock, evaluarDisponibilidadMedias } from '../utils/curvas';
 import { capitalizarNombreCompleto, formatearNombreSerie } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 import ImageLightboxModal from './ui/image-lightbox-modal';
@@ -4242,74 +4242,141 @@ export default function ComercialComponent({
                                     })}
                                   </div>
 
-                                  {/* Acciones Rápidas */}
-                                  {/* Acciones Rápidas: Media Docena Serie A / B */}
-                                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_A');
-                                        const newMap: Record<string, number> = { ...tallaCantidadesMap };
-                                        tallasList.forEach((t: any) => {
-                                          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
-                                          newMap[key] = (newMap[key] || 0) + (curva[key] || 0);
-                                        });
-                                        setTallaCantidadesMap(newMap);
-                                      }}
-                                      className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                    >
-                                      + ½ Doc A
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_B');
-                                        const newMap: Record<string, number> = { ...tallaCantidadesMap };
-                                        tallasList.forEach((t: any) => {
-                                          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
-                                          newMap[key] = (newMap[key] || 0) + (curva[key] || 0);
-                                        });
-                                        setTallaCantidadesMap(newMap);
-                                      }}
-                                      className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                    >
-                                      + ½ Doc B
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_A');
-                                        const newMap: Record<string, number> = { ...tallaCantidadesMap };
-                                        tallasList.forEach((t: any) => {
-                                          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
-                                          newMap[key] = Math.max(0, (newMap[key] || 0) - (curva[key] || 0));
-                                        });
-                                        setTallaCantidadesMap(newMap);
-                                      }}
-                                      className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                    >
-                                      − ½ Doc A
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_B');
-                                        const newMap: Record<string, number> = { ...tallaCantidadesMap };
-                                        tallasList.forEach((t: any) => {
-                                          const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
-                                          newMap[key] = Math.max(0, (newMap[key] || 0) - (curva[key] || 0));
-                                        });
-                                        setTallaCantidadesMap(newMap);
-                                      }}
-                                      className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                    >
-                                      − ½ Doc B
-                                    </button>
+                                  {/* Acciones Rápidas: Media Docena Serie A / B con Validación y Recomendación de Stock */}
+                                  {(() => {
+                                    const evalStock = tipoVentaItem !== 'SERIE_ESPECIAL'
+                                      ? evaluarDisponibilidadMedias(serieNombreDisplay, tallasList)
+                                      : null;
 
-                                    <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium ml-1">
-                                      = {totalParesConfig} pares total
-                                    </span>
-                                  </div>
+                                    return (
+                                      <div className="space-y-1.5 pt-0.5">
+                                        {evalStock && evalStock.mensajeAdvertencia && (
+                                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+                                            <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-500" />
+                                            <span>{evalStock.mensajeAdvertencia}</span>
+                                          </div>
+                                        )}
+
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (evalStock && !evalStock.mediaADisponible) {
+                                                showToast(
+                                                  evalStock.mensajeAdvertencia ||
+                                                  `No hay stock suficiente para Serie A. ${evalStock.mediaBDisponible ? `Solo queda disponible la Serie B (${evalStock.maxMediasB} disp.).` : 'No hay medias completas disponibles.'}`,
+                                                  'warning'
+                                                );
+                                              }
+                                              const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_A');
+                                              const newMap: Record<string, number> = { ...tallaCantidadesMap };
+                                              tallasList.forEach((t: any) => {
+                                                const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                                newMap[key] = (newMap[key] || 0) + (curva[key] || 0);
+                                              });
+                                              setTallaCantidadesMap(newMap);
+                                            }}
+                                            className={`px-2.5 py-1 border rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                              evalStock && !evalStock.mediaADisponible
+                                                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30'
+                                                : evalStock?.recomendacion === 'SOLO_A'
+                                                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-800 dark:text-emerald-200 border-emerald-500 ring-2 ring-emerald-500/30'
+                                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                                            }`}
+                                            title={evalStock ? `Disponibles en bodega: ${evalStock.maxMediasA} media(s) A` : undefined}
+                                          >
+                                            <span>+ ½ Doc A</span>
+                                            {evalStock && evalStock.maxMediasA !== 99 && (
+                                              <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${evalStock.mediaADisponible ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'}`}>
+                                                {evalStock.maxMediasA} disp
+                                              </span>
+                                            )}
+                                            {evalStock?.recomendacion === 'SOLO_A' && (
+                                              <span className="text-[9px] bg-emerald-600 text-white px-1 rounded uppercase font-black">
+                                                Recomendada
+                                              </span>
+                                            )}
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (evalStock && !evalStock.mediaBDisponible) {
+                                                showToast(
+                                                  evalStock.mensajeAdvertencia ||
+                                                  `No hay stock suficiente para Serie B. ${evalStock.mediaADisponible ? `Solo queda disponible la Serie A (${evalStock.maxMediasA} disp.).` : 'No hay medias completas disponibles.'}`,
+                                                  'warning'
+                                                );
+                                              }
+                                              const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_B');
+                                              const newMap: Record<string, number> = { ...tallaCantidadesMap };
+                                              tallasList.forEach((t: any) => {
+                                                const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                                newMap[key] = (newMap[key] || 0) + (curva[key] || 0);
+                                              });
+                                              setTallaCantidadesMap(newMap);
+                                            }}
+                                            className={`px-2.5 py-1 border rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                              evalStock && !evalStock.mediaBDisponible
+                                                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30'
+                                                : evalStock?.recomendacion === 'SOLO_B'
+                                                ? 'bg-teal-500/20 hover:bg-teal-500/30 text-teal-800 dark:text-teal-200 border-teal-500 ring-2 ring-teal-500/30'
+                                                : 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/20'
+                                            }`}
+                                            title={evalStock ? `Disponibles en bodega: ${evalStock.maxMediasB} media(s) B` : undefined}
+                                          >
+                                            <span>+ ½ Doc B</span>
+                                            {evalStock && evalStock.maxMediasB !== 99 && (
+                                              <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${evalStock.mediaBDisponible ? 'bg-teal-500/20 text-teal-700 dark:text-teal-300' : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'}`}>
+                                                {evalStock.maxMediasB} disp
+                                              </span>
+                                            )}
+                                            {evalStock?.recomendacion === 'SOLO_B' && (
+                                              <span className="text-[9px] bg-teal-600 text-white px-1 rounded uppercase font-black">
+                                                Recomendada
+                                              </span>
+                                            )}
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_A');
+                                              const newMap: Record<string, number> = { ...tallaCantidadesMap };
+                                              tallasList.forEach((t: any) => {
+                                                const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                                newMap[key] = Math.max(0, (newMap[key] || 0) - (curva[key] || 0));
+                                              });
+                                              setTallaCantidadesMap(newMap);
+                                            }}
+                                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                          >
+                                            − ½ Doc A
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const curva = calcularCurvaParaTallas(serieNombreDisplay, tallasList, 'MEDIA_B');
+                                              const newMap: Record<string, number> = { ...tallaCantidadesMap };
+                                              tallasList.forEach((t: any) => {
+                                                const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
+                                                newMap[key] = Math.max(0, (newMap[key] || 0) - (curva[key] || 0));
+                                              });
+                                              setTallaCantidadesMap(newMap);
+                                            }}
+                                            className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                          >
+                                            − ½ Doc B
+                                          </button>
+
+                                          <span className="text-[11px] text-[var(--muted-foreground)] font-mono font-medium ml-1">
+                                            = {totalParesConfig} pares total
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
 
                                   {/* Línea de Observación para este Modelo */}
                                   <div className="pt-1">
@@ -4401,26 +4468,41 @@ export default function ComercialComponent({
 
                           {/* Info de último precio al cliente si aplica */}
                           {ultimoPrecioCliente !== null && selectedProductId && clientId && (
-                            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center gap-2 text-xs animate-in fade-in duration-200">
-                              <span className="text-emerald-600 text-sm shrink-0">💡</span>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="font-bold text-emerald-800 dark:text-emerald-200">
-                                  Último precio aplicado:
-                                </span>
-                                <span className="font-black text-emerald-700 dark:text-emerald-300 font-mono text-sm">
-                                  ${ultimoPrecioCliente.toFixed(2)}
-                                </span>
-                                {sucursalUltimaVenta && (
-                                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 font-bold text-[10px]">
-                                    · {sucursalUltimaVenta}
+                            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center justify-between gap-2 text-xs animate-in fade-in duration-200">
+                              <div className="flex items-center gap-2">
+                                <span className="text-emerald-600 text-sm shrink-0">💡</span>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-bold text-emerald-800 dark:text-emerald-200">
+                                    Último precio a este cliente:
                                   </span>
-                                )}
-                                {fechaUltimaVenta && (
-                                  <span className="text-emerald-600/80 dark:text-emerald-400/80 font-mono text-[11px]">
-                                    ({fechaUltimaVenta})
+                                  <span className="font-black text-emerald-700 dark:text-emerald-300 font-mono text-sm">
+                                    ${ultimoPrecioCliente.toFixed(2)}
                                   </span>
-                                )}
+                                  {sucursalUltimaVenta && (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 font-bold text-[10px]">
+                                      · {sucursalUltimaVenta}
+                                    </span>
+                                  )}
+                                  {fechaUltimaVenta && (
+                                    <span className="text-emerald-600/80 dark:text-emerald-400/80 font-mono text-[11px]">
+                                      ({fechaUltimaVenta})
+                                    </span>
+                                  )}
+                                </div>
                               </div>
+                              {precioItem !== ultimoPrecioCliente && puedeCambiarPrecio && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPrecioItem(ultimoPrecioCliente);
+                                    setPrecioItemInput(String(ultimoPrecioCliente));
+                                  }}
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
+                                  title="Aplicar el último precio vendido a este cliente"
+                                >
+                                  Usar ${ultimoPrecioCliente.toFixed(2)}
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>

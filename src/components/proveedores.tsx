@@ -939,7 +939,15 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
   const serieNombreActiva = useMemo(() => {
     if (!productoSeleccionado) return 'ADULTO';
-    return productoSeleccionado.serie?.name || productoSeleccionado.serieNombre || productoSeleccionado.serie || 'ADULTO';
+    return (
+      productoSeleccionado.serie?.nombre ||
+      productoSeleccionado.serieNombre ||
+      productoSeleccionado.model?.serie?.nombre ||
+      productoSeleccionado.model?.serieNombre ||
+      (typeof productoSeleccionado.serie === 'string' ? productoSeleccionado.serie : null) ||
+      productoSeleccionado.serie?.name ||
+      'ADULTO'
+    );
   }, [productoSeleccionado]);
 
   // Cálculo de pares totales de la orden
@@ -1366,11 +1374,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               const matchedTalla = (prodCat?.tallas || prodCat?.stockByTalla || []).find(
                 (pt: any) => String(pt.numero ?? pt.sizeNumber ?? pt.talla ?? pt.nombre) === String(td.talla)
               );
+              const yaRecibido = Number(td.yaRecibido || 0);
+              const cantPendiente = Math.max(0, Number(td.cantidad || 0) - yaRecibido);
               return {
                 tallaId: td.tallaId || matchedTalla?.id || matchedTalla?.tallaId || String(td.talla),
                 sizeNumber: td.talla,
-                cantidadIngresada: td.cantidad,
-                cantidadEsperada: td.cantidad,
+                cantidadIngresada: cantPendiente,
+                cantidadEsperada: cantPendiente,
                 diferencia: 0,
               };
             });
@@ -1411,7 +1421,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       return;
     }
     const foto = obtenerFotoProducto(productoSeleccionado);
-    const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
+    const serieName = (
+      productoSeleccionado.serie?.nombre ||
+      productoSeleccionado.serieNombre ||
+      productoSeleccionado.model?.serie?.nombre ||
+      productoSeleccionado.model?.serieNombre ||
+      (typeof productoSeleccionado.serie === 'string' ? productoSeleccionado.serie : null) ||
+      productoSeleccionado.serie?.name ||
+      'ADULTO'
+    );
+    const prodTallas = productoSeleccionado.serie?.tallas || productoSeleccionado.model?.serie?.tallas || productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
     
     let tallasInit: Array<{
       tallaId: string;
@@ -1430,17 +1449,19 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       tallasInit = sorted.map((t: any) => ({
         tallaId: t.id || t.tallaId || String(t.sizeNumber || t.talla || t.numero),
         sizeNumber: t.sizeNumber || t.talla || t.numero || '38',
-        cantidadIngresada: 1,
+        cantidadIngresada: 0,
         cantidadEsperada: 0,
-        diferencia: 1,
+        diferencia: 0,
       }));
     } else {
-      tallasInit = [38, 39, 40, 41, 42].map((t) => ({
+      const curvaDoc = getCurvaDocena(serieName, 'DOCENA');
+      const tallasFromCurva = Object.keys(curvaDoc).length > 0 ? Object.keys(curvaDoc).map(Number) : [38, 39, 40, 41, 42];
+      tallasInit = tallasFromCurva.map((t) => ({
         tallaId: String(t),
         sizeNumber: t,
-        cantidadIngresada: 1,
+        cantidadIngresada: 0,
         cantidadEsperada: 0,
-        diferencia: 1,
+        diferencia: 0,
       }));
     }
 
@@ -1453,7 +1474,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         codigo: productoSeleccionado.codigo || productoSeleccionado.code || '',
         color: productoSeleccionado.color || '',
         fotoUrl: foto,
-        serieNombre: productoSeleccionado.serie?.nombre || productoSeleccionado.serie?.name || 'Serie Estándar',
+        serieNombre: serieName,
         precioCosto: Number(productoSeleccionado.precioCosto || productoSeleccionado.costPrice || 10),
         observacionLinea: 'Modelo adicional fuera de orden',
         tallas: tallasInit,
@@ -1507,19 +1528,21 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           }
         }
 
-        flatLines.push({
-          productId: m.productId,
-          tallaId: resolvedTallaId || String(t.sizeNumber) || 'TALLA_STANDAR',
-          cantidadIngresada: t.cantidadIngresada,
-          cantidadEsperada: t.cantidadEsperada,
-          diferencia: t.diferencia,
-          precioCosto: m.precioCosto,
-          observacionLinea: m.observacionLinea || undefined,
-        });
+        if ((t.cantidadIngresada || 0) > 0 || (t.cantidadEsperada || 0) > 0) {
+          flatLines.push({
+            productId: m.productId,
+            tallaId: resolvedTallaId || String(t.sizeNumber) || 'TALLA_STANDAR',
+            cantidadIngresada: Math.max(0, t.cantidadIngresada || 0),
+            cantidadEsperada: t.cantidadEsperada ?? 0,
+            diferencia: t.diferencia ?? 0,
+            precioCosto: m.precioCosto,
+            observacionLinea: m.observacionLinea || undefined,
+          });
+        }
       });
     });
 
-    const estadoCalculado = hayFaltantes ? 'CON_DIFERENCIAS' : 'COMPLETA';
+    const estadoCalculado = hayFaltantes ? 'RECIBIDA_PARCIAL' : 'COMPLETA';
 
     setSaving(true);
     try {
@@ -1533,7 +1556,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
       showToast(
         hayFaltantes
-          ? 'Mercancía ingresada con faltantes. La orden queda como Parcial y el saldo se actualizó.'
+          ? 'Mercancía ingresada con faltantes. La orden queda en Órdenes Parciales hasta completarse todo el pedido.'
           : 'Recepción completada exitosamente. Stock físico y saldo por pagar actualizados al instante.',
         'success'
       );
@@ -2795,7 +2818,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
-                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] ?? 1) : 1;
+                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] || 0) : 0;
                                         t.cantidadIngresada = (t.cantidadIngresada || 0) + qty;
                                         t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
                                       });
@@ -2812,7 +2835,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
-                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] ?? 1) : 1;
+                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] || 0) : 0;
                                         t.cantidadIngresada = (t.cantidadIngresada || 0) + qty;
                                         t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
                                       });
@@ -2829,7 +2852,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
-                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] ?? 1) : 1;
+                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] || 0) : 0;
                                         t.cantidadIngresada = Math.max(0, (t.cantidadIngresada || 0) - qty);
                                         t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
                                       });
@@ -2846,7 +2869,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
-                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] ?? 1) : 1;
+                                        const qty = hasCurva ? (curva[Number(t.sizeNumber)] || 0) : 0;
                                         t.cantidadIngresada = Math.max(0, (t.cantidadIngresada || 0) - qty);
                                         t.diferencia = t.cantidadIngresada - t.cantidadEsperada;
                                       });
@@ -3645,7 +3668,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     const curva = getCurvaDocena(serieName, 'MEDIA_A');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const newTallas = (line.tallasDesglose || []).map(t => {
-                                      const qty = hasCurva ? (curva[Number(t.talla)] ?? 1) : 1;
+                                      const qty = hasCurva ? (curva[Number(t.talla)] || 0) : 0;
                                       return { ...t, cantidad: t.cantidad + qty };
                                     });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
@@ -3669,7 +3692,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     const curva = getCurvaDocena(serieName, 'MEDIA_B');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const newTallas = (line.tallasDesglose || []).map(t => {
-                                      const qty = hasCurva ? (curva[Number(t.talla)] ?? 1) : 1;
+                                      const qty = hasCurva ? (curva[Number(t.talla)] || 0) : 0;
                                       return { ...t, cantidad: t.cantidad + qty };
                                     });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
@@ -3693,7 +3716,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     const curva = getCurvaDocena(serieName, 'MEDIA_A');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const newTallas = (line.tallasDesglose || []).map(t => {
-                                      const qty = hasCurva ? (curva[Number(t.talla)] ?? 1) : 1;
+                                      const qty = hasCurva ? (curva[Number(t.talla)] || 0) : 0;
                                       return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
                                     });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
@@ -3717,7 +3740,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     const curva = getCurvaDocena(serieName, 'MEDIA_B');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const newTallas = (line.tallasDesglose || []).map(t => {
-                                      const qty = hasCurva ? (curva[Number(t.talla)] ?? 1) : 1;
+                                      const qty = hasCurva ? (curva[Number(t.talla)] || 0) : 0;
                                       return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
                                     });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
@@ -5811,7 +5834,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         prev.map((l, i) => {
                                           const tMatch = m.tallas.find((t) => t.originalIdx === i);
                                           if (tMatch) {
-                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] ?? 1) : 1;
+                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] || 0) : 0;
                                             return { ...l, cantidad: l.cantidad + qty };
                                           }
                                           return l;
@@ -5831,7 +5854,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         prev.map((l, i) => {
                                           const tMatch = m.tallas.find((t) => t.originalIdx === i);
                                           if (tMatch) {
-                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] ?? 1) : 1;
+                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] || 0) : 0;
                                             return { ...l, cantidad: l.cantidad + qty };
                                           }
                                           return l;
@@ -5851,7 +5874,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         prev.map((l, i) => {
                                           const tMatch = m.tallas.find((t) => t.originalIdx === i);
                                           if (tMatch) {
-                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] ?? 1) : 1;
+                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] || 0) : 0;
                                             return { ...l, cantidad: Math.max(0, l.cantidad - qty) };
                                           }
                                           return l;
@@ -5871,7 +5894,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         prev.map((l, i) => {
                                           const tMatch = m.tallas.find((t) => t.originalIdx === i);
                                           if (tMatch) {
-                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] ?? 1) : 1;
+                                            const qty = hasCurva ? (curva[Number(tMatch.numeroTalla)] || 0) : 0;
                                             return { ...l, cantidad: Math.max(0, l.cantidad - qty) };
                                           }
                                           return l;

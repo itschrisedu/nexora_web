@@ -4826,7 +4826,7 @@ export default function ModelosComponent({
                                         setEditModelCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = hasCurva ? (curva[t.numero] || 0) : 0;
                                             for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
                                           return { ...ct, [s.id]: arr };
@@ -4844,7 +4844,7 @@ export default function ModelosComponent({
                                         setEditModelCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = hasCurva ? (curva[t.numero] || 0) : 0;
                                             for (let i = 0; i < qty; i++) arr.push(t.id);
                                           }
                                           return { ...ct, [s.id]: arr };
@@ -4862,7 +4862,7 @@ export default function ModelosComponent({
                                         setEditModelCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = hasCurva ? (curva[t.numero] || 0) : 0;
                                             for (let i = 0; i < qty; i++) {
                                               const idx = arr.indexOf(t.id);
                                               if (idx > -1) arr.splice(idx, 1);
@@ -4883,7 +4883,7 @@ export default function ModelosComponent({
                                         setEditModelCustomTallas(ct => {
                                           let arr = [...(ct[s.id] || [])];
                                           for (const t of sObj2.tallas!) {
-                                            const qty = hasCurva ? (curva[t.numero] ?? 1) : 1;
+                                            const qty = hasCurva ? (curva[t.numero] || 0) : 0;
                                             for (let i = 0; i < qty; i++) {
                                               const idx = arr.indexOf(t.id);
                                               if (idx > -1) arr.splice(idx, 1);
