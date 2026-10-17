@@ -884,6 +884,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       setTransferringUser(null);
       if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
       loadSucursales();
+      loadUsers();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al transferir colaborador.');
