@@ -689,8 +689,9 @@ export default function ComercialComponent({
       }
       try {
         const mId = productoSeleccionadoObj?.modelId || productoSeleccionadoObj?.modeloId || '';
+        const mName = productoSeleccionadoObj?.modelName || '';
         const data = await ApiService.get(
-          `/pedidos/ultimo-precio?clientId=${clientId}&productId=${selectedProductId}${mId ? `&modelId=${mId}` : ''}`
+          `/pedidos/ultimo-precio?clientId=${clientId}&productId=${selectedProductId}${mId ? `&modelId=${mId}` : ''}${mName ? `&modelName=${encodeURIComponent(mName)}` : ''}`
         );
         const precioAnterior = data.precioAnterior ? Number(data.precioAnterior) : null;
         setUltimoPrecioCliente(precioAnterior);
@@ -708,7 +709,7 @@ export default function ComercialComponent({
       }
     };
     fetchUltimoPrecio();
-  }, [clientId, selectedProductId, productoSeleccionadoObj, online]);
+  }, [clientId, selectedProductId, productoSeleccionadoObj?.modelId, productoSeleccionadoObj?.modelName, online]);
 
   const [businessConfig, setBusinessConfig] = useState<any | null>(null);
   const [sucursalesEmpresa, setSucursalesEmpresa] = useState<any[]>([]);
@@ -1485,7 +1486,9 @@ export default function ComercialComponent({
               imageUrl: v.imageUrl,
               costPrice: Number(v.costPrice || 0),
               salePrice: Number(v.salePrice || 0),
+              modelId: modelo.id,
               modelName: modelo.name,
+              baseCode: modelo.baseCode,
               serieNombre: v.serieNombre,
               tallas: (v.tallas || []).slice().sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0)),
             });
@@ -4450,6 +4453,32 @@ export default function ComercialComponent({
                                   />
                                   <span className="text-[11px] text-[var(--muted-foreground)] font-medium">/ par</span>
                                 </div>
+
+                                {/* Sugerencia Inmediata del Último Precio Vendido al Cliente */}
+                                {ultimoPrecioCliente !== null && (
+                                  <div className="mt-1 flex flex-col items-start lg:items-end gap-0.5">
+                                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-[10px] font-black shadow-2xs">
+                                      <span>💡 Vendido antes: ${ultimoPrecioCliente.toFixed(2)}/par</span>
+                                      {sucursalUltimaVenta && (
+                                        <span className="font-semibold text-[9px] text-amber-700 dark:text-amber-300">({sucursalUltimaVenta})</span>
+                                      )}
+                                    </div>
+                                    {precioItem !== ultimoPrecioCliente && puedeCambiarPrecio && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPrecioItem(ultimoPrecioCliente);
+                                          setPrecioItemInput(String(ultimoPrecioCliente));
+                                        }}
+                                        className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+                                        title="Re-aplicar el precio al que se le vendió anteriormente este modelo"
+                                      >
+                                        <span>👉 Usar ${ultimoPrecioCliente.toFixed(2)} sugerido</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+
                                 <div className="text-base font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
                                   ${subtotalConfig.toFixed(2)}
                                 </div>
