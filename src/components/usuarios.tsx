@@ -524,7 +524,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       setPermiteCambiarPrecio(false);
       setSelectedTenantForNewUser('');
       loadUsers();
-      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      reloadPersonalSucursal();
 
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
@@ -573,7 +573,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       setEditUserEmailError('');
       setEditingUser(null);
       loadUsers();
-      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      reloadPersonalSucursal();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al actualizar colaborador.');
@@ -597,7 +597,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
         permiteCambiarPrecio: user.permiteCambiarPrecio,
       });
       loadUsers();
-      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      reloadPersonalSucursal();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al cambiar estado.');
     }
@@ -618,7 +618,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
         permiteCambiarPrecio: !user.permiteCambiarPrecio,
       });
       loadUsers();
-      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      reloadPersonalSucursal();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al modificar permisos de precio.');
     }
@@ -639,7 +639,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       await ApiService.patch(`/auth/usuarios/${user.id}/unlock`, {});
       setSuccessMsg(`Cuenta de ${user.nombre} desbloqueada exitosamente.`);
       loadUsers();
-      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      reloadPersonalSucursal();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al desbloquear cuenta.');
     }
@@ -703,7 +703,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       setShowDeleteUserModal(false);
       setUserToDelete(null);
       loadUsers();
-      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      reloadPersonalSucursal();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setDeleteUserError(err.message || 'No se pudo eliminar el colaborador.');
@@ -713,6 +713,22 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
   };
 
   // ─── HANDLERS MASTER-DETAIL SUCURSAL ───
+
+  // Recarga la lista de personal de la sucursal actualmente seleccionada (sin toggle)
+  const reloadPersonalSucursal = async () => {
+    if (!selectedSucursalId) return;
+    setLoadingPersonalSuc(true);
+    try {
+      const data = await ApiService.get(`/configuracion/sucursales/${selectedSucursalId}/personal`);
+      setPersonalSucursal(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error recargando personal de sucursal:', err);
+    } finally {
+      setLoadingPersonalSuc(false);
+    }
+  };
+
+  // Toggle: clic en tarjeta de sucursal para seleccionar/deseleccionar
   const handleSelectSucursal = async (sucursalId: string) => {
     if (selectedSucursalId === sucursalId) {
       setSelectedSucursalId(null);
@@ -882,7 +898,7 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       setSuccessMsg(`${transferringUser.nombre} transferido exitosamente.`);
       setShowTransferModal(false);
       setTransferringUser(null);
-      if (selectedSucursalId) handleSelectSucursal(selectedSucursalId);
+      reloadPersonalSucursal();
       loadSucursales();
       loadUsers();
       setTimeout(() => setSuccessMsg(''), 4000);
