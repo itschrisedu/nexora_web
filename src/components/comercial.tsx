@@ -3089,11 +3089,11 @@ export default function ComercialComponent({
       {/* MODAL CREAR / EDITAR PEDIDO */}
       {showModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder()); }}
           onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowModal(false); setEditingOrderId(null); resetPedidoForm(); }, isDirtyOrder()); }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-4xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header Modal Estandarizado */}
             <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
@@ -5046,8 +5046,8 @@ export default function ComercialComponent({
               {errorMsg && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-medium">{errorMsg}</div>}
             </div>
 
-            {/* Sticky Pinned Footer on Mobile and Desktop */}
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-lg z-20">
+            {/* Sticky Pinned Footer on Mobile and Desktop con Soporte Safe-Area iOS/Android */}
+            <div className="p-3.5 sm:p-4 pb-[max(1.25rem,env(safe-area-inset-bottom,20px))] border-t border-[var(--border)] bg-[var(--card)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-lg z-20">
               {(() => {
                 const subtotalBase = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
                 const descCupon = cuponAplicado ? Number(cuponAplicado.descuentoCalculado || 0) : 0;
@@ -5088,11 +5088,11 @@ export default function ComercialComponent({
                 );
               })()}
 
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
@@ -5102,19 +5102,21 @@ export default function ComercialComponent({
                     type="button"
                     disabled={creatingOrder || lineasPedido.length === 0 || !clientId}
                     onClick={handleCrearPedidoOnline}
-                    className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                    className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     {creatingOrder ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                    {creatingOrder
-                      ? (editingOrderId ? 'Guardando Cambios...' : 'Creando Pedido...')
-                      : (editingOrderId ? 'Guardar Cambios del Pedido' : 'Guardar Pedido Completo')}
+                    <span>
+                      {creatingOrder
+                        ? (editingOrderId ? 'Guardando Cambios...' : 'Creando Pedido...')
+                        : (editingOrderId ? 'Guardar Cambios del Pedido' : 'Guardar Pedido Completo')}
+                    </span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={handleGuardarOffline}
                     disabled={savingOffline}
-                    className="px-5 py-2 bg-amber-500 text-slate-900 font-bold text-xs rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                    className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-500 text-slate-900 font-bold text-xs rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center cursor-pointer min-h-[42px]"
                   >
                     {savingOffline ? 'Guardando...' : 'Guardar Offline'}
                   </button>
@@ -6402,7 +6404,7 @@ export default function ComercialComponent({
       {/* Modal de Corrección de Precio Post-Venta / Post-Entrega */}
       {showCorregirPrecioModal && pedidoACorregir && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setShowCorregirPrecioModal(false);
@@ -6410,7 +6412,7 @@ export default function ComercialComponent({
             }
           }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] w-full max-w-xl rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[90dvh] flex flex-col">
             {/* Cabecera */}
             <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
@@ -6657,7 +6659,7 @@ export default function ComercialComponent({
             </div>
 
             {/* Pie con un solo botón de Guardar Cambios */}
-            <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex items-center justify-between shrink-0">
+            <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom,16px))] bg-[var(--muted)]/30 border-t border-[var(--border)] flex items-center justify-between shrink-0">
               <button
                 type="button"
                 onClick={() => {
