@@ -2227,37 +2227,61 @@ export default function ComercialComponent({
     setPedidoACorregir(orderToUse);
     const mapPrecios: Record<string, string> = {};
     (orderToUse.lines || []).forEach((l: any) => {
+      const modelKey = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
       const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
         ? Number(l.precioUnitario)
         : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
-      const key = l.productId || l.id;
-      if (mapPrecios[key] === undefined) {
-        mapPrecios[key] = pUnit > 0 ? String(pUnit) : '';
+      if (mapPrecios[modelKey] === undefined && pUnit > 0) {
+        mapPrecios[modelKey] = String(pUnit);
       }
     });
     setPreciosCorregirMap(mapPrecios);
     setShowCorregirPrecioModal(true);
   };
 
-  const handleGuardarCorreccionPrecio = async (productId: string, nuevoPrecioUnitario: number) => {
+  const handleGuardarTodasCorreccionesPrecio = async (modelosList: Array<{
+    modelKey: string;
+    productIds: string[];
+    modelName: string;
+    totalPares: number;
+    precioActual: number;
+  }>) => {
     if (!pedidoACorregir) return;
-    if (nuevoPrecioUnitario <= 0 || isNaN(nuevoPrecioUnitario)) {
-      showToast('Ingresa un precio mayor a 0', 'warning');
+
+    const itemsAEnviar: Array<{ productIds: string[]; nuevoPrecioUnitario: number }> = [];
+
+    for (const m of modelosList) {
+      const valorStr = preciosCorregirMap[m.modelKey] !== undefined
+        ? preciosCorregirMap[m.modelKey]
+        : (m.precioActual > 0 ? String(m.precioActual) : '');
+      const precioNum = parseFloat(valorStr);
+      if (isNaN(precioNum) || precioNum <= 0) {
+        showToast(`Ingresa un precio válido mayor a 0 para el modelo "${m.modelName}"`, 'warning');
+        return;
+      }
+      itemsAEnviar.push({
+        productIds: m.productIds,
+        nuevoPrecioUnitario: precioNum,
+      });
+    }
+
+    if (itemsAEnviar.length === 0) {
+      showToast('No se encontraron modelos para actualizar', 'warning');
       return;
     }
+
     setGuardandoCorreccionPrecio(true);
     try {
       const res = await ApiService.patch(`/pedidos/${pedidoACorregir.id}/corregir-precio`, {
-        productId,
-        nuevoPrecioUnitario,
+        items: itemsAEnviar,
       });
-      showToast(res.message || 'Precio corregido exitosamente. Se actualizaron saldos y notas de entrega.', 'success');
+      showToast(res.message || 'Precios corregidos exitosamente. Se actualizaron saldos y notas de entrega.', 'success');
       setShowCorregirPrecioModal(false);
       setPedidoACorregir(null);
       await loadPedidos();
       await loadListaClientes();
     } catch (err: any) {
-      showToast(err.message || 'Error al corregir precio', 'error');
+      showToast(err.message || 'Error al corregir precios', 'error');
     } finally {
       setGuardandoCorreccionPrecio(false);
     }
@@ -6333,159 +6357,291 @@ export default function ComercialComponent({
             </div>
 
             {/* Cuerpo del Modal */}
+            {/* Cuerpo del Modal */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-200">
-                💡 Si hubo un error en el precio pactado o acordado con el cliente, cámbialo aquí. El sistema reajustará la nota de entrega y el saldo pendiente del cliente.
+                💡 Si hubo un error en el precio pactado con el cliente, modifícalo aquí por modelo. Se aplicará a todos los colores de ese modelo y se reajustarán notas de entrega, total del pedido y saldos de cartera automáticamente.
               </div>
 
               {(() => {
-                const grouped = new Map<string, {
-                  productId: string;
+                const modelosMap = new Map<string, {
+                  modelKey: string;
                   modelName: string;
-                  color: string;
+                  colores: Set<string>;
                   serieNombre: string;
                   imageUrl?: string;
+                  productIds: Set<string>;
                   totalPares: number;
                   precioActual: number;
                 }>();
 
                 (pedidoACorregir.lines || []).forEach((l: any) => {
-                  const key = l.productId || l.id;
-                  if (!grouped.has(key)) {
-                    const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
-                      ? Number(l.precioUnitario)
-                      : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
-                    grouped.set(key, {
-                      productId: key,
+                  const modelKey = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
+                  const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
+                    ? Number(l.precioUnitario)
+                    : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
+
+                  if (!modelosMap.has(modelKey)) {
+                    modelosMap.set(modelKey, {
+                      modelKey,
                       modelName: l.modelName || l.product?.name || 'Calzado',
-                      color: l.color || l.product?.color || '',
+                      colores: new Set<string>(),
                       serieNombre: l.serieNombre || l.product?.serie?.nombre || 'Estándar',
                       imageUrl: l.imageUrl || l.product?.imageUrl,
+                      productIds: new Set<string>(),
                       totalPares: 0,
                       precioActual: pUnit,
                     });
                   }
-                  grouped.get(key)!.totalPares += (l.cantidad || 0);
+
+                  const m = modelosMap.get(modelKey)!;
+                  if (l.color) m.colores.add(l.color.trim());
+                  if (l.product?.color) m.colores.add(l.product.color.trim());
+                  if (l.productId) m.productIds.add(l.productId);
+                  if (!m.imageUrl && (l.imageUrl || l.product?.imageUrl)) {
+                    m.imageUrl = l.imageUrl || l.product?.imageUrl;
+                  }
+                  m.totalPares += (l.cantidad || 0);
+                  if (m.precioActual <= 0 && pUnit > 0) {
+                    m.precioActual = pUnit;
+                  }
                 });
 
-                const list = Array.from(grouped.values());
+                const list = Array.from(modelosMap.values()).map((m) => ({
+                  ...m,
+                  productIds: Array.from(m.productIds),
+                  coloresList: Array.from(m.colores).filter(Boolean),
+                }));
+
                 if (list.length === 0) {
                   return (
                     <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
-                      No se encontraron líneas de producto en este pedido.
+                      No se encontraron líneas de calzado en este pedido.
                     </div>
                   );
                 }
 
+                // Cálculo de totales previos y nuevos
+                let granTotalNuevo = 0;
+                let granTotalPrevio = 0;
+                list.forEach((m) => {
+                  const valStr = preciosCorregirMap[m.modelKey] !== undefined
+                    ? preciosCorregirMap[m.modelKey]
+                    : (m.precioActual > 0 ? String(m.precioActual) : '');
+                  const pNum = parseFloat(valStr) || 0;
+                  granTotalNuevo += m.totalPares * pNum;
+                  granTotalPrevio += m.totalPares * m.precioActual;
+                });
+                const difTotal = granTotalNuevo - granTotalPrevio;
+
                 return (
-                  <div className="space-y-3">
-                    {list.map((prod) => {
-                      const valorString = preciosCorregirMap[prod.productId] !== undefined
-                        ? preciosCorregirMap[prod.productId]
-                        : (prod.precioActual > 0 ? String(prod.precioActual) : '');
-                      const precioEditadoNum = parseFloat(valorString) || 0;
-                      const nuevoSubtotal = prod.totalPares * precioEditadoNum;
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      {list.map((m) => {
+                        const valorString = preciosCorregirMap[m.modelKey] !== undefined
+                          ? preciosCorregirMap[m.modelKey]
+                          : (m.precioActual > 0 ? String(m.precioActual) : '');
+                        const precioEditadoNum = parseFloat(valorString) || 0;
+                        const nuevoSubtotal = m.totalPares * precioEditadoNum;
+                        const docenasTexto = m.totalPares % 12 === 0
+                          ? `${m.totalPares / 12} ${m.totalPares / 12 === 1 ? 'Docena' : 'Docenas'}`
+                          : (m.totalPares === 6 ? '½ Docena' : `${m.totalPares} pares`);
 
-                      return (
-                        <div
-                          key={prod.productId}
-                          className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div
-                              onClick={() => {
-                                if (prod.imageUrl) setLightboxImage({ url: prod.imageUrl, title: prod.modelName });
-                              }}
-                              className={`w-12 h-12 rounded-xl bg-[var(--muted)]/50 border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center ${
-                                prod.imageUrl ? 'cursor-zoom-in hover:opacity-90' : ''
-                              }`}
-                              title={prod.imageUrl ? 'Ver foto ampliada' : ''}
-                            >
-                              {prod.imageUrl ? (
-                                <img src={prod.imageUrl} alt={prod.modelName} className="w-full h-full object-cover" />
-                              ) : (
-                                <span className="text-lg">👟</span>
-                              )}
+                        return (
+                          <div
+                            key={m.modelKey}
+                            className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-purple-500/40 transition-colors"
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                              <div
+                                onClick={() => {
+                                  if (m.imageUrl) setLightboxImage({ url: m.imageUrl, title: m.modelName });
+                                }}
+                                className={`w-14 h-14 rounded-xl bg-[var(--muted)]/50 border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center ${
+                                  m.imageUrl ? 'cursor-zoom-in hover:opacity-90' : ''
+                                }`}
+                                title={m.imageUrl ? 'Ver foto ampliada' : ''}
+                              >
+                                {m.imageUrl ? (
+                                  <img src={m.imageUrl} alt={m.modelName} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-2xl">👟</span>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="font-extrabold text-xs sm:text-sm text-[var(--foreground)] uppercase truncate">
+                                  {m.modelName}
+                                </h4>
+
+                                {/* Colores agrupados del modelo */}
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                  <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
+                                    Colores:
+                                  </span>
+                                  {m.coloresList.length > 0 ? (
+                                    m.coloresList.map((col, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20"
+                                      >
+                                        {col}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-[10px] text-[var(--muted-foreground)] italic">
+                                      Estándar
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
+                                  <span className="text-emerald-600 font-bold">
+                                    Serie: {formatearNombreSerie(m.serieNombre)}
+                                  </span>
+                                  <span className="text-[var(--muted-foreground)] font-medium">
+                                    · {m.totalPares} pares ({docenasTexto})
+                                  </span>
+                                </div>
+
+                                <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                                  Precio registrado: ${m.precioActual.toFixed(2)} / par
+                                </p>
+                              </div>
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-extrabold text-xs text-[var(--foreground)] uppercase truncate">
-                                {prod.modelName} {prod.color ? `· ${prod.color}` : ''}
-                              </h4>
-                              <p className="text-[11px] text-emerald-600 font-semibold">
-                                Serie: {formatearNombreSerie(prod.serieNombre)} · {prod.totalPares} pares
-                              </p>
-                              <p className="text-[10px] text-[var(--muted-foreground)]">
-                                Precio previo: ${prod.precioActual.toFixed(2)} / par
-                              </p>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-3 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-[var(--border)] shrink-0">
+                              <div className="text-right">
+                                <label className="text-[10px] font-bold text-[var(--muted-foreground)] block">
+                                  Nuevo Precio / Par (Todos los colores):
+                                </label>
+                                <div className="flex items-center gap-1 mt-0.5 justify-end">
+                                  <span className="text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="0.00"
+                                    value={valorString}
+                                    onChange={(e) => {
+                                      let val = e.target.value;
+                                      val = val.replace(/[^0-9.]/g, '');
+                                      const parts = val.split('.');
+                                      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                      if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                        val = val.replace(/^0+/, '');
+                                      }
+                                      setPreciosCorregirMap((prev) => ({
+                                        ...prev,
+                                        [m.modelKey]: val,
+                                      }));
+                                    }}
+                                    className="w-24 h-8 px-2 text-right text-xs font-bold bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-hidden focus:border-purple-600 font-mono shadow-inner"
+                                  />
+                                </div>
+                                <div className="text-[11px] font-extrabold text-emerald-600 mt-0.5 font-mono">
+                                  Subtotal: ${nuevoSubtotal.toFixed(2)}
+                                </div>
+                              </div>
                             </div>
                           </div>
+                        );
+                      })}
+                    </div>
 
-                          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-[var(--border)]">
-                            <div className="text-right">
-                              <label className="text-[10px] font-bold text-[var(--muted-foreground)] block">
-                                Nuevo Precio / Par:
-                              </label>
-                              <div className="flex items-center gap-1 mt-0.5 justify-end">
-                                <span className="text-xs font-bold text-[var(--muted-foreground)]">$</span>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="0.00"
-                                  value={valorString}
-                                  onChange={(e) => {
-                                    let val = e.target.value;
-                                    val = val.replace(/[^0-9.]/g, '');
-                                    const parts = val.split('.');
-                                    if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-                                    if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
-                                      val = val.replace(/^0+/, '');
-                                    }
-                                    setPreciosCorregirMap((prev) => ({
-                                      ...prev,
-                                      [prod.productId]: val,
-                                    }));
-                                  }}
-                                  className="w-20 h-7 px-1.5 text-right text-xs font-bold bg-[var(--card)] border border-[var(--border)] rounded-lg focus:outline-hidden focus:border-purple-600 font-mono"
-                                />
-                              </div>
-                              <div className="text-[10px] font-extrabold text-emerald-600 mt-0.5 font-mono">
-                                Total: ${nuevoSubtotal.toFixed(2)}
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              disabled={guardandoCorreccionPrecio || precioEditadoNum <= 0}
-                              onClick={() => handleGuardarCorreccionPrecio(prod.productId, precioEditadoNum)}
-                              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
-                            >
-                              {guardandoCorreccionPrecio ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <CheckCircle size={12} />
-                              )}
-                              <span>Guardar</span>
-                            </button>
-                          </div>
+                    {/* Resumen Comparativo de Totales */}
+                    <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                          Resumen General de la Corrección
+                        </span>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-[var(--foreground)]">
+                          <span>Total actual: <strong className="font-mono">${granTotalPrevio.toFixed(2)}</strong></span>
+                          <span>➔</span>
+                          <span>Nuevo total: <strong className="font-mono text-emerald-600">${granTotalNuevo.toFixed(2)}</strong></span>
                         </div>
-                      );
-                    })}
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] block">
+                          Diferencia en Pedido:
+                        </span>
+                        <span className={`text-xs font-black font-mono ${difTotal > 0 ? 'text-amber-600' : (difTotal < 0 ? 'text-blue-600' : 'text-slate-500')}`}>
+                          {difTotal > 0 ? `+ $${difTotal.toFixed(2)}` : (difTotal < 0 ? `- $${Math.abs(difTotal).toFixed(2)}` : '$0.00')}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 );
               })()}
             </div>
 
-            {/* Pie */}
-            <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex justify-end shrink-0">
+            {/* Pie con un solo botón de Guardar Cambios */}
+            <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex items-center justify-between shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setShowCorregirPrecioModal(false);
                   setPedidoACorregir(null);
                 }}
-                className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
+                disabled={guardandoCorreccionPrecio}
+                className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
               >
-                Cerrar
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={guardandoCorreccionPrecio}
+                onClick={() => {
+                  if (!pedidoACorregir) return;
+                  const modelosMap = new Map<string, {
+                    modelKey: string;
+                    productIds: Set<string>;
+                    modelName: string;
+                    totalPares: number;
+                    precioActual: number;
+                  }>();
+
+                  (pedidoACorregir.lines || []).forEach((l: any) => {
+                    const modelKey = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
+                    const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
+                      ? Number(l.precioUnitario)
+                      : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
+
+                    if (!modelosMap.has(modelKey)) {
+                      modelosMap.set(modelKey, {
+                        modelKey,
+                        productIds: new Set<string>(),
+                        modelName: l.modelName || l.product?.name || 'Calzado',
+                        totalPares: 0,
+                        precioActual: pUnit,
+                      });
+                    }
+                    const m = modelosMap.get(modelKey)!;
+                    if (l.productId) m.productIds.add(l.productId);
+                    m.totalPares += (l.cantidad || 0);
+                    if (m.precioActual <= 0 && pUnit > 0) m.precioActual = pUnit;
+                  });
+
+                  const list = Array.from(modelosMap.values()).map((m) => ({
+                    ...m,
+                    productIds: Array.from(m.productIds),
+                  }));
+
+                  handleGuardarTodasCorreccionesPrecio(list);
+                }}
+                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl text-xs font-extrabold shadow-md flex items-center gap-2 transition-all cursor-pointer"
+              >
+                {guardandoCorreccionPrecio ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Guardando precios...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} />
+                    <span>Guardar Todos los Precios</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
