@@ -3,15 +3,15 @@ export type TipoCurva = 'DOCENA' | 'MEDIA_A' | 'MEDIA_B';
 export const getCurvaDocena = (serieName: string, tipo: TipoCurva): Record<number, number> => {
   const name = (serieName || '').toUpperCase();
 
-  // 1. Serie Caballero / Adulto / Hombre
+  // 1. Serie Caballero / Adulto / Hombre (Estándar Cevallos: 38 al 42 con 39 y 40 repetidos)
   if (name.includes('CABALLERO') || name.includes('HOMBRE') || name.includes('ADULTO') || name === 'TALLA_GRANDE') {
-    if (name.includes('43')) {
-      // 38 al 43 (6 tallas)
-      if (tipo === 'DOCENA') return { 38: 1, 39: 2, 40: 3, 41: 3, 42: 2, 43: 1 };
-      if (tipo === 'MEDIA_A') return { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1, 43: 0 };
-      return { 38: 0, 39: 1, 40: 1, 41: 2, 42: 1, 43: 1 };
+    if (name.includes('GRANDE') || (name.includes('43') && name.includes('45'))) {
+      // 43 al 45 Talla Grande especial
+      if (tipo === 'DOCENA') return { 43: 4, 44: 4, 45: 4 };
+      if (tipo === 'MEDIA_A') return { 43: 2, 44: 2, 45: 2 };
+      return { 43: 2, 44: 2, 45: 2 };
     }
-    // 38 al 42 (5 tallas)
+    // 38 al 42 estándar Cevallos (5 tallas: 39 y 40 repetidos = 12 pares; Media A y B = 6 pares cada una)
     if (tipo === 'DOCENA') return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
     if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
     return { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1 };

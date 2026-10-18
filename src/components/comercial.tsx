@@ -855,7 +855,7 @@ export default function ComercialComponent({
       });
     } else {
       // Tallas estándar por defecto si no vienen
-      [38, 39, 40, 41, 42, 43].forEach(num => {
+      [38, 39, 40, 41, 42].forEach(num => {
         mapTallas[`Talla #${num}`] = 0;
       });
     }
@@ -1616,7 +1616,6 @@ export default function ComercialComponent({
           { id: 't-esp-40', numero: 40 },
           { id: 't-esp-41', numero: 41 },
           { id: 't-esp-42', numero: 42 },
-          { id: 't-esp-43', numero: 43 },
         ])
       : (prodObj.tallas || []);
 
@@ -4099,7 +4098,6 @@ export default function ComercialComponent({
                             { id: 't-esp-40', numero: 40 },
                             { id: 't-esp-41', numero: 41 },
                             { id: 't-esp-42', numero: 42 },
-                            { id: 't-esp-43', numero: 43 },
                           ])
                         : (prodObj.tallas || []).slice().sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0));
 
