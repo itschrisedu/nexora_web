@@ -69,11 +69,13 @@ export const calcularCurvaParaTallas = (
     return na - nb;
   });
 
-  // Si hay curva exacta para los números de esta serie y cubre las tallas del modelo
-  const coincideCurva = tallasOrdenadas.some((t) => {
-    const num = Number(t.numero ?? t.nombre);
-    return curvaPredefinida[num] !== undefined && curvaPredefinida[num] > 0;
-  });
+  // Coincide con la curva predefinida si el modelo tiene exactamente las mismas tallas de esa curva
+  const curvaKeys = Object.keys(curvaPredefinida).map(Number);
+  const tallasNums = tallasOrdenadas.map((t) => Number(t.numero ?? t.nombre));
+  const coincideCurva =
+    curvaKeys.length > 0 &&
+    tallasNums.length === curvaKeys.length &&
+    tallasNums.every((num) => curvaPredefinida[num] !== undefined && curvaPredefinida[num] > 0);
 
   if (coincideCurva) {
     tallasOrdenadas.forEach((t) => {
