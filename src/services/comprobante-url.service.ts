@@ -238,8 +238,11 @@ export async function generarUrlPublicaOrden(data: OrdenCompraPdfData): Promise<
     e_nom: data.emisor.nombre || 'NEXORA',
     lineas: (data.lineas || []).slice(0, 10).map((l) => ({
       m: l.modelo || 'Calzado',
+      c: l.codigo || '',
       col: l.color || '',
+      ser: l.serie || 'Adulto',
       num: l.numeracion || '',
+      img: l.imageUrl || '',
       qty: l.cantidadPares || 1,
       u: l.precioCosto || 0,
       tot: l.subtotal || 0,

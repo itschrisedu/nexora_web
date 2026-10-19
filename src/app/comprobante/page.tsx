@@ -33,6 +33,7 @@ import {
   OrdenCompraPdfData,
   PedidoClientePdfData,
   TicketPosPdfData,
+  limpiarObservacionesOrden,
 } from '@/services/pdf-factura.service';
 import { descargarHistorialPdf } from '@/services/pdf-historial.service';
 
@@ -314,7 +315,7 @@ function ComprobanteContent() {
     fetchOrderImages();
   }, [data?.t, data?.num]);
 
-  const handleDescargarPdf = () => {
+  const handleDescargarPdf = async () => {
     if (!data) return;
 
     if (data.t === 'ABONO') {
@@ -399,23 +400,26 @@ function ComprobanteContent() {
           numero: data.num || 'OC-0000',
           fecha: data.f || '',
           estado: 'EMITIDA',
-          observaciones: data.obs || '',
+          observaciones: limpiarObservacionesOrden(data.obs || ''),
         },
         lineas: (data.lineas || []).map((l: any) => ({
           modelo: l.m,
-          codigo: l.c,
-          color: l.col,
-          numeracion: l.num,
+          codigo: l.c || '',
+          color: l.col || '',
+          serie: l.ser || 'Adulto',
+          numeracion: l.num || '',
+          imageUrl: l.img || '',
           cantidadPares: l.qty,
           precioCosto: l.u || 0,
           subtotal: l.tot || 0,
+          observacion: limpiarObservacionesOrden(l.obs || ''),
         })),
         totales: {
           totalPares: Number(data.pares || 0),
           totalPagar: Number(data.tot || 0),
         },
       };
-      descargarOrdenCompraPdf(pdfData);
+      await descargarOrdenCompraPdf(pdfData);
     } else if (data.t === 'PEDIDO') {
       const pdfData: PedidoClientePdfData = {
         emisor: {
@@ -888,14 +892,18 @@ function ComprobanteContent() {
           {/* ═══ CUERPO: ORDEN DE COMPRA / PEDIDO DE CLIENTE ═══ */}
           {(esOrden || esPedido) && (
             <div className="space-y-4">
-              {data.obs && (
-                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900">
-                  <span className="font-extrabold text-[11px] uppercase tracking-wider block text-amber-800">
-                    📝 {esPedido ? 'Observaciones del Pedido:' : 'Observaciones / Instrucciones de Producción:'}
-                  </span>
-                  <p className="mt-1 leading-relaxed text-slate-800">{data.obs}</p>
-                </div>
-              )}
+              {(() => {
+                const obsValida = esOrden ? limpiarObservacionesOrden(data.obs) : data.obs;
+                if (!obsValida) return null;
+                return (
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900">
+                    <span className="font-extrabold text-[11px] uppercase tracking-wider block text-amber-800">
+                      📝 {esPedido ? 'Observaciones del Pedido:' : 'Observaciones / Instrucciones de Producción:'}
+                    </span>
+                    <p className="mt-1 leading-relaxed text-slate-800">{obsValida}</p>
+                  </div>
+                );
+              })()}
 
               <span className="text-xs font-extrabold uppercase text-slate-700 tracking-wider block">
                 {esPedido ? 'Artículos y Modelos del Pedido' : 'Modelos y Numeración para Producción'}
@@ -913,36 +921,38 @@ function ComprobanteContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {(data.lineas || []).map((l: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3 px-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
-                              {l.img ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={l.img}
-                                  alt={l.m || "Modelo"}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <Package size={18} className="text-slate-400" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <span className="font-bold text-slate-900 block truncate">{l.m}</span>
-                              <span className="text-[10px] text-slate-500 font-mono block">
-                                {l.c} {l.ser ? `• ${l.ser}` : ''}
-                              </span>
-                              {l.obs && (
-                                <span className="text-[10px] text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 block mt-1 font-medium max-w-xs">
-                                  Nota: {l.obs}
+                    {(data.lineas || []).map((l: any, idx: number) => {
+                      const obsNota = esOrden ? limpiarObservacionesOrden(l.obs) : l.obs;
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                                {l.img ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={l.img}
+                                    alt={l.m || "Modelo"}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <Package size={18} className="text-slate-400" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-900 block truncate">{l.m}</span>
+                                <span className="text-[10px] text-slate-500 font-mono block">
+                                  {l.c} {l.ser ? `• ${l.ser}` : ''}
                                 </span>
-                              )}
+                                {obsNota && (
+                                  <span className="text-[10px] text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 block mt-1 font-medium max-w-xs">
+                                    Nota: {obsNota}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
                         <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap">{l.col || '—'}</td>
                         <td className="py-3 px-3.5 text-slate-600 font-mono text-[11px] leading-relaxed">
                           {l.num || 'Serie Estándar'}
@@ -956,7 +966,8 @@ function ComprobanteContent() {
                           ${Number(l.tot || 0).toFixed(2)}
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </div>

@@ -55,7 +55,7 @@ import {
 } from 'lucide-react';
 import ConfirmModal from './ui/confirm-modal';
 import { useToast } from './ui/toast';
-import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, compartirOrdenCompraPdf, OrdenCompraPdfData } from '../services/pdf-factura.service';
+import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, compartirOrdenCompraPdf, OrdenCompraPdfData, limpiarObservacionesOrden } from '../services/pdf-factura.service';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { validarRuc } from '../utils/ecuador-validators';
 import { getCurvaDocena, TipoCurva } from '../utils/curvas';
@@ -1289,20 +1289,27 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   // Constructor unificado de datos para el PDF del fabricante (100% Confidencial - Sin datos de clientes)
   const construirPdfData = (order: any): OrdenCompraPdfData => {
     const lineasConsolidadas = consolidarLineasOrden(order.lines || [], productos);
+    const sucursalActual = sucursales?.find((s) => s.id === (order.sucursalId || activeSucursalId));
+    const emisorNombre = sucursalActual?.nombre || "LOCAL COMERCIAL DE CALZADO";
+    const emisorDireccion = sucursalActual?.direccion || "Cevallos, Tungurahua, Ecuador";
+    const emisorTelefono = sucursalActual?.telefono || "0998765432";
+
+    // Limpieza estricta de observaciones para no filtrar textos internos al taller
+    const obsOrdenLimpia = limpiarObservacionesOrden(order.observaciones);
 
     return {
       emisor: {
-        nombre: "LOCAL COMERCIAL DE CALZADO",
+        nombre: emisorNombre,
         ruc: "1804884664001",
-        direccion: "Cevallos, Tungurahua, Ecuador",
-        telefono: "0998765432",
-        email: "pedidos@calzadocevallos.com",
+        direccion: emisorDireccion,
+        telefono: emisorTelefono,
+        email: sucursalActual?.email || "pedidos@calzadocevallos.com",
       },
       orden: {
         numero: `OC-${String(order.numero).padStart(4, '0')}`,
         fecha: new Date(order.createdAt).toLocaleDateString('es-EC'),
         estado: order.estado === 'PENDIENTE' ? 'ENVIADA' : order.estado,
-        observaciones: order.observaciones,
+        observaciones: obsOrdenLimpia || undefined,
       },
       proveedor: {
         nombre: order.supplier?.razonSocial || order.supplier?.nombre || 'Proveedor',
@@ -1312,28 +1319,31 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         email: order.supplier?.email,
       },
       lineas: lineasConsolidadas.map((l) => {
-        const numeracionStr = l.tallasDesglose && l.tallasDesglose.length > 0
-          ? l.tallasDesglose.map((t) => `T${t.talla} (${t.cantidad})`).join(' | ')
+        // Tallas con pares pedidos > 0
+        const tallasValidas = (l.tallasDesglose || [])
+          .filter((t) => Number(t.cantidad) > 0)
+          .map((t) => ({ talla: String(t.talla), cantidad: Number(t.cantidad) }));
+
+        const numeracionStr = tallasValidas.length > 0
+          ? tallasValidas.map((t) => `T${t.talla} (${t.cantidad})`).join(' | ')
           : undefined;
 
-        // Limpieza de privacidad: Nunca incluir nombres de clientes en el PDF para el taller/fabricante
-        let obsFab: string | undefined = undefined;
-        if (l.observacionLinea && !l.observacionLinea.includes('Cliente:')) {
-          obsFab = l.observacionLinea;
-        }
+        // Limpieza de privacidad estricta en la línea
+        const obsFab = limpiarObservacionesOrden(l.observacionLinea);
 
         return {
           modelo: l.nombre,
           marca: l.marca,
           color: l.color,
           codigo: l.codigo,
-          serie: l.serie,
+          serie: l.serie || obtenerSerieProducto(l) || 'Adulto',
           numeracion: numeracionStr,
-          imageUrl: l.imageUrl,
+          tallasDetalle: tallasValidas,
+          imageUrl: l.imageUrl || '',
           cantidadPares: l.cantidadPedida,
           precioCosto: l.precioCosto,
           subtotal: l.subtotal,
-          observacion: obsFab,
+          observacion: obsFab || undefined,
         };
       }),
       totales: {
@@ -1385,7 +1395,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       if (!order) return;
 
       const pdfData = construirPdfData(order);
-      const url = obtenerOrdenCompraPdfBlobUrl(pdfData);
+      const url = await obtenerOrdenCompraPdfBlobUrl(pdfData);
       setPdfPreviewData(pdfData);
       setPdfPreviewUrl(url);
       setShowPdfPreviewModal(true);
@@ -1400,7 +1410,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       if (!order) return;
 
       const pdfData = construirPdfData(order);
-      descargarOrdenCompraPdf(pdfData);
+      await descargarOrdenCompraPdf(pdfData);
       showToast('PDF de Orden de Compra descargado.', 'success');
     } catch (e: any) {
       showToast('No se pudo generar el documento PDF.', 'error');
@@ -6161,7 +6171,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               <div className="hidden sm:flex items-center gap-2">
                 {pdfPreviewData && (
                   <button
-                    onClick={() => descargarOrdenCompraPdf(pdfPreviewData)}
+                    onClick={async () => {
+                      if (pdfPreviewData) await descargarOrdenCompraPdf(pdfPreviewData);
+                    }}
                     className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                   >
                     <Download size={13} />
@@ -6197,7 +6209,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               {pdfPreviewData ? (
                 <button
                   type="button"
-                  onClick={() => descargarOrdenCompraPdf(pdfPreviewData)}
+                  onClick={async () => {
+                    if (pdfPreviewData) await descargarOrdenCompraPdf(pdfPreviewData);
+                  }}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                 >
                   <Download size={13} />

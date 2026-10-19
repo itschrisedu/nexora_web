@@ -283,6 +283,7 @@ export interface OrdenCompraPdfData {
     serie?: string;
     numeracion?: string;
     imageUrl?: string;
+    tallasDetalle?: Array<{ talla: string | number; cantidad: number }>;
     cantidadPares: number;
     precioCosto: number;
     subtotal: number;
@@ -294,63 +295,262 @@ export interface OrdenCompraPdfData {
   };
 }
 
-export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
+/**
+ * Pre-carga una imagen a Base64 con timeout seguro para jsPDF
+ */
+async function cargarImagenComoBase64(url: string, timeoutMs = 2500): Promise<string | null> {
+  if (!url || typeof window === "undefined") return null;
+  if (url.startsWith("data:image/")) return url;
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve(null);
+      }
+    }, timeoutMs);
+
+    try {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.onload = () => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timer);
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth || img.width || 120;
+          canvas.height = img.naturalHeight || img.height || 120;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            resolve(dataUrl);
+            return;
+          }
+        } catch {
+          // Si el canvas es bloqueado por CORS, resolver null
+        }
+        resolve(null);
+      };
+      img.onerror = () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timer);
+          resolve(null);
+        }
+      };
+      img.src = url;
+    } catch {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timer);
+        resolve(null);
+      }
+    }
+  });
+}
+
+/**
+ * Limpia y filtra observaciones para que NUNCA aparezcan referencias a pedidos sin stock,
+ * clientes particulares ni textos internos del sistema en la orden de compra del taller.
+ */
+export function limpiarObservacionesOrden(obs?: string): string {
+  if (!obs) return "";
+  const partes = obs.split(/[\r\n+|]/);
+  const limpias = partes
+    .map((p) => p.trim())
+    .filter((p) => {
+      if (!p) return false;
+      const lower = p.toLowerCase();
+      if (lower.includes("generada autom")) return false;
+      if (lower.includes("pedido #") || lower.includes("pedido#")) return false;
+      if (lower.includes("anexo pedido")) return false;
+      if (lower.includes("sin stock")) return false;
+      if (lower.includes("faltan:")) return false;
+      if (lower.includes("faltan")) return false;
+      if (lower.includes("extra de stock")) return false;
+      if (lower.includes("demanda clientes")) return false;
+      if (lower.includes("cliente:")) return false;
+      if (lower.startsWith("nota:") && lower.includes("#")) return false;
+      return true;
+    });
+
+  return limpias.join(" • ").trim();
+}
+
+/**
+ * Formatea y limpia el nombre del modelo y marca evitando repeticiones absurdas
+ * (ej: "Straye Straye" -> "STRAYE")
+ */
+export function formatearTituloModelo(modeloRaw: string, marcaRaw?: string): {
+  modeloLimpio: string;
+  marcaLimpia: string;
+  nombreCompleto: string;
+} {
+  let marca = (marcaRaw || "").trim();
+  let modelo = (modeloRaw || "").trim();
+
+  // Si modelo ya empieza con la marca (ej: "Straye Straye" o "Straye Logan"), no duplicar
+  if (marca && modelo.toLowerCase().startsWith(marca.toLowerCase())) {
+    modelo = modelo.substring(marca.length).trim();
+  }
+
+  // Eliminar repeticiones consecutivas de la misma palabra (ej: "Straye Straye" -> "Straye")
+  modelo = modelo.replace(/\b(\w+)\s+\1\b/gi, "$1").trim();
+  marca = marca.replace(/\b(\w+)\s+\1\b/gi, "$1").trim();
+
+  if (!modelo) {
+    modelo = marca || "CALZADO DE CUERO";
+    marca = "";
+  }
+
+  const nombreCompleto = marca ? `${marca.toUpperCase()} ${modelo.toUpperCase()}` : modelo.toUpperCase();
+  return {
+    modeloLimpio: modelo.toUpperCase(),
+    marcaLimpia: marca.toUpperCase(),
+    nombreCompleto,
+  };
+}
+
+/**
+ * Extrae tallas con cantidad > 0 de un desglose o de una cadena de numeración
+ */
+export function extraerTallasValidas(
+  tallasDetalle?: Array<{ talla: string | number; cantidad: number }>,
+  numeracionStr?: string
+): Array<{ talla: string; cantidad: number }> {
+  if (Array.isArray(tallasDetalle) && tallasDetalle.length > 0) {
+    return tallasDetalle
+      .filter((t) => Number(t.cantidad) > 0)
+      .map((t) => ({ talla: String(t.talla), cantidad: Number(t.cantidad) }));
+  }
+
+  if (numeracionStr) {
+    const result: Array<{ talla: string; cantidad: number }> = [];
+    // Soporta formatos: T38 (1), T38: 1, T38: 1p, T38 (0)
+    const regex = /T?(\d{2})\s*(?:\(|:)\s*(\d+)/gi;
+    let match;
+    while ((match = regex.exec(numeracionStr)) !== null) {
+      const cant = parseInt(match[2], 10);
+      if (cant > 0) {
+        result.push({ talla: match[1], cantidad: cant });
+      }
+    }
+    if (result.length > 0) return result;
+  }
+
+  return [];
+}
+
+/**
+ * Formatea docenas de calzado con terminología comercial clara (½ docena, 1½ docena, etc.)
+ */
+export function formatearDocenasCorto(pares: number): string {
+  if (pares <= 0) return "0 pares";
+  if (pares === 6) return "½ Docena";
+  if (pares === 12) return "1 Docena";
+  if (pares === 18) return "1½ Docena";
+  if (pares % 12 === 0) return `${pares / 12} Docenas`;
+  if (pares % 6 === 0) {
+    const docEnteras = Math.floor(pares / 12);
+    return `${docEnteras > 0 ? `${docEnteras}½` : "½"} Docena${docEnteras > 1 ? "s" : ""}`;
+  }
+  return `${(pares / 12).toFixed(1)} doc.`;
+}
+
+/**
+ * Dibuja un placeholder elegante para cuando no hay foto disponible del calzado
+ */
+function dibujarPlaceholderCalzado(doc: jsPDF, x: number, y: number, size: number, nombre: string) {
+  doc.setFillColor(241, 245, 249); // Slate 100
+  doc.setDrawColor(203, 213, 225); // Slate 300
+  doc.roundedRect(x, y, size, size, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184); // Slate 400
+  const initials = nombre ? nombre.substring(0, 3).toUpperCase() : "MOD";
+  doc.text(initials, x + size / 2, y + size / 2 + 1, { align: "center" });
+}
+
+export async function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): Promise<jsPDF> {
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  let y = 15;
+  // Pre-cargar imágenes de las líneas en paralelo
+  const lineasConImagenes = await Promise.all(
+    data.lineas.map(async (l) => {
+      let b64: string | null = null;
+      if (l.imageUrl) {
+        b64 = await cargarImagenComoBase64(l.imageUrl);
+      }
+      return {
+        ...l,
+        loadedImageBase64: b64,
+      };
+    })
+  );
 
-  // ── Encabezado / Empresa ──
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let y = 14;
+
+  // ── 1. Encabezado Oficial / Emisor ──
   doc.setFillColor(15, 23, 42); // Slate 900
   doc.roundedRect(12, y, pageWidth - 24, 34, 2, 2, "F");
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.text(data.emisor.nombre || "COMERCIAL DE CALZADO", 18, y + 8);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(203, 213, 225);
-  doc.text(`RUC: ${data.emisor.ruc || "1804884664001"}`, 18, y + 15);
-  doc.text(`Dirección: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 20);
+  doc.setFontSize(8);
+  doc.setTextColor(52, 211, 153); // Emerald 400
+  doc.text("ORDEN OFICIAL DE COMPRA Y CONFECCIÓN DE CALZADO", 18, y + 13.5);
+
+  doc.setFontSize(8);
+  doc.setTextColor(203, 213, 225); // Slate 300
+  doc.text(`RUC: ${data.emisor.ruc || "1804884664001"}`, 18, y + 19);
+  doc.text(`Ubicación: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 24);
   if (data.emisor.telefono) {
-    doc.text(`Teléfono / Contacto: ${data.emisor.telefono}`, 18, y + 25);
+    doc.text(`Contacto: ${data.emisor.telefono}`, 18, y + 29);
   }
 
   // Cuadro Número de Orden (derecha)
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(pageWidth - 75, y + 4, 58, 26, 1.5, 1.5, "F");
+  doc.roundedRect(pageWidth - 76, y + 4, 60, 26, 1.5, 1.5, "F");
   doc.setTextColor(15, 23, 42);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("ORDEN DE COMPRA", pageWidth - 46, y + 11, { align: "center" });
+  doc.setFontSize(9.5);
+  doc.text("ORDEN DE COMPRA", pageWidth - 46, y + 10.5, { align: "center" });
 
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(180, 83, 9); // Amber 700
-  doc.text(`No. ${data.orden.numero}`, pageWidth - 46, y + 17, { align: "center" });
+  doc.text(`No. ${data.orden.numero}`, pageWidth - 46, y + 16.5, { align: "center" });
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
-  doc.text(`Fecha: ${data.orden.fecha}`, pageWidth - 46, y + 23, { align: "center" });
+  doc.text(`Emisión: ${data.orden.fecha}`, pageWidth - 46, y + 22.5, { align: "center" });
 
   y += 38;
 
-  // ── Datos del Proveedor / Fabricante ──
+  // ── 2. Datos del Proveedor / Taller de Producción ──
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(12, y, pageWidth - 24, 24, 1.5, 1.5, "FD");
+  doc.roundedRect(12, y, pageWidth - 24, 23, 1.5, 1.5, "FD");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(51, 65, 85);
-  doc.text("PROVEEDOR / TALLER DE PRODUCCIÓN", 16, y + 5);
+  doc.text("DESTINATARIO / TALLER DE PRODUCCIÓN", 16, y + 5);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -358,162 +558,266 @@ export function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): jsPDF {
   doc.text(`Razón Social: ${data.proveedor.nombre}`, 16, y + 11);
   doc.text(`RUC / C.I: ${data.proveedor.ruc}`, 16, y + 16);
   if (data.proveedor.contacto) {
-    doc.text(`Teléfono / Contacto: ${data.proveedor.contacto}`, 16, y + 21);
+    doc.text(`Teléfono / WhatsApp: ${data.proveedor.contacto}`, 16, y + 20.5);
   }
 
   doc.text(`Dirección: ${data.proveedor.direccion || "No especificada"}`, pageWidth / 2 + 10, y + 11);
   doc.text(`Email: ${data.proveedor.email || "No registrado"}`, pageWidth / 2 + 10, y + 16);
-  doc.text(`Estado: ${data.orden.estado}`, pageWidth / 2 + 10, y + 21);
+  doc.text(`Estado Documento: ${data.orden.estado}`, pageWidth / 2 + 10, y + 20.5);
 
-  y += 28;
+  y += 26.5;
 
-  // ── Observaciones Generales (Términos de fabricación) ──
-  if (data.orden.observaciones) {
-    // Filtrar para no mostrar nombres de clientes en observaciones de la orden
-    const obsLimpia = data.orden.observaciones.replace(/Cliente:\s*[^|]+(\||\n)?/gi, '').trim();
-    if (obsLimpia) {
-      doc.setFillColor(254, 243, 199); // Amber 100
-      doc.setDrawColor(251, 191, 36);
-      doc.roundedRect(12, y, pageWidth - 24, 11, 1.5, 1.5, "FD");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(146, 64, 14);
-      doc.text("OBSERVACIONES / ESPECIFICACIONES DE ENTREGA:", 16, y + 4.5);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(15, 23, 42);
-      doc.text(obsLimpia, 16, y + 8.5);
-      y += 15;
-    }
+  // ── 3. Observaciones Generales (Solo si hay observaciones legítimas de fabricación) ──
+  const obsGeneralLimpia = limpiarObservacionesOrden(data.orden.observaciones);
+  if (obsGeneralLimpia) {
+    doc.setFillColor(254, 243, 199); // Amber 100
+    doc.setDrawColor(251, 191, 36); // Amber 400
+    doc.roundedRect(12, y, pageWidth - 24, 11, 1.5, 1.5, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(146, 64, 14);
+    doc.text("OBSERVACIONES / ESPECIFICACIONES DE ENTREGA:", 16, y + 4.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(obsGeneralLimpia.substring(0, 140), 16, y + 8.5);
+    y += 14.5;
   }
 
-  // ── Tabla de Modelos Solicitados ──
-  doc.setFillColor(15, 23, 42);
-  doc.rect(12, y, pageWidth - 24, 7, "F");
+  // ── 4. Cabecera de la Tabla de Modelos ──
+  const dibujarCabeceraTabla = (currentY: number) => {
+    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.roundedRect(12, currentY, pageWidth - 24, 7.5, 1, 1, "F");
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text("MODELO / DETALLE DE NUMERACIÓN", 16, y + 4.5);
-  doc.text("CANTIDAD", pageWidth - 75, y + 4.5, { align: "center" });
-  doc.text("P. COSTO", pageWidth - 48, y + 4.5, { align: "right" });
-  doc.text("SUBTOTAL", pageWidth - 16, y + 4.5, { align: "right" });
-
-  y += 7;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(15, 23, 42);
-
-  data.lineas.forEach((line, i) => {
-    let extraLines = 0;
-    if (line.numeracion) extraLines += 4;
-    if (line.observacion) extraLines += 4;
-    const rowHeight = 8 + extraLines;
-
-    if (i % 2 === 1) {
-      doc.setFillColor(248, 250, 252);
-      doc.rect(12, y, pageWidth - 24, rowHeight, "F");
-    }
-    doc.setDrawColor(241, 245, 249);
-    doc.line(12, y + rowHeight, pageWidth - 12, y + rowHeight);
-
-    const docenas = (line.cantidadPares / 12).toFixed(1);
-    const textoPares = line.cantidadPares >= 12
-      ? `${line.cantidadPares} pares (${docenas} doc.)`
-      : line.cantidadPares === 6
-      ? `6 pares (½ docena)`
-      : `${line.cantidadPares} pares`;
-
-    let currentLineY = y + 4.5;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`${line.marca ? line.marca + " " : ""}${line.modelo} (${line.codigo}${line.color ? " - " + line.color : ""})`, 16, currentLineY);
-    
-    // Desglose de numeración para el fabricante
-    if (line.numeracion) {
-      currentLineY += 4;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(51, 65, 85);
-      doc.text(`Numeración: ${line.numeracion}`, 16, currentLineY);
+    doc.setFontSize(7.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("DETALLE DE MODELO, FOTO Y CURVA DE TALLAS", 16, currentY + 5);
+    doc.text("CANTIDAD", 144, currentY + 5, { align: "center" });
+    doc.text("P. COSTO", 170, currentY + 5, { align: "right" });
+    doc.text("SUBTOTAL", 194, currentY + 5, { align: "right" });
+  };
+
+  dibujarCabeceraTabla(y);
+  y += 9.5;
+
+  // ── 5. Filas de Modelos (Estructura de Tarjeta con Foto, Serie y Píldoras de Talla) ──
+  lineasConImagenes.forEach((line, i) => {
+    const { nombreCompleto, modeloLimpio } = formatearTituloModelo(line.modelo, line.marca);
+    const colorLimpio = line.color ? line.color.trim() : "";
+    const serieLimpia = line.serie && line.serie !== "Serie Estándar" ? line.serie.trim() : "Adulto";
+    const codigoLimpio = line.codigo ? line.codigo.trim() : "";
+    const tallas = extraerTallasValidas(line.tallasDetalle, line.numeracion);
+    const obsLineaLimpia = limpiarObservacionesOrden(line.observacion);
+
+    // Calcular altura dinámica de la fila
+    const tieneTallas = tallas.length > 0;
+    const muchasTallas = tallas.length > 6;
+    let extraH = 0;
+    if (muchasTallas) extraH += 5;
+    if (obsLineaLimpia) extraH += 4;
+    const rowHeight = Math.max(22, 18 + extraH);
+
+    // Salto de página si excede el límite
+    if (y + rowHeight > pageHeight - 32) {
+      doc.addPage();
+      y = 15;
+      dibujarCabeceraTabla(y);
+      y += 9.5;
     }
 
-    if (line.observacion) {
-      currentLineY += 4;
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(7);
-      doc.setTextColor(180, 83, 9);
-      doc.text(`Nota: ${line.observacion}`, 16, currentLineY);
+    // Fondo y borde de tarjeta para cada modelo
+    doc.setFillColor(i % 2 === 0 ? 255 : 249, i % 2 === 0 ? 255 : 250, i % 2 === 0 ? 255 : 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(12, y, pageWidth - 24, rowHeight, 1.5, 1.5, "FD");
+
+    // Miniatura de la Imagen del Calzado (Cuadrada con bordes redondeados)
+    const imgX = 14.5;
+    const imgY = y + 2.5;
+    const imgSize = 16.5;
+
+    if (line.loadedImageBase64) {
+      try {
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(imgX, imgY, imgSize, imgSize, 1.5, 1.5, "FD");
+        doc.addImage(line.loadedImageBase64, "JPEG", imgX + 0.6, imgY + 0.6, imgSize - 1.2, imgSize - 1.2);
+      } catch {
+        dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, modeloLimpio);
+      }
+    } else {
+      dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, modeloLimpio);
     }
+
+    // ── Columna de Información Central (x = 34 a 132) ──
+    // Línea 1: Nombre del Modelo + Color + Píldora de Serie
+    let nextX = 34;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42); // Slate 900
+    doc.text(nombreCompleto, nextX, y + 5.5);
+    nextX += doc.getTextWidth(nombreCompleto) + 2.5;
+
+    if (colorLimpio) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105); // Slate 600
+      doc.text(colorLimpio, nextX, y + 5.5);
+      nextX += doc.getTextWidth(colorLimpio) + 3;
+    }
+
+    // Píldora de Serie (Verde Esmeralda estándar)
+    const serieText = `Serie: ${serieLimpia}`;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.8);
+    const badgeW = doc.getTextWidth(serieText) + 4.5;
+    const badgeH = 4.2;
+
+    if (nextX + badgeW <= 134) {
+      doc.setFillColor(236, 253, 245); // Emerald 50
+      doc.setDrawColor(167, 243, 208); // Emerald 200
+      doc.roundedRect(nextX, y + 2.3, badgeW, badgeH, 1.2, 1.2, "FD");
+      doc.setTextColor(4, 120, 87); // Emerald 700
+      doc.text(serieText, nextX + 2.2, y + 5.2);
+    }
+
+    // Línea 2: Referencia / Código de Fabricación
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139); // Slate 500
+    const refText = codigoLimpio ? `Código: ${codigoLimpio}` : "Calzado de cuero nacional";
+    doc.text(refText, 34, y + 9.5);
+
+    // Línea 3: Curva de Tallas (Píldoras individuales por talla > 0)
+    if (tieneTallas) {
+      let curTallaX = 34;
+      let curTallaY = y + 11.5;
+      tallas.forEach((t) => {
+        const tText = `T${t.talla}: ${t.cantidad}p`;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.8);
+        const tw = doc.getTextWidth(tText) + 3.8;
+
+        if (curTallaX + tw > 132) {
+          curTallaX = 34;
+          curTallaY += 4.5;
+        }
+
+        doc.setFillColor(241, 245, 249); // Slate 100
+        doc.setDrawColor(203, 213, 225); // Slate 300
+        doc.roundedRect(curTallaX, curTallaY, tw, 4, 1, 1, "FD");
+        doc.setTextColor(30, 41, 59); // Slate 800
+        doc.text(tText, curTallaX + 1.9, curTallaY + 2.9);
+        curTallaX += tw + 1.8;
+      });
+    }
+
+    // Línea 4: Nota de taller si existe (limpia de clientes)
+    if (obsLineaLimpia) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(6.8);
+      doc.setTextColor(180, 83, 9); // Amber 700
+      doc.text(`• Nota: ${obsLineaLimpia.substring(0, 80)}`, 34, y + rowHeight - 2.5);
+    }
+
+    // ── Resumen Lateral Derecho ──
+    // Cantidad y Docenas
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${line.cantidadPares} pares`, 144, y + 7.5, { align: "center" });
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(15, 23, 42);
-    doc.text(textoPares, pageWidth - 75, y + 4.5, { align: "center" });
-    doc.text(`$${Number(line.precioCosto).toFixed(2)}`, pageWidth - 48, y + 4.5, { align: "right" });
-    doc.setFont("helvetica", "bold");
-    doc.text(`$${Number(line.subtotal).toFixed(2)}`, pageWidth - 16, y + 4.5, { align: "right" });
+    doc.setFontSize(7.2);
+    doc.setTextColor(100, 116, 139);
+    doc.text(formatearDocenasCorto(line.cantidadPares), 144, y + 12.5, { align: "center" });
 
-    y += rowHeight;
+    // P. Costo Unitario
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`$${Number(line.precioCosto).toFixed(2)}`, 170, y + 7.5, { align: "right" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.8);
+    doc.setTextColor(100, 116, 139);
+    doc.text("por par", 170, y + 12.5, { align: "right" });
+
+    // Subtotal Destacado
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(4, 120, 87); // Emerald 700
+    doc.text(`$${Number(line.subtotal).toFixed(2)}`, 194, y + 10, { align: "right" });
+
+    y += rowHeight + 2;
   });
 
-  y += 5;
+  // ── 6. Totales y Firmas ──
+  if (y + 36 > pageHeight - 15) {
+    doc.addPage();
+    y = 15;
+  } else {
+    y += 2;
+  }
 
-  // ── Totales y Firmas ──
   const startTotalsX = pageWidth - 85;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(startTotalsX, y, 73, 20, 1.5, 1.5, "FD");
+  doc.roundedRect(startTotalsX, y, 73, 22, 1.5, 1.5, "FD");
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
   doc.text("TOTAL PARES PEDIDOS:", startTotalsX + 4, y + 6);
   doc.setFont("helvetica", "bold");
-  doc.text(`${data.totales.totalPares} pares`, startTotalsX + 69, y + 6, { align: "right" });
+  doc.text(`${data.totales.totalPares} pares (${formatearDocenasCorto(data.totales.totalPares)})`, startTotalsX + 69, y + 6, { align: "right" });
 
   doc.setDrawColor(203, 213, 225);
-  doc.line(startTotalsX + 4, y + 9, startTotalsX + 69, y + 9);
+  doc.line(startTotalsX + 4, y + 9.5, startTotalsX + 69, y + 9.5);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("VALOR TOTAL ORDEN:", startTotalsX + 4, y + 15);
-  doc.setTextColor(180, 83, 9);
-  doc.text(`$${data.totales.totalPagar.toFixed(2)}`, startTotalsX + 69, y + 15, { align: "right" });
+  doc.text("VALOR TOTAL ORDEN:", startTotalsX + 4, y + 16);
+  doc.setTextColor(4, 120, 87); // Emerald 700
+  doc.setFontSize(11);
+  doc.text(`$${data.totales.totalPagar.toFixed(2)}`, startTotalsX + 69, y + 16, { align: "right" });
 
-  // Espacios de firmas
+  // Espacio de Firmas Formales
   y += 28;
   doc.setDrawColor(148, 163, 184);
-  doc.line(20, y + 12, 80, y + 12);
-  doc.line(pageWidth - 80, y + 12, pageWidth - 20, y + 12);
+  doc.line(20, y + 8, 80, y + 8);
+  doc.line(pageWidth - 80, y + 8, pageWidth - 20, y + 8);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text("Autorizado por (Comprador)", 50, y + 16, { align: "center" });
-  doc.text("Recibido por (Proveedor)", pageWidth - 50, y + 16, { align: "center" });
+  doc.text("Autorizado por (Comprador)", 50, y + 12, { align: "center" });
+  doc.text("Recibido y Conforme (Proveedor / Taller)", pageWidth - 50, y + 12, { align: "center" });
 
-  // Footer
-  y += 24;
+  // Pie de Página
+  y += 18;
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
-  doc.text(`Documento oficial de Orden de Compra emitido electrónicamente por ${data.emisor.nombre || "el comprador"}`, pageWidth / 2, y, { align: "center" });
+  doc.text(
+    `Documento oficial de Orden de Compra emitido electrónicamente por ${data.emisor.nombre || "el comprador"} • Cevallos, Tungurahua`,
+    pageWidth / 2,
+    y,
+    { align: "center" }
+  );
 
   return doc;
 }
 
-export function descargarOrdenCompraPdf(data: OrdenCompraPdfData): void {
-  const doc = generarOrdenCompraPdfDoc(data);
+export async function descargarOrdenCompraPdf(data: OrdenCompraPdfData): Promise<void> {
+  const doc = await generarOrdenCompraPdfDoc(data);
   const fileName = `Orden_Compra_${data.orden.numero}.pdf`;
   doc.save(fileName);
 }
 
-export function obtenerOrdenCompraPdfBlobUrl(data: OrdenCompraPdfData): string {
-  const doc = generarOrdenCompraPdfDoc(data);
+export async function obtenerOrdenCompraPdfBlobUrl(data: OrdenCompraPdfData): Promise<string> {
+  const doc = await generarOrdenCompraPdfDoc(data);
   const blob = doc.output("blob");
   return URL.createObjectURL(blob);
 }
