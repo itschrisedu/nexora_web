@@ -402,6 +402,9 @@ export default function ComercialComponent({
   const [pedidoEntregaSeleccionado, setPedidoEntregaSeleccionado] = useState<Pedido | null>(null);
   const [entregaItemsMap, setEntregaItemsMap] = useState<Record<string, number>>({});
   const [entregaPreciosMap, setEntregaPreciosMap] = useState<Record<string, string>>({});
+  const [entregaSustitutasMap, setEntregaSustitutasMap] = useState<Record<string, string>>({});
+  const [mostrarAlertasInsuficientes, setMostrarAlertasInsuficientes] = useState(false);
+  const [entregaProductosStockMap, setEntregaProductosStockMap] = useState<Record<string, any>>({});
   const [procesandoEntrega, setProcesandoEntrega] = useState(false);
 
   // ── Modal de Reversión / Corrección de Entrega Errónea (Fase 2) ──
@@ -533,7 +536,13 @@ export default function ComercialComponent({
       }
       if (showEntregaModal) {
         e.preventDefault();
-        safeDismiss(() => { setShowEntregaModal(false); setPedidoEntregaSeleccionado(null); setEntregaItemsMap({}); }, isDirtyEntrega());
+        safeDismiss(() => {
+          setShowEntregaModal(false);
+          setPedidoEntregaSeleccionado(null);
+          setEntregaItemsMap({});
+          setEntregaSustitutasMap({});
+          setMostrarAlertasInsuficientes(false);
+        }, isDirtyEntrega());
         return;
       }
       if (showSupplierOrderModal) {
@@ -2176,7 +2185,27 @@ export default function ComercialComponent({
       }
     } catch (e) {}
 
+    const productStockDetails: Record<string, any> = {};
+    const productIds = Array.from(new Set((orderToUse.lines || []).map((l: any) => l.productId).filter(Boolean)));
+    if (online && productIds.length > 0) {
+      await Promise.all(
+        productIds.map(async (prodId) => {
+          try {
+            const prod = await ApiService.get(`/inventario/productos/${prodId}`);
+            if (prod && prod.id) {
+              productStockDetails[prod.id] = prod;
+            }
+          } catch (err) {
+            console.warn(`No se pudo cargar stock en vivo para producto ${prodId}`, err);
+          }
+        })
+      );
+    }
+    setEntregaProductosStockMap(productStockDetails);
+
     setPedidoEntregaSeleccionado(orderToUse);
+    setEntregaSustitutasMap({});
+    setMostrarAlertasInsuficientes(false);
     const initialMap: Record<string, number> = {};
     const initialPrecios: Record<string, string> = {};
     (orderToUse.lines || []).forEach((l: any) => {
@@ -2204,6 +2233,7 @@ export default function ComercialComponent({
       .map(([lineId, cant]) => ({
         lineId,
         cantidadAEntregar: Number(cant) || 0,
+        tallaIdSustituta: entregaSustitutasMap[lineId] || undefined,
         precioUnitario: entregaPreciosMap[lineId] !== undefined && entregaPreciosMap[lineId] !== ''
           ? Number(entregaPreciosMap[lineId])
           : undefined,
@@ -2228,6 +2258,8 @@ export default function ComercialComponent({
         setPedidoEntregaSeleccionado(null);
         setEntregaItemsMap({});
         setEntregaPreciosMap({});
+        setEntregaSustitutasMap({});
+        setMostrarAlertasInsuficientes(false);
         await loadPedidos();
         await loadListaClientes();
       } else {
@@ -6344,14 +6376,35 @@ export default function ComercialComponent({
                     type="button"
                     onClick={() => {
                       const allMax: Record<string, number> = {};
+                      let huboInsuficiente = false;
                       (pedidoEntregaSeleccionado.lines || []).forEach((l: any) => {
                         const pend = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, l.cantidad - (l.cantidadEntregada || 0));
-                        const disp = l.stockDisponible !== undefined ? l.stockDisponible : pend;
-                        allMax[l.id] = Math.min(pend, Math.max(0, disp));
+                        const substId = entregaSustitutasMap[l.id];
+                        let disp = l.stockDisponible !== undefined ? l.stockDisponible : pend;
+                        const prodInfo = entregaProductosStockMap[l.productId];
+                        if (substId && prodInfo?.stockByTalla) {
+                          const stSub = prodInfo.stockByTalla.find((s: any) => s.tallaId === substId || s.talla?.id === substId);
+                          if (stSub) disp = stSub.stockDisponible !== undefined ? stSub.stockDisponible : (stSub.stockFisico !== undefined ? stSub.stockFisico : 0);
+                        } else if (prodInfo?.stockByTalla) {
+                          const st = prodInfo.stockByTalla.find((s: any) => s.tallaId === l.tallaId || s.talla?.id === l.tallaId);
+                          if (st) disp = st.stockDisponible !== undefined ? st.stockDisponible : (st.stockFisico !== undefined ? st.stockFisico : 0);
+                        }
+                        const canFill = Math.min(pend, Math.max(0, disp));
+                        allMax[l.id] = canFill;
+                        if (canFill < pend && pend > 0) {
+                          huboInsuficiente = true;
+                        }
                       });
                       setEntregaItemsMap(allMax);
+                      if (huboInsuficiente) {
+                        setMostrarAlertasInsuficientes(true);
+                        showToast('Se llenaron los pares con el stock disponible. Ciertas tallas tienen faltante en bodega.', 'warning');
+                      } else {
+                        setMostrarAlertasInsuficientes(false);
+                        showToast('Todas las tallas pendientes fueron cubiertas con el stock disponible.', 'success');
+                      }
                     }}
-                    className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white border border-emerald-600/20 rounded-lg text-xs font-bold transition-all"
+                    className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white border border-emerald-600/20 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
                   >
                     ⚡ Llenar Disponibles
                   </button>
@@ -6364,12 +6417,33 @@ export default function ComercialComponent({
                       });
                       setEntregaItemsMap(allZero);
                     }}
-                    className="px-2.5 py-1 bg-slate-500/10 text-slate-600 hover:bg-slate-500 hover:text-white border border-slate-500/20 rounded-lg text-xs font-bold transition-all"
+                    className="px-2.5 py-1 bg-slate-500/10 text-slate-600 hover:bg-slate-500 hover:text-white border border-slate-500/20 rounded-lg text-xs font-bold transition-all cursor-pointer"
                   >
                     🔄 Poner en 0
                   </button>
                 </div>
               </div>
+
+              {/* Banner de alerta si hay stock insuficiente en bodega (Fase 4.3) */}
+              {mostrarAlertasInsuficientes && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-200 animate-in fade-in">
+                  <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="font-bold">Stock insuficiente en ciertas tallas</div>
+                    <div className="text-[11px] text-amber-700 dark:text-amber-300">
+                      Las tallas resaltadas en ámbar o rojo no alcanzan a cubrir el pedido completo por falta de inventario físico. Puedes entregar las unidades disponibles o aplicar despacho compensatorio seleccionando una talla sustituta con stock.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarAlertasInsuficientes(false)}
+                    className="text-amber-500 hover:text-amber-700 p-0.5 cursor-pointer"
+                    title="Cerrar advertencia"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
 
               {/* Tarjetas interactivas agrupadas por Modelo / Variante (Idéntico a componente de pedidos) */}
               <div className="space-y-3">
@@ -6481,41 +6555,137 @@ export default function ComercialComponent({
                                   const cantPedida = l.cantidad || 0;
                                   const cantEntregada = l.cantidadEntregada !== undefined ? l.cantidadEntregada : 0;
                                   const cantPendiente = l.cantidadPendiente !== undefined ? l.cantidadPendiente : Math.max(0, cantPedida - cantEntregada);
-                                  const stockDisp = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : cantPendiente);
+
+                                  const origTallaId = l.tallaId;
+                                  const sustitutaId = entregaSustitutasMap[l.id];
+                                  const isSustituta = Boolean(sustitutaId && sustitutaId !== origTallaId);
+                                  const activeTallaId = isSustituta ? sustitutaId : origTallaId;
+
+                                  const prodInfo = entregaProductosStockMap[g.productId || l.productId];
+                                  let stockDisp = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : cantPendiente);
+                                  let activeTallaNumero = l.numeroTalla || l.tallaNumero || '38';
+
+                                  if (prodInfo && Array.isArray(prodInfo.stockByTalla)) {
+                                    const st = prodInfo.stockByTalla.find((s: any) => s.tallaId === activeTallaId || s.talla?.id === activeTallaId);
+                                    if (st) {
+                                      stockDisp = st.stockDisponible !== undefined ? st.stockDisponible : (st.stockFisico !== undefined ? st.stockFisico : 0);
+                                      if (st.talla?.numero) activeTallaNumero = String(st.talla.numero);
+                                    }
+                                  }
+
                                   const aEntregar = entregaItemsMap[l.id] ?? 0;
                                   const maxPermitido = Math.min(cantPendiente, Math.max(0, stockDisp));
-                                  const numTalla = l.numeroTalla || l.tallaNumero || '38';
+                                  const numTallaOrig = l.numeroTalla || l.tallaNumero || '38';
+                                  const tieneFaltante = cantPendiente > 0 && stockDisp < cantPendiente;
+
+                                  // Lista de tallas alternativas del mismo modelo que tienen stock disponible
+                                  const tallasAlternativasConStock = prodInfo && Array.isArray(prodInfo.stockByTalla)
+                                    ? prodInfo.stockByTalla.filter((st: any) => {
+                                        const tId = st.tallaId || st.talla?.id;
+                                        const qty = st.stockDisponible !== undefined ? st.stockDisponible : (st.stockFisico || 0);
+                                        return tId !== origTallaId && qty > 0;
+                                      })
+                                    : [];
 
                                   return (
                                     <div
                                       key={i}
-                                      className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 shadow-2xs"
+                                      className={`flex flex-wrap items-center gap-1.5 rounded-2xl border bg-[var(--card)] px-2.5 py-1.5 shadow-2xs transition-all ${
+                                        isSustituta
+                                          ? 'border-purple-500/40 bg-purple-500/5'
+                                          : tieneFaltante && mostrarAlertasInsuficientes
+                                          ? 'border-amber-500/50 bg-amber-500/5 ring-1 ring-amber-500/30'
+                                          : 'border-[var(--border)]'
+                                      }`}
                                     >
-                                      <span className="text-[var(--foreground)] font-black text-xs font-mono">
-                                        T{numTalla}
-                                      </span>
-
-                                      {cantPendiente > 0 && (
-                                        <span
-                                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-                                            stockDisp <= 0
-                                              ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                                              : stockDisp < cantPendiente
-                                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                          }`}
-                                          title={`Stock en bodega: ${stockDisp} pares`}
-                                        >
-                                          {stockDisp <= 0 ? 'Sin stock' : `Stock: ${stockDisp}`}
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[var(--foreground)] font-black text-xs font-mono">
+                                          T{numTallaOrig}
                                         </span>
+
+                                        {cantPendiente > 0 && (
+                                          <span
+                                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
+                                              stockDisp <= 0
+                                                ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                                                : stockDisp < cantPendiente
+                                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                            }`}
+                                            title={`Stock en bodega: ${stockDisp} pares`}
+                                          >
+                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${stockDisp <= 0 ? 'bg-rose-500' : stockDisp < cantPendiente ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                                            {stockDisp <= 0 ? 'Sin stock' : stockDisp < cantPendiente ? `Parcial: ${stockDisp}/${cantPendiente}` : `Stock: ${stockDisp}`}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Talla Sustituta Activa o Selector de Sustitución */}
+                                      {cantPendiente > 0 && (
+                                        <div className="flex items-center gap-1">
+                                          {isSustituta ? (
+                                            <div className="flex items-center gap-1 text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded-md">
+                                              <span>🔄 Sustituida por T{activeTallaNumero}</span>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setEntregaSustitutasMap((prev) => {
+                                                    const copy = { ...prev };
+                                                    delete copy[l.id];
+                                                    return copy;
+                                                  });
+                                                  setEntregaItemsMap((prev) => ({
+                                                    ...prev,
+                                                    [l.id]: 0,
+                                                  }));
+                                                }}
+                                                className="hover:text-rose-600 ml-0.5 font-bold cursor-pointer"
+                                                title="Quitar sustitución y volver a talla original"
+                                              >
+                                                ✕
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            tallasAlternativasConStock.length > 0 && (
+                                              <select
+                                                value=""
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  if (val) {
+                                                    setEntregaSustitutasMap((prev) => ({
+                                                      ...prev,
+                                                      [l.id]: val,
+                                                    }));
+                                                    const stAlt = prodInfo.stockByTalla.find((s: any) => s.tallaId === val || s.talla?.id === val);
+                                                    const dispAlt = stAlt ? (stAlt.stockDisponible !== undefined ? stAlt.stockDisponible : (stAlt.stockFisico || 0)) : 0;
+                                                    setEntregaItemsMap((prev) => ({
+                                                      ...prev,
+                                                      [l.id]: Math.min(cantPendiente, Math.max(0, dispAlt)),
+                                                    }));
+                                                  }
+                                                }}
+                                                className="text-[9px] font-medium bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)] rounded px-1 py-0.5 hover:border-purple-400 focus:outline-hidden cursor-pointer"
+                                                title="Sustituir por otra talla con stock disponible de este mismo modelo"
+                                              >
+                                                <option value="">🔄 Sustituir...</option>
+                                                {tallasAlternativasConStock.map((st: any) => (
+                                                  <option key={st.tallaId || st.talla?.id} value={st.tallaId || st.talla?.id}>
+                                                    T{st.talla?.numero} (Disp: {st.stockDisponible !== undefined ? st.stockDisponible : (st.stockFisico || 0)})
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            )
+                                          )}
+                                        </div>
                                       )}
 
+                                      {/* Stepper y Cantidades */}
                                       {cantPendiente === 0 ? (
-                                        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-1" title="Talla completada al 100%">
+                                        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-auto" title="Talla completada al 100%">
                                           ✓ {cantEntregada} entregados
                                         </span>
                                       ) : (
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 ml-auto">
                                           {cantEntregada > 0 && (
                                             <span className="text-[9px] font-bold text-emerald-600 bg-emerald-500/10 px-1 py-0.5 rounded mr-0.5" title={`Ya entregados: ${cantEntregada}, faltan: ${cantPendiente}`}>
                                               {cantEntregada}/{cantPedida}
@@ -6535,7 +6705,7 @@ export default function ComercialComponent({
                                                 ? 'bg-slate-500/10 text-slate-400 opacity-40 cursor-not-allowed'
                                                 : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 cursor-pointer'
                                             }`}
-                                            title={`Quitar 1 par T${numTalla}`}
+                                            title={`Quitar 1 par`}
                                           >
                                             −
                                           </button>
@@ -6559,11 +6729,11 @@ export default function ComercialComponent({
                                             title={
                                               maxPermitido <= 0
                                                 ? stockDisp <= 0
-                                                  ? `Sin stock disponible en bodega para T${numTalla}`
+                                                  ? `Sin stock disponible en bodega para T${activeTallaNumero}`
                                                   : `Ya se alcanzó el tope pendiente (${cantPendiente})`
                                                 : aEntregar >= maxPermitido
                                                 ? `Tope alcanzado (máx a entregar hoy: ${maxPermitido})`
-                                                : `Agregar 1 par T${numTalla}`
+                                                : `Agregar 1 par T${activeTallaNumero}`
                                             }
                                           >
                                             +
