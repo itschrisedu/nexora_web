@@ -64,6 +64,14 @@ import {
   armarMensajeWhatsAppAbono,
   ComprobanteAbonoPdfData,
 } from '../services/pdf-abono.service';
+import {
+  generarHistorialPdfDoc,
+  descargarHistorialPdf,
+  generarHistorialPdfBase64,
+  armarMensajeWhatsAppHistorial,
+  compartirHistorialWhatsApp,
+  HistorialComercialPdfData,
+} from '../services/pdf-historial.service';
 import { generarUrlPublicaAbono } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
 import { capitalizarNombreCompleto, formatearNombreSerie } from '@/utils/text-formatters';
@@ -597,6 +605,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [filtroHistorial, setFiltroHistorial] = useState<'TODOS' | 'COMPRAS' | 'ABONOS' | 'DEVOLUCIONES'>('TODOS');
   const [pedidoHistorialExpandidoId, setPedidoHistorialExpandidoId] = useState<string | null>(null);
 
+  // Modal Compartir Historial Comercial y Financiero (PDF, WhatsApp, Correo)
+  const [showCompartirHistorialModal, setShowCompartirHistorialModal] = useState(false);
+  const [filtroCompartirFechaInicio, setFiltroCompartirFechaInicio] = useState('');
+  const [filtroCompartirFechaFin, setFiltroCompartirFechaFin] = useState('');
+  const [compartirEmailDestino, setCompartirEmailDestino] = useState('');
+  const [compartirTelefonoDestino, setCompartirTelefonoDestino] = useState('');
+  const [descargarCopiaPdfAlCompartir, setDescargarCopiaPdfAlCompartir] = useState(true);
+  const [enviandoHistorialCorreo, setEnviandoHistorialCorreo] = useState(false);
+  const [enviandoHistorialWhatsApp, setEnviandoHistorialWhatsApp] = useState(false);
+
   // Modal Facturación SRI
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [tabFactura, setTabFactura] = useState<'CONFIGURAR' | 'PREVISUALIZAR'>('CONFIGURAR');
@@ -707,6 +725,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion());
         return;
       }
+      if (showCompartirHistorialModal) {
+        e.preventDefault();
+        setShowCompartirHistorialModal(false);
+        return;
+      }
       if (showHistorialModal) {
         e.preventDefault();
         setShowHistorialModal(false);
@@ -720,7 +743,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showDiscardModal, showConfirmAbonoModal, confirmModal.isOpen, showFacturaModal, showDevolucionModal, showHistorialModal, showCuentaModal, safeDismiss, isDirtyFactura, isDirtyDevolucion, isDirtyAbono]);
+  }, [showDiscardModal, showConfirmAbonoModal, confirmModal.isOpen, showFacturaModal, showDevolucionModal, showHistorialModal, showCompartirHistorialModal, showCuentaModal, safeDismiss, isDirtyFactura, isDirtyDevolucion, isDirtyAbono]);
 
   const loadSucursales = async () => {
     try {
@@ -1417,6 +1440,265 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       setShowHistorialModal(false);
     } finally {
       setLoadingHistorial(false);
+    }
+  };
+
+  const rangoFechasHistorial = useMemo(() => {
+    if (!historialCliente?.movimientos || historialCliente.movimientos.length === 0) {
+      const hoy = new Date().toISOString().split('T')[0];
+      return { minFecha: hoy, maxFecha: hoy, total: 0 };
+    }
+    const timestamps = historialCliente.movimientos
+      .map(m => new Date(m.fecha).getTime())
+      .filter(t => !isNaN(t));
+    if (timestamps.length === 0) {
+      const hoy = new Date().toISOString().split('T')[0];
+      return { minFecha: hoy, maxFecha: hoy, total: 0 };
+    }
+    const minTimestamp = Math.min(...timestamps);
+    const maxTimestamp = Math.max(...timestamps);
+    const minDateStr = new Date(minTimestamp).toISOString().split('T')[0];
+    const maxDateStr = new Date(maxTimestamp).toISOString().split('T')[0];
+    return {
+      minFecha: minDateStr,
+      maxFecha: maxDateStr,
+      total: historialCliente.movimientos.length,
+    };
+  }, [historialCliente]);
+
+  const movimientosFiltradosCompartir = useMemo(() => {
+    if (!historialCliente?.movimientos) return [];
+    return historialCliente.movimientos.filter(m => {
+      const fMov = m.fecha ? m.fecha.split('T')[0] : '';
+      if (filtroCompartirFechaInicio && fMov < filtroCompartirFechaInicio) return false;
+      if (filtroCompartirFechaFin && fMov > filtroCompartirFechaFin) return false;
+      return true;
+    });
+  }, [historialCliente, filtroCompartirFechaInicio, filtroCompartirFechaFin]);
+
+  const handleAbrirCompartirHistorial = () => {
+    if (!historialCliente) return;
+    setFiltroCompartirFechaInicio(rangoFechasHistorial.minFecha);
+    setFiltroCompartirFechaFin(rangoFechasHistorial.maxFecha);
+    setCompartirEmailDestino(historialCliente.cliente.email || '');
+    setCompartirTelefonoDestino(historialCliente.cliente.telefono || '');
+    setShowCompartirHistorialModal(true);
+  };
+
+  const construirHistorialPdfData = (): HistorialComercialPdfData | null => {
+    if (!historialCliente) return null;
+
+    const tenantUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
+    const emisorNombre = businessConfig?.nombre || tenantUser?.tenantName || 'Comercializadora de Calzado';
+    const emisorRuc = businessConfig?.ruc || '1804884664001';
+    const emisorDireccion = businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador';
+    const emisorTelefono = businessConfig?.telefono || (businessConfig as any)?.whatsappContacto || '';
+    const emisorEmail = businessConfig?.email || '';
+
+    const entregas: any[] = [];
+    const abonos: any[] = [];
+    const devoluciones: any[] = [];
+
+    let totalEntregasMonto = 0;
+    let totalParesEntregados = 0;
+    let totalAbonosMonto = 0;
+    let totalDevolucionesMonto = 0;
+
+    movimientosFiltradosCompartir.forEach((m) => {
+      if (m.tipo === 'COMPRA_PEDIDO') {
+        totalEntregasMonto += m.monto || 0;
+        let paresPedido = 0;
+        const rawLineas = (m.detalles?.lineas || m.detalles?.items || []) as any[];
+        const itemsEntrega = rawLineas.map((it: any) => {
+          const paresLinea = it.cantidadPares || it.totalPares || it.cantidad || 0;
+          paresPedido += paresLinea;
+          return {
+            modelo: it.modeloNombre || it.modelo || 'Modelo de Calzado',
+            color: it.color || '',
+            serie: it.serieNombre || it.serie || '',
+            curvaTallas: it.curvaTallas || (it.talla ? [{ talla: it.talla, cantidad: it.cantidad || 1 }] : undefined),
+            totalPares: paresLinea,
+            etiquetaVolumen: paresLinea ? `${paresLinea} pares` : undefined,
+            precioUnitario: it.precioUnitario || 0,
+            subtotal: it.subtotal || 0,
+          };
+        });
+        totalParesEntregados += paresPedido;
+        entregas.push({
+          fecha: m.fecha ? m.fecha.split('T')[0] : '',
+          pedidoId: m.pedidoId || m.id,
+          numeroNota: m.numeroCodigo || (m.titulo ? m.titulo.replace(/[^0-9]/g, '') : ''),
+          vendedor: m.vendedorNombre,
+          entregadoPor: m.entregadoPor,
+          fechaEntrega: m.fechaEntrega || m.fecha,
+          montoTotal: m.monto,
+          totalPares: paresPedido || undefined,
+          items: itemsEntrega,
+        });
+      } else if (m.tipo === 'ABONO') {
+        totalAbonosMonto += m.monto || 0;
+        abonos.push({
+          fecha: m.fecha ? m.fecha.split('T')[0] : '',
+          numeroComprobante: m.numeroCodigo || (m.titulo ? m.titulo.replace(/[^0-9]/g, '') : ''),
+          formaPago: m.metodo || 'EFECTIVO',
+          referencia: m.numeroCodigo,
+          monto: m.monto,
+          cobradoPor: m.cobradoPor,
+          saldoAnterior: m.saldoAnterior ?? (m.nuevoSaldo !== undefined ? m.nuevoSaldo + (m.monto || 0) : undefined),
+          nuevoSaldo: m.nuevoSaldo,
+        });
+      } else if (m.tipo === 'DEVOLUCION') {
+        totalDevolucionesMonto += m.monto || 0;
+        const devLineas = (m.detalles?.lineas || []) as any[];
+        const devPares = devLineas.reduce((acc: number, l: any) => acc + (l.cantidad || l.totalPares || 0), 0);
+        devoluciones.push({
+          fecha: m.fecha ? m.fecha.split('T')[0] : '',
+          monto: m.monto,
+          procesadoPor: m.procesadoPor,
+          motivo: m.detalles?.motivo || m.descripcion,
+          totalPares: devPares || undefined,
+        });
+      }
+    });
+
+    const esCompleto =
+      filtroCompartirFechaInicio === rangoFechasHistorial.minFecha &&
+      filtroCompartirFechaFin === rangoFechasHistorial.maxFecha;
+
+    return {
+      emisor: {
+        nombre: emisorNombre,
+        ruc: emisorRuc,
+        direccion: emisorDireccion,
+        telefono: emisorTelefono,
+        email: emisorEmail,
+        sucursal: 'Matriz Cevallos',
+      },
+      cliente: {
+        nombre: historialCliente.cliente.nombre,
+        cedula: historialCliente.cliente.cedula,
+        telefono: compartirTelefonoDestino || historialCliente.cliente.telefono,
+        email: compartirEmailDestino || historialCliente.cliente.email,
+        direccion: historialCliente.cliente.direccion,
+        nivelCredito: historialCliente.cliente.nivelCredito,
+        limiteCredito: historialCliente.cliente.limiteCredito,
+      },
+      periodo: {
+        fechaInicio: filtroCompartirFechaInicio || rangoFechasHistorial.minFecha,
+        fechaFin: filtroCompartirFechaFin || rangoFechasHistorial.maxFecha,
+        esHistoricoCompleto: esCompleto,
+      },
+      resumen: {
+        totalEntregasMonto,
+        totalParesEntregados,
+        totalAbonosMonto,
+        totalDevolucionesMonto,
+        saldoPendienteFinal: historialCliente.resumen.saldoPendienteTotal,
+      },
+      entregas,
+      abonos,
+      devoluciones,
+    };
+  };
+
+  const handleDescargarHistorialPdf = () => {
+    const pdfData = construirHistorialPdfData();
+    if (!pdfData) {
+      showToast('No se puede generar el documento del historial.', 'error');
+      return;
+    }
+    descargarHistorialPdf(pdfData);
+    showToast('Documento PDF generado y descargado exitosamente.', 'success');
+  };
+
+  const handleEnviarHistorialWhatsApp = async () => {
+    const pdfData = construirHistorialPdfData();
+    if (!pdfData) {
+      showToast('No se puede generar el documento del historial.', 'error');
+      return;
+    }
+    if (!compartirTelefonoDestino || compartirTelefonoDestino.trim().length < 7) {
+      showToast('Por favor ingrese un número de teléfono válido para WhatsApp.', 'warning');
+      return;
+    }
+    setEnviandoHistorialWhatsApp(true);
+    try {
+      await compartirHistorialWhatsApp(pdfData, compartirTelefonoDestino, descargarCopiaPdfAlCompartir);
+      showToast('Abriendo WhatsApp con el resumen comercial y financiero...', 'success');
+      if (descargarCopiaPdfAlCompartir) {
+        showToast('Copia PDF descargada para adjuntar en la conversación.', 'info');
+      }
+    } catch (e: any) {
+      showToast(e.message || 'Error al enviar por WhatsApp.', 'error');
+    } finally {
+      setEnviandoHistorialWhatsApp(false);
+    }
+  };
+
+  const handleEnviarHistorialCorreo = async () => {
+    const pdfData = construirHistorialPdfData();
+    if (!pdfData) {
+      showToast('No se puede generar el documento del historial.', 'error');
+      return;
+    }
+    const emailTarget = compartirEmailDestino.trim();
+    if (!emailTarget || !emailTarget.includes('@')) {
+      showToast('Por favor ingrese un correo electrónico válido.', 'warning');
+      return;
+    }
+    setEnviandoHistorialCorreo(true);
+    try {
+      const pdfBase64 = generarHistorialPdfBase64(pdfData);
+      const cleanCliente = pdfData.cliente.nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const nombreArchivo = `Historial_${cleanCliente}_${pdfData.periodo.fechaInicio}_${pdfData.periodo.fechaFin}.pdf`;
+
+      await ApiService.post('/notificaciones/email-comprobante', {
+        destinatario: emailTarget,
+        clienteNombre: pdfData.cliente.nombre,
+        asunto: `Historial Comercial y Financiero — ${pdfData.emisor.nombre}`,
+        cuerpoHtml: `
+          <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="background-color: #0f172a; padding: 18px 24px; border-radius: 8px; margin-bottom: 20px;">
+              <h2 style="color: #ffffff; margin: 0; font-size: 18px;">${pdfData.emisor.nombre}</h2>
+              <p style="color: #94a3b8; margin: 4px 0 0; font-size: 12px;">Historial Comercial y Financiero Oficial</p>
+            </div>
+            <p>Estimado(a) <strong>${pdfData.cliente.nombre}</strong>,</p>
+            <p>Adjunto a este correo encontrará el extracto cronológico oficial de sus transacciones y movimientos comerciales (pedidos despachados, abonos recibidos y saldos vigentes) para el periodo del <strong>${pdfData.periodo.fechaInicio}</strong> al <strong>${pdfData.periodo.fechaFin}</strong>.</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+              <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                <td style="padding: 10px;"><strong>Saldo Actual Pendiente:</strong></td>
+                <td style="padding: 10px; text-align: right; font-weight: bold; color: ${pdfData.resumen.saldoPendienteFinal > 0 ? '#b91c1c' : '#059669'}; font-size: 15px;">$${pdfData.resumen.saldoPendienteFinal.toFixed(2)}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 8px 10px;">Total Despachos en el Período:</td>
+                <td style="padding: 8px 10px; text-align: right;">$${pdfData.resumen.totalEntregasMonto.toFixed(2)} (${pdfData.resumen.totalParesEntregados} pares)</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 8px 10px;">Total Abonos Registrados:</td>
+                <td style="padding: 8px 10px; text-align: right; color: #059669; font-weight: bold;">-$${pdfData.resumen.totalAbonosMonto.toFixed(2)}</td>
+              </tr>
+            </table>
+            <p style="font-size: 12px; color: #64748b;">Si tiene alguna inquietud o necesita mayor detalle sobre las notas o comprobantes, no dude en contactarnos.</p>
+          </div>
+        `,
+        adjuntos: [
+          {
+            nombre: nombreArchivo,
+            contenidoBase64: pdfBase64,
+            tipoMime: 'application/pdf',
+          },
+        ],
+      });
+
+      if (descargarCopiaPdfAlCompartir) {
+        descargarHistorialPdf(pdfData);
+      }
+      showToast(`Historial enviado exitosamente a ${emailTarget}.`, 'success');
+      setShowCompartirHistorialModal(false);
+    } catch (err: any) {
+      showToast(err.message || 'Error al enviar el correo.', 'error');
+    } finally {
+      setEnviandoHistorialCorreo(false);
     }
   };
 
@@ -3618,6 +3900,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               <div className="absolute top-4 sm:top-5 right-4 sm:right-5 flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={handleAbrirCompartirHistorial}
+                  disabled={loadingHistorial || !historialCliente}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                  title="Compartir extracto de historial en PDF, WhatsApp o Correo"
+                >
+                  <Share2 size={14} />
+                  <span className="hidden sm:inline">Compartir Historial</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setShowHistorialModal(false);
                     setShowCuentaModal(true);
@@ -5815,6 +6107,229 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Compartir Historial Comercial y Financiero */}
+      {showCompartirHistorialModal && historialCliente && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden text-[var(--foreground)]">
+            {/* Header */}
+            <div className="p-5 sm:p-6 bg-[#0F172A] text-white flex items-center justify-between shrink-0 relative overflow-hidden">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Share2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base sm:text-lg tracking-tight">
+                    Compartir Historial Comercial
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300">
+                    Extracto formal en PDF, WhatsApp y Correo electrónico
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCompartirHistorialModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
+              {/* Tarjeta de información del cliente */}
+              <div className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-sm text-[var(--foreground)]">
+                      {historialCliente.cliente.nombre}
+                    </span>
+                    <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] border border-[#0F172A]/20 rounded-md text-[10px] font-bold">
+                      {historialCliente.cliente.nivelCredito}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Identificación: <strong>{historialCliente.cliente.cedula || '—'}</strong>
+                  </p>
+                </div>
+                <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
+                  <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold">
+                    Saldo Deudor Total
+                  </span>
+                  <span className="font-black text-base text-red-500">
+                    ${historialCliente.resumen.saldoPendienteTotal.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Selector de Rango de Fechas */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Filter size={15} className="text-[#0F172A]" />
+                    <span className="text-xs font-black uppercase tracking-wider text-[var(--foreground)]">
+                      Período del Extracto
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFiltroCompartirFechaInicio(rangoFechasHistorial.minFecha);
+                      setFiltroCompartirFechaFin(rangoFechasHistorial.maxFecha);
+                    }}
+                    className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <span>Todo el histórico</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                      ({rangoFechasHistorial.minFecha} al {rangoFechasHistorial.maxFecha})
+                    </span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                      Desde:
+                    </label>
+                    <input
+                      type="date"
+                      value={filtroCompartirFechaInicio}
+                      min={rangoFechasHistorial.minFecha}
+                      max={filtroCompartirFechaFin || rangoFechasHistorial.maxFecha}
+                      onChange={(e) => setFiltroCompartirFechaInicio(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                      Hasta:
+                    </label>
+                    <input
+                      type="date"
+                      value={filtroCompartirFechaFin}
+                      min={filtroCompartirFechaInicio || rangoFechasHistorial.minFecha}
+                      max={rangoFechasHistorial.maxFecha}
+                      onChange={(e) => setFiltroCompartirFechaFin(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]">
+                  <span>
+                    Transacciones en rango: <strong>{movimientosFiltradosCompartir.length}</strong> de {rangoFechasHistorial.total}
+                  </span>
+                  <span className="text-[10px] italic">
+                    Restringido estrictamente al historial del cliente
+                  </span>
+                </div>
+              </div>
+
+              {/* Destinatarios de Contacto */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle size={15} className="text-emerald-500" />
+                    <span className="text-xs font-extrabold text-[var(--foreground)]">
+                      Teléfono WhatsApp
+                    </span>
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="Ej: 0991234567 o +593991234567"
+                    value={compartirTelefonoDestino}
+                    onChange={(e) => setCompartirTelefonoDestino(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                  <label className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)] cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={descargarCopiaPdfAlCompartir}
+                      onChange={(e) => setDescargarCopiaPdfAlCompartir(e.target.checked)}
+                      className="rounded accent-emerald-600"
+                    />
+                    <span>Descargar copia PDF al abrir WhatsApp</span>
+                  </label>
+                </div>
+
+                <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Mail size={15} className="text-blue-500" />
+                    <span className="text-xs font-extrabold text-[var(--foreground)]">
+                      Correo Electrónico
+                    </span>
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="cliente@ejemplo.com"
+                    value={compartirEmailDestino}
+                    onChange={(e) => setCompartirEmailDestino(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-500"
+                  />
+                  <p className="text-[10px] text-[var(--muted-foreground)]">
+                    El documento PDF se generará y enviará adjunto por correo.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer con Acciones */}
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCompartirHistorialModal(false)}
+                className="px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] cursor-pointer transition-colors"
+              >
+                Cerrar
+              </button>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDescargarHistorialPdf}
+                  className="px-3.5 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] font-extrabold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  title="Descargar documento PDF local"
+                >
+                  <Download size={15} />
+                  <span>Descargar PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleEnviarHistorialWhatsApp}
+                  disabled={enviandoHistorialWhatsApp || !compartirTelefonoDestino}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Abrir WhatsApp con el resumen comercial"
+                >
+                  {enviandoHistorialWhatsApp ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <MessageCircle size={15} />
+                  )}
+                  <span>WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleEnviarHistorialCorreo}
+                  disabled={enviandoHistorialCorreo || !compartirEmailDestino}
+                  className="px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Enviar correo con extracto PDF adjunto"
+                >
+                  {enviandoHistorialCorreo ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Mail size={15} />
+                  )}
+                  <span>Enviar Correo</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
