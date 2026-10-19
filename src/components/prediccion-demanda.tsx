@@ -180,33 +180,18 @@ const TEMPORADAS_DISPONIBLES = [
   },
 ];
 
-// Helpers para identificación estricta de calzado escolar colegial (todo negro) y deportivo (todo blanco)
+// Helpers para identificación estricta de calzado escolar colegial (solo negro) y deportivo (solo blanco)
+// Debe coincidir estrictamente con Negro o Blanco (excluye compuestos como 'blanco - negro', 'blanco/azul', etc.)
 const esTodoNegro = (color?: string | null): boolean => {
   if (!color) return false;
-  const c = color.trim().toLowerCase();
-  return (
-    c.includes("negro") &&
-    !c.includes("/") &&
-    !c.includes(" con ") &&
-    !c.includes(" y ") &&
-    !c.includes("+") &&
-    !c.includes("rojo") &&
-    !c.includes("azul")
-  );
+  const c = color.trim().toLowerCase().replace(/[.,;:_-]+$/, "");
+  return c === "negro" || c === "negra";
 };
 
 const esTodoBlanco = (color?: string | null): boolean => {
   if (!color) return false;
-  const c = color.trim().toLowerCase();
-  return (
-    c.includes("blanco") &&
-    !c.includes("/") &&
-    !c.includes(" con ") &&
-    !c.includes(" y ") &&
-    !c.includes("+") &&
-    !c.includes("azul") &&
-    !c.includes("rojo")
-  );
+  const c = color.trim().toLowerCase().replace(/[.,;:_-]+$/, "");
+  return c === "blanco" || c === "blanca";
 };
 
 const esColorEscolarClasico = (color?: string | null): boolean => {
@@ -548,7 +533,11 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
         } else if (colorFiltro.trim()) {
           const target = colorFiltro.toLowerCase().trim();
           const itemColor = (item.color || "").toLowerCase().trim();
-          if (soloColorExacto) {
+          if (target === "negro") {
+            if (!esTodoNegro(item.color)) return false;
+          } else if (target === "blanco") {
+            if (!esTodoBlanco(item.color)) return false;
+          } else if (soloColorExacto) {
             if (itemColor !== target) return false;
           } else {
             if (!itemColor.includes(target)) return false;
