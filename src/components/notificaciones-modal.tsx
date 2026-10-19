@@ -697,20 +697,40 @@ export default function NotificacionesModal({
                         className="p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-2xs flex flex-col justify-between min-w-0 overflow-hidden"
                       >
                         <div className="space-y-2 min-w-0">
-                          <div className="flex items-start justify-between gap-1.5 min-w-0">
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-black text-[var(--foreground)] truncate">{item.nombre}</div>
-                              <div className="text-[10px] text-[var(--muted-foreground)] truncate">{item.marca} • {item.modelo}</div>
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            {/* Fotografía del Calzado */}
+                            <div className="w-12 h-12 rounded-xl border border-[var(--border)] bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden flex items-center justify-center relative shadow-2xs">
+                              {item.fotoUrl || item.imageUrl ? (
+                                <img
+                                  src={item.fotoUrl || item.imageUrl}
+                                  alt={item.nombre}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <Package size={20} className="text-slate-400" />
+                              )}
                             </div>
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-black border uppercase shrink-0 whitespace-nowrap ${
-                                isRed
-                                  ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
-                                  : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                              }`}
-                            >
-                              {badgeLabel}
-                            </span>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-1.5 min-w-0">
+                                <div className="text-xs font-black text-[var(--foreground)] truncate">{item.nombre}</div>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-black border uppercase shrink-0 whitespace-nowrap ${
+                                    isRed
+                                      ? 'bg-rose-500/15 text-rose-500 border-rose-500/30'
+                                      : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                  }`}
+                                >
+                                  {badgeLabel}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-[var(--muted-foreground)] truncate mt-0.5">
+                                {item.marca} • {item.modelo} {item.serieNombre ? `• Serie: ${item.serieNombre}` : ''}
+                              </div>
+                            </div>
                           </div>
 
                           <div className="p-2 rounded-lg bg-[var(--muted)]/40 flex items-center justify-between text-xs">

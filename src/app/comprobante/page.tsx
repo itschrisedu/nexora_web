@@ -34,6 +34,7 @@ import {
   PedidoClientePdfData,
   TicketPosPdfData,
 } from '@/services/pdf-factura.service';
+import { descargarHistorialPdf } from '@/services/pdf-historial.service';
 
 function getApiUrl(): string {
   const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -495,6 +496,58 @@ function ComprobanteContent() {
         },
       };
       descargarTicketPosPdf(pdfData);
+    } else if (data.t === 'HISTORIAL') {
+      const pdfData: any = {
+        emisor: {
+          nombre: data.e_nom || 'Comercializadora de Calzado',
+          ruc: data.e_ruc || '',
+          direccion: data.e_dir || 'Cevallos, Tungurahua',
+          telefono: data.e_tel || '',
+          sucursal: 'Matriz',
+        },
+        cliente: {
+          nombre: data.c_nom || 'Cliente',
+          cedula: data.c_id || '',
+          telefono: data.c_tel || '',
+          direccion: data.c_dir || '',
+        },
+        periodo: {
+          fechaInicio: data.f_ini || '',
+          fechaFin: data.f_fin || '',
+          esHistoricoCompleto: true,
+        },
+        resumen: {
+          totalEntregasMonto: Number(data.ent_m || 0),
+          totalParesEntregados: Number(data.ent_p || 0),
+          totalAbonosMonto: Number(data.abo_m || 0),
+          totalDevolucionesMonto: Number(data.dev_m || 0),
+          saldoPendienteFinal: Number(data.saldo || 0),
+        },
+        entregas: (data.entregas || []).map((e: any) => ({
+          fecha: e.f,
+          numeroNota: e.num,
+          montoTotal: Number(e.tot || 0),
+          totalPares: Number(e.pares || 0),
+          items: (e.items || []).map((it: any) => ({
+            modelo: it.m,
+            color: it.c,
+            serie: it.s,
+            imageUrl: it.img,
+            totalPares: it.qty,
+            precioUnitario: it.u,
+            subtotal: it.tot,
+          })),
+        })),
+        abonos: (data.abonos || []).map((a: any) => ({
+          fecha: a.f,
+          numeroComprobante: a.num,
+          formaPago: a.fp,
+          monto: Number(a.m || 0),
+          nuevoSaldo: Number(a.sal || 0),
+        })),
+        devoluciones: [],
+      };
+      descargarHistorialPdf(pdfData);
     }
   };
 
@@ -536,6 +589,7 @@ function ComprobanteContent() {
   const esOrden = data.t === 'ORDEN';
   const esPedido = data.t === 'PEDIDO';
   const esVentaPos = data.t === 'VENTA_POS';
+  const esHistorial = data.t === 'HISTORIAL';
 
   return (
     <div className="min-h-screen w-full bg-slate-100/70 py-6 sm:py-10 px-3 sm:px-6 pb-24 flex flex-col items-center justify-start overflow-y-auto">
@@ -603,6 +657,8 @@ function ComprobanteContent() {
                   ? 'Factura Electrónica'
                   : esVentaPos
                   ? 'Ticket de Venta en Mostrador'
+                  : esHistorial
+                  ? 'Historial Comercial y Financiero'
                   : 'Orden de Compra'}
               </span>
               <span className="text-base sm:text-lg font-mono font-black text-white block mt-0.5">
@@ -941,6 +997,152 @@ function ComprobanteContent() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ═══ CUERPO: HISTORIAL COMERCIAL Y FINANCIERO ═══ */}
+          {esHistorial && (
+            <div className="space-y-6">
+              {/* KPIs de Resumen */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-2xl">
+                  <span className="text-[10px] font-bold text-blue-800 uppercase block">Total Entregado</span>
+                  <span className="text-base sm:text-lg font-black font-mono text-blue-700 mt-0.5 block">
+                    ${Number(data.ent_m || 0).toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-blue-600 block mt-0.5">{data.ent_p || 0} pares</span>
+                </div>
+
+                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase block">Total Abonado</span>
+                  <span className="text-base sm:text-lg font-black font-mono text-emerald-700 mt-0.5 block">
+                    -${Number(data.abo_m || 0).toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 block mt-0.5">Pagos recibidos</span>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <span className="text-[10px] font-bold text-slate-700 uppercase block">Devoluciones</span>
+                  <span className="text-base sm:text-lg font-black font-mono text-slate-700 mt-0.5 block">
+                    -${Number(data.dev_m || 0).toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">Acreditadas</span>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border ${
+                  Number(data.saldo || 0) <= 0
+                    ? 'bg-emerald-50/80 border-emerald-200'
+                    : 'bg-rose-50/80 border-rose-200'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase block ${
+                    Number(data.saldo || 0) <= 0 ? 'text-emerald-800' : 'text-rose-800'
+                  }`}>
+                    Saldo Pendiente
+                  </span>
+                  <span className={`text-base sm:text-lg font-black font-mono mt-0.5 block ${
+                    Number(data.saldo || 0) <= 0 ? 'text-emerald-700' : 'text-rose-700'
+                  }`}>
+                    ${Number(data.saldo || 0).toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">Al corte actual</span>
+                </div>
+              </div>
+
+              {/* 1. Entregas de Producto (Variantes con imagen y serie) */}
+              {Array.isArray(data.entregas) && data.entregas.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <span className="text-xs font-black uppercase text-slate-800 tracking-wider">
+                      1. Resumen de Entregas Realizadas
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {data.entregas.length} {data.entregas.length === 1 ? 'despacho' : 'despachos'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {data.entregas.map((ent: any, eIdx: number) => (
+                      <div key={eIdx} className="p-3.5 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-2.5">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-800 border-b border-slate-200/60 pb-1.5">
+                          <span>📦 {ent.num ? `Nota ${ent.num}` : `Entrega #${eIdx + 1}`} • {ent.f}</span>
+                          <span className="text-blue-700 font-mono font-black">
+                            {ent.pares || 0} pares • ${Number(ent.tot || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {(ent.items || []).map((it: any, iIdx: number) => (
+                            <div key={iIdx} className="flex items-center gap-2.5 p-2 bg-white border border-slate-200/80 rounded-xl">
+                              <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 shrink-0 overflow-hidden flex items-center justify-center">
+                                {it.img ? (
+                                  <img src={it.img} alt={it.m} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package size={16} className="text-slate-400" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold text-slate-900 truncate">
+                                  {it.m} {it.c ? `(${it.c})` : ''}
+                                </div>
+                                <div className="text-[10px] text-emerald-700 font-semibold truncate">
+                                  {it.s ? `Serie: ${it.s}` : 'Calzado'}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="text-xs font-black text-slate-800">{it.qty} pares</div>
+                                <div className="text-[10px] font-mono text-slate-500">${Number(it.tot || 0).toFixed(2)}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Extracto de Movimientos y Abonos */}
+              {Array.isArray(data.abonos) && data.abonos.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <span className="text-xs font-black uppercase text-slate-800 tracking-wider">
+                      2. Registro de Abonos y Cobros
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {data.abonos.length} {data.abonos.length === 1 ? 'abono' : 'abonos'}
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-100 text-slate-600 font-bold text-[10px] uppercase">
+                        <tr>
+                          <th className="p-2.5">Fecha</th>
+                          <th className="p-2.5">Comprobante</th>
+                          <th className="p-2.5">Método</th>
+                          <th className="p-2.5 text-right">Monto Abonado</th>
+                          <th className="p-2.5 text-right">Saldo Restante</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {data.abonos.map((ab: any, aIdx: number) => (
+                          <tr key={aIdx} className={aIdx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
+                            <td className="p-2.5 font-medium text-slate-700">{ab.f}</td>
+                            <td className="p-2.5 font-mono text-slate-900 font-bold">{ab.num || 'REC'}</td>
+                            <td className="p-2.5 text-slate-600">{ab.fp || 'Efectivo'}</td>
+                            <td className="p-2.5 text-right font-black font-mono text-emerald-600">
+                              -${Number(ab.m || 0).toFixed(2)}
+                            </td>
+                            <td className="p-2.5 text-right font-mono text-slate-800 font-bold">
+                              ${Number(ab.sal || 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -6,9 +6,10 @@ export interface HistorialComercialItemEntrega {
   modelo: string;
   color?: string;
   serie?: string;
-  curvaTallas: string; // Ej: "T38: 2, T39: 4, T40: 6"
+  imageUrl?: string;
+  curvaTallas?: string;
   totalPares: number;
-  etiquetaVolumen?: string; // Ej: "1 Docena" o "12 pares"
+  etiquetaVolumen?: string;
   precioUnitario: number;
   subtotal: number;
 }
@@ -216,14 +217,14 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
 
   y += 23;
 
-  // ── 4. Sección de Entregas Realizadas ──────────────────────────
+  // ── 4. Sección de Entregas Realizadas (Resumen por Variante) ──
   checkSaltoPagina(20);
   doc.setFillColor(15, 23, 42);
   doc.roundedRect(12, y, pageWidth - 24, 6.5, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(255, 255, 255);
-  doc.text('1. REGISTRO DE ENTREGAS Y MERCADERÍA DESPACHADA', 16, y + 4.5);
+  doc.text('1. RESUMEN DE ENTREGAS Y MERCADERÍA DESPACHADA', 16, y + 4.5);
   y += 9.5;
 
   if (data.entregas.length === 0) {
@@ -234,7 +235,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     y += 8;
   } else {
     data.entregas.forEach((ent, index) => {
-      checkSaltoPagina(22 + ent.items.length * 6);
+      checkSaltoPagina(20 + ent.items.length * 6.5);
 
       // Cabecera de la entrega
       doc.setFillColor(241, 245, 249);
@@ -263,22 +264,21 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       doc.text(`${ent.totalPares} pares • $${ent.montoTotal.toFixed(2)}`, pageWidth - 16, y + 4.5, { align: 'right' });
       y += 8.5;
 
-      // Detalle de ítems entregados (curvas de tallas)
+      // Detalle de ítems entregados por variante (sin desglosar par por par)
       ent.items.forEach((it) => {
-        checkSaltoPagina(7);
+        checkSaltoPagina(6.5);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
         doc.setTextColor(15, 23, 42);
         const colStr = it.color ? ` (${it.color})` : '';
-        const serStr = it.serie && it.serie !== 'Estándar' ? ` - ${it.serie}` : '';
+        const serStr = it.serie && it.serie !== 'Estándar' ? ` • Serie: ${it.serie}` : '';
         doc.text(`▫️ ${it.modelo}${colStr}${serStr}`, 18, y + 3.5);
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         doc.setTextColor(71, 85, 105);
-        const curvaTxt = it.curvaTallas ? ` [${it.curvaTallas}]` : '';
-        const volTxt = it.etiquetaVolumen || `${it.totalPares} ${it.totalPares === 1 ? 'par' : 'pares'}`;
-        doc.text(`${volTxt}${curvaTxt}`, 75, y + 3.5);
+        const volTxt = `${it.totalPares} ${it.totalPares === 1 ? 'par' : 'pares'}`;
+        doc.text(volTxt, 88, y + 3.5);
 
         doc.text(`$${it.precioUnitario.toFixed(2)} / par`, pageWidth - 42, y + 3.5, { align: 'right' });
 
@@ -298,38 +298,84 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
 
   y += 4;
 
-  // ── 5. Sección de Abonos y Pagos Recibidos ───────────────────────
-  checkSaltoPagina(20);
+  // ── 5. Extracto Cronológico Unificado de Movimientos (Entregas y Pagos) ──
+  checkSaltoPagina(22);
   doc.setFillColor(15, 23, 42);
   doc.roundedRect(12, y, pageWidth - 24, 6.5, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(255, 255, 255);
-  doc.text('2. REGISTRO DE ABONOS Y COBROS EFECTUADOS', 16, y + 4.5);
+  doc.text('2. EXTRACTO CRONOLÓGICO DE MOVIMIENTOS (PAGOS Y ENTREGAS)', 16, y + 4.5);
   y += 9.5;
 
-  if (data.abonos.length === 0) {
+  // Consolidar cronológicamente todas las entregas, abonos y devoluciones
+  const movimientosCronologicos: Array<{
+    fecha: string;
+    tipo: 'ENTREGA' | 'ABONO' | 'DEVOLUCION';
+    referencia: string;
+    detalle: string;
+    cargo?: number;
+    abono?: number;
+    saldo?: number;
+  }> = [];
+
+  data.entregas.forEach((ent) => {
+    movimientosCronologicos.push({
+      fecha: ent.fecha,
+      tipo: 'ENTREGA',
+      referencia: ent.numeroNota ? `Nota ${ent.numeroNota}` : 'Pedido',
+      detalle: `Despacho de ${ent.totalPares} pares (${ent.vendedor ? 'Vend: ' + ent.vendedor : 'Almacén'})`,
+      cargo: ent.montoTotal,
+    });
+  });
+
+  data.abonos.forEach((ab) => {
+    const cobStr = ab.cobradoPor ? ` • Cobrado: ${capitalizarNombreCompleto(ab.cobradoPor)}` : '';
+    movimientosCronologicos.push({
+      fecha: ab.fecha,
+      tipo: 'ABONO',
+      referencia: ab.numeroComprobante || 'Recibo',
+      detalle: `${ab.formaPago}${cobStr}`,
+      abono: ab.monto,
+      saldo: ab.nuevoSaldo,
+    });
+  });
+
+  data.devoluciones?.forEach((dev) => {
+    movimientosCronologicos.push({
+      fecha: dev.fecha,
+      tipo: 'DEVOLUCION',
+      referencia: dev.motivo || 'Devolución',
+      detalle: dev.totalPares ? `Acreditación (${dev.totalPares} pares)` : 'Acreditación por devolución',
+      abono: dev.monto,
+    });
+  });
+
+  // Ordenar cronológicamente
+  movimientosCronologicos.sort((a, b) => (a.fecha > b.fecha ? 1 : a.fecha < b.fecha ? -1 : 0));
+
+  if (movimientosCronologicos.length === 0) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(7.5);
     doc.setTextColor(148, 163, 184);
-    doc.text('No se registran pagos ni abonos en el rango de fechas seleccionado.', 16, y + 3);
+    doc.text('No se registran movimientos en el rango de fechas seleccionado.', 16, y + 3);
     y += 8;
   } else {
-    // Encabezado de tabla de abonos
+    // Encabezado de tabla cronológica
     doc.setFillColor(241, 245, 249);
     doc.rect(12, y, pageWidth - 24, 5.5, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
+    doc.setFontSize(6.8);
     doc.setTextColor(71, 85, 105);
-    doc.text('FECHA / HORA', 16, y + 3.8);
-    doc.text('COMPROBANTE', 48, y + 3.8);
-    doc.text('MÉTODO / REF.', 78, y + 3.8);
-    doc.text('COBRADO POR', 115, y + 3.8);
-    doc.text('ABONADO', pageWidth - 42, y + 3.8, { align: 'right' });
-    doc.text('NUEVO SALDO', pageWidth - 16, y + 3.8, { align: 'right' });
+    doc.text('FECHA', 16, y + 3.8);
+    doc.text('MOVIMIENTO / REF.', 40, y + 3.8);
+    doc.text('DETALLE OPERATIVO', 78, y + 3.8);
+    doc.text('ENTREGA (+)', pageWidth - 46, y + 3.8, { align: 'right' });
+    doc.text('ABONO (-)', pageWidth - 28, y + 3.8, { align: 'right' });
+    doc.text('SALDO', pageWidth - 16, y + 3.8, { align: 'right' });
     y += 7;
 
-    data.abonos.forEach((ab, idx) => {
+    movimientosCronologicos.forEach((mov, idx) => {
       checkSaltoPagina(6.5);
       if (idx % 2 === 1) {
         doc.setFillColor(248, 250, 252);
@@ -339,20 +385,51 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(30, 41, 59);
-      doc.text(ab.fecha, 16, y + 3);
-      doc.text(ab.numeroComprobante || 'RECIBO', 48, y + 3);
-
-      const refStr = ab.referencia ? ` (${ab.referencia})` : '';
-      doc.text(`${ab.formaPago}${refStr}`, 78, y + 3);
-
-      doc.text(ab.cobradoPor ? capitalizarNombreCompleto(ab.cobradoPor) : 'Caja', 115, y + 3);
+      doc.text(mov.fecha, 16, y + 3);
 
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(16, 185, 129);
-      doc.text(`-$${ab.monto.toFixed(2)}`, pageWidth - 42, y + 3, { align: 'right' });
+      if (mov.tipo === 'ENTREGA') {
+        doc.setTextColor(37, 99, 235);
+        doc.text(`📦 ${mov.referencia}`, 40, y + 3);
+      } else if (mov.tipo === 'ABONO') {
+        doc.setTextColor(16, 185, 129);
+        doc.text(`💳 ${mov.referencia}`, 40, y + 3);
+      } else {
+        doc.setTextColor(225, 29, 72);
+        doc.text(`↩️ ${mov.referencia}`, 40, y + 3);
+      }
 
-      doc.setTextColor(ab.nuevoSaldo !== undefined && ab.nuevoSaldo > 0 ? 225 : 16, ab.nuevoSaldo !== undefined && ab.nuevoSaldo > 0 ? 29 : 185, ab.nuevoSaldo !== undefined && ab.nuevoSaldo > 0 ? 72 : 129);
-      doc.text(ab.nuevoSaldo !== undefined ? `$${ab.nuevoSaldo.toFixed(2)}` : '—', pageWidth - 16, y + 3, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
+      doc.text(mov.detalle, 78, y + 3);
+
+      // Columna Entrega (Cargo +)
+      doc.setFont('helvetica', 'bold');
+      if (mov.cargo) {
+        doc.setTextColor(37, 99, 235);
+        doc.text(`+$${mov.cargo.toFixed(2)}`, pageWidth - 46, y + 3, { align: 'right' });
+      } else {
+        doc.setTextColor(148, 163, 184);
+        doc.text('—', pageWidth - 46, y + 3, { align: 'right' });
+      }
+
+      // Columna Abono (Pago -)
+      if (mov.abono) {
+        doc.setTextColor(16, 185, 129);
+        doc.text(`-$${mov.abono.toFixed(2)}`, pageWidth - 28, y + 3, { align: 'right' });
+      } else {
+        doc.setTextColor(148, 163, 184);
+        doc.text('—', pageWidth - 28, y + 3, { align: 'right' });
+      }
+
+      // Columna Saldo
+      if (mov.saldo !== undefined) {
+        doc.setTextColor(mov.saldo > 0 ? 225 : 16, mov.saldo > 0 ? 29 : 185, mov.saldo > 0 ? 72 : 129);
+        doc.text(`$${mov.saldo.toFixed(2)}`, pageWidth - 16, y + 3, { align: 'right' });
+      } else {
+        doc.setTextColor(148, 163, 184);
+        doc.text('—', pageWidth - 16, y + 3, { align: 'right' });
+      }
 
       y += 5.5;
     });
@@ -454,7 +531,10 @@ export function generarHistorialPdfBase64(data: HistorialComercialPdfData): stri
 /**
  * Genera el mensaje de WhatsApp formal y detallado con la estructura idéntica a los comprobantes de abonos
  */
-export async function armarMensajeWhatsAppHistorial(data: HistorialComercialPdfData): Promise<string> {
+export async function armarMensajeWhatsAppHistorial(
+  data: HistorialComercialPdfData,
+  urlPublica?: string
+): Promise<string> {
   const nombreNegocio = data.emisor.nombre || 'Administración de Cobros';
   let msg = `Estimado/a *${capitalizarNombreCompleto(data.cliente.nombre)}*,\n\n`;
   msg += `Le saludamos cordialmente de *${nombreNegocio}*. Adjuntamos el extracto detallado de su *Historial Comercial y Financiero*:\n\n`;
@@ -478,7 +558,7 @@ export async function armarMensajeWhatsAppHistorial(data: HistorialComercialPdfD
   }
   msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  // Detalle de entregas
+  // Detalle de entregas por variante (sin desglose de tallas)
   if (data.entregas.length > 0) {
     msg += `📦 *DETALLE DE ENTREGAS REALIZADAS:*\n`;
     data.entregas.forEach((ent) => {
@@ -487,16 +567,15 @@ export async function armarMensajeWhatsAppHistorial(data: HistorialComercialPdfD
       msg += `🔹 *${ent.fecha}*${notaStr}${entregadorStr}\n`;
       ent.items.forEach((it) => {
         const colorStr = it.color ? ` (${it.color})` : '';
-        const serieStr = it.serie && it.serie !== 'Estándar' ? ` • ${it.serie}` : '';
-        const curvaStr = it.curvaTallas ? ` [${it.curvaTallas}]` : '';
-        const volStr = it.etiquetaVolumen || `${it.totalPares} pares`;
-        msg += `   ▫️ ${it.modelo}${colorStr}${serieStr}\n      ${volStr}${curvaStr} • $${it.subtotal.toFixed(2)}\n`;
+        const serieStr = it.serie && it.serie !== 'Estándar' ? ` • Serie: ${it.serie}` : '';
+        const volStr = `${it.totalPares} ${it.totalPares === 1 ? 'par' : 'pares'}`;
+        msg += `   ▫️ ${it.modelo}${colorStr}${serieStr}\n      ${volStr} • $${it.subtotal.toFixed(2)}\n`;
       });
       msg += `   💰 Subtotal entrega: $${ent.montoTotal.toFixed(2)}\n\n`;
     });
   }
 
-  // Detalle de abonos
+  // Detalle de abonos y pagos
   if (data.abonos.length > 0) {
     msg += `💳 *DETALLE DE ABONOS Y COBROS RECIBIDOS:*\n`;
     data.abonos.forEach((ab) => {
@@ -505,6 +584,12 @@ export async function armarMensajeWhatsAppHistorial(data: HistorialComercialPdfD
       msg += `   ▫️ *${ab.fecha}* • $${ab.monto.toFixed(2)} [${ab.formaPago}${refStr}]${cobradorStr}\n`;
     });
     msg += `\n`;
+  }
+
+  if (urlPublica) {
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📥 *Consulta y descarga aquí tu historial completo en línea:*\n👉 ${urlPublica}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
   }
 
   msg += `📄 _Este extracto certifica las transacciones comerciales registradas en su cuenta corriente._\n\n`;
@@ -519,7 +604,8 @@ export async function armarMensajeWhatsAppHistorial(data: HistorialComercialPdfD
 export async function compartirHistorialWhatsApp(
   data: HistorialComercialPdfData,
   telefono: string,
-  descargarLocal: boolean = false
+  descargarLocal: boolean = false,
+  urlPublica?: string,
 ): Promise<void> {
   let numLimpio = telefono.replace(/\D/g, '');
   if (numLimpio.startsWith('09') && numLimpio.length === 10) {
@@ -532,6 +618,6 @@ export async function compartirHistorialWhatsApp(
     descargarHistorialPdf(data);
   }
 
-  const mensajeTexto = await armarMensajeWhatsAppHistorial(data);
+  const mensajeTexto = await armarMensajeWhatsAppHistorial(data, urlPublica);
   abrirWhatsAppUniversal(numLimpio, mensajeTexto);
 }

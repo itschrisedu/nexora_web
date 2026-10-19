@@ -442,3 +442,50 @@ export function armarMensajeWhatsAppVentaPOS(data: VentaPosComprobanteData, urlC
 
   return msg;
 }
+
+/**
+ * Genera el enlace publico ultra-corto para el Historial Comercial y Financiero
+ */
+export async function generarUrlPublicaHistorial(data: any): Promise<string> {
+  const payload = {
+    t: 'HISTORIAL',
+    num: `HIST-${data.cliente?.cedula || 'CLI'}-${data.periodo?.fechaInicio || ''}`,
+    c_nom: data.cliente?.nombre || 'Cliente',
+    c_id: data.cliente?.cedula || '',
+    c_tel: data.cliente?.telefono || '',
+    c_dir: data.cliente?.direccion || '',
+    e_nom: data.emisor?.nombre || 'Comercializadora de Calzado',
+    f_ini: data.periodo?.fechaInicio || '',
+    f_fin: data.periodo?.fechaFin || '',
+    ent_m: Number(data.resumen?.totalEntregasMonto || 0),
+    ent_p: Number(data.resumen?.totalParesEntregados || 0),
+    abo_m: Number(data.resumen?.totalAbonosMonto || 0),
+    dev_m: Number(data.resumen?.totalDevolucionesMonto || 0),
+    saldo: Number(data.resumen?.saldoPendienteFinal || 0),
+    entregas: (data.entregas || []).slice(0, 15).map((e: any) => ({
+      f: e.fecha,
+      num: e.numeroNota,
+      tot: Number(e.montoTotal || 0),
+      pares: Number(e.totalPares || 0),
+      items: (e.items || []).slice(0, 10).map((it: any) => ({
+        m: it.modelo,
+        c: it.color || '',
+        s: it.serie || '',
+        img: it.imageUrl || null,
+        qty: it.totalPares || 1,
+        u: it.precioUnitario || 0,
+        tot: it.subtotal || 0,
+      })),
+    })),
+    abonos: (data.abonos || []).slice(0, 20).map((a: any) => ({
+      f: a.fecha,
+      num: a.numeroComprobante,
+      fp: a.formaPago,
+      m: Number(a.monto || 0),
+      sal: Number(a.nuevoSaldo || 0),
+    })),
+  };
+
+  return guardarYObtenerToken('HISTORIAL', payload);
+}
+

@@ -162,9 +162,14 @@ export default function ReportesComponent({
     }
     if (activeUser) {
       setCurrentUser(activeUser);
-      const isGlobal = activeUser.rol === 'ROL_SUPER_ADMIN' || (activeUser.rol === 'ROL_ADMIN' && Boolean(activeUser.esAdminGeneral));
-      if (!isGlobal && (activeUser.tenantId || propActiveSucursalId)) {
-        setSucursalSeleccionada(activeUser.tenantId || propActiveSucursalId || '');
+      const isGlobal = activeUser.rol === 'ROL_SUPER_ADMIN' || (activeUser.rol === 'ROL_ADMIN' && activeUser.esAdminGeneral === true);
+      if (!isGlobal) {
+        const localSucursal = (propActiveSucursalId && propActiveSucursalId !== 'TODAS')
+          ? propActiveSucursalId
+          : (activeUser.tenantId || activeUser.sucursalId || '');
+        if (localSucursal) {
+          setSucursalSeleccionada(localSucursal);
+        }
       }
       if (activeUser.rol === 'ROL_VENDEDOR') {
         setVendedorSeleccionado(activeUser.id || activeUser.sub || '');
@@ -173,7 +178,7 @@ export default function ReportesComponent({
   }, [propUser, propActiveSucursalId]);
 
   const isSuperAdmin = currentUser?.rol === 'ROL_SUPER_ADMIN';
-  const isGlobalAdmin = isSuperAdmin || (currentUser?.rol === 'ROL_ADMIN' && Boolean(currentUser?.esAdminGeneral));
+  const isGlobalAdmin = isSuperAdmin || (currentUser?.rol === 'ROL_ADMIN' && currentUser?.esAdminGeneral === true);
   const isVendedor = currentUser?.rol === 'ROL_VENDEDOR';
 
   useEffect(() => {
@@ -871,7 +876,7 @@ export default function ReportesComponent({
                 </>
               ) : (
                 <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
-                  <span>📍 {sucursales.find((s) => s.id === (currentUser?.tenantId || sucursalSeleccionada))?.name || 'Sucursal Asignada'}</span>
+                  <span>📍 {sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada'}</span>
                   <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Sede Local</span>
                 </div>
               )}

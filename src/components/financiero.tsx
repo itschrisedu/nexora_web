@@ -72,7 +72,7 @@ import {
   compartirHistorialWhatsApp,
   HistorialComercialPdfData,
 } from '../services/pdf-historial.service';
-import { generarUrlPublicaAbono } from '../services/comprobante-url.service';
+import { generarUrlPublicaAbono, generarUrlPublicaHistorial } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
 import { capitalizarNombreCompleto, formatearNombreSerie } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
@@ -612,8 +612,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [compartirEmailDestino, setCompartirEmailDestino] = useState('');
   const [compartirTelefonoDestino, setCompartirTelefonoDestino] = useState('');
   const [descargarCopiaPdfAlCompartir, setDescargarCopiaPdfAlCompartir] = useState(true);
-  const [enviandoHistorialCorreo, setEnviandoHistorialCorreo] = useState(false);
-  const [enviandoHistorialWhatsApp, setEnviandoHistorialWhatsApp] = useState(false);
+  const [compartiendoHistorial, setCompartiendoHistorial] = useState(false);
 
   // Modal Facturación SRI
   const [showFacturaModal, setShowFacturaModal] = useState(false);
@@ -1509,20 +1508,40 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         totalEntregasMonto += m.monto || 0;
         let paresPedido = 0;
         const rawLineas = (m.detalles?.lineas || m.detalles?.items || []) as any[];
-        const itemsEntrega = rawLineas.map((it: any) => {
-          const paresLinea = it.cantidadPares || it.totalPares || it.cantidad || 0;
+
+        // Agrupación limpia por variante de modelo (sin desglose par por par)
+        const variantesMap = new Map<string, any>();
+        rawLineas.forEach((it: any) => {
+          const modNom = it.modeloNombre || it.modelName || it.modelo || 'Modelo de Calzado';
+          const col = it.color || '';
+          const ser = it.serieNombre || it.serie || '';
+          const img = it.imageUrl || it.fotoUrl || null;
+          const precio = Number(it.precioUnitario || 0);
+          const paresLinea = Number(it.cantidadPares || it.totalPares || it.cantidad || 0);
           paresPedido += paresLinea;
-          return {
-            modelo: it.modeloNombre || it.modelo || 'Modelo de Calzado',
-            color: it.color || '',
-            serie: it.serieNombre || it.serie || '',
-            curvaTallas: it.curvaTallas || (it.talla ? [{ talla: it.talla, cantidad: it.cantidad || 1 }] : undefined),
-            totalPares: paresLinea,
-            etiquetaVolumen: paresLinea ? `${paresLinea} pares` : undefined,
-            precioUnitario: it.precioUnitario || 0,
-            subtotal: it.subtotal || 0,
-          };
+
+          const key = `${modNom}_${col}_${ser}_${precio}`;
+          if (!variantesMap.has(key)) {
+            variantesMap.set(key, {
+              modelo: modNom,
+              color: col,
+              serie: ser,
+              imageUrl: img,
+              totalPares: paresLinea,
+              etiquetaVolumen: paresLinea ? `${paresLinea} pares` : undefined,
+              precioUnitario: precio,
+              subtotal: paresLinea * precio,
+            });
+          } else {
+            const exist = variantesMap.get(key);
+            exist.totalPares += paresLinea;
+            exist.subtotal = exist.totalPares * exist.precioUnitario;
+            exist.etiquetaVolumen = `${exist.totalPares} pares`;
+            if (!exist.imageUrl && img) exist.imageUrl = img;
+          }
         });
+
+        const itemsEntrega = Array.from(variantesMap.values());
         totalParesEntregados += paresPedido;
         entregas.push({
           fecha: m.fecha ? m.fecha.split('T')[0] : '',
@@ -1611,7 +1630,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     showToast('Documento PDF generado y descargado exitosamente.', 'success');
   };
 
-  const handleEnviarHistorialWhatsApp = async () => {
+  const handleCompartirHistorial = async () => {
     const pdfData = construirHistorialPdfData();
     if (!pdfData) {
       showToast('No se puede generar el documento del historial.', 'error');
@@ -1621,84 +1640,88 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       showToast('Por favor ingrese un número de teléfono válido para WhatsApp.', 'warning');
       return;
     }
-    setEnviandoHistorialWhatsApp(true);
+
+    setCompartiendoHistorial(true);
     try {
-      await compartirHistorialWhatsApp(pdfData, compartirTelefonoDestino, descargarCopiaPdfAlCompartir);
-      showToast('Abriendo WhatsApp con el resumen comercial y financiero...', 'success');
-      if (descargarCopiaPdfAlCompartir) {
-        showToast('Copia PDF descargada para adjuntar en la conversación.', 'info');
+      // 1. Generar enlace público ultra-corto para consultar el historial en línea
+      let urlPublica = '';
+      try {
+        urlPublica = await generarUrlPublicaHistorial(pdfData);
+      } catch (urlErr) {
+        console.warn('Error generando URL corta de historial:', urlErr);
       }
-    } catch (e: any) {
-      showToast(e.message || 'Error al enviar por WhatsApp.', 'error');
-    } finally {
-      setEnviandoHistorialWhatsApp(false);
-    }
-  };
 
-  const handleEnviarHistorialCorreo = async () => {
-    const pdfData = construirHistorialPdfData();
-    if (!pdfData) {
-      showToast('No se puede generar el documento del historial.', 'error');
-      return;
-    }
-    const emailTarget = compartirEmailDestino.trim();
-    if (!emailTarget || !emailTarget.includes('@')) {
-      showToast('Por favor ingrese un correo electrónico válido.', 'warning');
-      return;
-    }
-    setEnviandoHistorialCorreo(true);
-    try {
-      const pdfBase64 = generarHistorialPdfBase64(pdfData);
-      const cleanCliente = pdfData.cliente.nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const nombreArchivo = `Historial_${cleanCliente}_${pdfData.periodo.fechaInicio}_${pdfData.periodo.fechaFin}.pdf`;
+      // 2. Enviar en segundo plano al correo electrónico si fue especificado
+      const emailTarget = compartirEmailDestino?.trim();
+      if (emailTarget && emailTarget.includes('@')) {
+        const pdfBase64 = generarHistorialPdfBase64(pdfData);
+        const cleanCliente = pdfData.cliente.nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const nombreArchivo = `Historial_${cleanCliente}_${pdfData.periodo.fechaInicio}_${pdfData.periodo.fechaFin}.pdf`;
 
-      await ApiService.post('/notificaciones/email-comprobante', {
-        destinatario: emailTarget,
-        clienteNombre: pdfData.cliente.nombre,
-        asunto: `Historial Comercial y Financiero — ${pdfData.emisor.nombre}`,
-        cuerpoHtml: `
-          <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <div style="background-color: #0f172a; padding: 18px 24px; border-radius: 8px; margin-bottom: 20px;">
-              <h2 style="color: #ffffff; margin: 0; font-size: 18px;">${pdfData.emisor.nombre}</h2>
-              <p style="color: #94a3b8; margin: 4px 0 0; font-size: 12px;">Historial Comercial y Financiero Oficial</p>
+        const enlaceHtml = urlPublica
+          ? `<div style="text-align: center; margin: 25px 0;">
+               <a href="${urlPublica}" style="background-color: #059669; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+                 📄 Ver y Descargar Historial Completo en Línea
+               </a>
+               <p style="font-size: 11px; color: #64748b; margin-top: 8px;">Enlace seguro: <a href="${urlPublica}" style="color: #059669;">${urlPublica}</a></p>
+             </div>`
+          : '';
+
+        ApiService.post('/notificaciones/email-comprobante', {
+          destinatario: emailTarget,
+          clienteNombre: pdfData.cliente.nombre,
+          asunto: `Historial Comercial y Financiero — ${pdfData.emisor.nombre}`,
+          cuerpoHtml: `
+            <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+              <div style="background-color: #0f172a; padding: 18px 24px; border-radius: 8px; margin-bottom: 20px;">
+                <h2 style="color: #ffffff; margin: 0; font-size: 18px;">${pdfData.emisor.nombre}</h2>
+                <p style="color: #94a3b8; margin: 4px 0 0; font-size: 12px;">Historial Comercial y Financiero Oficial</p>
+              </div>
+              <p>Estimado(a) <strong>${pdfData.cliente.nombre}</strong>,</p>
+              <p>Adjunto a este correo encontrará el extracto cronológico oficial de sus transacciones y movimientos comerciales (pedidos despachados, abonos recibidos y saldos vigentes) para el periodo del <strong>${pdfData.periodo.fechaInicio}</strong> al <strong>${pdfData.periodo.fechaFin}</strong>.</p>
+              ${enlaceHtml}
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+                <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                  <td style="padding: 10px;"><strong>Saldo Actual Pendiente:</strong></td>
+                  <td style="padding: 10px; text-align: right; font-weight: bold; color: ${pdfData.resumen.saldoPendienteFinal > 0 ? '#b91c1c' : '#059669'}; font-size: 15px;">$${pdfData.resumen.saldoPendienteFinal.toFixed(2)}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 10px;">Total Despachos en el Período:</td>
+                  <td style="padding: 8px 10px; text-align: right;">$${pdfData.resumen.totalEntregasMonto.toFixed(2)} (${pdfData.resumen.totalParesEntregados} pares)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px 10px;">Total Abonos Registrados:</td>
+                  <td style="padding: 8px 10px; text-align: right; color: #059669; font-weight: bold;">-$${pdfData.resumen.totalAbonosMonto.toFixed(2)}</td>
+                </tr>
+              </table>
+              <p style="font-size: 12px; color: #64748b;">Si tiene alguna inquietud o necesita mayor detalle sobre las notas o comprobantes, no dude en contactarnos.</p>
             </div>
-            <p>Estimado(a) <strong>${pdfData.cliente.nombre}</strong>,</p>
-            <p>Adjunto a este correo encontrará el extracto cronológico oficial de sus transacciones y movimientos comerciales (pedidos despachados, abonos recibidos y saldos vigentes) para el periodo del <strong>${pdfData.periodo.fechaInicio}</strong> al <strong>${pdfData.periodo.fechaFin}</strong>.</p>
-            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
-              <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                <td style="padding: 10px;"><strong>Saldo Actual Pendiente:</strong></td>
-                <td style="padding: 10px; text-align: right; font-weight: bold; color: ${pdfData.resumen.saldoPendienteFinal > 0 ? '#b91c1c' : '#059669'}; font-size: 15px;">$${pdfData.resumen.saldoPendienteFinal.toFixed(2)}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 8px 10px;">Total Despachos en el Período:</td>
-                <td style="padding: 8px 10px; text-align: right;">$${pdfData.resumen.totalEntregasMonto.toFixed(2)} (${pdfData.resumen.totalParesEntregados} pares)</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 8px 10px;">Total Abonos Registrados:</td>
-                <td style="padding: 8px 10px; text-align: right; color: #059669; font-weight: bold;">-$${pdfData.resumen.totalAbonosMonto.toFixed(2)}</td>
-              </tr>
-            </table>
-            <p style="font-size: 12px; color: #64748b;">Si tiene alguna inquietud o necesita mayor detalle sobre las notas o comprobantes, no dude en contactarnos.</p>
-          </div>
-        `,
-        adjuntos: [
-          {
-            nombre: nombreArchivo,
-            contenidoBase64: pdfBase64,
-            tipoMime: 'application/pdf',
-          },
-        ],
-      });
-
-      if (descargarCopiaPdfAlCompartir) {
-        descargarHistorialPdf(pdfData);
+          `,
+          adjuntos: [
+            {
+              nombre: nombreArchivo,
+              contenidoBase64: pdfBase64,
+              tipoMime: 'application/pdf',
+            },
+          ],
+        }).catch((err) => {
+          console.warn('Envío de correo de historial en segundo plano falló:', err);
+        });
       }
-      showToast(`Historial enviado exitosamente a ${emailTarget}.`, 'success');
-      setShowCompartirHistorialModal(false);
-    } catch (err: any) {
-      showToast(err.message || 'Error al enviar el correo.', 'error');
+
+      // 3. Compartir vía WhatsApp con el enlace público incluido
+      await compartirHistorialWhatsApp(pdfData, compartirTelefonoDestino, descargarCopiaPdfAlCompartir, urlPublica);
+
+      showToast(
+        emailTarget && emailTarget.includes('@')
+          ? 'Historial compartido por WhatsApp y enviado al correo en segundo plano.'
+          : 'Historial compartido exitosamente vía WhatsApp.',
+        'success'
+      );
+    } catch (e: any) {
+      showToast(e.message || 'Error al compartir el historial.', 'error');
     } finally {
-      setEnviandoHistorialCorreo(false);
+      setCompartiendoHistorial(false);
     }
   };
 
@@ -6313,56 +6336,31 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             </div>
 
             {/* Footer con Acciones */}
-            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-2 shrink-0">
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex flex-wrap items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setShowCompartirHistorialModal(false)}
-                className="px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] cursor-pointer transition-colors"
+                onClick={handleDescargarHistorialPdf}
+                className="px-3.5 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] font-extrabold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                title="Descargar documento PDF local"
               >
-                Cerrar
+                <Download size={15} />
+                <span>Descargar PDF</span>
               </button>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleDescargarHistorialPdf}
-                  className="px-3.5 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] font-extrabold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                  title="Descargar documento PDF local"
-                >
-                  <Download size={15} />
-                  <span>Descargar PDF</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleEnviarHistorialWhatsApp}
-                  disabled={enviandoHistorialWhatsApp || !compartirTelefonoDestino}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="Abrir WhatsApp con el resumen comercial"
-                >
-                  {enviandoHistorialWhatsApp ? (
-                    <Loader2 size={15} className="animate-spin" />
-                  ) : (
-                    <MessageCircle size={15} />
-                  )}
-                  <span>WhatsApp</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleEnviarHistorialCorreo}
-                  disabled={enviandoHistorialCorreo || !compartirEmailDestino}
-                  className="px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="Enviar correo con extracto PDF adjunto"
-                >
-                  {enviandoHistorialCorreo ? (
-                    <Loader2 size={15} className="animate-spin" />
-                  ) : (
-                    <Mail size={15} />
-                  )}
-                  <span>Enviar Correo</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleCompartirHistorial}
+                disabled={compartiendoHistorial || !compartirTelefonoDestino}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                title="Compartir por WhatsApp y enviar por correo en segundo plano con enlace en línea"
+              >
+                {compartiendoHistorial ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Share2 size={15} />
+                )}
+                <span>Compartir</span>
+              </button>
             </div>
           </div>
         </div>
