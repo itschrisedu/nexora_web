@@ -180,6 +180,39 @@ const TEMPORADAS_DISPONIBLES = [
   },
 ];
 
+// Helpers para identificación estricta de calzado escolar colegial (todo negro) y deportivo (todo blanco)
+const esTodoNegro = (color?: string | null): boolean => {
+  if (!color) return false;
+  const c = color.trim().toLowerCase();
+  return (
+    c.includes("negro") &&
+    !c.includes("/") &&
+    !c.includes(" con ") &&
+    !c.includes(" y ") &&
+    !c.includes("+") &&
+    !c.includes("rojo") &&
+    !c.includes("azul")
+  );
+};
+
+const esTodoBlanco = (color?: string | null): boolean => {
+  if (!color) return false;
+  const c = color.trim().toLowerCase();
+  return (
+    c.includes("blanco") &&
+    !c.includes("/") &&
+    !c.includes(" con ") &&
+    !c.includes(" y ") &&
+    !c.includes("+") &&
+    !c.includes("azul") &&
+    !c.includes("rojo")
+  );
+};
+
+const esColorEscolarClasico = (color?: string | null): boolean => {
+  return esTodoNegro(color) || esTodoBlanco(color);
+};
+
 export default function PrediccionDemandaComponent() {
   const { showToast } = useToast();
   const [horizonte, setHorizonte] = useState<number>(30);
@@ -199,6 +232,26 @@ export default function PrediccionDemandaComponent() {
   const [modoVista, setModoVista] = useState<'AGRUPADO' | 'TABLA'>('AGRUPADO');
   const [modelosExpandidos, setModelosExpandidos] = useState<Record<string, boolean>>({});
   const [filtroSoloDeficit, setFiltroSoloDeficit] = useState<boolean>(false);
+
+  // Detección de temporada escolar activa
+  const esTemporadaClases = temporadaActiva === "CLASES_SIERRA" || temporadaActiva === "CLASES_COSTA";
+
+  // Manejador especializado para cambio de temporada
+  const handleCambiarTemporada = (tId: string) => {
+    setTemporadaActiva(tId);
+    const esClases = tId === "CLASES_SIERRA" || tId === "CLASES_COSTA";
+    if (esClases) {
+      // Regla: En inicio a clases solo deben aparecer los que debe anticiparse a la compra (con déficit)
+      setFiltroSoloDeficit(true);
+      // Por defecto zapato todo negro y zapato todo blanco
+      setColorFiltro("ESCOLAR_NEGRO_BLANCO");
+    } else {
+      if (colorFiltro === "ESCOLAR_NEGRO_BLANCO" || colorFiltro === "TODO_NEGRO" || colorFiltro === "TODO_BLANCO") {
+        setColorFiltro("");
+      }
+      setFiltroSoloDeficit(false);
+    }
+  };
 
   // Modal de Variantes del Modelo
   const [modalVariantes, setModalVariantes] = useState<{
@@ -335,7 +388,13 @@ export default function PrediccionDemandaComponent() {
     setErrorMsg("");
     try {
       let url = `/ml/prediccion?dias=${dias}&temporada=${temporada}&colorExacto=${exacto}`;
-      if (color.trim()) {
+      if (color === "ESCOLAR_NEGRO_BLANCO") {
+        url += `&color=ESCOLAR_NEGRO_BLANCO`;
+      } else if (color === "TODO_NEGRO") {
+        url += `&color=negro`;
+      } else if (color === "TODO_BLANCO") {
+        url += `&color=blanco`;
+      } else if (color.trim() && color !== "TODOS") {
         url += `&color=${encodeURIComponent(color.trim())}`;
       }
       const res = await ApiService.get(url);
@@ -449,6 +508,7 @@ export default function PrediccionDemandaComponent() {
   const itemsFiltrados = useMemo(() => {
     return (prediccion?.predicciones || [])
       .filter((item) => {
+        // 1. Búsqueda por texto (si el usuario busca un modelo o término, se respeta libremente)
         if (busqueda.trim()) {
           const q = busqueda.toLowerCase().trim();
           const matchBusqueda =
@@ -459,7 +519,17 @@ export default function PrediccionDemandaComponent() {
           if (!matchBusqueda) return false;
         }
 
-        if (colorFiltro.trim()) {
+        // 2. Filtro de color
+        if (colorFiltro === "ESCOLAR_NEGRO_BLANCO") {
+          // Filtro escolar por defecto: zapato todo negro y zapato todo blanco
+          if (!esColorEscolarClasico(item.color)) return false;
+        } else if (colorFiltro === "TODO_NEGRO") {
+          if (!esTodoNegro(item.color)) return false;
+        } else if (colorFiltro === "TODO_BLANCO") {
+          if (!esTodoBlanco(item.color)) return false;
+        } else if (colorFiltro === "TODOS") {
+          // No restringe por color, muestra todos
+        } else if (colorFiltro.trim()) {
           const target = colorFiltro.toLowerCase().trim();
           const itemColor = (item.color || "").toLowerCase().trim();
           if (soloColorExacto) {
@@ -467,15 +537,28 @@ export default function PrediccionDemandaComponent() {
           } else {
             if (!itemColor.includes(target)) return false;
           }
+        } else if (esTemporadaClases) {
+          // Por defecto en clases si no hay filtro explícito: calzado todo negro y todo blanco
+          if (!esColorEscolarClasico(item.color)) return false;
         }
 
-        if (filtroSoloDeficit && (item.deficit_stock || 0) <= 0) {
-          return false;
+        // 3. Anticipación de compra: en inicio a clases (Sierra o Costa) solo debe aparecer los que se debe anticipar a la compra
+        if (esTemporadaClases || filtroSoloDeficit) {
+          if ((item.deficit_stock || 0) <= 0) {
+            return false;
+          }
         }
 
         return true;
       })
       .sort((a, b) => {
+        // En temporada escolar, primero calzado escolar: Todo Negro (1) y Todo Blanco (2)
+        if (esTemporadaClases) {
+          const prioA = esTodoNegro(a.color) ? 1 : esTodoBlanco(a.color) ? 2 : 3;
+          const prioB = esTodoNegro(b.color) ? 1 : esTodoBlanco(b.color) ? 2 : 3;
+          if (prioA !== prioB) return prioA - prioB;
+        }
+
         // 1. Agrupar por modelo (alfabéticamente)
         const modeloA = (a.modelo || '').toLowerCase();
         const modeloB = (b.modelo || '').toLowerCase();
@@ -496,7 +579,7 @@ export default function PrediccionDemandaComponent() {
         // 4. Dentro de la misma serie, ordenar por talla ascendente
         return Number(a.talla) - Number(b.talla);
       });
-  }, [prediccion, busqueda, colorFiltro, soloColorExacto, filtroSoloDeficit]);
+  }, [prediccion, busqueda, colorFiltro, soloColorExacto, filtroSoloDeficit, esTemporadaClases]);
 
   // Fase 6.2: Agrupación a Nivel de Modelo con Desglose por Tallas (Rule 7 ModelTallaCurvaCard)
   const modelosAgrupados: GrupoModeloPrediccion[] = useMemo(() => {
@@ -545,10 +628,18 @@ export default function PrediccionDemandaComponent() {
     });
 
     return Array.from(map.values()).sort((a, b) => {
+      // Si es temporada escolar, primero calzados Todo Negro (1), luego Todo Blanco (2), luego otros (3)
+      if (esTemporadaClases) {
+        const prioA = esTodoNegro(a.color) ? 1 : esTodoBlanco(a.color) ? 2 : 3;
+        const prioB = esTodoNegro(b.color) ? 1 : esTodoBlanco(b.color) ? 2 : 3;
+        if (prioA !== prioB) return prioA - prioB;
+      }
+
+      // Ordenar por mayor déficit (anticiparse a la compra)
       if (b.totalDeficit !== a.totalDeficit) return b.totalDeficit - a.totalDeficit;
       return b.totalDemanda - a.totalDemanda;
     });
-  }, [itemsFiltrados, modelosInventarioMap]);
+  }, [itemsFiltrados, modelosInventarioMap, esTemporadaClases]);
 
   // Métricas agregadas
   const totalDemandaEstimada = (prediccion?.predicciones || []).reduce((acc, p) => acc + (p.demanda_estimada || 0), 0);
@@ -620,7 +711,7 @@ export default function PrediccionDemandaComponent() {
             return (
               <button
                 key={t.id}
-                onClick={() => setTemporadaActiva(t.id)}
+                onClick={() => handleCambiarTemporada(t.id)}
                 className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer ${
                   isSelected
                     ? "bg-[#0F172A] text-white border-[#0F172A] shadow-md ring-2 ring-amber-400/40"
@@ -886,69 +977,149 @@ export default function PrediccionDemandaComponent() {
               </span>
             </button>
 
-            {/* Toggle Rápido: Solo con Déficit */}
+            {/* Toggle Rápido: Anticipar Compra / Solo con Déficit */}
             <button
               type="button"
               onClick={() => setFiltroSoloDeficit((prev) => !prev)}
               className={`flex items-center justify-between sm:justify-start gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                filtroSoloDeficit
+                filtroSoloDeficit || esTemporadaClases
                   ? "bg-rose-500/10 text-rose-800 dark:text-rose-300 border-rose-500/30"
                   : "bg-[var(--muted)]/50 text-[var(--muted-foreground)] border-[var(--border)]"
               }`}
-              title="Filtrar únicamente calzados con faltante de stock en bodega"
+              title={esTemporadaClases ? "En temporada escolar se muestran únicamente los modelos con necesidad de compra anticipada (déficit)" : "Filtrar únicamente calzados con faltante de stock en bodega"}
             >
-              <AlertTriangle size={13} className={filtroSoloDeficit ? "text-rose-500" : "text-[var(--muted-foreground)]"} />
-              <span>Solo con déficit</span>
+              <AlertTriangle size={13} className={filtroSoloDeficit || esTemporadaClases ? "text-rose-500" : "text-[var(--muted-foreground)]"} />
+              <span>{esTemporadaClases ? "Anticipar compras (Con déficit)" : "Solo con déficit"}</span>
             </button>
           </div>
 
-          {/* Píldoras rápidas de colores populares */}
+          {/* Banner específico para temporada escolar */}
+          {esTemporadaClases && (
+            <div className="flex items-center gap-2 p-2.5 bg-indigo-500/10 border border-indigo-500/25 rounded-xl text-xs text-indigo-900 dark:text-indigo-200">
+              <span className="text-base shrink-0">🎒</span>
+              <div className="flex-1 min-w-0">
+                <span className="font-extrabold mr-1">Inicio a clases activo:</span>
+                <span className="text-[11px] opacity-90">
+                  Mostrando compras anticipadas a taller (déficit de stock). Por defecto se prioriza zapato colegial <strong>todo negro</strong> y deportivo <strong>todo blanco</strong>. Puede consultar otros colores en cualquier momento usando los botones inferiores.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Píldoras rápidas de colores */}
           <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1">
             <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mr-1">
-              Colores frecuentes:
+              {esTemporadaClases ? "Filtro escolar:" : "Colores frecuentes:"}
             </span>
-            <button
-              type="button"
-              onClick={() => setColorFiltro("")}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                colorFiltro === ""
-                  ? "bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 shadow-xs"
-                  : "bg-[var(--muted)]/60 text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
-              }`}
-            >
-              Todos
-            </button>
-            {coloresDisponibles.slice(0, 8).map((col, idx) => {
-              const isSelected = colorFiltro.toLowerCase().trim() === col.toLowerCase().trim();
-              return (
+
+            {/* Píldoras escolares dedicadas */}
+            {esTemporadaClases ? (
+              <>
                 <button
-                  key={idx}
                   type="button"
-                  onClick={() => setColorFiltro(isSelected ? "" : col)}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                    isSelected
-                      ? "bg-[#0F172A] dark:bg-amber-400 text-white dark:text-slate-900 shadow-xs"
+                  onClick={() => setColorFiltro("ESCOLAR_NEGRO_BLANCO")}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                    colorFiltro === "ESCOLAR_NEGRO_BLANCO" || colorFiltro === ""
+                      ? "bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-400/40"
+                      : "bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/25"
+                  }`}
+                  title="Mostrar por defecto zapato colegial todo negro y deportivo todo blanco"
+                >
+                  <span>🎒 Por defecto escolar (Todo Negro & Todo Blanco)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setColorFiltro("TODO_NEGRO")}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    colorFiltro === "TODO_NEGRO"
+                      ? "bg-[#0F172A] text-white shadow-xs ring-2 ring-amber-400/40"
                       : "bg-[var(--muted)]/60 text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
                   }`}
                 >
-                  <span
-                    className="w-2 h-2 rounded-full border border-black/10 shrink-0"
-                    style={{
-                      backgroundColor:
-                        col.toLowerCase().includes("negro") ? "#1e293b" :
-                        col.toLowerCase().includes("blanco") ? "#f1f5f9" :
-                        col.toLowerCase().includes("cafe") || col.toLowerCase().includes("café") ? "#78350f" :
-                        col.toLowerCase().includes("azul") ? "#1d4ed8" :
-                        col.toLowerCase().includes("rojo") ? "#b91c1c" :
-                        col.toLowerCase().includes("vino") ? "#831843" :
-                        col.toLowerCase().includes("miel") ? "#d97706" :
-                        "#64748b"
-                    }}
-                  />
-                  <span>{col}</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-700 shrink-0" />
+                  <span>Todo Negro</span>
                 </button>
-              );
-            })}
+
+                <button
+                  type="button"
+                  onClick={() => setColorFiltro("TODO_BLANCO")}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    colorFiltro === "TODO_BLANCO"
+                      ? "bg-slate-200 text-slate-900 border border-slate-400 shadow-xs ring-2 ring-amber-400/40"
+                      : "bg-[var(--muted)]/60 text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-white border border-slate-300 shrink-0" />
+                  <span>Todo Blanco</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setColorFiltro("TODOS")}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    colorFiltro === "TODOS"
+                      ? "bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 shadow-xs"
+                      : "bg-[var(--muted)]/60 text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
+                  }`}
+                >
+                  Ver todos los colores
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setColorFiltro("")}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                  colorFiltro === ""
+                    ? "bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 shadow-xs"
+                    : "bg-[var(--muted)]/60 text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
+                }`}
+              >
+                Todos
+              </button>
+            )}
+
+            {/* Colores individuales disponibles para búsqueda manual */}
+            {coloresDisponibles
+              .filter((c) => {
+                if (!esTemporadaClases) return true;
+                // En clases ya tenemos botones de Todo Negro y Todo Blanco, así que dejamos el resto para exploración libre
+                const cLower = c.toLowerCase().trim();
+                return cLower !== "negro" && cLower !== "blanco";
+              })
+              .slice(0, 8)
+              .map((col, idx) => {
+                const isSelected = colorFiltro.toLowerCase().trim() === col.toLowerCase().trim();
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setColorFiltro(isSelected ? (esTemporadaClases ? "ESCOLAR_NEGRO_BLANCO" : "") : col)}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-[#0F172A] dark:bg-amber-400 text-white dark:text-slate-900 shadow-xs"
+                        : "bg-[var(--muted)]/60 text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
+                    }`}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full border border-black/10 shrink-0"
+                      style={{
+                        backgroundColor:
+                          col.toLowerCase().includes("negro") ? "#1e293b" :
+                          col.toLowerCase().includes("blanco") ? "#f1f5f9" :
+                          col.toLowerCase().includes("cafe") || col.toLowerCase().includes("café") ? "#78350f" :
+                          col.toLowerCase().includes("azul") ? "#1d4ed8" :
+                          col.toLowerCase().includes("rojo") ? "#b91c1c" :
+                          col.toLowerCase().includes("vino") ? "#831843" :
+                          col.toLowerCase().includes("miel") ? "#d97706" :
+                          "#64748b"
+                      }}
+                    />
+                    <span>{col}</span>
+                  </button>
+                );
+              })}
           </div>
         </div>
 
