@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ApiService } from "@/services/api.service";
 import {
   BrainCircuit,
@@ -29,6 +29,14 @@ import {
   Eye,
   ImageIcon,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  LayoutGrid,
+  TableProperties,
+  Check,
+  Filter,
+  SlidersHorizontal,
+  Info,
   Boxes,
 } from "lucide-react";
 import { useToast } from "./ui/toast";
@@ -66,11 +74,31 @@ interface ItemPrediccion {
   imageUrl?: string | null;
   fotoUrl?: string | null;
   color?: string;
+  colorPuro?: boolean;
   variantes?: VarianteInfo[];
   confianza: number;
   tendencia: string;
   sugerencia_reorden: number;
   prioridad?: string;
+}
+
+interface GrupoModeloPrediccion {
+  key: string;
+  modelo: string;
+  serie: string;
+  color: string;
+  colorPuro: boolean;
+  imageUrl: string | null;
+  brand: string;
+  variantes: VarianteInfo[];
+  totalDemanda: number;
+  totalStock: number;
+  totalDeficit: number;
+  totalInversion: number;
+  totalSugerenciaReorden: number;
+  precioCostoUnitario: number;
+  precioVentaUnitario: number;
+  tallas: ItemPrediccion[];
 }
 
 interface RespuestaPrediccion {
@@ -163,6 +191,15 @@ export default function PrediccionDemandaComponent() {
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [busqueda, setBusqueda] = useState<string>("");
 
+  // Fase 6.1: Filtrado de color y color exacto
+  const [colorFiltro, setColorFiltro] = useState<string>("");
+  const [soloColorExacto, setSoloColorExacto] = useState<boolean>(true);
+
+  // Fase 6.2: Modo de visualización (Agrupado por Modelo con Desglose vs Tabla)
+  const [modoVista, setModoVista] = useState<'AGRUPADO' | 'TABLA'>('AGRUPADO');
+  const [modelosExpandidos, setModelosExpandidos] = useState<Record<string, boolean>>({});
+  const [filtroSoloDeficit, setFiltroSoloDeficit] = useState<boolean>(false);
+
   // Modal de Variantes del Modelo
   const [modalVariantes, setModalVariantes] = useState<{
     modelo: string;
@@ -189,10 +226,10 @@ export default function PrediccionDemandaComponent() {
   const [pedidoGuardando, setPedidoGuardando] = useState<boolean>(false);
 
   useEffect(() => {
-    cargarPrediccion(horizonte, temporadaActiva);
+    cargarPrediccion(horizonte, temporadaActiva, colorFiltro, soloColorExacto);
     cargarEstadoModelo();
     cargarModelosCatalogo();
-  }, [horizonte, temporadaActiva]);
+  }, [horizonte, temporadaActiva, colorFiltro, soloColorExacto]);
 
   const cargarModelosCatalogo = async () => {
     try {
@@ -288,11 +325,20 @@ export default function PrediccionDemandaComponent() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [lightbox.isOpen, modalVariantes, pedidoModalItem]);
 
-  const cargarPrediccion = async (dias: number, temporada: string) => {
+  const cargarPrediccion = async (
+    dias = horizonte,
+    temporada = temporadaActiva,
+    color = colorFiltro,
+    exacto = soloColorExacto,
+  ) => {
     setLoading(true);
     setErrorMsg("");
     try {
-      const res = await ApiService.get(`/ml/prediccion?dias=${dias}&temporada=${temporada}`);
+      let url = `/ml/prediccion?dias=${dias}&temporada=${temporada}&colorExacto=${exacto}`;
+      if (color.trim()) {
+        url += `&color=${encodeURIComponent(color.trim())}`;
+      }
+      const res = await ApiService.get(url);
       if (res) {
         if (res.error && !res.predicciones) {
           setErrorMsg(res.mensaje || res.error || "Aún no hay suficientes ventas para generar la proyección.");
@@ -330,7 +376,7 @@ export default function PrediccionDemandaComponent() {
       } else {
         showToast("Modelo IA y patrones de temporada reentrenados exitosamente", "success");
         await cargarEstadoModelo();
-        await cargarPrediccion(horizonte, temporadaActiva);
+        await cargarPrediccion(horizonte, temporadaActiva, colorFiltro, soloColorExacto);
       }
     } catch (err: any) {
       showToast("No se pudo reentrenar el modelo: " + (err.message || "Error de conexión"), "error");
@@ -385,37 +431,124 @@ export default function PrediccionDemandaComponent() {
     return 5;
   };
 
-  const itemsFiltrados = (prediccion?.predicciones || [])
-    .filter((item) => {
-      if (!busqueda.trim()) return true;
-      const q = busqueda.toLowerCase();
-      return (
-        item.modelo.toLowerCase().includes(q) ||
-        item.serie.toLowerCase().includes(q) ||
-        String(item.talla).includes(q)
-      );
-    })
-    .sort((a, b) => {
-      // 1. Agrupar por modelo (alfabéticamente)
-      const modeloA = (a.modelo || '').toLowerCase();
-      const modeloB = (b.modelo || '').toLowerCase();
-      const cmpModelo = modeloA.localeCompare(modeloB, 'es');
-      if (cmpModelo !== 0) return cmpModelo;
-
-      // 2. Dentro del mismo modelo, agrupar por color
-      const colorA = (a.color || '').toLowerCase();
-      const colorB = (b.color || '').toLowerCase();
-      const cmpColor = colorA.localeCompare(colorB, 'es');
-      if (cmpColor !== 0) return cmpColor;
-
-      // 3. Dentro del mismo modelo+color, ordenar por serie (Grande → Adulto → Juvenil → Niño → Bebé)
-      const ordenSerieA = obtenerOrdenSerie(a.serie);
-      const ordenSerieB = obtenerOrdenSerie(b.serie);
-      if (ordenSerieA !== ordenSerieB) return ordenSerieA - ordenSerieB;
-
-      // 4. Dentro de la misma serie, ordenar por talla ascendente
-      return Number(a.talla) - Number(b.talla);
+  // Colores únicos disponibles para el filtro rápido
+  const coloresDisponibles = useMemo(() => {
+    const setColores = new Set<string>();
+    (prediccion?.predicciones || []).forEach((p) => {
+      if (p.color && p.color.trim()) setColores.add(p.color.trim());
     });
+    modelosInventarioMap.forEach((m) => {
+      (m.variantes || []).forEach((v: any) => {
+        if (v.color && v.color.trim()) setColores.add(v.color.trim());
+      });
+    });
+    return Array.from(setColores).sort();
+  }, [prediccion, modelosInventarioMap]);
+
+  // Ítems filtrados por texto y condiciones
+  const itemsFiltrados = useMemo(() => {
+    return (prediccion?.predicciones || [])
+      .filter((item) => {
+        if (busqueda.trim()) {
+          const q = busqueda.toLowerCase().trim();
+          const matchBusqueda =
+            item.modelo.toLowerCase().includes(q) ||
+            item.serie.toLowerCase().includes(q) ||
+            (item.color || "").toLowerCase().includes(q) ||
+            String(item.talla).includes(q);
+          if (!matchBusqueda) return false;
+        }
+
+        if (colorFiltro.trim()) {
+          const target = colorFiltro.toLowerCase().trim();
+          const itemColor = (item.color || "").toLowerCase().trim();
+          if (soloColorExacto) {
+            if (itemColor !== target) return false;
+          } else {
+            if (!itemColor.includes(target)) return false;
+          }
+        }
+
+        if (filtroSoloDeficit && (item.deficit_stock || 0) <= 0) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        // 1. Agrupar por modelo (alfabéticamente)
+        const modeloA = (a.modelo || '').toLowerCase();
+        const modeloB = (b.modelo || '').toLowerCase();
+        const cmpModelo = modeloA.localeCompare(modeloB, 'es');
+        if (cmpModelo !== 0) return cmpModelo;
+
+        // 2. Dentro del mismo modelo, agrupar por color
+        const colorA = (a.color || '').toLowerCase();
+        const colorB = (b.color || '').toLowerCase();
+        const cmpColor = colorA.localeCompare(colorB, 'es');
+        if (cmpColor !== 0) return cmpColor;
+
+        // 3. Dentro del mismo modelo+color, ordenar por serie
+        const ordenSerieA = obtenerOrdenSerie(a.serie);
+        const ordenSerieB = obtenerOrdenSerie(b.serie);
+        if (ordenSerieA !== ordenSerieB) return ordenSerieA - ordenSerieB;
+
+        // 4. Dentro de la misma serie, ordenar por talla ascendente
+        return Number(a.talla) - Number(b.talla);
+      });
+  }, [prediccion, busqueda, colorFiltro, soloColorExacto, filtroSoloDeficit]);
+
+  // Fase 6.2: Agrupación a Nivel de Modelo con Desglose por Tallas (Rule 7 ModelTallaCurvaCard)
+  const modelosAgrupados: GrupoModeloPrediccion[] = useMemo(() => {
+    const map = new Map<string, GrupoModeloPrediccion>();
+
+    itemsFiltrados.forEach((item) => {
+      const colorVal = item.color || "Sin color";
+      const key = `${item.modelo}__${colorVal}__${item.serie}`;
+
+      if (!map.has(key)) {
+        const infoModelo = obtenerDatosModelo(item);
+        map.set(key, {
+          key,
+          modelo: item.modelo,
+          serie: item.serie,
+          color: item.color || "",
+          colorPuro: Boolean(
+            item.colorPuro ??
+            (!item.color || (!item.color.toLowerCase().includes(' con ') && !item.color.toLowerCase().includes('/') && !item.color.toLowerCase().includes('+')))
+          ),
+          imageUrl: infoModelo.imageUrl,
+          brand: infoModelo.brand,
+          variantes: infoModelo.variantes,
+          totalDemanda: 0,
+          totalStock: 0,
+          totalDeficit: 0,
+          totalInversion: 0,
+          totalSugerenciaReorden: 0,
+          precioCostoUnitario: item.precio_costo || 22,
+          precioVentaUnitario: item.precio_venta || 35,
+          tallas: [],
+        });
+      }
+
+      const grp = map.get(key)!;
+      grp.totalDemanda += item.demanda_estimada || 0;
+      grp.totalStock += item.stock_actual || 0;
+      grp.totalDeficit += item.deficit_stock || 0;
+      grp.totalInversion += item.inversion_reorden_estimada || (item.deficit_stock ? item.deficit_stock * (item.precio_costo || 22) : 0);
+      grp.totalSugerenciaReorden += item.sugerencia_reorden || 0;
+      grp.tallas.push(item);
+    });
+
+    map.forEach((grp) => {
+      grp.tallas.sort((a, b) => Number(a.talla) - Number(b.talla));
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (b.totalDeficit !== a.totalDeficit) return b.totalDeficit - a.totalDeficit;
+      return b.totalDemanda - a.totalDemanda;
+    });
+  }, [itemsFiltrados, modelosInventarioMap]);
 
   // Métricas agregadas
   const totalDemandaEstimada = (prediccion?.predicciones || []).reduce((acc, p) => acc + (p.demanda_estimada || 0), 0);
@@ -622,33 +755,204 @@ export default function PrediccionDemandaComponent() {
         </div>
       )}
 
-      {/* ══════ Tabla de Predicciones por Calzado ══════ */}
+      {/* ══════ Filtros Avanzados y Vistas de Predicción ══════ */}
       <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        {/* Cabecera de la sección de predicciones */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div>
             <h3 className="font-bold text-[var(--foreground)] flex items-center gap-2 text-sm">
               <Package size={16} className="text-[#0F172A] dark:text-amber-400" />
               Proyección de Demanda Estacional por Calzado
             </h3>
             <p className="text-xs text-[var(--muted-foreground)]">
-              Comparativa de rotación base, factor estacional y sugerencias de reabastecimiento
+              Agrupación inteligente por modelo, curva de tallas y filtro de colores puros y exactos
             </p>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-60">
-              <Search size={14} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
-              <input
-                type="text"
-                placeholder="Filtrar modelo, serie, talla..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
-              />
+          {/* Selector de Modo de Visualización (Agrupado vs Tabla) */}
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <div className="flex items-center p-1 bg-[var(--muted)]/60 rounded-xl border border-[var(--border)] w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setModoVista('AGRUPADO')}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  modoVista === 'AGRUPADO'
+                    ? "bg-[var(--card)] text-[var(--foreground)] shadow-xs"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                }`}
+                title="Ver modelos agrupados con su curva de tallas"
+              >
+                <LayoutGrid size={13} />
+                <span>Agrupado por Modelo</span>
+                <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-extrabold">
+                  {modelosAgrupados.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModoVista('TABLA')}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  modoVista === 'TABLA'
+                    ? "bg-[var(--card)] text-[var(--foreground)] shadow-xs"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                }`}
+                title="Ver listado detallado registro por registro"
+              >
+                <TableProperties size={13} />
+                <span>Tabla por Talla</span>
+                <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] font-mono">
+                  {itemsFiltrados.length}
+                </span>
+              </button>
             </div>
           </div>
         </div>
 
+        {/* ── Barra de Controles & Filtros (Fase 6.1) ── */}
+        <div className="flex flex-col gap-3 pt-2 border-t border-[var(--border)]/70">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            {/* Input de Búsqueda de Modelo / Serie / Talla */}
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
+              <input
+                type="text"
+                placeholder="Buscar por modelo, serie, talla o material..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A] dark:focus:border-amber-400"
+              />
+              {busqueda && (
+                <button
+                  type="button"
+                  onClick={() => setBusqueda("")}
+                  className="absolute right-2.5 top-2.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Selector / Input de Color */}
+            <div className="relative w-full sm:w-52">
+              <Palette size={14} className="absolute left-3 top-2.5 text-amber-500" />
+              <input
+                type="text"
+                list="colores-catalogo-list"
+                placeholder="Filtrar color (ej: Negro)..."
+                value={colorFiltro}
+                onChange={(e) => setColorFiltro(e.target.value)}
+                className="w-full pl-8 pr-7 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A] dark:focus:border-amber-400"
+              />
+              <datalist id="colores-catalogo-list">
+                {coloresDisponibles.map((c, idx) => (
+                  <option key={idx} value={c} />
+                ))}
+              </datalist>
+              {colorFiltro && (
+                <button
+                  type="button"
+                  onClick={() => setColorFiltro("")}
+                  className="absolute right-2.5 top-2.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Toggle Fase 6.1: Solo Color Exacto */}
+            <button
+              type="button"
+              onClick={() => setSoloColorExacto((prev) => !prev)}
+              className={`flex items-center justify-between sm:justify-start gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                soloColorExacto
+                  ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-500/30"
+                  : "bg-[var(--muted)]/50 text-[var(--muted-foreground)] border-[var(--border)]"
+              }`}
+              title="Al activar, si busca 'Negro' solo se mostrará ese color puro, excluyendo variantes como 'Negro con Blanco'"
+            >
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={13} className={soloColorExacto ? "text-emerald-600" : "text-[var(--muted-foreground)]"} />
+                <span>Solo color exacto</span>
+              </div>
+              <span
+                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[9px] ${
+                  soloColorExacto
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "border-[var(--muted-foreground)]/40"
+                }`}
+              >
+                {soloColorExacto && <Check size={10} />}
+              </span>
+            </button>
+
+            {/* Toggle Rápido: Solo con Déficit */}
+            <button
+              type="button"
+              onClick={() => setFiltroSoloDeficit((prev) => !prev)}
+              className={`flex items-center justify-between sm:justify-start gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                filtroSoloDeficit
+                  ? "bg-rose-500/10 text-rose-800 dark:text-rose-300 border-rose-500/30"
+                  : "bg-[var(--muted)]/50 text-[var(--muted-foreground)] border-[var(--border)]"
+              }`}
+              title="Filtrar únicamente calzados con faltante de stock en bodega"
+            >
+              <AlertTriangle size={13} className={filtroSoloDeficit ? "text-rose-500" : "text-[var(--muted-foreground)]"} />
+              <span>Solo con déficit</span>
+            </button>
+          </div>
+
+          {/* Píldoras rápidas de colores populares */}
+          <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1">
+            <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mr-1">
+              Colores frecuentes:
+            </span>
+            <button
+              type="button"
+              onClick={() => setColorFiltro("")}
+              className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                colorFiltro === ""
+                  ? "bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 shadow-xs"
+                  : "bg-[var(--muted)]/60 text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
+              }`}
+            >
+              Todos
+            </button>
+            {coloresDisponibles.slice(0, 8).map((col, idx) => {
+              const isSelected = colorFiltro.toLowerCase().trim() === col.toLowerCase().trim();
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setColorFiltro(isSelected ? "" : col)}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-[#0F172A] dark:bg-amber-400 text-white dark:text-slate-900 shadow-xs"
+                      : "bg-[var(--muted)]/60 text-[var(--muted-foreground)] hover:text-[var(--foreground)] border border-[var(--border)]"
+                  }`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full border border-black/10 shrink-0"
+                    style={{
+                      backgroundColor:
+                        col.toLowerCase().includes("negro") ? "#1e293b" :
+                        col.toLowerCase().includes("blanco") ? "#f1f5f9" :
+                        col.toLowerCase().includes("cafe") || col.toLowerCase().includes("café") ? "#78350f" :
+                        col.toLowerCase().includes("azul") ? "#1d4ed8" :
+                        col.toLowerCase().includes("rojo") ? "#b91c1c" :
+                        col.toLowerCase().includes("vino") ? "#831843" :
+                        col.toLowerCase().includes("miel") ? "#d97706" :
+                        "#64748b"
+                    }}
+                  />
+                  <span>{col}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Contenido de Predicción ── */}
         {loading ? (
           <div className="py-16 text-center text-[var(--muted-foreground)] space-y-3">
             <Loader2 size={28} className="animate-spin mx-auto text-[#0F172A] dark:text-amber-400" />
@@ -658,12 +962,337 @@ export default function PrediccionDemandaComponent() {
           <div className="py-16 text-center space-y-3">
             <BrainCircuit size={32} className="mx-auto text-[var(--muted-foreground)] opacity-40" />
             <p className="text-xs text-[var(--muted-foreground)]">
-              No se encontraron calzados para esta temporada o filtro de búsqueda.
+              No se encontraron calzados para esta temporada o filtro de color/búsqueda.
             </p>
+            {(busqueda || colorFiltro || filtroSoloDeficit) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBusqueda("");
+                  setColorFiltro("");
+                  setFiltroSoloDeficit(false);
+                }}
+                className="text-xs font-bold text-amber-700 dark:text-amber-400 underline cursor-pointer"
+              >
+                Limpiar filtros aplicados
+              </button>
+            )}
+          </div>
+        ) : modoVista === 'AGRUPADO' ? (
+          /* ══════ VISTA AGRUPADA POR MODELO CON DESGLOSE POR TALLAS (Regla 7 ModelTallaCurvaCard) ══════ */
+          <div className="space-y-3.5 pt-1">
+            {modelosAgrupados.map((grupo) => {
+              const isExpanded = modelosExpandidos[grupo.key] ?? false;
+              const toggleExpand = () => {
+                setModelosExpandidos((prev) => ({ ...prev, [grupo.key]: !isExpanded }));
+              };
+              const docenasEquiv = (grupo.totalDemanda / 12).toFixed(1);
+              const docenasLabel =
+                grupo.totalDemanda === 6
+                  ? "½ Docena"
+                  : grupo.totalDemanda === 12
+                  ? "1 Docena"
+                  : `${docenasEquiv} doc.`;
+
+              return (
+                <div
+                  key={grupo.key}
+                  className={`border rounded-2xl transition-all shadow-xs overflow-hidden ${
+                    grupo.totalDeficit > 0
+                      ? "bg-[var(--card)] border-rose-500/25 hover:border-rose-500/40"
+                      : "bg-[var(--card)] border-[var(--border)] hover:border-emerald-500/30"
+                  }`}
+                >
+                  {/* ── Encabezado y Resumen Estándar ModelTallaCurvaCard (Regla 7) ── */}
+                  <div className="p-4 sm:p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                    {/* Lado izquierdo: Miniatura + Encabezado + Badges */}
+                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                      {/* Miniatura cuadrada con foto del calzado y lightbox */}
+                      {grupo.imageUrl ? (
+                        <div
+                          onClick={() =>
+                            setLightbox({
+                              isOpen: true,
+                              imageUrl: grupo.imageUrl,
+                              title: grupo.modelo,
+                              subtitle: `${formatearNombreSerie(grupo.serie)}${grupo.color ? ` · Color: ${grupo.color}` : ""}`,
+                              badge: grupo.color || "Calzado",
+                            })
+                          }
+                          className="w-12 h-12 rounded-xl border border-[var(--border)] overflow-hidden shrink-0 bg-[var(--muted)]/40 relative group cursor-pointer shadow-xs hover:ring-2 hover:ring-emerald-500/50 transition-all"
+                          title="Clic para ver foto en tamaño completo"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={grupo.imageUrl}
+                            alt={grupo.modelo}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = "none";
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                            <ZoomIn size={14} className="text-white drop-shadow" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          className="w-12 h-12 rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 flex flex-col items-center justify-center shrink-0 text-[var(--muted-foreground)]"
+                          title="Sin foto registrada"
+                        >
+                          <Package size={20} className="opacity-50" />
+                        </div>
+                      )}
+
+                      {/* Encabezado: Nombre en negrita mayúscula, Color y Serie en verde esmeralda */}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-black uppercase text-sm sm:text-base text-[var(--foreground)] tracking-tight">
+                            {grupo.modelo}
+                          </span>
+
+                          {/* Píldora de color */}
+                          {grupo.color && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)]">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs border border-black/10"
+                                style={{
+                                  backgroundColor:
+                                    grupo.color.toLowerCase().includes("negro") ? "#1e293b" :
+                                    grupo.color.toLowerCase().includes("blanco") ? "#f1f5f9" :
+                                    grupo.color.toLowerCase().includes("cafe") || grupo.color.toLowerCase().includes("café") ? "#78350f" :
+                                    grupo.color.toLowerCase().includes("azul") ? "#1d4ed8" :
+                                    grupo.color.toLowerCase().includes("rojo") ? "#b91c1c" :
+                                    grupo.color.toLowerCase().includes("vino") ? "#831843" :
+                                    grupo.color.toLowerCase().includes("miel") ? "#d97706" :
+                                    "#64748b"
+                                }}
+                              />
+                              <span>{grupo.color}</span>
+                            </span>
+                          )}
+
+                          {/* Badge Fase 6.1: Color Puro vs Compuesto */}
+                          {grupo.colorPuro ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20">
+                              <Sparkles size={10} className="text-emerald-600" /> Color Puro
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-800 dark:text-purple-300 border border-purple-500/20">
+                              <Layers size={10} className="text-purple-600" /> Color Compuesto / Variante
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Serie destacada en verde esmeralda */}
+                        <div className="flex items-center gap-3 mt-1 text-xs">
+                          <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                            Serie: {formatearNombreSerie(grupo.serie)}
+                          </span>
+                          {grupo.brand && (
+                            <span className="text-[11px] text-[var(--muted-foreground)]">
+                              Marca: <strong className="text-[var(--foreground)]">{grupo.brand}</strong>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lado derecho: Resumen con etiqueta de docenas, déficit y precio/subtotal */}
+                    <div className="flex items-center justify-between lg:justify-end gap-5 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-[var(--border)]">
+                      {/* Métricas consolidadas del modelo */}
+                      <div className="text-right space-y-0.5">
+                        <div className="text-sm font-black text-[var(--foreground)] font-mono flex items-center justify-end gap-1.5">
+                          <span>{grupo.totalDemanda} pares</span>
+                          <span className="text-xs font-semibold text-[var(--muted-foreground)] font-sans">
+                            ({docenasLabel})
+                          </span>
+                        </div>
+                        <div className="text-xs flex items-center justify-end gap-2">
+                          <span className="text-[11px] text-[var(--muted-foreground)] font-medium">
+                            ${grupo.precioCostoUnitario.toFixed(2)} / par
+                          </span>
+                          <span className="font-black text-emerald-700 dark:text-emerald-400 font-mono text-sm">
+                            ${grupo.totalInversion.toFixed(2)}
+                          </span>
+                        </div>
+                        {/* Indicador de Déficit */}
+                        {grupo.totalDeficit > 0 ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-rose-600 dark:text-rose-400 text-[11px]">
+                            <AlertTriangle size={12} /> Déficit: {grupo.totalDeficit} pares a pedir
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 text-[11px]">
+                            <CheckCircle2 size={12} /> Stock en bodega cubierto
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Botón de acción: Pedir a Taller/Proveedor */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const itemReferencia = grupo.tallas[0] || null;
+                            if (itemReferencia) {
+                              setPedidoModalItem({
+                                ...itemReferencia,
+                                sugerencia_reorden: grupo.totalDeficit > 0 ? grupo.totalDeficit : grupo.totalDemanda,
+                              });
+                              setPedidoCantidad(grupo.totalDeficit > 0 ? grupo.totalDeficit : Math.max(12, grupo.totalDemanda));
+                            }
+                          }}
+                          className="px-3 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+                          title="Solicitar abastecimiento para este modelo completo"
+                        >
+                          <ShoppingCart size={13} />
+                          <span>Pedir Modelo</span>
+                        </button>
+
+                        {/* Toggle expandir / colapsar curva de tallas */}
+                        <button
+                          type="button"
+                          onClick={toggleExpand}
+                          className="p-2 rounded-xl border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer"
+                          title={isExpanded ? "Ocultar desglose de tallas" : "Ver curva completa de tallas"}
+                        >
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Curva de Tallas: Píldoras horizontales por talla ── */}
+                  <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--border)]/60">
+                      <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mr-1">
+                        Curva de Tallas:
+                      </span>
+                      {grupo.tallas.map((tallaItem, tIdx) => {
+                        const defTalla = tallaItem.deficit_stock ?? 0;
+                        const tieneDef = defTalla > 0;
+                        return (
+                          <div
+                            key={tIdx}
+                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-mono transition-all ${
+                              tieneDef
+                                ? "bg-rose-500/10 border-rose-500/25 text-rose-900 dark:text-rose-200"
+                                : "bg-[var(--muted)]/50 border-[var(--border)] text-[var(--foreground)]"
+                            }`}
+                          >
+                            <span className="font-black text-xs px-1.5 py-0.5 rounded-md bg-[var(--card)] border border-[var(--border)]">
+                              T{tallaItem.talla}
+                            </span>
+                            <div className="flex items-center gap-1 text-[11px]">
+                              <span className="text-[var(--muted-foreground)]" title="Demanda proyectada">
+                                {tallaItem.demanda_estimada}p
+                              </span>
+                              <span className="text-[var(--border)]">/</span>
+                              <span className="font-semibold" title="Stock actual en bodega">
+                                {tallaItem.stock_actual ?? 0}p
+                              </span>
+                            </div>
+                            {tieneDef ? (
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-rose-500 text-white shadow-xs">
+                                -{defTalla}p
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* ── Desglose Detallado Expandible (Tabla Tamaño 10 - Regla 10) ── */}
+                  {isExpanded && (
+                    <div className="bg-[var(--muted)]/30 border-t border-[var(--border)] p-4 sm:p-5 animate-in fade-in duration-150">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-[10px]">
+                          <thead>
+                            <tr className="border-b border-[var(--border)] text-[var(--muted-foreground)] uppercase tracking-wider">
+                              <th className="py-2 px-3 font-bold">Talla</th>
+                              <th className="py-2 px-3 font-bold text-center">Demanda Base</th>
+                              <th className="py-2 px-3 font-bold text-center">Impacto Estacional</th>
+                              <th className="py-2 px-3 font-bold text-center">Demanda Proyectada</th>
+                              <th className="py-2 px-3 font-bold text-center">Stock Bodega</th>
+                              <th className="py-2 px-3 font-bold text-center">Déficit</th>
+                              <th className="py-2 px-3 font-bold text-center">Reorden Sugerido</th>
+                              <th className="py-2 px-3 font-bold text-right">Inversión</th>
+                              <th className="py-2 px-3 font-bold text-center">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--border)]/50 font-mono">
+                            {grupo.tallas.map((tItem, idx) => (
+                              <tr key={idx} className="hover:bg-[var(--card)]/60 transition-colors">
+                                <td className="py-2.5 px-3 font-bold text-[var(--foreground)]">
+                                  Talla {tItem.talla}
+                                </td>
+                                <td className="py-2.5 px-3 text-center text-[var(--muted-foreground)]">
+                                  {tItem.demanda_base ?? Math.round(tItem.demanda_estimada / 1.3)} pares
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {tItem.impacto_estacional_pct && tItem.impacto_estacional_pct > 0 ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                      +{tItem.impacto_estacional_pct}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500">Base</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-black text-[var(--foreground)] text-xs">
+                                  {tItem.demanda_estimada} pares
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-bold">
+                                  <span className={(tItem.stock_actual ?? 0) === 0 ? "text-rose-500" : "text-emerald-600"}>
+                                    {tItem.stock_actual ?? 0} pares
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {(tItem.deficit_stock ?? 0) > 0 ? (
+                                    <span className="font-bold text-rose-600">
+                                      -{tItem.deficit_stock} pares
+                                    </span>
+                                  ) : (
+                                    <span className="text-emerald-600">Cubierto</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-bold text-[var(--foreground)]">
+                                  +{tItem.sugerencia_reorden} pares
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-bold text-[var(--foreground)]">
+                                  ${(tItem.inversion_reorden_estimada ?? (tItem.sugerencia_reorden * 22)).toFixed(2)}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPedidoModalItem(tItem);
+                                      setPedidoCantidad(tItem.sugerencia_reorden || 6);
+                                    }}
+                                    className="px-2 py-1 rounded-lg bg-[var(--card)] hover:bg-[#0F172A] hover:text-white border border-[var(--border)] text-[10px] font-bold transition-all cursor-pointer"
+                                  >
+                                    Pedir Talla
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
+          /* ══════ VISTA TABLA POR TALLAS (Regla 10: Tamaño 10) ══════ */
           <div className="overflow-x-auto -mx-5">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-[10px]">
               <thead>
                 <tr className="border-b border-[var(--border)] text-[var(--muted-foreground)] bg-[var(--muted)]/20">
                   <th className="px-5 py-3 font-bold">Calzado / Modelo</th>
@@ -684,11 +1313,14 @@ export default function PrediccionDemandaComponent() {
                   const imgParaMostrar = infoModelo.imageUrl;
                   const variantes = infoModelo.variantes;
                   const tieneDeficit = (item.deficit_stock ?? 0) > 0;
+                  const esPuro = Boolean(
+                    item.colorPuro ??
+                    (!item.color || (!item.color.toLowerCase().includes(' con ') && !item.color.toLowerCase().includes('/')))
+                  );
                   return (
                     <tr key={idx} className="hover:bg-[var(--muted)]/30 transition-colors">
                       <td className="px-5 py-3.5 font-bold text-[var(--foreground)]">
                         <div className="flex items-center gap-3">
-                          {/* Miniatura cuadrada con foto del calzado */}
                           {imgParaMostrar ? (
                             <div
                               onClick={() =>
@@ -725,20 +1357,29 @@ export default function PrediccionDemandaComponent() {
                             </div>
                           )}
 
-                          {/* Nombre del Modelo, Color y Selector de Variantes */}
                           <div className="min-w-0">
                             <span className="truncate max-w-[180px] text-xs font-black uppercase text-[var(--foreground)] block tracking-tight">
                               {item.modelo}
                             </span>
 
                             {item.color && (
-                              <span className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-1 font-medium mt-0.5">
-                                <Palette size={10} className="text-amber-500 shrink-0" />
-                                <span className="truncate max-w-[140px]">{item.color}</span>
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                <span className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1 font-medium">
+                                  <Palette size={10} className="text-amber-500 shrink-0" />
+                                  <span className="truncate max-w-[120px]">{item.color}</span>
+                                </span>
+                                {esPuro ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                    Puro
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
+                                    Compuesto
+                                  </span>
+                                )}
+                              </div>
                             )}
 
-                            {/* Botón para ver variantes del modelo */}
                             {variantes.length > 0 && (
                               <button
                                 type="button"
@@ -750,37 +1391,18 @@ export default function PrediccionDemandaComponent() {
                                     brand: infoModelo.brand,
                                   })
                                 }
-                                className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer group"
+                                className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer group"
                                 title={`Ver las ${variantes.length} variantes disponibles de ${item.modelo}`}
                               >
-                                <Layers size={11} className="group-hover:scale-110 transition-transform" />
+                                <Layers size={10} className="group-hover:scale-110 transition-transform" />
                                 <span>{variantes.length} {variantes.length === 1 ? "variante" : "variantes"}</span>
-                                <div className="flex items-center -space-x-1 ml-0.5">
-                                  {variantes.slice(0, 3).map((v, vIdx) => (
-                                    <span
-                                      key={vIdx}
-                                      className="w-2 h-2 rounded-full border border-white dark:border-slate-800 shrink-0 shadow-xs"
-                                      style={{
-                                        backgroundColor:
-                                          v.color?.toLowerCase().includes("negro") ? "#1e293b" :
-                                          v.color?.toLowerCase().includes("blanco") ? "#f1f5f9" :
-                                          v.color?.toLowerCase().includes("cafe") || v.color?.toLowerCase().includes("café") ? "#78350f" :
-                                          v.color?.toLowerCase().includes("azul") ? "#1d4ed8" :
-                                          v.color?.toLowerCase().includes("rojo") ? "#b91c1c" :
-                                          v.color?.toLowerCase().includes("vino") ? "#831843" :
-                                          v.color?.toLowerCase().includes("miel") ? "#d97706" :
-                                          "#64748b"
-                                      }}
-                                    />
-                                  ))}
-                                </div>
                               </button>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-[var(--muted-foreground)]">
-                        <span className="truncate max-w-[120px] block">{item.serie}</span>
+                      <td className="px-3 py-3 text-[var(--muted-foreground)] font-bold text-emerald-700 dark:text-emerald-400">
+                        <span className="truncate max-w-[120px] block">{formatearNombreSerie(item.serie)}</span>
                       </td>
                       <td className="px-3 py-3 text-center">
                         <span className="px-2 py-0.5 bg-[var(--muted)] border border-[var(--border)] rounded-md font-mono font-bold text-[var(--foreground)]">
@@ -800,7 +1422,7 @@ export default function PrediccionDemandaComponent() {
                           {item.stock_actual ?? 0} p.
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center font-bold text-[#0F172A] dark:text-amber-400 font-mono text-sm">
+                      <td className="px-3 py-3 text-center font-bold text-[#0F172A] dark:text-amber-400 font-mono text-xs">
                         {item.demanda_estimada}{" "}
                         <span className="text-[10px] font-normal text-[var(--muted-foreground)]">
                           ({item.demanda_base ?? Math.round(item.demanda_estimada / 1.3)} base)
