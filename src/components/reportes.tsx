@@ -3128,8 +3128,12 @@ export default function ReportesComponent({
 
       {/* Modal de Detalle de Venta POS / Ticket Térmico */}
       {ventaPosDetalle && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-[var(--card)] text-[var(--foreground)] rounded-3xl max-w-md w-full border border-[var(--border)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setVentaPosDetalle(null); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setVentaPosDetalle(null); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl max-w-md w-full h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 bg-[var(--muted)]/40 border-b border-[var(--border)] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Receipt size={16} className="text-emerald-600" />

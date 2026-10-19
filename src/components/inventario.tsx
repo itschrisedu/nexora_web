@@ -801,34 +801,39 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
       {/* MODAL MOVIMIENTO MULTIFORMATO */}
       {showMovModal && movProd && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowMovModal(false), isDirtyMov()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
-            <div className="p-5 sm:p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowMovModal(false), isDirtyMov()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowMovModal(false), isDirtyMov()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-lg h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className={`p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 font-bold ${
+                <div className={`p-2 sm:p-2.5 bg-white/10 rounded-2xl border border-white/10 font-bold shrink-0 ${
                   movType === "entrada" ? "text-emerald-400" : "text-rose-400"
                 }`}>
                   {movType === "entrada" ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
                     {movType === "entrada" ? "Ingreso de Mercadería a Bodega" : "Salida / Ajuste de Stock"}
                   </h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     {movProd.nombre} · {movProd.codigo} {movProd.serie?.nombre ? `(${movProd.serie.nombre})` : ""}
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowMovModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleMovimiento} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 pb-6">
+            <form onSubmit={handleMovimiento} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                 {movType === "entrada" && (
                   <div className="space-y-4">
                     {/* Selector de modo: Pares Sueltos vs Serie Completa */}
@@ -1085,9 +1090,20 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                   </div>
                 )}
               </div>
-              <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] shrink-0">
-                <button type="submit" disabled={movSaving} className={`w-full py-3 text-white font-semibold text-sm rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 ${movType === "entrada" ? "bg-emerald-600" : "bg-red-500"}`}>
-                  {movSaving ? <><Loader2 size={16} className="animate-spin" /> Registrando...</> : movType === "entrada" ? <><TrendingUp size={16} /> Registrar Entrada ({ingresoFormato === "serie" ? `${totalParesLote} pares` : "Pares sueltos"})</> : <><TrendingDown size={16} /> Registrar Salida</>}
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowMovModal(false)}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={movSaving}
+                  className={`flex-1 sm:flex-none px-5 py-2.5 text-white font-bold text-xs rounded-xl hover:opacity-90 transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer min-h-[42px] ${movType === "entrada" ? "bg-emerald-600" : "bg-red-500"}`}
+                >
+                  {movSaving ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : movType === "entrada" ? <><TrendingUp size={14} /> Registrar Entrada ({ingresoFormato === "serie" ? `${totalParesLote} pares` : "Pares sueltos"})</> : <><TrendingDown size={14} /> Registrar Salida</>}
                 </button>
               </div>
             </form>
@@ -1097,33 +1113,38 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
 
       {/* MODAL TRANSFERENCIA INTER-SUCURSAL */}
       {showTransfModal && transfProd && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransfModal(false), isDirtyTransf()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
-            <div className="p-5 sm:p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransfModal(false), isDirtyTransf()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransfModal(false), isDirtyTransf()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-lg h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-500/20 backdrop-blur-sm rounded-2xl border border-blue-400/30 font-bold text-blue-300">
+                <div className="p-2 sm:p-2.5 bg-blue-500/20 rounded-2xl border border-blue-400/30 font-bold text-blue-300 shrink-0">
                   <ArrowRightLeft size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
                     Despacho / Transferencia a Sucursal
                   </h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     {transfProd.nombre} · {transfProd.codigo}
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowTransfModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleTransferencia} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 pb-6">
+            <form onSubmit={handleTransferencia} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                 <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-300">
                   <span>Transfiere pares físicos desde <strong>{activeSucursalId === 'TODAS' ? 'Matriz' : sucursales?.find(s => s.id === activeSucursalId)?.name || 'Matriz'}</strong> hacia otra sucursal del negocio. El stock se actualizará de inmediato en ambos locales.</span>
                 </div>
@@ -1393,19 +1414,26 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                 )}
               </div>
 
-              <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] shrink-0">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowTransfModal(false)}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
                 <button
                   type="submit"
                   disabled={transfSaving}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer min-h-[42px]"
                 >
                   {transfSaving ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" /> Despachando pares...
+                      <Loader2 size={14} className="animate-spin" /> Despachando pares...
                     </>
                   ) : (
                     <>
-                      <ArrowRightLeft size={16} /> Confirmar Despacho a Sucursal ({transfFormato === "serie" ? `${totalParesTransf} pares` : "Pares sueltos"})
+                      <ArrowRightLeft size={14} /> Confirmar Despacho a Sucursal ({transfFormato === "serie" ? `${totalParesTransf} pares` : "Pares sueltos"})
                     </>
                   )}
                 </button>

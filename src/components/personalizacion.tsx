@@ -10,7 +10,7 @@ import {
   Truck, Star, Trash2, Plus, Phone, Globe,
   Image, ExternalLink, Eye, EyeOff, Share2,
   Copy, Check, MessageCircle, Upload, Sparkles,
-  Layers, Sliders, Settings2, HelpCircle, Crop, Mail, ShieldCheck, KeyRound
+  Layers, Sliders, Settings2, HelpCircle, Crop, Mail, ShieldCheck, KeyRound, X
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
@@ -2931,23 +2931,38 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
       {/* MODAL CREAR NUEVA EMPRESA DE TRANSPORTE */}
       {showModalTransporte && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowModalTransporte(false), isDirtyTransporte()); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
-              <div className="flex items-center gap-2">
-                <Truck className="text-amber-500" size={18} />
-                <h3 className="text-sm font-bold text-[var(--foreground)]">Nueva Empresa de Transporte</h3>
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowModalTransporte(false), isDirtyTransporte()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowModalTransporte(false), isDirtyTransporte()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30 font-bold shrink-0">
+                  <Truck size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Nueva Empresa de Transporte
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                    Registra una cooperativa o transporte para despachos
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowModalTransporte(false)}
-                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-base"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCrearTransporte} className="space-y-3">
+            <form onSubmit={handleCrearTransporte} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
                   Nombre de la Cooperativa / Transporte *
@@ -3001,21 +3016,22 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+              </div>
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowModalTransporte(false)}
-                  className="px-3 py-1.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] text-xs font-bold rounded-xl"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={guardandoTransporte || !nuevoTranspNombre.trim()}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer min-h-[42px]"
                 >
-                  {guardandoTransporte ? <Loader2 className="animate-spin" size={13} /> : <CheckCircle size={13} />}
-                  Guardar
+                  {guardandoTransporte ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                  Guardar Transporte
                 </button>
               </div>
             </form>

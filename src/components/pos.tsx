@@ -2301,15 +2301,21 @@ export default function PosComponent() {
       ══════════════════════════════════════════════════════════════════════ */}
       {ventaDetalleModalOpen && ventaSeleccionada && (
         <div
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setVentaDetalleModalOpen(false);
               setVentaSeleccionada(null);
             }
           }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setVentaDetalleModalOpen(false);
+              setVentaSeleccionada(null);
+            }
+          }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl max-w-2xl w-full p-6 space-y-5 relative my-8 shadow-2xl">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl max-w-2xl w-full h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => {
                 setVentaDetalleModalOpen(false);
@@ -2482,15 +2488,21 @@ export default function PosComponent() {
       {/* ── MODAL DE CIERRE DE CAJA / ARQUEO DE TURNO ── */}
       {modalCierreOpen && (
         <div
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setModalCierreOpen(false);
               setResultadoCierre(null);
             }
           }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setModalCierreOpen(false);
+              setResultadoCierre(null);
+            }
+          }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl max-w-md w-full p-6 space-y-5 relative shadow-2xl">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl max-w-md w-full h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => setModalCierreOpen(false)}
               className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"

@@ -653,6 +653,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         safeDismiss(() => { setShowSupplierModal(false); resetSupplierForm(); }, isDirtySupplier());
         return;
       }
+      if (showEditSupplierModal) {
+        e.preventDefault();
+        setShowEditSupplierModal(false);
+        setEditingSupplier(null);
+        return;
+      }
       if (showOrderModal) {
         e.preventDefault();
         safeDismiss(() => setShowOrderModal(false), isDirtyOrder());
@@ -678,7 +684,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [
     showDiscardModal, confirmModal.isOpen, showPdfPreviewModal, showConstanciaModal,
-    showManualDefectuosoModal, showDevolucionModal, showSupplierModal, showOrderModal,
+    showManualDefectuosoModal, showDevolucionModal, showSupplierModal, showEditSupplierModal, showOrderModal,
     showPaymentModal, showCuentaModal, showOrderDetailModal, safeDismiss,
     isDirtyManualDefectuoso, isDirtyDevolucion, isDirtySupplier, isDirtyOrder, isDirtyPayment
   ]);
@@ -3319,17 +3325,21 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: DETALLE DE ORDEN (Con Botón Enviar Explícito)
          ══════════════════════════════════════════ */}
       {showOrderDetailModal && selectedOrder && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowOrderDetailModal(false); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowOrderDetailModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowOrderDetailModal(false); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-4xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header del Modal Estandarizado (Azul Oscuro #0F172A / Blanco) */}
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <FileText size={20} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-base text-white">
+                    <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
                       Orden de Compra OC-{String(selectedOrder.numero).padStart(4, '0')}
                     </h3>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -3344,7 +3354,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       {selectedOrder.estado === 'BORRADOR' ? 'Borrador (Acumulándose)' : selectedOrder.estado === 'PENDIENTE' ? 'Enviada al Proveedor' : selectedOrder.estado}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-300 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5">
                     Proveedor: <strong className="text-white">{selectedOrder.supplier?.razonSocial || selectedOrder.supplier?.nombre}</strong> ({selectedOrder.supplier?.ruc})
                   </p>
                 </div>
@@ -3353,14 +3363,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 flex-1 min-h-0 text-xs">
               {/* Tarjeta Destacada: Cliente / Pedido Originador */}
               {(() => {
                 const obsText = (selectedOrder.lines || []).map((l: any) => l.observacionLinea).filter(Boolean).join(' ');
@@ -3771,7 +3781,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             </div>
 
             {/* Footer Modal con Botones Estandarizados */}
-            <div className="p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="p-4 sm:p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -3883,18 +3893,22 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: ESTADO DE CUENTA MASTER-DETAIL
          ══════════════════════════════════════════ */}
       {showCuentaModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCuentaModal(false); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCuentaModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCuentaModal(false); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-4xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Receipt size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
                     Estado de Cuenta — {cuentaCorrienteData?.supplier?.razonSocial || cuentaCorrienteData?.supplier?.nombre || 'Proveedor'}
                   </h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     RUC: {cuentaCorrienteData?.supplier?.ruc} • Histórico de compras, entregas y pagos
                   </p>
                 </div>
@@ -3903,7 +3917,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => setShowCuentaModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
@@ -3985,7 +3999,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               });
 
               return (
-              <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1 min-h-0 text-xs">
                 {/* ── PANEL RESUMEN GENERAL (4 tarjetas) ── */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 space-y-1">
@@ -4304,8 +4318,19 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   )}
                 </div>
               </div>
-              );
-            })() : null}
+            );
+          })() : null}
+
+            {/* Pinned Footer */}
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCuentaModal(false)}
+                className="w-full sm:w-auto px-5 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -4314,30 +4339,35 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: REGISTRAR PAGO A PROVEEDOR
          ══════════════════════════════════════════ */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowPaymentModal(false), isDirtyPayment()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowPaymentModal(false), isDirtyPayment()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowPaymentModal(false), isDirtyPayment()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <DollarSign size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Registrar Pago a Proveedor</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Abono o liquidación de compra con comprobante</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Registrar Pago a Proveedor</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Abono o liquidación de compra con comprobante</p>
                 </div>
               </div>
 
               {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleGuardarPago} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleGuardarPago} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Proveedor / Fabricante Receptor *
@@ -4439,17 +4469,28 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {saving ? (
-                  <><Loader2 size={14} className="animate-spin" /><span>Registrando Pago...</span></>
-                ) : (
-                  <><CheckCircle size={14} /><span>Confirmar y Descontar Deuda</span></>
-                )}
-              </button>
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => safeDismiss(() => setShowPaymentModal(false), isDirtyPayment())}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? (
+                    <><Loader2 size={14} className="animate-spin" /><span>Registrando...</span></>
+                  ) : (
+                    <><CheckCircle size={14} /><span>Confirmar y Descontar Deuda</span></>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -4459,31 +4500,35 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: EMITIR NUEVA ORDEN (Borrador con Curva Exacta)
          ══════════════════════════════════════════ */}
       {showOrderModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowOrderModal(false), isDirtyOrder()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowOrderModal(false), isDirtyOrder()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowOrderModal(false), isDirtyOrder()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-3xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <FileText size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Emitir Orden de Compra a Proveedor</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Borrador acumulativo con cálculo de curva y numeración</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Emitir Orden de Compra a Proveedor</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Borrador acumulativo con cálculo de curva y numeración</p>
                 </div>
               </div>
 
               {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => setShowOrderModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCrearOrden} className="flex flex-col flex-1 overflow-hidden text-xs">
-              <div className="p-6 space-y-5 overflow-y-auto flex-1 pb-24 sm:pb-6">
+            <form onSubmit={handleCrearOrden} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
@@ -4967,7 +5012,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               </div>
 
-              <div className="p-4 sm:p-5 border-t border-[var(--border)] bg-[var(--card)] flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-lg sticky bottom-0 z-10">
+              <div className="p-4 sm:p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
                 <div className="text-xs w-full sm:w-auto text-center sm:text-left">
                   <span className="text-[var(--muted-foreground)]">Total de la Orden: </span>
                   <span className="font-black text-[#0F172A] dark:text-amber-400 font-mono text-base ml-1">
@@ -4978,13 +5023,22 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </span>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={saving || orderLines.length === 0}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700 cursor-pointer"
-                >
-                  {saving ? 'Guardando...' : 'Guardar Borrador de Orden'}
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => safeDismiss(() => setShowOrderModal(false), isDirtyOrder())}
+                    className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving || orderLines.length === 0}
+                    className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                  >
+                    {saving ? 'Guardando...' : 'Guardar Borrador de Orden'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -4995,30 +5049,35 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: REGISTRAR NUEVO PROVEEDOR
          ══════════════════════════════════════════ */}
       {showSupplierModal && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowSupplierModal(false); resetSupplierForm(); }, isDirtySupplier()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowSupplierModal(false); resetSupplierForm(); }, isDirtySupplier()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowSupplierModal(false); resetSupplierForm(); }, isDirtySupplier()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-lg h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Truck size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Registrar Nuevo Proveedor</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Taller de fabricación o curtiduría de calzado</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Registrar Nuevo Proveedor</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Taller de fabricación o curtiduría de calzado</p>
                 </div>
               </div>
 
               {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => { setShowSupplierModal(false); resetSupplierForm(); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateProveedor} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
+            <form onSubmit={handleCreateProveedor} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* Sugerencias de Proveedores Existentes en la Empresa (Inter-Sucursal) */}
               {sugerenciasGlobales.length > 0 && (
                 <div className="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl space-y-2.5 animate-in fade-in shadow-xs">
@@ -5280,18 +5339,20 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               </div>
 
-              <div className="pt-2 flex gap-2">
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => { setShowSupplierModal(false); resetSupplierForm(); }}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {saving ? (
                     <div className="flex items-center justify-center gap-1.5">
@@ -5312,29 +5373,34 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: EDITAR PROVEEDOR
          ══════════════════════════════════════════ */}
       {showEditSupplierModal && editingSupplier && (
-        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowEditSupplierModal(false); setEditingSupplier(null); } }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowEditSupplierModal(false); setEditingSupplier(null); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowEditSupplierModal(false); setEditingSupplier(null); } }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-lg h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <Edit3 size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Editar Proveedor</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Actualizar datos de {editingSupplier.razonSocial || editingSupplier.nombre}</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Editar Proveedor</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Actualizar datos de {editingSupplier.razonSocial || editingSupplier.nombre}</p>
                 </div>
               </div>
 
               <button
                 onClick={() => { setShowEditSupplierModal(false); setEditingSupplier(null); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateProveedor} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
+            <form onSubmit={handleUpdateProveedor} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   RUC del Proveedor
@@ -5521,18 +5587,20 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               </div>
 
-              <div className="pt-2 flex gap-2">
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => { setShowEditSupplierModal(false); setEditingSupplier(null); }}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {saving ? (
                     <div className="flex items-center justify-center gap-1.5">
@@ -5553,27 +5621,31 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: PREVISUALIZADOR DE PDF DE ORDEN
          ══════════════════════════════════════════ */}
       {showPdfPreviewModal && pdfPreviewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowPdfPreviewModal(false); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-4 px-6 pr-16 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowPdfPreviewModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowPdfPreviewModal(false); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-5xl h-[92dvh] sm:h-[92vh] max-h-[92dvh] sm:max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 text-emerald-400 font-bold">
-                  <FileText size={18} />
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
+                  <FileText size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2 tracking-tight truncate">
                     <span>Documento Oficial: {pdfPreviewData?.orden.numero || 'Orden de Compra'}</span>
                     <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold rounded-full">
                       Confidencial / Fabricante
                     </span>
                   </h3>
-                  <p className="text-[11px] text-slate-300">
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     Proveedor: <strong className="text-white">{pdfPreviewData?.proveedor.nombre}</strong> • Sin datos de clientes en el documento
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
                 {pdfPreviewData && (
                   <button
                     onClick={() => descargarOrdenCompraPdf(pdfPreviewData)}
@@ -5592,7 +5664,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
                   setPdfPreviewUrl(null);
                 }}
-                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar visor"
               >
                 <X size={18} />
@@ -5606,6 +5678,31 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 className="w-full h-full rounded-2xl border border-[var(--border)] shadow-inner"
               />
             </div>
+
+            {/* Pinned Footer */}
+            <div className="p-3 sm:p-4 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-between gap-2 shrink-0">
+              {pdfPreviewData ? (
+                <button
+                  type="button"
+                  onClick={() => descargarOrdenCompraPdf(pdfPreviewData)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                >
+                  <Download size={13} />
+                  <span>Descargar PDF</span>
+                </button>
+              ) : <div />}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPdfPreviewModal(false);
+                  if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+                  setPdfPreviewUrl(null);
+                }}
+                className="px-5 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -5614,34 +5711,40 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: REGISTRAR DEVOLUCIÓN AL PROVEEDOR
          ══════════════════════════════════════════ */}
       {showDevolucionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion()); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30">
+                <div className="p-2 sm:p-2.5 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30 shrink-0">
                   <RotateCcw size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2 tracking-tight truncate">
                     <span>Registrar Devolución al Fabricante</span>
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                       Garantía / Falla
                     </span>
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     Descuenta automáticamente de la deuda del proveedor y genera el comprobante DEV
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowDevolucionModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleGuardarDevolucionProveedor} className="flex-1 overflow-y-auto p-6 space-y-5">
+            <form onSubmit={handleGuardarDevolucionProveedor} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0">
               {/* Proveedor Selector */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
@@ -5992,19 +6095,21 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               )}
 
+              </div>
+
               {/* Botones de acción */}
-              <div className="pt-3 border-t border-[var(--border)] flex justify-end items-center gap-3">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowDevolucionModal(false)}
-                  className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving || devLines.length === 0 || !devSupplierId}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {saving ? (
                     <>
@@ -6028,31 +6133,37 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: INGRESO MANUAL DE CALZADO DEFECTUOSO
          ══════════════════════════════════════════ */}
       {showManualDefectuosoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowManualDefectuosoModal(false), isDirtyManualDefectuoso()); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowManualDefectuosoModal(false), isDirtyManualDefectuoso()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowManualDefectuosoModal(false), isDirtyManualDefectuoso()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-lg h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30">
+                <div className="p-2 sm:p-2.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30 shrink-0">
                   <ShieldAlert size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
                     Ingresar Calzado Defectuoso
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     Añade calzado con fallas de bodega a la bandeja de devolución a fábrica
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowManualDefectuosoModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleGuardarManualDefectuoso} className="p-6 space-y-4">
+            <form onSubmit={handleGuardarManualDefectuoso} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* Buscador de Producto */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
@@ -6219,19 +6330,21 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               </div>
 
+              </div>
+
               {/* Botones de acción */}
-              <div className="pt-3 border-t border-[var(--border)] flex justify-end items-center gap-3">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowManualDefectuosoModal(false)}
-                  className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !manualProd || !manualTallaId}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {saving ? (
                     <>
@@ -6255,34 +6368,39 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           MODAL: CONSTANCIA DE DEVOLUCIÓN A PROVEEDOR
          ══════════════════════════════════════════ */}
       {showConstanciaModal && selectedConstancia && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowConstanciaModal(false); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-            <div className="p-5 px-6 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowConstanciaModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowConstanciaModal(false); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] flex justify-between items-center bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30">
+                <div className="p-2 sm:p-2.5 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30 shrink-0">
                   <Receipt size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2 tracking-tight truncate">
                     <span>Constancia #{selectedConstancia.numeroCodigo || 'DEV-0001'}</span>
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                       Liquidada
                     </span>
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     Proveedor: {selectedConstancia.supplier?.razonSocial || selectedConstancia.supplier?.nombre}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowConstanciaModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0 text-xs">
               {/* Metadatos */}
               <div className="grid grid-cols-2 gap-3 p-3.5 bg-[var(--muted)]/40 rounded-2xl border border-[var(--border)] text-xs">
                 <div>
@@ -6356,11 +6474,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             </div>
 
             {/* Footer */}
-            <div className="p-4 px-6 border-t border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/20">
+            <div className="p-4 sm:p-5 border-t border-[var(--border)] flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-3 bg-[var(--muted)]/20 shrink-0">
               <button
                 type="button"
                 onClick={() => handleEnviarDevolucionWhatsApp(selectedConstancia)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
               >
                 <MessageCircle size={14} />
                 <span>Notificar por WhatsApp</span>
@@ -6368,7 +6486,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               <button
                 type="button"
                 onClick={() => setShowConstanciaModal(false)}
-                className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] hover:bg-[var(--card)] transition-colors"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer text-center"
               >
                 Cerrar
               </button>

@@ -1191,26 +1191,34 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
       {/* MODAL: REGISTRAR / EDITAR GASTO OPERATIVO                        */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {showGastoModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowGastoModal(false), isDirtyGasto()); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowGastoModal(false), isDirtyGasto()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowGastoModal(false), isDirtyGasto()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header del Modal */}
-            <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
-                  <Wallet size={18} />
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30 font-bold shrink-0">
+                  <Wallet size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-white">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
                     {editingGastoId ? 'Editar Gasto Operativo' : 'Registrar Gasto Operativo'}
                   </h3>
-                  <p className="text-[10px] text-slate-300">Control de egresos, servicios, nómina y mantenimiento</p>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                    Control de egresos, servicios, nómina y mantenimiento
+                  </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowGastoModal(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
@@ -1386,18 +1394,18 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
               </div>
 
               {/* Botones de Acción */}
-              <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowGastoModal(false)}
-                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingGasto}
-                  className="px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer min-h-[42px]"
                 >
                   {savingGasto ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                   <span>{editingGastoId ? 'Guardar Cambios' : 'Registrar Gasto'}</span>

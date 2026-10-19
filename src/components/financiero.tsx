@@ -2719,31 +2719,36 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       {/* ════════════════════════════════════════════════════════════════ */}
       {showCuentaModal && carteraSeleccionada && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCuentaModal(false), isDirtyAbono()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCuentaModal(false), isDirtyAbono()); }}
         >
           <div
-            className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
+            className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           >
             {/* ── Header del Modal ── */}
-            <div className="p-5 border-b border-[var(--border)] bg-gradient-to-r from-[#0F172A] to-[#1e293b]">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10">
-                    <CreditCard size={20} className="text-emerald-400" />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-base text-white">Gestión de Cobros</h3>
-                    <p className="text-[11px] text-slate-300 mt-0.5">Cuenta corriente y registro de abonos</p>
-                  </div>
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex flex-col shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-white/10 rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
+                  <CreditCard size={20} />
                 </div>
-                <button
-                  onClick={() => setShowCuentaModal(false)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <X size={18} />
-                </button>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Gestión de Cobros
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                    Cuenta corriente y registro de abonos
+                  </p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => safeDismiss(() => setShowCuentaModal(false), isDirtyAbono())}
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
 
               {/* Info del Cliente en el Header */}
               <div className="mt-4 p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
@@ -2773,7 +2778,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             </div>
 
             {/* ── Body del Modal (scrollable) ── */}
-            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* 1. Saldo Pendiente */}
               <div className="p-3.5 bg-red-500/5 dark:bg-red-500/10 rounded-xl border border-red-500/20 flex items-center justify-between">
                 <div>
@@ -3574,36 +3579,43 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       {/* MODAL: HISTORIAL COMPLETO DE CLIENTE (Compras, Abonos, Pagos) */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {showHistorialModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowHistorialModal(false); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-5 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/20">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-[#0F172A] text-white rounded-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowHistorialModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowHistorialModal(false); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-4xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-32 sm:pr-40 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-white/10 rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <History size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-[var(--foreground)]">Historial Comercial y Financiero</h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Historial Comercial y Financiero
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     Detalle cronológico de compras, notas de venta y abonos del cliente
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="absolute top-4 sm:top-5 right-4 sm:right-5 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setShowHistorialModal(false);
                     setShowCuentaModal(true);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted)]/80 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-[var(--border)]"
+                  className="px-3 py-1.5 rounded-xl bg-white/10 text-slate-200 hover:text-white hover:bg-white/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10"
                   title="Volver a la gestión de cobro"
                 >
                   <ArrowLeft size={14} />
-                  <span>Volver a Cobros</span>
+                  <span className="hidden sm:inline">Volver a Cobros</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowHistorialModal(false)}
-                  className="p-1.5 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                   title="Cerrar ventana"
                 >
                   <X size={18} />
@@ -3913,11 +3925,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               )}
             </div>
 
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-end">
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowHistorialModal(false)}
-                className="px-5 py-2 bg-[#0F172A] text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 bg-[#0F172A] text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors cursor-pointer min-h-[42px] flex items-center justify-center"
               >
                 Cerrar Historial
               </button>
@@ -3928,20 +3940,28 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       {/* Modal Devolución de Cliente Mejorado Multimodelo */}
       {showDevolucionModal && carteraSeleccionada && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion()); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh] animate-in fade-in">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowDevolucionModal(false), isDirtyDevolucion()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-4xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header del Modal */}
-            <div className="p-4 border-b border-[var(--border)] bg-gradient-to-r from-rose-950 via-slate-900 to-[#0F172A] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-rose-500/20 rounded-xl border border-rose-500/30 text-rose-400">
-                  <AlertTriangle size={18} />
+            <div className="p-4 sm:p-6 pr-32 sm:pr-40 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-rose-500/20 rounded-2xl border border-rose-500/30 text-rose-400 font-bold shrink-0">
+                  <AlertTriangle size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-white">Registro de Devolución de Calzado</h3>
-                  <p className="text-[11px] text-slate-300">Cliente: <strong className="text-white capitalize">{capitalizarNombreCompleto(carteraSeleccionada.clienteNombre)}</strong> (C.I: {carteraSeleccionada.clienteCedula})</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Registro de Devolución de Calzado
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                    Cliente: <strong className="text-white capitalize">{capitalizarNombreCompleto(carteraSeleccionada.clienteNombre)}</strong> (C.I: {carteraSeleccionada.clienteCedula})
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="absolute top-4 sm:top-5 right-4 sm:right-5 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -3952,14 +3972,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   title="Volver a la gestión de cobro"
                 >
                   <ArrowLeft size={14} />
-                  <span>Volver a Cobros</span>
+                  <span className="hidden sm:inline">Volver a Cobros</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowDevolucionModal(false)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                   title="Cerrar ventana"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
@@ -4565,14 +4586,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex gap-2">
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex flex-wrap items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setShowDevolucionModal(false);
                   setShowCuentaModal(true);
                 }}
-                className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <ArrowLeft size={14} />
                 <span>Volver a Cobros</span>
@@ -4580,7 +4601,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               <button
                 type="button"
                 onClick={() => setShowDevolucionModal(false)}
-                className="px-3 py-2.5 border border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
               >
                 Cancelar
               </button>
@@ -4588,7 +4609,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 type="button"
                 onClick={handleRegistrarDevolucion}
                 disabled={savingDevolucion || lineasDevolucion.length === 0}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-h-[42px]"
                 title={lineasDevolucion.length === 0 ? 'Añade al menos un modelo a la devolución primero' : 'Procesar devolución'}
               >
                 {savingDevolucion ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
@@ -4655,11 +4676,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
         return (
         <div
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowFacturaModal(false), isDirtyFactura()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowFacturaModal(false), isDirtyFactura()); }}
         >
           <div
-            className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in"
+            className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-5xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           >
             {/* Header del Modal */}
             <div className="p-6 pr-52 border-b border-[var(--border)] bg-[#0F172A] text-white">
@@ -5359,7 +5381,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             </div>
 
             {/* Footer con Acciones Estandarizadas */}
-            <div className="p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-wrap items-center justify-end gap-2">
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex flex-wrap items-center justify-end gap-2 shrink-0">
               <div className="flex flex-wrap items-center gap-2">
                 {/* Botón Imprimir / Guardar PDF */}
                 {tabFactura === 'PREVISUALIZAR' && (
@@ -5428,17 +5450,33 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       {/* MODAL: CAMBIAR MODALIDAD DE VENTA (CONTADO <-> CRÉDITO)       */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {showCambiarTipoModal && cobroParaCambiarTipo && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCambiarTipoModal(false);
+              setCobroParaCambiarTipo(null);
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCambiarTipoModal(false);
+              setCobroParaCambiarTipo(null);
+            }
+          }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-lg h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header del Modal */}
-            <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/10 text-emerald-400">
+                <div className="p-2 sm:p-2.5 bg-white/10 rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <CreditCard size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Cambiar Condición de Venta</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Cambiar Condición de Venta
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     {cobroParaCambiarTipo.saleNote?.numero
                       ? `Nota #${String(cobroParaCambiarTipo.saleNote.numero).padStart(4, '0')}`
                       : cobroParaCambiarTipo.numeroCobro || 'Nota Comercial'} · {cobroParaCambiarTipo.clienteNombre || 'Cliente'}
@@ -5451,14 +5489,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   setShowCambiarTipoModal(false);
                   setCobroParaCambiarTipo(null);
                 }}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0 text-xs">
               {/* Selector de Tipo Destino */}
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
@@ -5661,14 +5700,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-between gap-3 shrink-0">
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setShowCambiarTipoModal(false);
                   setCobroParaCambiarTipo(null);
                 }}
-                className="px-4 py-2 text-xs font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
               >
                 Cancelar
               </button>
@@ -5677,7 +5716,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 type="button"
                 onClick={handleEjecutarCambioTipo}
                 disabled={savingCambiarTipo}
-                className="px-5 py-2.5 bg-gradient-to-r from-slate-900 to-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer border border-slate-700"
+                className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border border-slate-700 min-h-[42px]"
               >
                 {savingCambiarTipo ? (
                   <>

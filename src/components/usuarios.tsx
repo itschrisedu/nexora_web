@@ -1828,27 +1828,32 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
 
       {/* ═══ MODAL CREAR SUCURSAL ═══ */}
       {showAddSucursalModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Store size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Nueva Sucursal / Punto de Venta</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Gestión de locales comerciales de calzado</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Nueva Sucursal / Punto de Venta</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Gestión de locales comerciales de calzado</p>
                 </div>
               </div>
               <button
                 onClick={() => safeDismiss(() => setShowAddSucursalModal(false), isDirtySucursal())}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateSucursal} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateSucursal} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre de la Sucursal *</label>
                 <input
@@ -1979,18 +1984,20 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                 </div>
               )}
 
-              <div className="flex gap-2 pt-2">
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => safeDismiss(() => { setShowAddSucursalModal(false); setSucursalModalError(''); }, isDirtySucursal())}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={creatingSucursal}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {creatingSucursal ? 'Creando...' : 'Crear Sucursal'}
                 </button>
@@ -2002,27 +2009,32 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
 
       {/* ═══ MODAL CREAR COLABORADOR ═══ */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddModal(false), isDirtyAddUser()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
-            <div className="p-5 sm:p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddModal(false), isDirtyAddUser()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowAddModal(false), isDirtyAddUser()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <UserPlus size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Registrar Nuevo Colaborador</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Asignación de rol, contraseña y permisos</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Registrar Nuevo Colaborador</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Asignación de rol, contraseña y permisos</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateUser} autoComplete="off" className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 custom-scrollbar">
+            <form onSubmit={handleCreateUser} autoComplete="off" className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
               {/* Dummy fields to absorb aggressive browser autofill / password managers */}
               <input type="text" name="fake_username_prevent_autofill" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
               <input type="password" name="fake_password_prevent_autofill" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
@@ -2247,18 +2259,20 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                 </>
               )}
 
-              <div className="flex gap-2 pt-2">
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !password || !confirmPassword || password !== confirmPassword || password.length < 6 || (nombreTouched && !!nombreError)}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {saving ? 'Guardando...' : 'Crear Colaborador'}
                 </button>
@@ -2270,27 +2284,32 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
 
       {/* ═══ MODAL EDITAR COLABORADOR ═══ */}
       {showEditModal && editingUser && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModal(false); setEditingUser(null); }, isDirtyEditUser()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModal(false); setEditingUser(null); }, isDirtyEditUser()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModal(false); setEditingUser(null); }, isDirtyEditUser()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <Edit2 size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Editar Colaborador</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Modificación de permisos, rol y estado</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Editar Colaborador</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Modificación de permisos, rol y estado</p>
                 </div>
               </div>
               <button
-                onClick={() => setShowEditModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => { setShowEditModal(false); setEditingUser(null); }}
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateUser} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleUpdateUser} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre Completo</label>
                 <input
@@ -2425,18 +2444,20 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                 </>
               )}
 
-              <div className="flex gap-2 pt-2">
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                  onClick={() => { setShowEditModal(false); setEditingUser(null); }}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {saving ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
@@ -2448,16 +2469,20 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
 
       {/* ═══ MODAL RESETEAR CONTRASEÑA ═══ */}
       {showResetPasswordModal && resettingUser && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowResetPasswordModal(false), isDirtyResetPw()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowResetPasswordModal(false), isDirtyResetPw()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowResetPasswordModal(false), isDirtyResetPw()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-sm h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <KeyRound size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Restablecer Contraseña</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Clave para <strong>{resettingUser.nombre}</strong></p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Restablecer Contraseña</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Clave para <strong>{resettingUser.nombre}</strong></p>
                 </div>
               </div>
               <button
@@ -2467,13 +2492,14 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                   setNewPassword('');
                   setConfirmNewPassword('');
                 }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleResetPassword} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleResetPassword} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nueva Contraseña *</label>
                 <div className="relative">
@@ -2535,7 +2561,9 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                 )}
               </div>
 
-              <div className="flex gap-2 pt-2">
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -2544,14 +2572,14 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                     setNewPassword('');
                     setConfirmNewPassword('');
                   }}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingPassword || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword || newPassword.length < 6}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {savingPassword ? 'Guardando...' : 'Restablecer'}
                 </button>
@@ -2563,27 +2591,32 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
 
       {/* ═══ MODAL EDITAR SUCURSAL ═══ */}
       {showEditSucursalModal && editingSucursal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <Edit2 size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Editar Sucursal</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Modificar datos del punto de venta</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Editar Sucursal</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Modificar datos del punto de venta</p>
                 </div>
               </div>
               <button
                 onClick={() => safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal())}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleSaveEditSucursal} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveEditSucursal} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Nombre de la Sucursal</label>
                 <input
@@ -2723,7 +2756,9 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                 </div>
               )}
 
-              <div className="flex gap-2 pt-2">
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-between gap-2 shrink-0">
                 {!editingSucursal.isMatriz && (
                   <button
                     type="button"
@@ -2731,26 +2766,28 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                       setSucursalToDelete(editingSucursal);
                       setShowDeleteSucursalModal(true);
                     }}
-                    className="px-3 py-2.5 border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5"
+                    className="px-3 py-2.5 border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
                     title="Eliminar esta sucursal"
                   >
                     <Trash2 size={14} /> Eliminar
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal())}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingSucursal || !isDirtyEditSucursal()}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {savingSucursal ? 'Guardando...' : 'Guardar Cambios'}
-                </button>
+                <div className="flex items-center gap-2 flex-1 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => safeDismiss(() => setShowEditSucursalModal(false), isDirtyEditSucursal())}
+                    className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingSucursal || !isDirtyEditSucursal()}
+                    className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                  >
+                    {savingSucursal ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -2806,62 +2843,69 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
       )}
 
       {/* ═══ MODAL TRANSFERIR PERSONAL ═══ */}
+      {/* ═══ MODAL TRANSFERIR PERSONAL ═══ */}
       {showTransferModal && transferringUser && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransferModal(false), isDirtyTransfer()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransferModal(false), isDirtyTransfer()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowTransferModal(false), isDirtyTransfer()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-sm h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-purple-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-purple-400 font-bold shrink-0">
                   <ArrowRightLeft size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">Transferir Colaborador</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Mover a <strong>{transferringUser.nombre}</strong></p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Transferir Colaborador</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Mover a <strong>{transferringUser.nombre}</strong></p>
                 </div>
               </div>
               <button
                 onClick={() => setShowTransferModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleTransferPersonal} className="p-6 space-y-4 text-xs">
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Destino</label>
-                <select
-                  required
-                  value={targetSucursalId}
-                  onChange={(e) => setTargetSucursalId(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                >
-                  <option value="">Seleccionar sucursal...</option>
-                  {sucursales
-                    .filter(s => s.id !== selectedSucursalId)
-                    .map(s => (
-                      <option key={s.id} value={s.id}>{s.name} {s.isMatriz ? '(Matriz)' : ''}</option>
-                    ))
-                  }
-                </select>
+            <form onSubmit={handleTransferPersonal} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Sucursal Destino</label>
+                  <select
+                    required
+                    value={targetSucursalId}
+                    onChange={(e) => setTargetSucursalId(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="">Seleccionar sucursal...</option>
+                    {sucursales
+                      .filter(s => s.id !== selectedSucursalId)
+                      .map(s => (
+                        <option key={s.id} value={s.id}>{s.name} {s.isMatriz ? '(Matriz)' : ''}</option>
+                      ))
+                    }
+                  </select>
+                </div>
+
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-600 font-semibold">
+                  El colaborador sera desvinculado de la sucursal actual y asignado a la sucursal seleccionada.
+                </div>
               </div>
 
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-600 font-semibold">
-                El colaborador sera desvinculado de la sucursal actual y asignado a la sucursal seleccionada.
-              </div>
-
-              <div className="flex gap-2 pt-2">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowTransferModal(false)}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingTransfer || !targetSucursalId}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {savingTransfer ? 'Transfiriendo...' : 'Confirmar Transferencia'}
                 </button>

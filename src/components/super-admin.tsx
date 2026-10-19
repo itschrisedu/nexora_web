@@ -2347,29 +2347,36 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL: CREAR TENANT / EMPRESA ═══ */}
       {showCreateModal && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseCreateTenant(); }}
+          onClick={(e) => { if (e.target === e.currentTarget) requestCloseCreateTenant(); }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <Building2 size={20} className="text-[#0F172A]" />
-                  Crear Nueva Empresa
-                </h2>
-                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                  Registra una nueva organización con su administrador principal.
-                </p>
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-lg h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-white/10 rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Crear Nueva Empresa
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                    Registra una nueva organización con su administrador principal
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={requestCloseCreateTenant}
-                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateTenant} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            <form onSubmit={handleCreateTenant} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Nombre de la Empresa / Organización *
@@ -2582,18 +2589,19 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={requestCloseCreateTenant}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={createLoading || !newTenant.adminPassword || !newTenant.adminConfirmPassword || newTenant.adminPassword !== newTenant.adminConfirmPassword || newTenant.adminPassword.length < 6}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 min-h-[42px]"
                 >
                   {createLoading && <Loader2 size={14} className="animate-spin" />}
                   {createLoading ? "Creando..." : "Crear Empresa"}
@@ -2607,29 +2615,36 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL: EDITAR EMPRESA / PLAN ═══ */}
       {showEditTenantModal && editingTenant && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseEditTenant(); }}
+          onClick={(e) => { if (e.target === e.currentTarget) requestCloseEditTenant(); }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <Pencil size={20} className="text-amber-500" />
-                  Editar Empresa y Plan
-                </h2>
-                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                  Modifica el nombre, plan contratado y datos comerciales.
-                </p>
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-amber-500/20 rounded-2xl border border-amber-500/30 text-amber-400 font-bold shrink-0">
+                  <Pencil size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Editar Empresa y Plan
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                    Modifica el nombre, plan contratado y datos comerciales
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={requestCloseEditTenant}
-                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateTenant} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            <form onSubmit={handleUpdateTenant} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Nombre de la Organización
@@ -2751,18 +2766,19 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={requestCloseEditTenant}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={editTenantLoading}
-                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-500 text-white font-bold rounded-xl text-xs hover:bg-amber-600 transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer min-h-[42px]"
                 >
                   {editTenantLoading && <Loader2 size={14} className="animate-spin" />}
                   {editTenantLoading ? "Guardando..." : "Guardar Cambios"}
@@ -2776,30 +2792,35 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL: GESTIÓN DE SUSCRIPCIÓN Y PAGOS ═══ */}
       {showSubscriptionModal && subscribingTenant && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseSubscription(); }}
+          onClick={(e) => { if (e.target === e.currentTarget) requestCloseSubscription(); }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="p-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30">
-                  <CreditCard size={22} />
+                <div className="p-2 sm:p-2.5 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30 shrink-0 font-bold">
+                  <CreditCard size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base">Suscripción y Licenciamiento Super Admin</h3>
-                  <p className="text-xs text-slate-300 mt-0.5">{subscribingTenant.name}</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Suscripción y Licenciamiento Super Admin
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">{subscribingTenant.name}</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={requestCloseSubscription}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* Resumen del Plan Actual */}
               <div className="bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between">
                 <div>
@@ -3152,15 +3173,21 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL DETALLE TENANT ═══ */}
       {showDetailModal && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { 
             if (e.target === e.currentTarget) {
               setShowDetailModal(false);
               setSelectedTenantDetail(null);
             }
           }}
+          onClick={(e) => { 
+            if (e.target === e.currentTarget) {
+              setShowDetailModal(false);
+              setSelectedTenantDetail(null);
+            }
+          }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-3xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {loadingDetail ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 size={32} className="animate-spin text-[#0F172A]" />
@@ -3425,24 +3452,34 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL: CREAR USUARIO PARA TENANT ═══ */}
       {showCreateUserModal && selectedTenantDetail && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseCreateUser(); }}
+          onClick={(e) => { if (e.target === e.currentTarget) requestCloseCreateUser(); }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <UserPlus size={20} className="text-[#0F172A]" />
-                Agregar Usuario a {selectedTenantDetail.name}
-              </h2>
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-white/10 rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
+                  <UserPlus size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Agregar Usuario
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">{selectedTenantDetail.name}</p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={requestCloseCreateUser}
-                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+            <form onSubmit={handleCreateUser} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Nombre Completo
@@ -3573,18 +3610,19 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   </p>
                 )}
               </div>
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={requestCloseCreateUser}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={createUserLoading || !newUser.password || !newUser.confirmPassword || newUser.password !== newUser.confirmPassword || newUser.password.length < 6}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 min-h-[42px]"
                 >
                   {createUserLoading && <Loader2 size={14} className="animate-spin" />}
                   {createUserLoading ? "Creando..." : "Crear Usuario"}
@@ -3598,24 +3636,34 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL: EDITAR USUARIO ═══ */}
       {showEditUserModal && editingUser && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) requestCloseEditUser(); }}
+          onClick={(e) => { if (e.target === e.currentTarget) requestCloseEditUser(); }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Pencil size={20} className="text-amber-500" />
-                Editar Usuario
-              </h2>
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-amber-500/20 rounded-2xl border border-amber-500/30 text-amber-400 font-bold shrink-0">
+                  <Pencil size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Editar Usuario
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">{editingUser.email}</p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={requestCloseEditUser}
-                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
+            <form onSubmit={handleUpdateUser} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Nombre Completo
@@ -3756,18 +3804,19 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                   )}
                 </div>
               )}
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={requestCloseEditUser}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={editUserLoading || (!!editingUser.password.trim() && (editingUser.password.trim().length < 6 || editingUser.password.trim() !== (editingUser.confirmPassword || "").trim()))}
-                  className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-500 text-white font-bold rounded-xl text-xs hover:bg-amber-600 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 min-h-[42px]"
                 >
                   {editUserLoading && <Loader2 size={14} className="animate-spin" />}
                   {editUserLoading ? "Guardando..." : "Guardar Cambios"}
@@ -3822,29 +3871,36 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL: CREAR SUPER ADMINISTRADOR ═══ */}
       {showCreateSuperAdminModal && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowCreateSuperAdminModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCreateSuperAdminModal(false); }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30 font-bold shrink-0">
                   <ShieldAlert size={20} />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white">Nuevo Super Administrador</h2>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Acceso irrestricto y control global de la plataforma</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Nuevo Super Administrador
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                    Acceso irrestricto y control global de la plataforma
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCreateSuperAdminModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCrearSuperAdmin} className="p-6 space-y-4">
+            <form onSubmit={handleCrearSuperAdmin} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Nombre Completo *
@@ -3935,18 +3991,19 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowCreateSuperAdminModal(false)}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingSuperAdmin || !superAdminForm.password || !superAdminForm.confirmPassword || superAdminForm.password !== superAdminForm.confirmPassword || superAdminForm.password.length < 6}
-                  className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 min-h-[42px]"
                 >
                   {savingSuperAdmin && <Loader2 size={14} className="animate-spin" />}
                   {savingSuperAdmin ? "Guardando..." : "Crear Super Admin"}
@@ -3960,29 +4017,34 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
       {/* ═══ MODAL: EDITAR SUPER ADMINISTRADOR ═══ */}
       {showEditSuperAdminModal && editingSuperAdmin && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowEditSuperAdminModal(false); setEditingSuperAdmin(null); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowEditSuperAdminModal(false); setEditingSuperAdmin(null); } }}
         >
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-blue-500/20 text-blue-400 rounded-xl">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-blue-500/20 text-blue-400 rounded-2xl border border-blue-500/30 font-bold shrink-0">
                   <Pencil size={20} />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white">Editar Super Administrador</h2>
-                  <p className="text-[11px] text-slate-300 mt-0.5">{editingSuperAdmin.email}</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                    Editar Super Administrador
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">{editingSuperAdmin.email}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => { setShowEditSuperAdminModal(false); setEditingSuperAdmin(null); }}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleActualizarSuperAdmin} className="p-6 space-y-4">
+            <form onSubmit={handleActualizarSuperAdmin} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Nombre Completo *
@@ -4083,18 +4145,19 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </select>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              </div>
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => { setShowEditSuperAdminModal(false); setEditingSuperAdmin(null); }}
-                  className="flex-1 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingSuperAdmin || (!!superAdminForm.password.trim() && (superAdminForm.password.trim().length < 6 || superAdminForm.password.trim() !== (superAdminForm.confirmPassword || "").trim()))}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 min-h-[42px]"
                 >
                   {savingSuperAdmin && <Loader2 size={14} className="animate-spin" />}
                   {savingSuperAdmin ? "Actualizando..." : "Guardar Cambios"}

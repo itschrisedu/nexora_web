@@ -267,13 +267,14 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       if (e.key !== "Escape") return;
       if (showDiscardModal) return; // Don't close if discard modal is open
       if (confirmModal.isOpen) { setConfirmModal(p => ({ ...p, isOpen: false })); return; }
+      if (showMobileDetailModal) { e.preventDefault(); setShowMobileDetailModal(false); return; }
       if (showCreate || showEdit) { e.preventDefault(); safeDismissModal(closeClienteModal, isClienteFormDirty()); return; }
       if (showPromoModal) { e.preventDefault(); safeDismissModal(closePromoModal, isPromoFormDirty()); return; }
       if (showModalWhatsApp) { e.preventDefault(); closeWhatsAppModal(); return; }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showCreate, showEdit, showPromoModal, showModalWhatsApp, showDiscardModal, confirmModal.isOpen, safeDismissModal, closeClienteModal, closeWhatsAppModal, closePromoModal, isClienteFormDirty, isPromoFormDirty]);
+  }, [showMobileDetailModal, showCreate, showEdit, showPromoModal, showModalWhatsApp, showDiscardModal, confirmModal.isOpen, safeDismissModal, closeClienteModal, closeWhatsAppModal, closePromoModal, isClienteFormDirty, isPromoFormDirty]);
 
   const loadBusinessInfo = async () => {
     try {
@@ -1394,28 +1395,31 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       {/* ══════════════════════════════════════════════════════════════ */}
       {showMobileDetailModal && selected && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150 xl:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150 xl:hidden"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowMobileDetailModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowMobileDetailModal(false); }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] w-full max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
             {/* Header del Modal Móvil */}
-            <div className="p-4 sm:p-5 pr-14 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-white/10 text-emerald-400 flex items-center justify-center text-sm font-black shrink-0 border border-white/10">
-                {(selected.nombre || "?").charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-extrabold text-sm text-white truncate capitalize">
-                  {capitalizarNombreCompleto(selected.apellido || '') ? `${capitalizarNombreCompleto(selected.apellido || '')} ` : ''}{capitalizarNombreCompleto(selected.nombre || '')}
-                </h3>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>
-                    {selected.nivelCredito?.replace("_", " ")}
-                  </span>
-                  {selected.sucursalNombre && (
-                    <span className="text-[10px] text-slate-300 font-medium">
-                      • {selected.sucursalNombre}
+            <div className="p-4 sm:p-5 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0 flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 text-emerald-400 flex items-center justify-center text-sm font-black shrink-0 border border-white/10">
+                  {(selected.nombre || "?").charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white truncate capitalize">
+                    {capitalizarNombreCompleto(selected.apellido || '') ? `${capitalizarNombreCompleto(selected.apellido || '')} ` : ''}{capitalizarNombreCompleto(selected.nombre || '')}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold ${nivelColor(selected.nivelCredito || "SIN_CREDITO")}`}>
+                      {selected.nivelCredito?.replace("_", " ")}
                     </span>
-                  )}
+                    {selected.sucursalNombre && (
+                      <span className="text-[10px] text-slate-300 font-medium">
+                        • {selected.sucursalNombre}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1423,7 +1427,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               <button
                 type="button"
                 onClick={() => setShowMobileDetailModal(false)}
-                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
@@ -1630,24 +1634,24 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
             </div>
 
             {/* Footer de Acciones del Modal */}
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/30 flex items-center gap-2 shrink-0">
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowMobileDetailModal(false)}
+                className="w-1/3 sm:w-auto px-4 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-xs font-semibold transition-all text-center cursor-pointer"
+              >
+                Cerrar
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setShowMobileDetailModal(false);
                   openEdit(selected);
                 }}
-                className="flex-1 py-2.5 px-4 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 sm:flex-none py-2.5 px-5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer min-h-[42px]"
               >
                 <Edit2 size={14} />
                 <span>Editar Cliente</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowMobileDetailModal(false)}
-                className="py-2.5 px-4 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] rounded-xl text-xs font-bold transition-all cursor-pointer"
-              >
-                Cerrar
               </button>
             </div>
           </div>
@@ -2019,29 +2023,33 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       {/* MODAL: REACTIVACIÓN DE CLIENTE INACTIVO POR WHATSAPP           */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showModalWhatsApp && clienteWhatsApp && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) closeWhatsAppModal(); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+             onMouseDown={(e) => { if (e.target === e.currentTarget) closeWhatsAppModal(); }}
+             onClick={(e) => { if (e.target === e.currentTarget) closeWhatsAppModal(); }}>
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] w-full max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] animate-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <MessageCircle size={20} />
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-white">Reactivación por WhatsApp</h3>
-                  <p className="text-[11px] text-slate-300">Cliente inactivo: {clienteWhatsApp.nombre} {clienteWhatsApp.apellido || ''}</p>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Reactivación por WhatsApp</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Cliente inactivo: {clienteWhatsApp.nombre} {clienteWhatsApp.apellido || ''}</p>
                 </div>
               </div>
               <button
-                onClick={() => setShowModalWhatsApp(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+                type="button"
+                onClick={closeWhatsAppModal}
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                aria-label="Cerrar modal"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Body */}
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* Info de inactividad */}
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between text-xs text-amber-900 dark:text-amber-300 font-semibold">
                 <span className="flex items-center gap-1.5">
@@ -2109,26 +2117,26 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                   className="w-full p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-medium focus:outline-none focus:border-emerald-600 resize-none leading-relaxed"
                 />
               </div>
+            </div>
 
-              {/* Botones */}
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setShowModalWhatsApp(false)}
-                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={enviarWhatsAppInactivo}
-                  disabled={!clienteWhatsApp.telefono}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  <Send size={14} />
-                  <span>Abrir Chat de WhatsApp</span>
-                </button>
-              </div>
+            {/* Footer */}
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={closeWhatsAppModal}
+                className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={enviarWhatsAppInactivo}
+                disabled={!clienteWhatsApp.telefono}
+                className="flex-1 sm:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer min-h-[42px]"
+              >
+                <Send size={14} />
+                <span>Abrir Chat de WhatsApp</span>
+              </button>
             </div>
           </div>
         </div>
@@ -2138,27 +2146,32 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       {/* MODAL: CREAR NUEVA CAMPAÑA PROMOCIONAL / CUPÓN                 */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showPromoModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismissModal(closePromoModal, isPromoFormDirty()); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-purple-500/20 text-purple-400 rounded-xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+             onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismissModal(closePromoModal, isPromoFormDirty()); }}
+             onClick={(e) => { if (e.target === e.currentTarget) safeDismissModal(closePromoModal, isPromoFormDirty()); }}>
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] w-full max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] animate-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-purple-400 font-bold shrink-0">
                   <Gift size={18} />
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-white">Crear Campaña con Cupo Limitado</h3>
-                  <p className="text-[10px] text-slate-300">Genera cupones exclusivos para listas de difusión</p>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Crear Campaña con Cupo Limitado</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Genera cupones exclusivos para listas de difusión</p>
                 </div>
               </div>
               <button
-                onClick={() => { setShowPromoModal(false); setPromoError(""); }}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                type="button"
+                onClick={() => safeDismissModal(closePromoModal, isPromoFormDirty())}
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                aria-label="Cerrar modal"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCrearPromocion} className="p-5 space-y-4 max-h-[82vh] overflow-y-auto">
+            <form onSubmit={handleCrearPromocion} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* 1. TÍTULO DE LA CAMPAÑA (Primero) */}
               <div>
                 <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
@@ -2402,19 +2415,20 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                   </div>
                 </div>
               )}
+              </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => { setShowPromoModal(false); setPromoError(""); }}
-                  className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
+                  onClick={() => safeDismissModal(closePromoModal, isPromoFormDirty())}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={guardandoPromo}
-                  className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer min-h-[42px]"
                 >
                   {guardandoPromo ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
                   <span>Crear Campaña</span>
@@ -2429,27 +2443,31 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       {/* MODAL CREAR / EDITAR CLIENTE                                   */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {(showCreate || (showEdit && selected)) && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismissModal(closeClienteModal, isClienteFormDirty()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+             onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismissModal(closeClienteModal, isClienteFormDirty()); }}
+             onClick={(e) => { if (e.target === e.currentTarget) safeDismissModal(closeClienteModal, isClienteFormDirty()); }}>
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] w-full max-w-xl rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] animate-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <UserPlus size={20} />
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-base text-white">{showCreate ? "Registrar Cliente" : "Editar Cliente"}</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Gestión de datos de facturación, contacto y crédito</p>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">{showCreate ? "Registrar Cliente" : "Editar Cliente"}</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Gestión de datos de cliente, contacto y crédito</p>
                 </div>
               </div>
               <button
-                onClick={() => { setShowCreate(false); setShowEdit(false); resetForm(); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                type="button"
+                onClick={() => safeDismissModal(closeClienteModal, isClienteFormDirty())}
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={showCreate ? handleCreate : handleEdit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={showCreate ? handleCreate : handleEdit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Lbl t="Nombres" req />
@@ -2690,18 +2708,29 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 </div>
               )}
 
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-                  <AlertCircle size={14} /> {error}
-                </div>
-              )}
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><CheckCircle size={16} />{showCreate ? "Registrar Cliente" : "Guardar Cambios"}</>}
-              </button>
+                {error && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} /> {error}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => safeDismissModal(closeClienteModal, isClienteFormDirty())}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><CheckCircle size={16} />{showCreate ? "Registrar Cliente" : "Guardar Cambios"}</>}
+                </button>
+              </div>
             </form>
           </div>
         </div>

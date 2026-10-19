@@ -860,12 +860,15 @@ export default function PrediccionDemandaComponent() {
       {/* ══════ MODAL DE REABASTECIMIENTO A TALLER / PROVEEDOR ══════ */}
       {pedidoModalItem && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setPedidoModalItem(null);
           }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPedidoModalItem(null);
+          }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -961,18 +964,18 @@ export default function PrediccionDemandaComponent() {
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setPedidoModalItem(null)}
-                  className="flex-1 py-2.5 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] font-semibold rounded-xl transition-all cursor-pointer"
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={pedidoGuardando}
-                  className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50 cursor-pointer min-h-[42px]"
                 >
                   {pedidoGuardando ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                   Confirmar Pedido
@@ -986,12 +989,15 @@ export default function PrediccionDemandaComponent() {
       {/* ══════ MODAL DE VARIANTES DEL MODELO ══════ */}
       {modalVariantes && (
         <div
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setModalVariantes(null);
           }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setModalVariantes(null);
+          }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Encabezado */}
             <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
               <div className="flex items-center justify-between">

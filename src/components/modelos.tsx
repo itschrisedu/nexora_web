@@ -558,6 +558,11 @@ export default function ModelosComponent({
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         return;
       }
+      if (importModalData.isOpen) {
+        e.preventDefault();
+        setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] });
+        return;
+      }
       if (showQuickSupplier) {
         e.preventDefault();
         safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier());
@@ -2746,12 +2751,12 @@ export default function ModelosComponent({
       {/* ═════════════════════════════════════════════════════════ */}
       {importModalData.isOpen && importModalData.model && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
           onMouseDown={e => { if (e.target === e.currentTarget) setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] }); }}
           onClick={e => { if (e.target === e.currentTarget) setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] }); }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Sparkles size={20} />
@@ -2767,12 +2772,13 @@ export default function ModelosComponent({
                 type="button"
                 onClick={() => setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] })}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="flex items-center justify-between bg-[var(--muted)]/20 border border-[var(--border)] p-3 rounded-xl text-xs">
                 <div>
                   <span className="text-[var(--muted-foreground)]">Origen: </span>
@@ -2867,11 +2873,11 @@ export default function ModelosComponent({
               </div>
             </div>
 
-            <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/10 flex items-center justify-end gap-3">
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] })}
-                className="px-4 py-2.5 text-xs font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/40 rounded-xl transition-colors cursor-pointer"
+                className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
               >
                 Cancelar
               </button>
@@ -2879,7 +2885,7 @@ export default function ModelosComponent({
                 type="button"
                 disabled={importModalData.selectedVariantIds.length === 0 || Boolean(importingModelId)}
                 onClick={() => handleImportarModeloDirecto(importModalData.model!, importModalData.selectedVariantIds)}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="flex-1 sm:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[42px]"
               >
                 {importingModelId ? (
                   <><Loader2 size={15} className="animate-spin" /><span>Sincronizando...</span></>
@@ -2896,12 +2902,12 @@ export default function ModelosComponent({
       {/* MODAL CREAR MASIVO */}
       {showCreate && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowCreate(false); resetForm(); }, isDirtyCreate()); }}
           onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowCreate(false); resetForm(); }, isDirtyCreate()); }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Plus size={20} />
@@ -2912,6 +2918,7 @@ export default function ModelosComponent({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => { setShowCreate(false); resetForm(); }}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
@@ -2919,7 +2926,8 @@ export default function ModelosComponent({
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreate} className="p-4 sm:p-5 space-y-5 overflow-y-auto flex-1 min-h-0">
+            <form onSubmit={handleCreate} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
               
               {/* Opción para Sucursales: Adoptar Modelo Base de la Matriz */}
               {!isMatrizTenant && modelosMatrizDisponibles.length > 0 && (
@@ -3367,11 +3375,29 @@ export default function ModelosComponent({
                   <AlertCircle size={14} /> {error}
                 </div>
               )}
-              
-              <button type="submit" disabled={saving}
-                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
-                {saving ? <><Loader2 size={16} className="animate-spin" />Generando variantes en lote...</> : <><Plus size={16} />Crear Modelo y Variantes</>}
-              </button>
+              </div>
+
+              {/* Pie del Modal Estandarizado */}
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowCreate(false); resetForm(); }}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? (
+                    <><Loader2 size={15} className="animate-spin" /><span>Generando variantes...</span></>
+                  ) : (
+                    <><Plus size={15} /><span>Crear Modelo y Variantes</span></>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -3380,12 +3406,12 @@ export default function ModelosComponent({
       {/* ── MODAL AÑADIR NUEVO COLOR A MODELO EXISTENTE ── */}
       {showAddColorModal && selectedModelForColor && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowAddColorModal(false); setSelectedModelForColor(null); }, isDirtyAddColor()); }}
           onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowAddColorModal(false); setSelectedModelForColor(null); }, isDirtyAddColor()); }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <Palette size={20} />
@@ -3398,6 +3424,7 @@ export default function ModelosComponent({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => { setShowAddColorModal(false); setSelectedModelForColor(null); }}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
@@ -3406,7 +3433,8 @@ export default function ModelosComponent({
               </button>
             </div>
 
-            <form onSubmit={handleCreateNewColor} className="p-4 sm:p-5 space-y-5 overflow-y-auto flex-1 min-h-0">
+            <form onSubmit={handleCreateNewColor} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
               {/* Sección 1: Detalle del Color */}
               <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
                 <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest border-b border-[var(--border)] pb-1.5">
@@ -3761,11 +3789,29 @@ export default function ModelosComponent({
                   <AlertCircle size={14} /> {error}
                 </div>
               )}
+              </div>
 
-              <button type="submit" disabled={saving}
-                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
-                {saving ? <><Loader2 size={16} className="animate-spin" />Añadiendo nuevo color...</> : <><Palette size={16} />Añadir Color al Modelo</>}
-              </button>
+              {/* Pie del Modal Estandarizado */}
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowAddColorModal(false); setSelectedModelForColor(null); }}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? (
+                    <><Loader2 size={15} className="animate-spin" /><span>Añadiendo nuevo color...</span></>
+                  ) : (
+                    <><Palette size={15} /><span>Añadir Color al Modelo</span></>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -3773,11 +3819,15 @@ export default function ModelosComponent({
 
       {/* MODAL PRECIOS */}
       {showPrice && priceProd && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowPrice(false); setPriceProd(null); }, isDirtyPrice()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowPrice(false); setPriceProd(null); }, isDirtyPrice()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowPrice(false); setPriceProd(null); }, isDirtyPrice()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <DollarSign size={20} />
                 </div>
                 <div>
@@ -3786,87 +3836,104 @@ export default function ModelosComponent({
                 </div>
               </div>
               <button
-                onClick={() => setShowPrice(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                type="button"
+                onClick={() => { setShowPrice(false); setPriceProd(null); }}
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdatePrice} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Lbl t="Precio de Costo ($)" req />
-                  <input type="number" min="0.01" step="0.01" value={newCosto} onChange={e => setNewCosto(e.target.value)} className={INPUT} />
+            <form onSubmit={handleUpdatePrice} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Lbl t="Precio de Costo ($)" req />
+                    <input type="number" min="0.01" step="0.01" value={newCosto} onChange={e => setNewCosto(e.target.value)} className={INPUT} />
+                  </div>
+                  <div>
+                    <Lbl t="Precio de Venta ($)" req />
+                    <input type="number" min="0.01" step="0.01" value={newVenta} onChange={e => setNewVenta(e.target.value)} className={INPUT} />
+                  </div>
                 </div>
-                <div>
-                  <Lbl t="Precio de Venta ($)" req />
-                  <input type="number" min="0.01" step="0.01" value={newVenta} onChange={e => setNewVenta(e.target.value)} className={INPUT} />
-                </div>
+
+                {/* Recomendación y Margen de Rentabilidad */}
+                {(() => {
+                  const c = parseFloat(newCosto) || 0;
+                  const v = parseFloat(newVenta) || 0;
+                  const rec20 = c > 0 ? (c * 1.20).toFixed(2) : "0.00";
+                  const diff = v - c;
+                  const pct = c > 0 ? ((diff / c) * 100).toFixed(1) : "0";
+                  const esPerdida = c > 0 && v < c;
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-xs">
+                        <div>
+                          <span className="text-[var(--muted-foreground)]">Recomendación (+20% mínimo): </span>
+                          <span className="font-bold text-emerald-500">${rec20}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setNewVenta(rec20)}
+                          className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 font-bold rounded-lg text-[10px] transition-colors"
+                        >
+                          Aplicar +20%
+                        </button>
+                      </div>
+
+                      {c > 0 && (
+                        <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                          esPerdida
+                            ? "bg-rose-500/10 border-rose-500/30 text-rose-500 animate-pulse font-bold"
+                            : parseFloat(pct) >= 20
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 font-semibold"
+                            : "bg-amber-500/10 border-amber-500/20 text-amber-500 font-semibold"
+                        }`}>
+                          <div>
+                            {esPerdida ? "⚠️ PÉRDIDA DETECTADA" : "Ganancia Estimada:"}
+                          </div>
+                          <div>
+                            ${diff.toFixed(2)} ({pct}%)
+                          </div>
+                        </div>
+                      )}
+
+                      {esPerdida && (
+                        <div className="p-3 bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs rounded-xl font-bold flex items-center gap-2">
+                          <AlertCircle size={16} className="shrink-0 text-rose-500 animate-bounce" />
+                          <span>¡ALERTA ROJA! El precio de venta es MENOR al costo de compra. Estás vendiendo a pérdida.</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div><Lbl t="Motivo (opcional)" /><input type="text" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej. Ajuste de temporada..." className={INPUT} /></div>
+                {error && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} /> {error}
+                  </div>
+                )}
               </div>
 
-              {/* Recomendación y Margen de Rentabilidad */}
-              {(() => {
-                const c = parseFloat(newCosto) || 0;
-                const v = parseFloat(newVenta) || 0;
-                const rec20 = c > 0 ? (c * 1.20).toFixed(2) : "0.00";
-                const diff = v - c;
-                const pct = c > 0 ? ((diff / c) * 100).toFixed(1) : "0";
-                const esPerdida = c > 0 && v < c;
-
-                return (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-xs">
-                      <div>
-                        <span className="text-[var(--muted-foreground)]">Recomendación (+20% mínimo): </span>
-                        <span className="font-bold text-emerald-500">${rec20}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setNewVenta(rec20)}
-                        className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 font-bold rounded-lg text-[10px] transition-colors"
-                      >
-                        Aplicar +20%
-                      </button>
-                    </div>
-
-                    {c > 0 && (
-                      <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
-                        esPerdida
-                          ? "bg-rose-500/10 border-rose-500/30 text-rose-500 animate-pulse font-bold"
-                          : parseFloat(pct) >= 20
-                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 font-semibold"
-                          : "bg-amber-500/10 border-amber-500/20 text-amber-500 font-semibold"
-                      }`}>
-                        <div>
-                          {esPerdida ? "⚠️ PÉRDIDA DETECTADA" : "Ganancia Estimada:"}
-                        </div>
-                        <div>
-                          ${diff.toFixed(2)} ({pct}%)
-                        </div>
-                      </div>
-                    )}
-
-                    {esPerdida && (
-                      <div className="p-3 bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs rounded-xl font-bold flex items-center gap-2">
-                        <AlertCircle size={16} className="shrink-0 text-rose-500 animate-bounce" />
-                        <span>¡ALERTA ROJA! El precio de venta es MENOR al costo de compra. Estás vendiendo a pérdida.</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              <div><Lbl t="Motivo (opcional)" /><input type="text" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej. Ajuste de temporada..." className={INPUT} /></div>
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-                  <AlertCircle size={14} /> {error}
-                </div>
-              )}
-              <button type="submit" disabled={saving}
-                className="w-full py-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
-                {saving ? <><Loader2 size={16} className="animate-spin" />Guardando...</> : <><DollarSign size={16} />Actualizar Precios</>}
-              </button>
+              {/* Pie del Modal Estandarizado */}
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowPrice(false); setPriceProd(null); }}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? <><Loader2 size={15} className="animate-spin" /><span>Guardando...</span></> : <><DollarSign size={15} /><span>Actualizar Precios</span></>}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -3874,11 +3941,15 @@ export default function ModelosComponent({
 
       {/* ── MODAL CREAR SERIE PERSONALIZADA ── */}
       {showCreateSeriesModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCreateSeriesModal(false), isDirtyCreateSeries()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCreateSeriesModal(false), isDirtyCreateSeries()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowCreateSeriesModal(false), isDirtyCreateSeries()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Layers size={20} />
                 </div>
                 <div>
@@ -3887,44 +3958,53 @@ export default function ModelosComponent({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowCreateSeriesModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleCreateSeriesWithTallas} className="p-5 space-y-4">
-              <div>
-                <Lbl t="Nombre de la Serie" req />
-                <input type="text" value={newSerieNombre} onChange={e => setNewSerieNombre(e.target.value)}
-                  placeholder="Ej. CHINO, ESPECIAL, DAMA..." className={INPUT} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleCreateSeriesWithTallas} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                 <div>
-                  <Lbl t="Talla Desde" req />
-                  <input type="number" min="1" max="60" value={newSerieTallasDesde}
-                    onChange={e => setNewSerieTallasDesde(e.target.value)} className={INPUT} required />
+                  <Lbl t="Nombre de la Serie" req />
+                  <input type="text" value={newSerieNombre} onChange={e => setNewSerieNombre(e.target.value)}
+                    placeholder="Ej. CHINO, ESPECIAL, DAMA..." className={INPUT} required />
                 </div>
-                <div>
-                  <Lbl t="Talla Hasta" req />
-                  <input type="number" min="1" max="60" value={newSerieTallasHasta}
-                    onChange={e => setNewSerieTallasHasta(e.target.value)} className={INPUT} required />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Lbl t="Talla Desde" req />
+                    <input type="number" min="1" max="60" value={newSerieTallasDesde}
+                      onChange={e => setNewSerieTallasDesde(e.target.value)} className={INPUT} required />
+                  </div>
+                  <div>
+                    <Lbl t="Talla Hasta" req />
+                    <input type="number" min="1" max="60" value={newSerieTallasHasta}
+                      onChange={e => setNewSerieTallasHasta(e.target.value)} className={INPUT} required />
+                  </div>
                 </div>
+                {error && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} /> {error}
+                  </div>
+                )}
               </div>
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-                  <AlertCircle size={14} /> {error}
-                </div>
-              )}
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowCreateSeriesModal(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateSeriesModal(false)}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
                   Cancelar
                 </button>
-                <button type="submit" disabled={saving}
-                  className="px-4 py-2.5 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
                   <span>Crear Serie</span>
                 </button>
               </div>
@@ -3935,11 +4015,15 @@ export default function ModelosComponent({
 
       {/* ── MODAL EDITAR SERIE EXISTENTE ── */}
       {showEditSeriesModal && editingSerie && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150" onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSeriesModal(false), isDirtyEditSeries()); }}>
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white">
+        <div
+          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSeriesModal(false), isDirtyEditSeries()); }}
+          onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowEditSeriesModal(false), isDirtyEditSeries()); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-md h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-amber-400 font-bold shrink-0">
                   <Layers size={20} />
                 </div>
                 <div>
@@ -3948,44 +4032,53 @@ export default function ModelosComponent({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => { setShowEditSeriesModal(false); setEditingSerie(null); }}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateSeries} className="p-5 space-y-4">
-              <div>
-                <Lbl t="Nombre de la Serie" req />
-                <input type="text" value={editSerieNombre} onChange={e => setEditSerieNombre(e.target.value)}
-                  className={INPUT} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleUpdateSeries} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                 <div>
-                  <Lbl t="Talla Desde" req />
-                  <input type="number" min="1" max="60" value={editSerieTallasDesde}
-                    onChange={e => setEditSerieTallasDesde(e.target.value)} className={INPUT} required />
+                  <Lbl t="Nombre de la Serie" req />
+                  <input type="text" value={editSerieNombre} onChange={e => setEditSerieNombre(e.target.value)}
+                    className={INPUT} required />
                 </div>
-                <div>
-                  <Lbl t="Talla Hasta" req />
-                  <input type="number" min="1" max="60" value={editSerieTallasHasta}
-                    onChange={e => setEditSerieTallasHasta(e.target.value)} className={INPUT} required />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Lbl t="Talla Desde" req />
+                    <input type="number" min="1" max="60" value={editSerieTallasDesde}
+                      onChange={e => setEditSerieTallasDesde(e.target.value)} className={INPUT} required />
+                  </div>
+                  <div>
+                    <Lbl t="Talla Hasta" req />
+                    <input type="number" min="1" max="60" value={editSerieTallasHasta}
+                      onChange={e => setEditSerieTallasHasta(e.target.value)} className={INPUT} required />
+                  </div>
                 </div>
+                {error && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} /> {error}
+                  </div>
+                )}
               </div>
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-                  <AlertCircle size={14} /> {error}
-                </div>
-              )}
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => { setShowEditSeriesModal(false); setEditingSerie(null); }}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditSeriesModal(false); setEditingSerie(null); }}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
                   Cancelar
                 </button>
-                <button type="submit" disabled={saving}
-                  className="px-4 py-2.5 text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Edit2 size={14} />}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? <Loader2 size={15} className="animate-spin" /> : <Edit2 size={15} />}
                   <span>Guardar Cambios</span>
                 </button>
               </div>
@@ -3997,12 +4090,12 @@ export default function ModelosComponent({
       {/* ── MODAL EDITAR VARIANTE INTEGRAL ── */}
       {showEditProduct && editProduct && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditProduct(false); setEditProduct(null); }, isDirtyEditProduct()); }}
           onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditProduct(false); setEditProduct(null); }, isDirtyEditProduct()); }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-lg h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Boxes size={20} />
@@ -4015,6 +4108,7 @@ export default function ModelosComponent({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
@@ -4022,7 +4116,8 @@ export default function ModelosComponent({
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateProduct} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+            <form onSubmit={handleUpdateProduct} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {error && (
                 <div className="flex items-start justify-between gap-2.5 p-3.5 bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 text-xs rounded-2xl font-bold animate-in fade-in duration-150">
                   <div className="flex items-start gap-2">
@@ -4361,14 +4456,23 @@ export default function ModelosComponent({
                   <AlertCircle size={14} /> {error}
                 </div>
               )}
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+              </div>
+
+              {/* Pie del Modal Estandarizado */}
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditProduct(false); setEditProduct(null); }}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
                   Cancelar
                 </button>
-                <button type="submit" disabled={saving}
-                  className="px-5 py-2.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
                   <span>Guardar Cambios</span>
                 </button>
               </div>
@@ -4380,12 +4484,12 @@ export default function ModelosComponent({
       {/* ── MODAL EDITAR MODELO BASE ── */}
       {showEditModel && editModel && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModel(false); setEditModel(null); }, isDirtyEditModel()); }}
           onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => { setShowEditModel(false); setEditModel(null); }, isDirtyEditModel()); }}
         >
-          <div className="relative bg-[var(--card)] border border-[var(--border)] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-blue-400 font-bold shrink-0">
                   <Edit3 size={20} />
@@ -4396,6 +4500,7 @@ export default function ModelosComponent({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => { setShowEditModel(false); setEditModel(null); }}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
@@ -4403,7 +4508,8 @@ export default function ModelosComponent({
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleUpdateModel} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+            <form onSubmit={handleUpdateModel} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <Lbl t="Nombre del Modelo" req />
                 <input type="text" value={editModelName} onChange={e => setEditModelName(e.target.value)}
@@ -4656,14 +4762,23 @@ export default function ModelosComponent({
                   <AlertCircle size={14} /> {error}
                 </div>
               )}
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => { setShowEditModel(false); setEditModel(null); }}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--border)] hover:bg-[var(--muted)]">
+              </div>
+
+              {/* Pie del Modal Estandarizado */}
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditModel(false); setEditModel(null); }}
+                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                >
                   Cancelar
                 </button>
-                <button type="submit" disabled={saving}
-                  className="px-4 py-2.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2">
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
                   <span>Guardar Cambios</span>
                 </button>
               </div>
@@ -4719,92 +4834,95 @@ export default function ModelosComponent({
 
       {/* Modal de Proveedor Rápido */}
       {showQuickSupplier && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150"
-             onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}>
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-5 px-6 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+             onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}
+             onClick={(e) => { if (e.target === e.currentTarget) safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier()); }}>
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg max-h-[92dvh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
                   <Truck size={18} />
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-white">Nuevo Proveedor / Taller</h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Crea y asigna inmediatamente el taller o proveedor</p>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Nuevo Proveedor / Taller</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Crea y asigna inmediatamente el taller o proveedor</p>
                 </div>
               </div>
-              <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer">
-                <X size={16} />
+              <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer" aria-label="Cerrar modal">
+                <X size={18} />
               </button>
             </div>
-            <form onSubmit={handleQuickCreateSupplier} className="p-6 space-y-4 text-xs">
-              {qsError && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
-                  <AlertCircle size={14} className="shrink-0" />
-                  <span>{qsError}</span>
-                </div>
-              )}
+            <form onSubmit={handleQuickCreateSupplier} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 min-h-0">
+                {qsError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{qsError}</span>
+                  </div>
+                )}
 
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Cédula / RUC del Proveedor
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. 1804567890 o 1792348574001 (10 o 13 dígitos)"
-                  value={qsRuc}
-                  onChange={e => {
-                    setQsRuc(e.target.value.replace(/\D/g, '').slice(0, 13));
-                    if (qsError) setQsError('');
-                  }}
-                  className={INPUT}
-                />
-                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  10 dígitos para cédula de persona natural o 13 dígitos para RUC.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <Lbl t="Nombres del Proveedor" req />
-                  <input type="text" required placeholder="Ej. Juan Carlos" value={qsNombres} onChange={e => { setQsNombres(formatearNombres(e.target.value)); if (qsError) setQsError(''); }} className={INPUT} />
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Cédula / RUC del Proveedor
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. 1804567890 o 1792348574001 (10 o 13 dígitos)"
+                    value={qsRuc}
+                    onChange={e => {
+                      setQsRuc(e.target.value.replace(/\D/g, '').slice(0, 13));
+                      if (qsError) setQsError('');
+                    }}
+                    className={INPUT}
+                  />
+                  <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                    10 dígitos para cédula de persona natural o 13 dígitos para RUC.
+                  </p>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Lbl t="Nombres del Proveedor" req />
+                    <input type="text" required placeholder="Ej. Juan Carlos" value={qsNombres} onChange={e => { setQsNombres(formatearNombres(e.target.value)); if (qsError) setQsError(''); }} className={INPUT} />
+                  </div>
+                  <div>
+                    <Lbl t="Apellidos del Proveedor" req />
+                    <input type="text" required placeholder="Ej. Pérez Gómez" value={qsApellidos} onChange={e => { setQsApellidos(formatearApellidos(e.target.value)); if (qsError) setQsError(''); }} className={INPUT} />
+                  </div>
+                </div>
+
                 <div>
-                  <Lbl t="Apellidos del Proveedor" req />
-                  <input type="text" required placeholder="Ej. Pérez Gómez" value={qsApellidos} onChange={e => { setQsApellidos(formatearApellidos(e.target.value)); if (qsError) setQsError(''); }} className={INPUT} />
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
+                    Nombre Comercial / Taller
+                  </label>
+                  <input type="text" placeholder="Ej. Calzados Artesanales Cevallos (Dejar vacío si es persona natural)" value={qsNombreComercial} onChange={e => setQsNombreComercial(e.target.value)} className={INPUT} />
+                  <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                    Si no se ingresa, se usarán los nombres y apellidos como razón social.
+                  </p>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Nombre Comercial / Taller
-                </label>
-                <input type="text" placeholder="Ej. Calzados Artesanales Cevallos (Dejar vacío si es persona natural)" value={qsNombreComercial} onChange={e => setQsNombreComercial(e.target.value)} className={INPUT} />
-                <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  Si no se ingresa, se usarán los nombres y apellidos como razón social.
-                </p>
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Lbl t="Teléfono / WhatsApp" req />
+                    <input type="text" required placeholder="Ej. 0998765432" value={qsContacto} onChange={e => setQsContacto(formatearTelefono(e.target.value))} className={INPUT} />
+                  </div>
+                  <div>
+                    <Lbl t="Correo Electrónico (Opcional)" />
+                    <input type="email" placeholder="Ej. pedidos@proveedor.com" value={qsEmail} onChange={e => setQsEmail(formatearEmail(e.target.value))} className={INPUT} />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <Lbl t="Teléfono / WhatsApp" req />
-                  <input type="text" required placeholder="Ej. 0998765432" value={qsContacto} onChange={e => setQsContacto(formatearTelefono(e.target.value))} className={INPUT} />
-                </div>
-                <div>
-                  <Lbl t="Correo Electrónico (Opcional)" />
-                  <input type="email" placeholder="Ej. pedidos@proveedor.com" value={qsEmail} onChange={e => setQsEmail(formatearEmail(e.target.value))} className={INPUT} />
+                  <Lbl t="Dirección de Taller / Fábrica (Opcional)" />
+                  <input type="text" placeholder="Ej. Parque Industrial / Av. Principal" value={qsDireccion} onChange={e => setQsDireccion(e.target.value)} onBlur={() => setQsDireccion(formatearDireccion(qsDireccion))} className={INPUT} />
                 </div>
               </div>
 
-              <div>
-                <Lbl t="Dirección de Taller / Fábrica (Opcional)" />
-                <input type="text" placeholder="Ej. Parque Industrial / Av. Principal" value={qsDireccion} onChange={e => setQsDireccion(e.target.value)} onBlur={() => setQsDireccion(formatearDireccion(qsDireccion))} className={INPUT} />
-              </div>
-
-              <div className="pt-2 flex gap-2">
-                <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="flex-1 py-2.5 border border-[var(--border)] rounded-xl font-bold text-xs hover:bg-[var(--muted)] transition-colors">
+              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+                <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors">
                   Cancelar
                 </button>
-                <button type="submit" disabled={qsSaving} className="flex-1 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer">
+                <button type="submit" disabled={qsSaving} className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]">
                   {qsSaving ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={14} />}
                   <span>Guardar y Asignar</span>
                 </button>
