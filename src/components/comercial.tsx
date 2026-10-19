@@ -36,6 +36,7 @@ import {
   ExternalLink,
   RefreshCw,
   Search,
+  RotateCcw,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -403,7 +404,14 @@ export default function ComercialComponent({
   const [entregaPreciosMap, setEntregaPreciosMap] = useState<Record<string, string>>({});
   const [procesandoEntrega, setProcesandoEntrega] = useState(false);
 
-  // ── Modal de Corrección de Precio Post-Venta / Post-Entrega ──
+  // ── Modal de Reversión / Corrección de Entrega Errónea (Fase 2) ──
+  const [showRevertirEntregaModal, setShowRevertirEntregaModal] = useState(false);
+  const [pedidoRevertirSeleccionado, setPedidoRevertirSeleccionado] = useState<Pedido | null>(null);
+  const [revertirItemsMap, setRevertirItemsMap] = useState<Record<string, number>>({});
+  const [motivoReversion, setMotivoReversion] = useState('');
+  const [procesandoReversion, setProcesandoReversion] = useState(false);
+
+    // ── Modal de Corrección de Precio Post-Venta / Post-Entrega ──
   const [showCorregirPrecioModal, setShowCorregirPrecioModal] = useState(false);
   const [pedidoACorregir, setPedidoACorregir] = useState<Pedido | null>(null);
   const [preciosCorregirMap, setPreciosCorregirMap] = useState<Record<string, string>>({});
@@ -2291,7 +2299,74 @@ export default function ComercialComponent({
     }
   };
 
-  // ── Identificador del local propio del usuario ─────────
+  // ── Handlers de Reversión / Corrección de Entrega Errónea (Fase 2) ──
+  const handleAbrirRevertirEntrega = async (p: Pedido) => {
+    const pedidoTenantId = (p as any).tenantId || (p as any).sucursalId;
+    if (pedidoTenantId && miLocalId && pedidoTenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
+      showToast(`Solo la sucursal asignada a este pedido (${p.sucursalNombre || 'sucursal propietaria'}) puede revertir o corregir entregas.`, 'warning');
+      return;
+    }
+
+    let orderToUse = p;
+    try {
+      if (online) {
+        const fresh = await ApiService.get(`/pedidos/${p.id}`);
+        if (fresh && fresh.lines) orderToUse = fresh;
+      }
+    } catch (e) {}
+
+    setPedidoRevertirSeleccionado(orderToUse);
+    const initialMap: Record<string, number> = {};
+    (orderToUse.lines || []).forEach((l: any) => {
+      initialMap[l.id] = 0;
+    });
+    setRevertirItemsMap(initialMap);
+    setMotivoReversion('');
+    setShowRevertirEntregaModal(true);
+  };
+
+  const handleConfirmarRevertirEntrega = async () => {
+    if (!pedidoRevertirSeleccionado) return;
+
+    const items = Object.entries(revertirItemsMap)
+      .filter(([_, cant]) => Number(cant) > 0)
+      .map(([lineId, cantidadARevertir]) => ({
+        lineId,
+        cantidadARevertir: Number(cantidadARevertir),
+      }));
+
+    if (items.length === 0) {
+      showToast('Selecciona al menos 1 par para revertir al inventario.', 'warning');
+      return;
+    }
+
+    const totalPares = items.reduce((acc, it) => acc + it.cantidadARevertir, 0);
+    const confirmacion = window.confirm(
+      `¿Confirmas la reversión de ${totalPares} pares de calzado? Estos pares regresarán inmediatamente al inventario físico de bodega y se ajustará el saldo/deuda del cliente.`
+    );
+    if (!confirmacion) return;
+
+    setProcesandoReversion(true);
+    try {
+      const res = await ApiService.put(`/pedidos/${pedidoRevertirSeleccionado.id}/revertir-entrega`, {
+        items,
+        motivo: motivoReversion || 'Corrección de entrega errónea',
+      });
+
+      showToast(res.message || `Reversión exitosa: se restituyeron ${totalPares} pares al inventario.`, 'success');
+      setShowRevertirEntregaModal(false);
+      setPedidoRevertirSeleccionado(null);
+      setRevertirItemsMap({});
+      setMotivoReversion('');
+      await loadPedidos();
+    } catch (err: any) {
+      showToast(err.message || 'Error al revertir la entrega errónea', 'error');
+    } finally {
+      setProcesandoReversion(false);
+    }
+  };
+
+    // ── Identificador del local propio del usuario ─────────
   const miLocalId = useMemo(() => {
     if (activeSucursalId && activeSucursalId !== 'TODAS') return activeSucursalId;
     if (typeof window !== 'undefined') {
@@ -2787,6 +2862,18 @@ export default function ComercialComponent({
                                   );
                                 })()}
                                 {p.estado === 'ENTREGADO_PARCIAL' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleAbrirRevertirEntrega(p);
+                                      }}
+                                      className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1 cursor-pointer"
+                                      title="Corregir o revertir pares entregados por error"
+                                    >
+                                      <RotateCcw size={12} /> Corregir Entrega
+                                    </button>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -2797,6 +2884,7 @@ export default function ComercialComponent({
                                   >
                                     <MessageCircle size={12} /> WhatsApp
                                   </button>
+                                  </>
                                 )}
                                 <button
                                   onClick={() => handleAbrirCancelarPedido(p)}
@@ -2811,6 +2899,17 @@ export default function ComercialComponent({
                                 <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
                                   <CheckCircle size={13} /> Entregado
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAbrirRevertirEntrega(p);
+                                  }}
+                                  className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1 cursor-pointer"
+                                  title="Revertir o corregir pares entregados por error y restituir al inventario"
+                                >
+                                  <RotateCcw size={12} /> Corregir Entrega
+                                </button>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -6176,6 +6275,21 @@ export default function ComercialComponent({
                                         T{numTalla}
                                       </span>
 
+                                      {cantPendiente > 0 && (
+                                        <span
+                                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                                            stockDisp <= 0
+                                              ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                                              : stockDisp < cantPendiente
+                                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                          }`}
+                                          title={`Stock en bodega: ${stockDisp} pares`}
+                                        >
+                                          {stockDisp <= 0 ? 'Sin stock' : `Stock: ${stockDisp}`}
+                                        </span>
+                                      )}
+
                                       {cantPendiente === 0 ? (
                                         <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-1" title="Talla completada al 100%">
                                           ✓ {cantEntregada} entregados
@@ -6189,13 +6303,18 @@ export default function ComercialComponent({
                                           )}
                                           <button
                                             type="button"
+                                            disabled={aEntregar <= 0}
                                             onClick={() => {
                                               setEntregaItemsMap((prev) => ({
                                                 ...prev,
                                                 [l.id]: Math.max(0, aEntregar - 1),
                                               }));
                                             }}
-                                            className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
+                                            className={`w-5 h-5 flex items-center justify-center rounded text-xs font-black transition-colors ${
+                                              aEntregar <= 0
+                                                ? 'bg-slate-500/10 text-slate-400 opacity-40 cursor-not-allowed'
+                                                : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 cursor-pointer'
+                                            }`}
                                             title={`Quitar 1 par T${numTalla}`}
                                           >
                                             −
@@ -6205,14 +6324,27 @@ export default function ComercialComponent({
                                           </span>
                                           <button
                                             type="button"
+                                            disabled={aEntregar >= maxPermitido}
                                             onClick={() => {
                                               setEntregaItemsMap((prev) => ({
                                                 ...prev,
                                                 [l.id]: Math.min(maxPermitido, aEntregar + 1),
                                               }));
                                             }}
-                                            className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-black transition-colors cursor-pointer"
-                                            title={`Agregar 1 par T${numTalla} (máx disponible a entregar hoy: ${maxPermitido})`}
+                                            className={`w-5 h-5 flex items-center justify-center rounded text-xs font-black transition-colors ${
+                                              aEntregar >= maxPermitido
+                                                ? 'bg-slate-500/10 text-slate-400 opacity-40 cursor-not-allowed'
+                                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 cursor-pointer'
+                                            }`}
+                                            title={
+                                              maxPermitido <= 0
+                                                ? stockDisp <= 0
+                                                  ? `Sin stock disponible en bodega para T${numTalla}`
+                                                  : `Ya se alcanzó el tope pendiente (${cantPendiente})`
+                                                : aEntregar >= maxPermitido
+                                                ? `Tope alcanzado (máx a entregar hoy: ${maxPermitido})`
+                                                : `Agregar 1 par T${numTalla}`
+                                            }
                                           >
                                             +
                                           </button>
@@ -6446,6 +6578,316 @@ export default function ComercialComponent({
               >
                 {procesandoEntrega ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />}
                 <span>Confirmar y Despachar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reversión / Corrección de Entrega Errónea (Fase 2) */}
+      {showRevertirEntregaModal && pedidoRevertirSeleccionado && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowRevertirEntregaModal(false);
+              setPedidoRevertirSeleccionado(null);
+              setRevertirItemsMap({});
+            }
+          }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] w-full max-w-3xl rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[90dvh] flex flex-col">
+            {/* Cabecera */}
+            <div className="p-5 border-b border-[var(--border)] bg-[#0F172A] text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base">Corregir / Revertir Entrega</h3>
+                  <p className="text-xs text-slate-300">
+                    Pedido #{pedidoRevertirSeleccionado.numeroCodigo || pedidoRevertirSeleccionado.id.slice(0, 8)} · {pedidoRevertirSeleccionado.clienteNombre || 'Cliente'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRevertirEntregaModal(false);
+                  setPedidoRevertirSeleccionado(null);
+                  setRevertirItemsMap({});
+                }}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Contenido scrollable */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900 dark:text-amber-200">
+                Selecciona la cantidad de pares que fueron entregados por error para restituirlos al inventario físico. El saldo del cliente y las notas de entrega se ajustarán automáticamente.
+              </div>
+
+              {/* Tarjetas de Modelos con Curva de Tallas entregadas (Rule 7) */}
+              <div className="space-y-3">
+                {(() => {
+                  const lineasEntregadas = (pedidoRevertirSeleccionado.lines || []).filter(
+                    (l: any) => (l.cantidadEntregada || 0) > 0
+                  );
+                  if (lineasEntregadas.length === 0) {
+                    return (
+                      <div className="p-6 text-center text-xs text-[var(--muted-foreground)]">
+                        No hay pares entregados registrados en este pedido para revertir.
+                      </div>
+                    );
+                  }
+
+                  const gruposMap = new Map<string, { key: string; productId: string; modelName: string; color: string; serieNombre: string; imageUrl?: string; precioUnitario: number; tipoVenta?: string; observacionModelo?: string; lineas: any[]; }>();
+                  lineasEntregadas.forEach((l: any) => {
+                    const key = [l.productId || l.modelName, l.color || '', l.serieNombre || '', l.tipoVenta || 'GENERAL'].join('_');
+                    if (!gruposMap.has(key)) {
+                      gruposMap.set(key, {
+                        key,
+                        productId: l.productId,
+                        modelName: l.modelName || 'Calzado',
+                        color: l.color || '',
+                        serieNombre: l.serieNombre || 'Serie Estándar',
+                        imageUrl: l.imageUrl,
+                        precioUnitario: Number(l.precioUnitario || 0),
+                        tipoVenta: l.tipoVenta,
+                        observacionModelo: l.observacionModelo || l.observacion,
+                        lineas: [],
+                      });
+                    }
+                    gruposMap.get(key)!.lineas.push(l);
+                  });
+                  return Array.from(gruposMap.values()).map((g) => {
+                    const sortedTallas = [...g.lineas].sort((a, b) => {
+                      const na = Number(a.numeroTalla || a.tallaNumero || 0);
+                      const nb = Number(b.numeroTalla || b.tallaNumero || 0);
+                      return na - nb;
+                    });
+
+                    const paresARevertirModelo = sortedTallas.reduce(
+                      (acc, l) => acc + (revertirItemsMap[l.id] || 0),
+                      0
+                    );
+                    const subtotalRevertirModelo = sortedTallas.reduce(
+                      (acc, l) => acc + (revertirItemsMap[l.id] || 0) * Number(l.precioUnitario || 0),
+                      0
+                    );
+
+                    return (
+                      <div
+                        key={g.key}
+                        className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs"
+                      >
+                        {/* Izquierda: Miniatura + Info + Chips */}
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          {/* Miniatura cuadrada Rule 7 */}
+                          <div className="w-12 h-12 rounded-xl object-cover border border-[var(--border)] overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                            {g.imageUrl ? (
+                              <img src={g.imageUrl} alt={g.modelName} className="w-full h-full object-cover" />
+                            ) : (
+                              <Package className="text-slate-400" size={20} />
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            {/* Encabezado Rule 7 */}
+                            <h4 className="font-black uppercase text-xs text-[var(--foreground)] truncate">
+                              {g.modelName}
+                            </h4>
+                            <div className="text-xs text-[var(--muted-foreground)]">
+                              {g.color ? `${g.color.toUpperCase()} · ` : ''}
+                              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                Serie: {formatearNombreSerie(g.serieNombre)}
+                              </span>
+                            </div>
+
+                            {/* Curva de Tallas con controles + / - */}
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              {sortedTallas.map((l, i) => {
+                                const yaEntregado = l.cantidadEntregada || 0;
+                                const aRevertir = revertirItemsMap[l.id] || 0;
+                                const numTalla = l.numeroTalla || l.tallaNumero || '38';
+
+                                return (
+                                  <div
+                                    key={i}
+                                    className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 shadow-2xs"
+                                  >
+                                    <span className="text-[var(--foreground)] font-black text-xs font-mono">
+                                      T{numTalla}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-slate-500 bg-slate-500/10 px-1 py-0.5 rounded mr-0.5" title={`Entregados previamente: ${yaEntregado}`}>
+                                      {yaEntregado} ent.
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        disabled={aRevertir <= 0}
+                                        onClick={() => {
+                                          setRevertirItemsMap((prev) => ({
+                                            ...prev,
+                                            [l.id]: Math.max(0, aRevertir - 1),
+                                          }));
+                                        }}
+                                        className={`w-5 h-5 flex items-center justify-center rounded text-xs font-black transition-colors ${
+                                          aRevertir <= 0
+                                            ? 'bg-slate-500/10 text-slate-400 opacity-40 cursor-not-allowed'
+                                            : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 cursor-pointer'
+                                        }`}
+                                        title={`Restar 1 par a revertir T${numTalla}`}
+                                      >
+                                        −
+                                      </button>
+                                      <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
+                                        {aRevertir}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        disabled={aRevertir >= yaEntregado}
+                                        onClick={() => {
+                                          setRevertirItemsMap((prev) => ({
+                                            ...prev,
+                                            [l.id]: Math.min(yaEntregado, aRevertir + 1),
+                                          }));
+                                        }}
+                                        className={`w-5 h-5 flex items-center justify-center rounded text-xs font-black transition-colors ${
+                                          aRevertir >= yaEntregado
+                                            ? 'bg-slate-500/10 text-slate-400 opacity-40 cursor-not-allowed'
+                                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 cursor-pointer'
+                                        }`}
+                                        title={`Sumar 1 par a revertir T${numTalla} (máx: ${yaEntregado})`}
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Acciones Rápidas Rule 7 */}
+                            <div className="flex items-center gap-2 mt-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextMap = { ...revertirItemsMap };
+                                  sortedTallas.forEach((l) => {
+                                    nextMap[l.id] = l.cantidadEntregada || 0;
+                                  });
+                                  setRevertirItemsMap(nextMap);
+                                }}
+                                className="px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 rounded text-[10px] font-bold border border-amber-500/20 cursor-pointer"
+                              >
+                                Revertir Todo el Modelo
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextMap = { ...revertirItemsMap };
+                                  sortedTallas.forEach((l) => {
+                                    nextMap[l.id] = 0;
+                                  });
+                                  setRevertirItemsMap(nextMap);
+                                }}
+                                className="px-2 py-0.5 bg-slate-500/10 text-slate-500 hover:bg-slate-500/20 rounded text-[10px] font-bold border border-slate-500/20 cursor-pointer"
+                              >
+                                Poner en 0
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Derecha: Resumen Lateral Rule 7 */}
+                        <div className="text-right shrink-0 min-w-[120px] border-t md:border-t-0 md:border-l border-[var(--border)] pt-2 md:pt-0 md:pl-4">
+                          <div className="text-xs font-bold text-[var(--foreground)]">
+                            {paresARevertirModelo} {paresARevertirModelo === 1 ? 'par' : 'pares'} a revertir
+                          </div>
+                          <div className="text-[11px] text-[var(--muted-foreground)]">
+                            ${Number(sortedTallas[0]?.precioUnitario || 0).toFixed(2)} / par
+                          </div>
+                          <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                            -${subtotalRevertirModelo.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Campo de motivo obligatorio para auditoría */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[var(--foreground)]">
+                  Motivo de la corrección o reversión:
+                </label>
+                <input
+                  type="text"
+                  value={motivoReversion}
+                  onChange={(e) => setMotivoReversion(e.target.value)}
+                  placeholder="Ej: Despacho de calzado equivocado al cliente / Devolución inmediata en mostrador"
+                  className="w-full px-3 py-2 text-xs bg-[var(--background)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Barra de totales generales */}
+              {(() => {
+                const totalRevertirGeneral = Object.values(revertirItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0);
+                let montoTotalRevertirGeneral = 0;
+                (pedidoRevertirSeleccionado.lines || []).forEach((l: any) => {
+                  const cant = Number(revertirItemsMap[l.id] || 0);
+                  if (cant > 0) {
+                    montoTotalRevertirGeneral += cant * Number(l.precioUnitario || 0);
+                  }
+                });
+
+                return (
+                  <div className="p-4 bg-slate-900 text-white rounded-xl flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="text-xs text-slate-300">Total de pares a restituir al inventario:</div>
+                      <div className="text-lg font-black text-amber-400">
+                        {totalRevertirGeneral} pares
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-slate-300">Descuento total a reflejar en saldo:</div>
+                      <div className="text-lg font-black text-emerald-400">
+                        -${montoTotalRevertirGeneral.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Pie del modal */}
+            <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRevertirEntregaModal(false);
+                  setPedidoRevertirSeleccionado(null);
+                  setRevertirItemsMap({});
+                }}
+                className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  procesandoReversion ||
+                  Object.values(revertirItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0) === 0
+                }
+                onClick={handleConfirmarRevertirEntrega}
+                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-extrabold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                {procesandoReversion ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                <span>Confirmar Reversión al Inventario</span>
               </button>
             </div>
           </div>
