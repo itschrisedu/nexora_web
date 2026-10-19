@@ -53,6 +53,7 @@ import {
   BarChart3,
   Filter,
   Package,
+  UserCheck,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
 import { compartirFacturaPdf, generarFacturaPdfDoc } from '../services/pdf-factura.service';
@@ -229,6 +230,20 @@ interface ClienteHistorial {
     detalles?: any;
     saldoAnterior?: number;
     nuevoSaldo?: number;
+    vendedorNombre?: string;
+    vendedorEmail?: string;
+    vendedorRol?: string;
+    entregadoPor?: string;
+    entregadoPorEmail?: string;
+    entregadoPorRol?: string;
+    fechaEntrega?: string | null;
+    cobradoPor?: string;
+    cobradoPorEmail?: string;
+    cobradoPorRol?: string;
+    cobradoPorSucursal?: string;
+    esCobroOtraSucursal?: boolean;
+    procesadoPor?: string;
+    procesadoPorRol?: string;
   }[];
 }
 
@@ -3751,6 +3766,59 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                     </span>
                                   </div>
                                   <div className="text-[11px] text-[var(--muted-foreground)]">{m.descripcion}</div>
+
+                                  {/* Responsables: Cobrado por / Vendedor / Entregado por / Procesado por */}
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                    {/* Cobrado por (para abonos) */}
+                                    {isAbono && m.cobradoPor && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20"
+                                        title={`Cobrado por ${m.cobradoPor}${m.cobradoPorRol ? ` (${m.cobradoPorRol})` : ''}${m.cobradoPorSucursal ? ` — ${m.cobradoPorSucursal}` : ''}`}
+                                      >
+                                        <UserCheck size={10} className="shrink-0" />
+                                        <span>Cobrado por: {m.cobradoPor}</span>
+                                        {m.esCobroOtraSucursal && (
+                                          <span className="text-[9px] px-1 py-0 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 ml-0.5">
+                                            Otra sucursal
+                                          </span>
+                                        )}
+                                      </span>
+                                    )}
+
+                                    {/* Vendedor (para pedidos/compras) */}
+                                    {isPedido && m.vendedorNombre && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-800 dark:text-blue-300 border border-blue-500/20"
+                                        title={`Vendido por ${m.vendedorNombre}${m.vendedorRol ? ` (${m.vendedorRol})` : ''}`}
+                                      >
+                                        <User size={10} className="shrink-0" />
+                                        <span>Vendedor: {m.vendedorNombre}</span>
+                                      </span>
+                                    )}
+
+                                    {/* Entregado por (para pedidos que ya fueron despachados) */}
+                                    {isPedido && m.entregadoPor && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20"
+                                        title={`Entregado por ${m.entregadoPor}${m.entregadoPorRol ? ` (${m.entregadoPorRol})` : ''}${m.fechaEntrega ? ` el ${new Date(m.fechaEntrega).toLocaleString('es-EC')}` : ''}`}
+                                      >
+                                        <Truck size={10} className="shrink-0" />
+                                        <span>Entregado por: {m.entregadoPor}</span>
+                                      </span>
+                                    )}
+
+                                    {/* Procesado por (para devoluciones) */}
+                                    {isDevolucion && m.procesadoPor && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-800 dark:text-rose-300 border border-rose-500/20"
+                                        title={`Procesado por ${m.procesadoPor}${m.procesadoPorRol ? ` (${m.procesadoPorRol})` : ''}`}
+                                      >
+                                        <UserCheck size={10} className="shrink-0" />
+                                        <span>Procesado por: {m.procesadoPor}</span>
+                                      </span>
+                                    )}
+                                  </div>
+
                                   <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5 mt-1">
                                     <Calendar size={11} />
                                     <span>{new Date(m.fecha).toLocaleString('es-EC')}</span>
