@@ -1890,8 +1890,9 @@ function MainApp() {
           {vistaActual === 'sri' && <SriComponent />}
           {vistaActual === 'personalizacion' && <PersonalizacionComponent online={online} />}
 
-          {vistaActual === 'pos' && <PosComponent />}
-          {vistaActual === 'prediccion-ml' && <PrediccionDemandaComponent />}
+          {vistaActual === 'prediccion-ml' && (
+            <PrediccionDemandaComponent onNavigateToProveedores={() => setVistaActual('proveedores')} />
+          )}
           {vistaActual === 'auditoria' && (
             user?.rol === 'ROL_ADMIN' || isSuperAdmin ? (
               <AuditoriaComponent />

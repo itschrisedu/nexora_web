@@ -105,6 +105,8 @@ interface OrdenCompraLine {
   precioCosto: number;
   subtotal?: number;
   observacionLinea?: string;
+  tallasDesglose?: Array<{ talla: string | number; cantidad: number }>;
+  _tallasOverride?: any;
   producto?: {
     id: string;
     nombre: string;
@@ -428,6 +430,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrdenCompra | null>(null);
   const [editingOrder, setEditingOrder] = useState(false);
+  const [addingModelToDetail, setAddingModelToDetail] = useState(false);
 
   // Modal Consolidar Demanda Pendiente de Clientes (Fase 5.2)
   const [showConsolidarDemandaModal, setShowConsolidarDemandaModal] = useState(false);
@@ -561,9 +564,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     productId: string;
     cantidadPedida: number;
     precioCosto: number;
+    subtotal?: number;
     observacionLinea?: string;
     producto?: any;
     tallasDesglose?: Array<{ talla: string | number; cantidad: number }>;
+    _tallasOverride?: any;
   }>>([]);
 
   // Form: Recepción de Mercancía
@@ -1051,13 +1056,45 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         serie: productoSeleccionado.serie?.name || productoSeleccionado.serieNombre || 'Serie Estándar',
         tallas: productoSeleccionado.tallas,
       },
+      _tallasOverride: distribucionPreview,
     };
 
     if (isEditingExisting && selectedOrder) {
-      const lineasActuales = [...(selectedOrder.lines || []), nuevaLinea];
-      setSelectedOrder({ ...selectedOrder, lines: lineasActuales });
+      const existingIdx = (selectedOrder.lines || []).findIndex((l: any) => l.productId === productoSeleccionado.id);
+      if (existingIdx >= 0) {
+        const lineasActuales = [...(selectedOrder.lines || [])];
+        const exist = lineasActuales[existingIdx];
+        const newCant = exist.cantidadPedida + paresCalculados;
+        lineasActuales[existingIdx] = {
+          ...exist,
+          cantidadPedida: newCant,
+          subtotal: newCant * (exist.precioCosto || precioCostoInput),
+          observacionLinea: observacionItemInput ? `${exist.observacionLinea || ''} | ${observacionItemInput}`.trim() : exist.observacionLinea,
+          tallasDesglose: distribucionPreview,
+          _tallasOverride: distribucionPreview,
+        };
+        setSelectedOrder({ ...selectedOrder, lines: lineasActuales });
+      } else {
+        setSelectedOrder({ ...selectedOrder, lines: [...(selectedOrder.lines || []), nuevaLinea] });
+      }
     } else {
-      setOrderLines([...orderLines, nuevaLinea]);
+      const existingIdx = orderLines.findIndex((l: any) => l.productId === productoSeleccionado.id);
+      if (existingIdx >= 0) {
+        const lineasActuales = [...orderLines];
+        const exist = lineasActuales[existingIdx];
+        const newCant = exist.cantidadPedida + paresCalculados;
+        lineasActuales[existingIdx] = {
+          ...exist,
+          cantidadPedida: newCant,
+          subtotal: newCant * (exist.precioCosto || precioCostoInput),
+          observacionLinea: observacionItemInput ? `${exist.observacionLinea || ''} | ${observacionItemInput}`.trim() : exist.observacionLinea,
+          tallasDesglose: distribucionPreview,
+          _tallasOverride: distribucionPreview,
+        };
+        setOrderLines(lineasActuales);
+      } else {
+        setOrderLines([...orderLines, nuevaLinea]);
+      }
     }
 
     setProductoSeleccionado(null);
@@ -1066,6 +1103,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     setPrecioCostoInput(0);
     setObservacionItemInput('');
     setMostrarObsModeloOrden(false);
+    setAddingModelToDetail(false);
     showToast(`Modelo agregado a la orden (${paresCalculados} pares).`, 'success');
   };
 
@@ -1128,20 +1166,43 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
     setSaving(true);
     try {
-      await ApiService.put(`/proveedores/ordenes-compra/${selectedOrder.id}`, {
-        observaciones: selectedOrder.observaciones,
-        lines: selectedOrder.lines.map((l) => ({
-          productId: l.productId,
-          cantidadPedida: l.cantidadPedida,
-          precioCosto: l.precioCosto,
-          observacionLinea: l.observacionLinea || undefined,
-        })),
+      const consolidadas = consolidarLineasOrden(selectedOrder.lines || [], productos);
+      const lineasAGuardar = consolidadas.map((c) => {
+        const tallas = c.tallasDesglose || [];
+        const cantFinal = tallas.length > 0
+          ? tallas.reduce((s, t) => s + (Number(t.cantidad) || 0), 0)
+          : c.cantidadPedida;
+
+        const curvaStr = tallas.length > 0
+          ? `Curva: ${tallas.map((t) => `T${t.talla}:${t.cantidad}`).join(', ')}`
+          : '';
+
+        let obs = (c.observacionLinea || '').trim();
+        if (curvaStr) {
+          if (obs.includes('Curva:')) {
+            obs = obs.replace(/Curva:\s*[^|;)]+/i, curvaStr).trim();
+          } else {
+            obs = obs ? `${obs} | ${curvaStr}` : curvaStr;
+          }
+        }
+
+        return {
+          productId: c.productId,
+          cantidadPedida: cantFinal,
+          precioCosto: c.precioCosto,
+          observacionLinea: obs || undefined,
+        };
       });
 
-      showToast('Orden actualizada correctamente.', 'success');
+      await ApiService.put(`/proveedores/ordenes-compra/${selectedOrder.id}`, {
+        observaciones: selectedOrder.observaciones,
+        lines: lineasAGuardar,
+      });
+
+      showToast('Orden actualizada y sincronizada correctamente.', 'success');
       setEditingOrder(false);
-      handleVerDetalleOrden(selectedOrder.id);
-      loadData();
+      await handleVerDetalleOrden(selectedOrder.id);
+      await loadData();
     } catch (err: any) {
       showToast(err.message || 'Error al guardar los cambios.', 'error');
     } finally {
@@ -3429,8 +3490,24 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       {showOrderDetailModal && selectedOrder && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowOrderDetailModal(false); }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowOrderDetailModal(false); }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowOrderDetailModal(false);
+              setEditingOrder(false);
+              setAddingModelToDetail(false);
+              setProductoSeleccionado(null);
+              setBusquedaModelo('');
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowOrderDetailModal(false);
+              setEditingOrder(false);
+              setAddingModelToDetail(false);
+              setProductoSeleccionado(null);
+              setBusquedaModelo('');
+            }
+          }}
         >
           <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-4xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header del Modal Estandarizado (Azul Oscuro #0F172A / Blanco) */}
@@ -3464,7 +3541,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
-                onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
+                onClick={() => {
+                  setShowOrderDetailModal(false);
+                  setEditingOrder(false);
+                  setAddingModelToDetail(false);
+                  setProductoSeleccionado(null);
+                  setBusquedaModelo('');
+                }}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
@@ -3879,6 +3962,328 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     );
                   })}
                 </div>
+
+                {/* Sección Agregar Otro Modelo a esta Orden (Fase 2) */}
+                {(selectedOrder.estado === 'BORRADOR' || selectedOrder.estado === 'PENDIENTE') && (
+                  <div className="pt-2">
+                    {!addingModelToDetail ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingOrder(true);
+                          setAddingModelToDetail(true);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl border border-dashed border-emerald-500/50 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+                      >
+                        <Plus size={15} />
+                        <span>Agregar Otro Modelo a esta Orden</span>
+                      </button>
+                    ) : (
+                      <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-4 animate-in fade-in duration-200">
+                        {/* Cabecera del formulario de agregar modelo */}
+                        <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
+                          <span className="text-xs font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <Plus size={14} /> Agregar Nuevo Modelo a esta Orden
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddingModelToDetail(false);
+                              setProductoSeleccionado(null);
+                              setBusquedaModelo('');
+                            }}
+                            className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+
+                        {/* Buscador de Producto */}
+                        {!productoSeleccionado && (
+                          <div className="relative">
+                            <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">
+                              Buscar Modelo de Calzado *
+                            </label>
+                            <div className="relative">
+                              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                              <input
+                                type="text"
+                                placeholder="Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."
+                                value={busquedaModelo}
+                                onChange={(e) => {
+                                  setBusquedaModelo(e.target.value);
+                                  setShowDropdownModelo(true);
+                                }}
+                                onFocus={() => setShowDropdownModelo(true)}
+                                className="w-full pl-9 pr-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                              />
+                            </div>
+
+                            {showDropdownModelo && (busquedaModelo.trim().length > 0 || serieFiltroOrden !== 'TODAS') && (() => {
+                              const q = busquedaModelo.toLowerCase().trim();
+                              const filtrados = productos
+                                .filter((p) => {
+                                  if (serieFiltroOrden !== 'TODAS') {
+                                    const serProd = obtenerSerieProducto(p);
+                                    if (serProd.toLowerCase() !== serieFiltroOrden.toLowerCase()) {
+                                      return false;
+                                    }
+                                  }
+                                  if (!q) return true;
+                                  return (
+                                    (p.nombre && p.nombre.toLowerCase().includes(q)) ||
+                                    (p.name && p.name.toLowerCase().includes(q)) ||
+                                    (p.codigo && p.codigo.toLowerCase().includes(q)) ||
+                                    (p.color && p.color.toLowerCase().includes(q)) ||
+                                    (p.marca && p.marca.toLowerCase().includes(q)) ||
+                                    (obtenerSerieProducto(p).toLowerCase().includes(q))
+                                  );
+                                })
+                                .sort((a, b) => {
+                                  const nomA = (a.nombre || a.name || '').toLowerCase();
+                                  const nomB = (b.nombre || b.name || '').toLowerCase();
+                                  const cmp = nomA.localeCompare(nomB, 'es', { sensitivity: 'base' });
+                                  if (cmp !== 0) return cmp;
+                                  return (a.color || '').localeCompare(b.color || '', 'es', { sensitivity: 'base' });
+                                });
+
+                              return (
+                                <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto">
+                                  {filtrados.length > 0 ? (
+                                    filtrados.map((p) => {
+                                      const serieName = obtenerSerieProducto(p);
+                                      return (
+                                        <button
+                                          key={p.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setProductoSeleccionado(p);
+                                            setPrecioCostoInput(Number(p.precioCosto || p.costPrice || 0));
+                                            setShowDropdownModelo(false);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--muted)] border-b border-[var(--border)] last:border-none flex items-center justify-between cursor-pointer"
+                                        >
+                                          <div className="flex items-center gap-2.5">
+                                            {obtenerFotoProducto(p) ? (
+                                              // eslint-disable-next-line @next/next/no-img-element
+                                              <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
+                                            ) : (
+                                              <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">👟</div>
+                                            )}
+                                            <div>
+                                              <span className="font-bold block">{p.nombre || p.name}</span>
+                                              <span className="text-[10px] text-[var(--muted-foreground)]">
+                                                {p.marca} • {p.color} ({p.codigo})
+                                                {serieName && ` • Serie: ${formatearNombreSerie(serieName)}`}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <span className="font-mono text-emerald-600 font-bold">${Number(p.precioCosto || p.costPrice || 0).toFixed(2)}</span>
+                                        </button>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
+                                      No se encontraron modelos que coincidan con "{busquedaModelo}".
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+
+                        {/* Configuración de Curva Exacta cuando hay producto seleccionado */}
+                        {productoSeleccionado && (
+                          <div className="p-3 bg-[var(--card)] rounded-xl border border-[var(--border)] space-y-3">
+                            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+                              <div className="flex items-center gap-2.5">
+                                {obtenerFotoProducto(productoSeleccionado) ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-10 h-10 object-cover rounded-xl border border-[var(--border)]" />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-xl bg-[var(--muted)] flex items-center justify-center text-base">👟</div>
+                                )}
+                                <div>
+                                  <span className="font-black text-xs uppercase block text-[var(--foreground)]">
+                                    {productoSeleccionado.nombre || productoSeleccionado.name}
+                                  </span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                                    {productoSeleccionado.color} • <span className="text-emerald-600 font-bold">Serie: {formatearNombreSerie(serieNombreActiva)}</span>
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProductoSeleccionado(null);
+                                  setBusquedaModelo('');
+                                }}
+                                className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer"
+                              >
+                                Cambiar modelo
+                              </button>
+                            </div>
+
+                            <div>
+                              <span className="text-xs font-bold text-[var(--foreground)] block mb-1.5">Seleccionar Curva de Serie:</span>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSubtipoCurva('MEDIA_A')}
+                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                                    subtipoCurva === 'MEDIA_A'
+                                      ? 'bg-emerald-600 text-white border-transparent shadow-xs font-black'
+                                      : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
+                                  }`}
+                                >
+                                  ½ Media A (6 pares)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSubtipoCurva('MEDIA_B')}
+                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                                    subtipoCurva === 'MEDIA_B'
+                                      ? 'bg-emerald-600 text-white border-transparent shadow-xs font-black'
+                                      : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
+                                  }`}
+                                >
+                                  ½ Media B (6 pares)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSubtipoCurva('DOCENA')}
+                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                                    subtipoCurva === 'DOCENA'
+                                      ? 'bg-emerald-600 text-white border-transparent shadow-xs font-black'
+                                      : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
+                                  }`}
+                                >
+                                  1 Docena (12 pares)
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className="text-xs font-bold text-[var(--foreground)]">
+                                {subtipoCurva === 'DOCENA' ? '¿Cuántas docenas?:' : '¿Cuántas medias docenas?:'}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setCantidadCurvas(Math.max(1, cantidadCurvas - 1))}
+                                  className="w-8 h-8 rounded-lg border bg-[var(--muted)] flex items-center justify-center font-bold text-xs"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={cantidadCurvas}
+                                  onChange={(e) => setCantidadCurvas(Math.max(1, parseInt(e.target.value) || 1))}
+                                  className="w-16 h-8 text-center font-bold text-xs bg-[var(--card)] border rounded-lg font-mono"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setCantidadCurvas(cantidadCurvas + 1)}
+                                  className="w-8 h-8 rounded-lg border bg-[var(--muted)] flex items-center justify-center font-bold text-xs"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <span className="text-xs font-black text-emerald-600">
+                                = {paresCalculados} pares ({ (paresCalculados / 12).toFixed(1) } doc.)
+                              </span>
+                            </div>
+
+                            {/* Previsualización idéntica de la distribución de curva */}
+                            <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
+                                  DISTRIBUCIÓN DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
+                                </span>
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
+                                  Serie: {distribucionPreview.map((d: any) => `${d.cantidad}/${d.talla}`).join(', ')}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {distribucionPreview.map((d: any, i: number) => (
+                                  <div key={i} className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs flex items-center gap-1.5">
+                                    <span className="font-bold text-emerald-700">T{d.talla}:</span>
+                                    <span className="font-black text-emerald-900 dark:text-emerald-300 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">
+                                      {d.cantidad} pares
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-2 pt-2">
+                              <div className="w-full">
+                                <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Precio Costo Unit ($) *</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0.01"
+                                  value={precioCostoInput}
+                                  onChange={(e) => setPrecioCostoInput(parseFloat(e.target.value) || 0)}
+                                  className="w-full px-3 py-1.5 bg-[var(--card)] border rounded-lg text-xs font-mono font-bold"
+                                />
+                              </div>
+
+                              {/* Observación por Modelo Opcional */}
+                              <div>
+                                {!mostrarObsModeloOrden && !observacionItemInput ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setMostrarObsModeloOrden(true)}
+                                    className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <span>+ Agregar observación a este modelo (opcional)</span>
+                                  </button>
+                                ) : (
+                                  <div className="space-y-1 animate-in fade-in duration-150">
+                                    <div className="flex justify-between items-center">
+                                      <label className="block text-[10px] font-bold text-[var(--muted-foreground)]">
+                                        Observación Específica del Modelo (Opcional)
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMostrarObsModeloOrden(false);
+                                          setObservacionItemInput('');
+                                        }}
+                                        className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
+                                      >
+                                        Quitar observación
+                                      </button>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      placeholder="Ej. Hebilla dorada, cuero charol, suela cocida..."
+                                      value={observacionItemInput}
+                                      onChange={(e) => setObservacionItemInput(e.target.value)}
+                                      className="w-full px-3 py-1.5 bg-[var(--card)] border rounded-lg text-xs"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAgregarModeloAOrden(true)}
+                              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Plus size={14} />
+                              <span>Agregar a esta Orden ({paresCalculados} pares)</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -3887,7 +4292,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => { setShowOrderDetailModal(false); setEditingOrder(false); }}
+                  onClick={() => {
+                    setShowOrderDetailModal(false);
+                    setEditingOrder(false);
+                    setAddingModelToDetail(false);
+                    setProductoSeleccionado(null);
+                    setBusquedaModelo('');
+                  }}
                   className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <ArrowLeft size={14} />

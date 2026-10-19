@@ -213,7 +213,11 @@ const esColorEscolarClasico = (color?: string | null): boolean => {
   return esTodoNegro(color) || esTodoBlanco(color);
 };
 
-export default function PrediccionDemandaComponent() {
+interface PrediccionDemandaProps {
+  onNavigateToProveedores?: () => void;
+}
+
+export default function PrediccionDemandaComponent({ onNavigateToProveedores }: PrediccionDemandaProps = {}) {
   const { showToast } = useToast();
   const [horizonte, setHorizonte] = useState<number>(30);
   const [temporadaActiva, setTemporadaActiva] = useState<string>("REGULAR");
@@ -449,20 +453,32 @@ export default function PrediccionDemandaComponent() {
     if (!pedidoModalItem) return;
     setPedidoGuardando(true);
     try {
-      // Registrar orden de compra / reabastecimiento
-      await ApiService.post("/inventario/ordenes-compra", {
+      const res = await ApiService.post("/proveedores/ordenes-compra/solicitar-modelo", {
         modelo: pedidoModalItem.modelo,
+        productId: pedidoModalItem.productId,
         serie: pedidoModalItem.serie,
         talla: pedidoModalItem.talla,
         cantidad: pedidoCantidad,
-        motivo: `Abastecimiento estacional IA: ${temporadaInfoActual?.nombre || "Temporada"}`,
+        motivo: `Predicción IA ${temporadaInfoActual?.nombre || 'General'}: ${pedidoModalItem.modelo} (${pedidoCantidad} pares)`,
       });
-      showToast(`Solicitud de ${pedidoCantidad} pares para ${pedidoModalItem.modelo} enviada a taller`, "success");
+      showToast(
+        res?.message || `Solicitud de ${pedidoCantidad} pares para ${pedidoModalItem.modelo} agregada a la Orden de Compra (Borrador)`,
+        "success"
+      );
       setPedidoModalItem(null);
+
+      // Sincronizar navegación inmediata a Órdenes de Compra (Borrador)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('proveedores_initial_tab', 'ordenes');
+        if (res?.orderId) {
+          localStorage.setItem('proveedores_selected_order_id', res.orderId);
+        }
+      }
+      if (onNavigateToProveedores) {
+        onNavigateToProveedores();
+      }
     } catch (err: any) {
-      // En caso de ruta alternativa
-      showToast(`Sugerencia de abastecimiento (${pedidoCantidad} pares) registrada exitosamente`, "success");
-      setPedidoModalItem(null);
+      showToast(err.message || 'Error al agregar pedido a órdenes de compra.', 'error');
     } finally {
       setPedidoGuardando(false);
     }
@@ -1306,15 +1322,18 @@ export default function PrediccionDemandaComponent() {
                           onClick={() => {
                             const itemReferencia = grupo.tallas[0] || null;
                             if (itemReferencia) {
+                              const infoM = obtenerDatosModelo(itemReferencia);
+                              const prodId = itemReferencia.productId || infoM.variantes?.[0]?.id;
                               setPedidoModalItem({
                                 ...itemReferencia,
+                                productId: prodId,
                                 sugerencia_reorden: grupo.totalDeficit > 0 ? grupo.totalDeficit : grupo.totalDemanda,
                               });
                               setPedidoCantidad(grupo.totalDeficit > 0 ? grupo.totalDeficit : Math.max(12, grupo.totalDemanda));
                             }
                           }}
                           className="px-3 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
-                          title="Solicitar abastecimiento para este modelo completo"
+                          title="Solicitar abastecimiento para este modelo completo a órdenes de compra"
                         >
                           <ShoppingCart size={13} />
                           <span>Pedir Modelo</span>
@@ -1441,7 +1460,9 @@ export default function PrediccionDemandaComponent() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setPedidoModalItem(tItem);
+                                      const infoM = obtenerDatosModelo(tItem);
+                                      const prodId = tItem.productId || infoM.variantes?.[0]?.id;
+                                      setPedidoModalItem({ ...tItem, productId: prodId });
                                       setPedidoCantidad(tItem.sugerencia_reorden || 6);
                                     }}
                                     className="px-2 py-1 rounded-lg bg-[var(--card)] hover:bg-[#0F172A] hover:text-white border border-[var(--border)] text-[10px] font-bold transition-all cursor-pointer"
@@ -1632,7 +1653,9 @@ export default function PrediccionDemandaComponent() {
                       <td className="px-5 py-3 text-center">
                         <button
                           onClick={() => {
-                            setPedidoModalItem(item);
+                            const infoM = obtenerDatosModelo(item);
+                            const prodId = item.productId || infoM.variantes?.[0]?.id;
+                            setPedidoModalItem({ ...item, productId: prodId });
                             setPedidoCantidad(item.sugerencia_reorden || 12);
                           }}
                           className="px-2.5 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-[11px] font-semibold transition-all shadow-sm flex items-center gap-1 mx-auto cursor-pointer"
@@ -1757,6 +1780,13 @@ export default function PrediccionDemandaComponent() {
                 </div>
               </div>
 
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-2 text-blue-900 dark:text-blue-300">
+                <ShoppingCart size={14} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                <p className="text-[11px] leading-relaxed">
+                  Este pedido se agregará a la sección de <strong>Órdenes de Compra a Proveedores</strong> en estado <strong>Borrador</strong>, acumulándose con las demás solicitudes para que puedas revisarla, editarla y despacharla al taller.
+                </p>
+              </div>
+
               <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
@@ -1771,7 +1801,7 @@ export default function PrediccionDemandaComponent() {
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50 cursor-pointer min-h-[42px]"
                 >
                   {pedidoGuardando ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                  Confirmar Pedido
+                  <span>Enviar a Órdenes de Compra</span>
                 </button>
               </div>
             </form>
