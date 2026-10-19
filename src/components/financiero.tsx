@@ -1014,6 +1014,96 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const notaMasAntiguaPendiente = cobrosOrdenadosPorAntiguedad.find((c) => Number(c.saldoPendiente) > 0) || cobrosOrdenadosPorAntiguedad[0];
   const cobroSeleccionado = cobros.find((c) => c.id === cobroSeleccionadoId) || notaMasAntiguaPendiente || null;
 
+  // Agrupación de los últimos 3 abonos reales del cliente (tal como se realizaron los pagos unificados)
+  const ultimos3AbonosCliente = useMemo(() => {
+    if (!carteraSeleccionada?.cobros) return [];
+
+    const todosAbonos: Array<{
+      id: string;
+      monto: number;
+      metodo: string;
+      createdAt: string;
+      notas?: string;
+      usuarioNombre?: string;
+      usuarioSucursal?: string;
+      esCobroOtraSucursal?: boolean;
+      cobroId: string;
+      numeroNota?: string | number;
+    }> = [];
+
+    carteraSeleccionada.cobros.forEach((c) => {
+      const numNota = c.saleNote?.numero
+        ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}`
+        : (c.numeroCobro || `#${c.id.slice(0, 8).toUpperCase()}`);
+
+      (c.abonos || []).forEach((a) => {
+        todosAbonos.push({
+          id: a.id,
+          monto: Number(a.monto),
+          metodo: a.metodo,
+          createdAt: a.createdAt,
+          notas: a.notas,
+          usuarioNombre: a.usuarioNombre,
+          usuarioSucursal: a.usuarioSucursal,
+          esCobroOtraSucursal: a.esCobroOtraSucursal,
+          cobroId: c.id,
+          numeroNota: numNota,
+        });
+      });
+    });
+
+    const gruposMap = new Map<string, {
+      id: string;
+      montoTotal: number;
+      metodo: string;
+      createdAt: string;
+      notas: string;
+      reciboRef?: string;
+      usuarioNombre?: string;
+      usuarioSucursal?: string;
+      esCobroOtraSucursal?: boolean;
+      notasAfectadas: Array<{ numeroNota: string | number; monto: number }>;
+    }>();
+
+    todosAbonos.forEach((a) => {
+      const matchRec = a.notas?.match(/\[REC-([A-Z0-9]+)\]/i);
+      const key = matchRec
+        ? `REC-${matchRec[1]}`
+        : `MANUAL-${a.createdAt ? a.createdAt.slice(0, 16) : a.id}-${a.metodo}-${a.usuarioNombre || ''}`;
+
+      const notasLimpias = a.notas ? a.notas.replace(/\[REC-[A-Z0-9]+\]\s*/i, '').trim() : '';
+
+      if (!gruposMap.has(key)) {
+        gruposMap.set(key, {
+          id: a.id,
+          montoTotal: a.monto,
+          metodo: a.metodo,
+          createdAt: a.createdAt,
+          notas: notasLimpias,
+          reciboRef: matchRec ? `REC-${matchRec[1]}` : undefined,
+          usuarioNombre: a.usuarioNombre,
+          usuarioSucursal: a.usuarioSucursal,
+          esCobroOtraSucursal: a.esCobroOtraSucursal,
+          notasAfectadas: [{ numeroNota: a.numeroNota || 'S/N', monto: a.monto }],
+        });
+      } else {
+        const g = gruposMap.get(key)!;
+        g.montoTotal += a.monto;
+        if (!g.notas && notasLimpias) g.notas = notasLimpias;
+        const yaExisteNota = g.notasAfectadas.find((n) => n.numeroNota === a.numeroNota);
+        if (yaExisteNota) {
+          yaExisteNota.monto += a.monto;
+        } else {
+          g.notasAfectadas.push({ numeroNota: a.numeroNota || 'S/N', monto: a.monto });
+        }
+      }
+    });
+
+    return Array.from(gruposMap.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3);
+  }, [carteraSeleccionada]);
+
   const handleSeleccionarCliente = (c: ClienteCartera) => {
     setClienteSeleccionadoId(c.clientId);
     // Ordenar cobros por fecha ascendente (de la más antigua a la más reciente)
@@ -3116,12 +3206,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               </div>
 
               {/* 2. Formulario para Registrar Nuevo Abono (debajo del saldo pendiente) */}
-              {cobroSeleccionado && Number(cobroSeleccionado.saldoPendiente) > 0 && (
+              {carteraSeleccionada && Number(carteraSeleccionada.saldoTotalPendiente) > 0 && (
                 <div className="space-y-3 pt-1">
-                  <span className="text-xs font-bold text-[var(--foreground)] block flex items-center gap-1.5">
-                    <ArrowUpRight size={13} className="text-emerald-600" />
-                    Registrar Abono
-                  </span>
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <span className="text-xs font-bold text-[var(--foreground)] block flex items-center gap-1.5">
+                      <ArrowUpRight size={13} className="text-emerald-600" />
+                      Registrar Abono
+                    </span>
+                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                      Se descontará automáticamente de las notas pendientes (FIFO)
+                    </span>
+                  </div>
 
                   {/* Monto con Botones de Sugerencia Rápida */}
                   <div>
@@ -3134,7 +3229,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         <button
                           type="button"
                           onClick={() => {
-                            const val = (Number(cobroSeleccionado.saldoPendiente) * 0.25).toFixed(2);
+                            const val = (Number(carteraSeleccionada.saldoTotalPendiente) * 0.25).toFixed(2);
                             setMontoAbono(val);
                           }}
                           className="px-2 py-0.5 bg-[var(--muted)]/50 hover:bg-emerald-500/10 hover:text-emerald-600 text-[10px] font-bold rounded-md border border-[var(--border)] transition-all cursor-pointer"
@@ -3144,7 +3239,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         <button
                           type="button"
                           onClick={() => {
-                            const val = (Number(cobroSeleccionado.saldoPendiente) * 0.50).toFixed(2);
+                            const val = (Number(carteraSeleccionada.saldoTotalPendiente) * 0.50).toFixed(2);
                             setMontoAbono(val);
                           }}
                           className="px-2 py-0.5 bg-[var(--muted)]/50 hover:bg-emerald-500/10 hover:text-emerald-600 text-[10px] font-bold rounded-md border border-[var(--border)] transition-all cursor-pointer"
@@ -3154,12 +3249,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         <button
                           type="button"
                           onClick={() => {
-                            const val = Number(cobroSeleccionado.saldoPendiente).toFixed(2);
+                            const val = Number(carteraSeleccionada.saldoTotalPendiente).toFixed(2);
                             setMontoAbono(val);
                           }}
                           className="px-2 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold rounded-md border border-emerald-500/30 transition-all cursor-pointer"
                         >
-                          Totalidad (${Number(cobroSeleccionado.saldoPendiente).toFixed(2)})
+                          Totalidad (${Number(carteraSeleccionada.saldoTotalPendiente).toFixed(2)})
                         </button>
                       </div>
                     </div>
@@ -3167,7 +3262,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       type="number"
                       step="0.01"
                       min="0.01"
-                      max={cobroSeleccionado.saldoPendiente}
+                      max={carteraSeleccionada.saldoTotalPendiente}
                       placeholder="0.00"
                       value={montoAbono}
                       onChange={(e) => setMontoAbono(e.target.value)}
@@ -3219,41 +3314,74 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 </div>
               )}
 
-              {/* 3. Últimos Abonos Realizados (debajo de registrar abono) */}
+              {/* 3. Últimos 3 Abonos Registrados tal como se realizaron */}
               <div className="space-y-2 pt-3 border-t border-[var(--border)]">
-                <span className="text-[11px] font-bold text-[var(--foreground)] block flex items-center gap-1.5">
-                  <ArrowDownRight size={12} className="text-emerald-600" />
-                  Abonos registrados a esta nota:
-                </span>
-                {cobroSeleccionado?.abonos && cobroSeleccionado.abonos.length > 0 ? (
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                    {cobroSeleccionado.abonos.map((a) => (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[var(--foreground)] block flex items-center gap-1.5">
+                    <ArrowDownRight size={12} className="text-emerald-600" />
+                    Últimos Abonos Registrados:
+                  </span>
+                  {ultimos3AbonosCliente.length > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                      {ultimos3AbonosCliente.length} {ultimos3AbonosCliente.length === 1 ? 'abono reciente' : 'últimos abonos'}
+                    </span>
+                  )}
+                </div>
+
+                {ultimos3AbonosCliente.length > 0 ? (
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {ultimos3AbonosCliente.map((a) => (
                       <div
                         key={a.id}
-                        className="p-2.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs gap-2"
+                        className="p-2.5 bg-[var(--muted)]/20 hover:bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs gap-2 transition-colors"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-extrabold text-emerald-600">${Number(a.monto).toFixed(2)}</span>
+                            <span className="font-extrabold text-emerald-600 text-sm">
+                              ${a.montoTotal.toFixed(2)}
+                            </span>
                             <span className="text-[10px] text-[var(--muted-foreground)] font-semibold px-1.5 py-0.5 bg-emerald-500/10 rounded">
                               {a.metodo}
                             </span>
                             <span className="text-[10px] text-[var(--muted-foreground)]">
                               {new Date(a.createdAt).toLocaleDateString('es-EC')}
                             </span>
+                            {a.reciboRef && (
+                              <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                                {a.reciboRef}
+                              </span>
+                            )}
                             {a.usuarioNombre && (
-                              <span className="inline-flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
                                 <User size={10} />
                                 <span>Cobrado por: <strong className="font-semibold capitalize">{capitalizarNombreCompleto(a.usuarioNombre)}</strong></span>
                                 {a.esCobroOtraSucursal && a.usuarioSucursal && (
                                   <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                                    📍 Sucursal: {a.usuarioSucursal}
+                                    📍 {a.usuarioSucursal}
                                   </span>
                                 )}
                               </span>
                             )}
                           </div>
-                          {a.notas && <p className="text-[9px] text-[var(--muted-foreground)] italic mt-0.5 truncate">{a.notas}</p>}
+
+                          {/* Desglose de notas donde se descontó internamente */}
+                          <div className="mt-1 flex items-center gap-1 flex-wrap text-[10px]">
+                            <span className="text-[var(--muted-foreground)] font-semibold">Descontado en:</span>
+                            {a.notasAfectadas.map((na, idx) => (
+                              <span
+                                key={idx}
+                                className="px-1.5 py-0.2 bg-[var(--card)] border border-[var(--border)] rounded font-mono text-[9px] text-[var(--foreground)]"
+                              >
+                                {na.numeroNota} (${na.monto.toFixed(2)})
+                              </span>
+                            ))}
+                          </div>
+
+                          {a.notas && (
+                            <p className="text-[9px] text-[var(--muted-foreground)] italic mt-0.5 truncate">
+                              {a.notas}
+                            </p>
+                          )}
                         </div>
 
                         {/* Botones de acción individual por abono: Descargar PDF y Enviar WhatsApp */}
@@ -3262,15 +3390,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             type="button"
                             onClick={() => {
                               const dataAbono = armarDatosComprobanteAbono(carteraSeleccionada, {
-                                monto: Number(a.monto),
+                                monto: a.montoTotal,
                                 metodo: a.metodo,
                                 fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
                                 notas: a.notas,
-                                numeroNota: cobroSeleccionado.saleNote?.numero
-                                  ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
-                                  : cobroSeleccionado.numeroCobro,
+                                numeroNota: a.reciboRef || (a.notasAfectadas.length > 0 ? a.notasAfectadas.map((n) => n.numeroNota).join(', ') : 'Abono unificado'),
                                 usuarioNombre: a.usuarioNombre,
-                                sucursalNombre: cobroSeleccionado.sucursalNombre,
+                                sucursalNombre: a.usuarioSucursal,
                               });
                               descargarComprobanteAbonoPdf(dataAbono);
                               showToast('Comprobante de abono PDF descargado.', 'success');
@@ -3288,15 +3414,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 handleEnviarComprobanteAbono(
                                   carteraSeleccionada,
                                   {
-                                    monto: Number(a.monto),
+                                    monto: a.montoTotal,
                                     metodo: a.metodo,
                                     fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
                                     notas: a.notas,
-                                    numeroNota: cobroSeleccionado.saleNote?.numero
-                                      ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
-                                      : cobroSeleccionado.numeroCobro,
+                                    numeroNota: a.reciboRef || (a.notasAfectadas.length > 0 ? a.notasAfectadas.map((n) => n.numeroNota).join(', ') : 'Abono unificado'),
                                     usuarioNombre: a.usuarioNombre,
-                                    sucursalNombre: cobroSeleccionado.sucursalNombre,
+                                    sucursalNombre: a.usuarioSucursal,
                                   },
                                   formatoEnvioAbono
                                 );
@@ -3313,13 +3437,28 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   </div>
                 ) : (
                   <p className="text-[11px] text-[var(--muted-foreground)] italic p-3 bg-[var(--muted)]/10 rounded-xl border border-dashed border-[var(--border)]">
-                    No registra abonos previos en esta nota.
+                    No registra abonos previos en la cuenta del cliente.
                   </p>
                 )}
               </div>
 
-              {/* 4. Nota de Crédito / Venta activa (debajo de los abonos registrados) */}
+              {/* 4. Notas de Venta y Calzado Entregado (debajo de los abonos registrados) */}
               <div className="space-y-3 pt-3 border-t border-[var(--border)]">
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <div>
+                    <span className="text-[11px] font-bold text-[var(--foreground)] block flex items-center gap-1.5">
+                      <FileText size={13} className="text-[#0F172A]" />
+                      Notas de Venta y Calzado Entregado:
+                    </span>
+                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                      El saldo de cada nota se descuenta internamente en orden cronológico (FIFO).
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)]">
+                    {carteraSeleccionada.cobros.length} {carteraSeleccionada.cobros.length === 1 ? 'nota registrada' : 'notas registradas'}
+                  </span>
+                </div>
+
                 {/* Badge Saldo a Favor del Cliente */}
                 {carteraSeleccionada.saldoAFavorCliente > 0 && (
                   <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 flex items-center justify-between">
@@ -3721,7 +3860,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             {/* ── Footer del Modal (Estático al final del modal) ── */}
             <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]/20 flex flex-col gap-2 shrink-0">
               {/* Botón de Confirmación del Abono (estático en el footer) */}
-              {cobroSeleccionado && Number(cobroSeleccionado.saldoPendiente) > 0 && (
+              {carteraSeleccionada && Number(carteraSeleccionada.saldoTotalPendiente) > 0 && (
                 <button
                   onClick={handleSolicitarConfirmacionAbono}
                   disabled={savingAbono || !montoAbono || !online}

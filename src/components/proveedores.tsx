@@ -52,6 +52,8 @@ import {
   ShieldAlert,
   Sparkles,
   Lock,
+  UserCheck,
+  User,
 } from 'lucide-react';
 import ConfirmModal from './ui/confirm-modal';
 import { useToast } from './ui/toast';
@@ -375,6 +377,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [devSupplierId, setDevSupplierId] = useState('');
   const [devClienteDevolucionId, setDevClienteDevolucionId] = useState('');
   const [devMotivo, setDevMotivo] = useState('');
+  const [devEntregadoPor, setDevEntregadoPor] = useState('Bodega / Despacho');
+  const [devRecibidoPor, setDevRecibidoPor] = useState('');
   const [devLines, setDevLines] = useState<Array<{
     productId: string;
     tallaId: string;
@@ -452,6 +456,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [cuentaCorrienteData, setCuentaCorrienteData] = useState<any | null>(null);
   const [loadingCuenta, setLoadingCuenta] = useState(false);
+  const [movimientoExpandidoId, setMovimientoExpandidoId] = useState<string | null>(null);
 
   // Modal Pagos
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -574,6 +579,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   // Form: Recepción de Mercancía
   const [entrySupplierId, setEntrySupplierId] = useState('');
   const [entryOrderId, setEntryOrderId] = useState('');
+  const [entryEntregadoPor, setEntryEntregadoPor] = useState('');
+  const [entryRecibidoPor, setEntryRecibidoPor] = useState('Bodega / Recepción');
   const [entryObservaciones, setEntryObservaciones] = useState('');
   const [entryModelos, setEntryModelos] = useState<Array<{
     productId: string;
@@ -1698,12 +1705,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
     const estadoCalculado = hayFaltantes ? 'RECIBIDA_PARCIAL' : 'COMPLETA';
 
+    const entregadoTag = entryEntregadoPor.trim() ? `[ENTREGADO POR: ${entryEntregadoPor.trim()}] ` : '';
+    const recibidoTag = entryRecibidoPor.trim() ? `[RECIBIDO POR: ${entryRecibidoPor.trim()}] ` : '';
+    const obsTotal = `${entregadoTag}${recibidoTag}${entryObservaciones || ''}`.trim() || undefined;
+
     setSaving(true);
     try {
       await ApiService.post('/proveedores/entradas', {
         supplierId: entrySupplierId,
         supplierOrderId: entryOrderId || undefined,
-        observaciones: entryObservaciones || undefined,
+        observaciones: obsTotal,
         estado: estadoCalculado,
         lines: flatLines,
       });
@@ -1716,6 +1727,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       );
       setEntrySupplierId('');
       setEntryOrderId('');
+      setEntryEntregadoPor('');
+      setEntryRecibidoPor('Bodega / Recepción');
       setEntryObservaciones('');
       setEntryModelos([]);
 
@@ -1820,13 +1833,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       setDevMotivo(item.motivo || 'Devolución de calzado defectuoso / garantía');
       
       const firstLineWithSupplier = item.lines?.find((l: any) => l.supplierId);
-      if (firstLineWithSupplier?.supplierId) {
-        setDevSupplierId(firstLineWithSupplier.supplierId);
-      } else if (proveedores.length > 0) {
-        setDevSupplierId(proveedores[0].id);
-      } else {
-        setDevSupplierId('');
-      }
+      const targetSuppId = firstLineWithSupplier?.supplierId || (proveedores.length > 0 ? proveedores[0].id : '');
+      setDevSupplierId(targetSuppId);
+
+      const provTarget = proveedores.find((p) => p.id === targetSuppId);
+      setDevRecibidoPor(provTarget?.contacto || provTarget?.razonSocial || '');
+      setDevEntregadoPor('Bodega / Despacho');
 
       setDevLines(
         (item.lines || []).map((l: any) => ({
@@ -1844,7 +1856,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     } else {
       setDevClienteDevolucionId('');
       setDevMotivo('');
-      setDevSupplierId(proveedores[0]?.id || '');
+      const firstSupp = proveedores[0];
+      setDevSupplierId(firstSupp?.id || '');
+      setDevRecibidoPor(firstSupp?.contacto || firstSupp?.razonSocial || '');
+      setDevEntregadoPor('Bodega / Despacho');
       setDevLines([]);
     }
     setShowDevolucionModal(true);
@@ -1866,6 +1881,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       const res: any = await ApiService.post('/devoluciones/proveedor', {
         supplierId: devSupplierId,
         motivo: devMotivo || 'Devolución de calzado por falla / garantía de fábrica',
+        entregadoPor: devEntregadoPor || undefined,
+        recibidoPor: devRecibidoPor || undefined,
         clienteDevolucionId: devClienteDevolucionId || undefined,
         lines: devLines.map((l) => ({
           productId: l.productId,
@@ -2643,6 +2660,36 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         );
                       })}
                   </select>
+                </div>
+              </div>
+
+              {/* Trazabilidad: Quién entrega y Quién recibe en bodega */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Truck size={12} className="text-amber-500" />
+                    <span>Entregado por (Proveedor / Transportista)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Chofer distribuidor / Nombre del proveedor"
+                    value={entryEntregadoPor}
+                    onChange={(e) => setEntryEntregadoPor(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <UserCheck size={12} className="text-blue-500" />
+                    <span>Recibido por (Bodega / Responsable)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Bodega Central / Chris Paucar"
+                    value={entryRecibidoPor}
+                    onChange={(e) => setEntryRecibidoPor(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
+                  />
                 </div>
               </div>
 
@@ -4727,144 +4774,282 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       const isEntrega = mov.tipo === 'ENTREGA_MERCANCIA';
                       const isPago = mov.tipo === 'PAGO_PROVEEDOR';
                       const isDevolucion = mov.tipo === 'DEVOLUCION_PROVEEDOR';
-                      const saldoEnEstePunto = runningBalanceMap.get(`${mov.id}-${mov.fecha}`) ?? 0;
+                      const canExpand = isEntrega || isDevolucion;
+                      const isExpanded = canExpand && (movimientoExpandidoId === mov.id);
+                      const lineas = mov.detalles?.lineas || [];
                       const tipoPago = isPago ? clasificacionPagos.get(mov.id) : null;
                       const cruceEntrega = isEntrega ? (crucesPorEntrega.get(mov.id) || 0) : 0;
 
                       return (
                         <div
-                          key={idx}
-                          className={`p-4 rounded-2xl border flex flex-col gap-3 transition-colors ${
-                            isPago
-                              ? 'bg-emerald-500/5 border-emerald-500/20'
-                              : isDevolucion
-                              ? 'bg-rose-500/5 border-rose-500/20'
-                              : isEntrega
-                              ? 'bg-blue-500/5 border-blue-500/20'
-                              : 'bg-[var(--card)] border-[var(--border)]'
-                          }`}
+                          key={mov.id || idx}
+                          className={`p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-xl transition-all shadow-xs ${
+                            canExpand ? 'cursor-pointer hover:border-[#0F172A]/40' : ''
+                          } ${isExpanded ? 'ring-2 ring-[#0F172A]/10 border-[#0F172A]/30' : ''}`}
+                          onClick={() => {
+                            if (canExpand) {
+                              setMovimientoExpandidoId(isExpanded ? null : mov.id);
+                            }
+                          }}
                         >
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-xl text-white font-bold shrink-0 ${
-                                isPago ? 'bg-emerald-600' : isDevolucion ? 'bg-rose-600' : isEntrega ? 'bg-blue-600' : 'bg-slate-700'
-                              }`}>
-                                {isPago ? <DollarSign size={14} /> : isDevolucion ? <RotateCcw size={14} /> : isEntrega ? <Package size={14} /> : <FileText size={14} />}
-                              </div>
-                              <div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                              {isEntrega ? (
+                                <div className="p-2 rounded-xl mt-0.5 bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+                                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </div>
+                              ) : isDevolucion ? (
+                                <div className="p-2 rounded-xl mt-0.5 bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0">
+                                  {isExpanded ? <ChevronUp size={16} /> : <RotateCcw size={16} />}
+                                </div>
+                              ) : (
+                                <div className="p-2 rounded-xl mt-0.5 bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                                  <DollarSign size={16} />
+                                </div>
+                              )}
+
+                              <div className="space-y-0.5 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <h5 className="font-bold text-xs text-[var(--foreground)]">{mov.titulo}</h5>
-                                  {mov.numeroCodigo && (
-                                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                      isDevolucion ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
-                                    }`}>
-                                      {mov.numeroCodigo}
-                                    </span>
-                                  )}
-                                  {/* Badge de tipo de pago */}
+                                  <span className="font-extrabold text-xs text-[var(--foreground)]">{mov.titulo}</span>
+                                  <span className="font-semibold text-xs text-[var(--muted-foreground)]">
+                                    {cuentaCorrienteData.supplier?.razonSocial || cuentaCorrienteData.supplier?.nombre || 'Proveedor'}
+                                  </span>
                                   {tipoPago === 'ADELANTO' && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/25">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/25">
                                       ADELANTO
                                     </span>
                                   )}
                                   {tipoPago === 'ABONO' && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
                                       ABONO A DEUDA
                                     </span>
                                   )}
                                   {tipoPago === 'MIXTO' && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">
                                       ABONO + ADELANTO
                                     </span>
                                   )}
-                                  {/* Badge de cruce en entrega */}
                                   {isEntrega && cruceEntrega > 0.01 && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
                                       CRUZADO: ${cruceEntrega.toFixed(2)}
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
-                                  {mov.descripcion}
-                                </p>
+                                <div className="text-[11px] text-[var(--muted-foreground)]">{mov.subtitulo || mov.descripcion}</div>
+
+                                {/* Responsables: Entregado por y Recibido por */}
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                  {/* Entregado por */}
+                                  {mov.entregadoPor && (
+                                    <span
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20"
+                                      title={`Entregado por: ${mov.entregadoPor}`}
+                                    >
+                                      <Truck size={10} className="shrink-0" />
+                                      <span>Entregado por: {mov.entregadoPor}</span>
+                                    </span>
+                                  )}
+
+                                  {/* Recibido por */}
+                                  {mov.recibidoPor && (
+                                    <span
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-800 dark:text-blue-300 border border-blue-500/20"
+                                      title={`Recibido por: ${mov.recibidoPor}`}
+                                    >
+                                      <UserCheck size={10} className="shrink-0" />
+                                      <span>Recibido por: {mov.recibidoPor}</span>
+                                    </span>
+                                  )}
+
+                                  {/* Pagado por */}
+                                  {isPago && mov.pagadoPor && (
+                                    <span
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20"
+                                      title={`Registrado por: ${mov.pagadoPor}`}
+                                    >
+                                      <User size={10} className="shrink-0" />
+                                      <span>Pagado por: {mov.pagadoPor}</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5 mt-1">
+                                  <Calendar size={11} />
+                                  <span>{new Date(mov.fecha).toLocaleString('es-EC')}</span>
+                                </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 self-end sm:self-center">
-                              <div className="text-right">
-                                <span className={`font-black font-mono text-sm ${
+                            <div className="text-right shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <div
+                                className={`text-xs font-black ${
                                   isPago
-                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    ? 'text-emerald-600'
                                     : isDevolucion
-                                    ? 'text-rose-600 dark:text-rose-400'
-                                    : 'text-[#0F172A] dark:text-amber-400'
-                                }`}>
-                                  {isPago || isDevolucion ? `-$${Number(mov.monto).toFixed(2)}` : `+$${Number(mov.monto).toFixed(2)}`}
-                                </span>
-                                <span className="text-[10px] text-[var(--muted-foreground)] block font-mono">
-                                  {new Date(mov.fecha).toLocaleDateString('es-EC')}
-                                </span>
+                                    ? 'text-rose-600'
+                                    : 'text-blue-600'
+                                }`}
+                              >
+                                {isPago || isDevolucion ? `− ${Number(mov.monto).toFixed(2)}` : `+ ${Number(mov.monto).toFixed(2)}`}
                               </div>
+                              {mov.metodo && (
+                                <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
+                                  {mov.metodo}
+                                </span>
+                              )}
+                              {isDevolucion && (
+                                <span className="px-1.5 py-0.5 bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded text-[9px] font-bold border border-rose-500/20 inline-block mt-0.5">
+                                  DEVOLUCIÓN
+                                </span>
+                              )}
 
+                              {/* Trazabilidad Contable Rigurosa: Saldo Anterior y Nuevo Saldo */}
+                              {mov.saldoAnterior !== undefined && (
+                                <div className="mt-1.5 pt-1.5 border-t border-[var(--border)]/60 flex flex-col items-end gap-0.5 text-[10px]">
+                                  <div className="text-[var(--muted-foreground)]">
+                                    Saldo Anterior: <span className="font-semibold text-[var(--foreground)]">${Number(mov.saldoAnterior).toFixed(2)}</span>
+                                  </div>
+                                  <div className="text-[var(--muted-foreground)]">
+                                    Nuevo Saldo: <span className={`font-bold ${Number(mov.nuevoSaldo) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>${Number(mov.nuevoSaldo).toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Acciones de WhatsApp */}
                               {isPago && (
-                                <button
-                                  onClick={() => handleEnviarPagoWhatsApp({
-                                    id: mov.id,
-                                    supplierId: selectedSupplierId!,
-                                    monto: mov.monto,
-                                    metodo: mov.metodo || 'TRANSFERENCIA',
-                                    banco: mov.banco,
-                                    comprobante: mov.comprobante,
-                                    notas: mov.descripcion,
-                                    createdAt: mov.fecha,
-                                    supplier: cuentaCorrienteData.supplier,
-                                  })}
-                                  className="p-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors cursor-pointer"
-                                  title="Enviar Comprobante por WhatsApp"
-                                >
-                                  <MessageCircle size={14} />
-                                </button>
+                                <div className="flex items-center justify-end gap-1 mt-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEnviarPagoWhatsApp({
+                                      id: mov.id,
+                                      supplierId: selectedSupplierId!,
+                                      monto: mov.monto,
+                                      metodo: mov.metodo || 'TRANSFERENCIA',
+                                      banco: mov.banco,
+                                      comprobante: mov.comprobante,
+                                      notas: mov.descripcion,
+                                      createdAt: mov.fecha,
+                                      supplier: cuentaCorrienteData.supplier,
+                                    })}
+                                    className="p-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer"
+                                    title="Enviar Comprobante por WhatsApp"
+                                  >
+                                    <MessageCircle size={11} />
+                                    <span>WhatsApp</span>
+                                  </button>
+                                </div>
                               )}
 
                               {isDevolucion && (
-                                <button
-                                  onClick={() => handleEnviarDevolucionWhatsApp({
-                                    id: mov.id,
-                                    numeroCodigo: mov.numeroCodigo,
-                                    supplierId: selectedSupplierId!,
-                                    motivo: mov.descripcion,
-                                    totalDevuelto: mov.monto,
-                                    deudaDescontada: mov.detalles?.deudaDescontada || mov.monto,
-                                    lines: mov.detalles?.lines || [],
-                                    createdAt: mov.fecha,
-                                    supplier: cuentaCorrienteData.supplier,
-                                  })}
-                                  className="p-1.5 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-colors cursor-pointer"
-                                  title="Enviar Constancia de Devolucion por WhatsApp"
-                                >
-                                  <MessageCircle size={14} />
-                                </button>
+                                <div className="flex items-center justify-end gap-1 mt-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEnviarDevolucionWhatsApp({
+                                      id: mov.id,
+                                      numeroCodigo: mov.numeroCodigo,
+                                      supplierId: selectedSupplierId!,
+                                      motivo: mov.descripcion,
+                                      totalDevuelto: mov.monto,
+                                      deudaDescontada: mov.detalles?.deudaDescontada || mov.monto,
+                                      lines: mov.detalles?.lines || [],
+                                      createdAt: mov.fecha,
+                                      supplier: cuentaCorrienteData.supplier,
+                                    })}
+                                    className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer"
+                                    title="Enviar Constancia por WhatsApp"
+                                  >
+                                    <MessageCircle size={11} />
+                                    <span>WhatsApp</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
 
-                          {/* ── Saldo acumulado al momento de este movimiento ── */}
-                          <div className="flex items-center justify-end gap-2 border-t border-dashed border-[var(--border)] pt-2 -mb-1">
-                            <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">Saldo tras este movimiento:</span>
-                            <span className={`text-[11px] font-black font-mono ${
-                              saldoEnEstePunto > 0.01
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : saldoEnEstePunto < -0.01
-                                  ? 'text-blue-600 dark:text-blue-400'
-                                  : 'text-emerald-600 dark:text-emerald-400'
-                            }`}>
-                              {saldoEnEstePunto > 0.01
-                                ? `Deuda: $${saldoEnEstePunto.toFixed(2)}`
-                                : saldoEnEstePunto < -0.01
-                                  ? `Adelanto: $${Math.abs(saldoEnEstePunto).toFixed(2)}`
-                                  : 'Al dia: $0.00'}
-                            </span>
-                          </div>
+                          {/* Desglose Expandible de Artículos Recibidos o Devueltos */}
+                          {isExpanded && (
+                            <div className="mt-3.5 pt-3 border-t border-[var(--border)] space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
+                                  📦 DETALLE DE ARTÍCULOS {isDevolucion ? 'DEVUELTOS' : 'RECIBIDOS'} — {mov.numeroCodigo || mov.titulo}
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                                  {lineas.length} {lineas.length === 1 ? 'ítem' : 'ítems'} ({mov.detalles?.totalPares || 0} pares)
+                                </span>
+                              </div>
+
+                              {lineas.length > 0 ? (
+                                <div className="space-y-2">
+                                  {(() => {
+                                    const grupos: { [key: string]: any[] } = {};
+                                    lineas.forEach((l: any) => {
+                                      const key = l.productId || l.modelName;
+                                      if (!grupos[key]) grupos[key] = [];
+                                      grupos[key].push(l);
+                                    });
+
+                                    return Object.entries(grupos).map(([key, items]) => {
+                                      const item = items[0];
+                                      const totalPares = items.reduce((s: number, it: any) => s + (it.cantidad || it.cantidadIngresada || 0), 0);
+                                      const subtotalModelo = items.reduce((s: number, it: any) => s + Number(it.subtotal || ((it.cantidad || it.cantidadIngresada || 0) * (it.precioCosto || 0))), 0);
+
+                                      return (
+                                        <div
+                                          key={key}
+                                          className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl flex items-center justify-between gap-3"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            {item.imageUrl ? (
+                                              <img
+                                                src={item.imageUrl}
+                                                alt=""
+                                                className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] shrink-0"
+                                              />
+                                            ) : (
+                                              <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-base shrink-0">
+                                                👟
+                                              </div>
+                                            )}
+                                            <div>
+                                              <div className="font-extrabold text-xs text-[var(--foreground)]">
+                                                {item.modelName} {item.color ? `(${item.color})` : ''}
+                                              </div>
+                                              <div className="text-[10px] text-[var(--muted-foreground)] font-medium">
+                                                Serie: {item.serieNombre || 'ADULTO'}
+                                              </div>
+                                              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                {items.map((l: any, iIdx: number) => (
+                                                  <span
+                                                    key={iIdx}
+                                                    className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-md text-[10px] font-bold"
+                                                  >
+                                                    T{l.numeroTalla}: {l.cantidad || l.cantidadIngresada}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="text-right shrink-0">
+                                            <span className="text-xs font-black text-emerald-600 block">
+                                              {totalPares} {totalPares === 1 ? 'par' : 'pares'}
+                                            </span>
+                                            <span className="text-[10px] text-[var(--muted-foreground)] font-semibold block">
+                                              ${subtotalModelo.toFixed(2)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-[var(--muted-foreground)] italic text-center py-2">
+                                  No hay detalle de artículos registrado para este movimiento.
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -6335,6 +6520,38 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-hidden"
                   required
                 />
+              </div>
+
+              {/* Trazabilidad: Quién entrega y Quién recibe en el proveedor */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5 flex items-center gap-1">
+                    <Truck size={12} className="text-amber-500" />
+                    <span>Entregado / Despachado por *</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Bodega / Despacho / Chris Paucar"
+                    value={devEntregadoPor}
+                    onChange={(e) => setDevEntregadoPor(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-hidden"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5 flex items-center gap-1">
+                    <UserCheck size={12} className="text-emerald-500" />
+                    <span>Recibido en Proveedor por *</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Carmen Rojas / Repartidor / Asesor"
+                    value={devRecibidoPor}
+                    onChange={(e) => setDevRecibidoPor(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-hidden"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Items a Devolver */}
