@@ -410,6 +410,9 @@ export default function ComercialComponent({
   const [revertirItemsMap, setRevertirItemsMap] = useState<Record<string, number>>({});
   const [motivoReversion, setMotivoReversion] = useState('');
   const [procesandoReversion, setProcesandoReversion] = useState(false);
+  const [confirmandoReversionPaso, setConfirmandoReversionPaso] = useState(false);
+  const [editingObservacionProductId, setEditingObservacionProductId] = useState<string | null>(null);
+  const [tempObservacionText, setTempObservacionText] = useState('');
 
     // ── Modal de Corrección de Precio Post-Venta / Post-Entrega ──
   const [showCorregirPrecioModal, setShowCorregirPrecioModal] = useState(false);
@@ -2315,17 +2318,27 @@ export default function ComercialComponent({
       }
     } catch (e) {}
 
+    // Auto-sanar pedidos existentes cuyo estado es ENTREGADO pero lines tenían cantidadEntregada en 0
+    const linesNormalizadas = (orderToUse.lines || []).map((l: any) => {
+      const yaEntregado = (l.cantidadEntregada !== undefined && l.cantidadEntregada !== null && l.cantidadEntregada > 0)
+        ? l.cantidadEntregada
+        : (orderToUse.estado === 'ENTREGADO' ? l.cantidad : 0);
+      return { ...l, cantidadEntregada: yaEntregado };
+    });
+    orderToUse = { ...orderToUse, lines: linesNormalizadas };
+
     setPedidoRevertirSeleccionado(orderToUse);
     const initialMap: Record<string, number> = {};
-    (orderToUse.lines || []).forEach((l: any) => {
+    linesNormalizadas.forEach((l: any) => {
       initialMap[l.id] = 0;
     });
     setRevertirItemsMap(initialMap);
     setMotivoReversion('');
+    setConfirmandoReversionPaso(false);
     setShowRevertirEntregaModal(true);
   };
 
-  const handleConfirmarRevertirEntrega = async () => {
+  const handleEjecutarReversionDirecta = async () => {
     if (!pedidoRevertirSeleccionado) return;
 
     const items = Object.entries(revertirItemsMap)
@@ -2341,10 +2354,6 @@ export default function ComercialComponent({
     }
 
     const totalPares = items.reduce((acc, it) => acc + it.cantidadARevertir, 0);
-    const confirmacion = window.confirm(
-      `¿Confirmas la reversión de ${totalPares} pares de calzado? Estos pares regresarán inmediatamente al inventario físico de bodega y se ajustará el saldo/deuda del cliente.`
-    );
-    if (!confirmacion) return;
 
     setProcesandoReversion(true);
     try {
@@ -2358,7 +2367,9 @@ export default function ComercialComponent({
       setPedidoRevertirSeleccionado(null);
       setRevertirItemsMap({});
       setMotivoReversion('');
+      setConfirmandoReversionPaso(false);
       await loadPedidos();
+      await loadListaClientes();
     } catch (err: any) {
       showToast(err.message || 'Error al revertir la entrega errónea', 'error');
     } finally {
@@ -4730,7 +4741,7 @@ export default function ComercialComponent({
                                             onClick={() => {
                                               const nuevasLineas = [...lineasPedido];
                                               const idx = nuevasLineas.findIndex(
-                                                (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
+                                                (item) => item.productId === l.productId && item.tallaId === l.tallaId
                                               );
                                               if (idx !== -1) {
                                                 if (nuevasLineas[idx].cantidad > 1) {
@@ -4754,7 +4765,7 @@ export default function ComercialComponent({
                                             onClick={() => {
                                               const nuevasLineas = [...lineasPedido];
                                               const idx = nuevasLineas.findIndex(
-                                                (item) => item.productId === l.productId && item.tallaId === l.tallaId && item.tipoVenta === l.tipoVenta
+                                                (item) => item.productId === l.productId && item.tallaId === l.tallaId
                                               );
                                               if (idx !== -1) {
                                                 nuevasLineas[idx].cantidad += 1;
@@ -4778,7 +4789,7 @@ export default function ComercialComponent({
                                         const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_A');
                                         const hasCurva = Object.keys(curva).length > 0;
                                         const nuevasLineas = lineasPedido.map(item => {
-                                          if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                          if (item.productId === primerItem.productId) {
                                             const num = Number(item.numeroTalla);
                                             const qty = hasCurva ? (curva[num] ?? 0) : 1;
                                             return { ...item, cantidad: item.cantidad + qty };
@@ -4797,7 +4808,7 @@ export default function ComercialComponent({
                                         const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_B');
                                         const hasCurva = Object.keys(curva).length > 0;
                                         const nuevasLineas = lineasPedido.map(item => {
-                                          if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                          if (item.productId === primerItem.productId) {
                                             const num = Number(item.numeroTalla);
                                             const qty = hasCurva ? (curva[num] ?? 0) : 1;
                                             return { ...item, cantidad: item.cantidad + qty };
@@ -4815,14 +4826,16 @@ export default function ComercialComponent({
                                       onClick={() => {
                                         const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_A');
                                         const hasCurva = Object.keys(curva).length > 0;
-                                        const nuevasLineas = lineasPedido.map(item => {
-                                          if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
-                                            const num = Number(item.numeroTalla);
-                                            const qty = hasCurva ? (curva[num] ?? 0) : 1;
-                                            return { ...item, cantidad: Math.max(1, item.cantidad - qty) };
-                                          }
-                                          return item;
-                                        });
+                                        const nuevasLineas = lineasPedido
+                                          .map(item => {
+                                            if (item.productId === primerItem.productId) {
+                                              const num = Number(item.numeroTalla);
+                                              const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                              return { ...item, cantidad: Math.max(0, item.cantidad - qty) };
+                                            }
+                                            return item;
+                                          })
+                                          .filter(item => item.cantidad > 0);
                                         setLineasPedido(nuevasLineas);
                                       }}
                                       className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
@@ -4834,14 +4847,16 @@ export default function ComercialComponent({
                                       onClick={() => {
                                         const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_B');
                                         const hasCurva = Object.keys(curva).length > 0;
-                                        const nuevasLineas = lineasPedido.map(item => {
-                                          if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
-                                            const num = Number(item.numeroTalla);
-                                            const qty = hasCurva ? (curva[num] ?? 0) : 1;
-                                            return { ...item, cantidad: Math.max(1, item.cantidad - qty) };
-                                          }
-                                          return item;
-                                        });
+                                        const nuevasLineas = lineasPedido
+                                          .map(item => {
+                                            if (item.productId === primerItem.productId) {
+                                              const num = Number(item.numeroTalla);
+                                              const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                              return { ...item, cantidad: Math.max(0, item.cantidad - qty) };
+                                            }
+                                            return item;
+                                          })
+                                          .filter(item => item.cantidad > 0);
                                         setLineasPedido(nuevasLineas);
                                       }}
                                       className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
@@ -4864,7 +4879,7 @@ export default function ComercialComponent({
                                         type="button"
                                         onClick={() => {
                                           const nuevasLineas = lineasPedido.map(item => {
-                                            if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
+                                            if (item.productId === primerItem.productId) {
                                               return { ...item, observacionModelo: undefined };
                                             }
                                             return item;
@@ -4877,21 +4892,67 @@ export default function ComercialComponent({
                                         ✕
                                       </button>
                                     </div>
+                                  ) : editingObservacionProductId === primerItem.productId ? (
+                                    <div className="flex items-center gap-1.5 mt-1.5">
+                                      <input
+                                        type="text"
+                                        autoFocus
+                                        value={tempObservacionText}
+                                        onChange={(e) => setTempObservacionText(e.target.value)}
+                                        placeholder="Ej: hebilla dorada, suela especial..."
+                                        className="text-xs px-2.5 py-1 bg-[var(--background)] border border-[var(--border)] rounded-lg flex-1 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            const nuevasLineas = lineasPedido.map(item => {
+                                              if (item.productId === primerItem.productId) {
+                                                return { ...item, observacionModelo: tempObservacionText.trim() || undefined };
+                                              }
+                                              return item;
+                                            });
+                                            setLineasPedido(nuevasLineas);
+                                            setEditingObservacionProductId(null);
+                                            setTempObservacionText('');
+                                          } else if (e.key === 'Escape') {
+                                            setEditingObservacionProductId(null);
+                                            setTempObservacionText('');
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nuevasLineas = lineasPedido.map(item => {
+                                            if (item.productId === primerItem.productId) {
+                                              return { ...item, observacionModelo: tempObservacionText.trim() || undefined };
+                                            }
+                                            return item;
+                                          });
+                                          setLineasPedido(nuevasLineas);
+                                          setEditingObservacionProductId(null);
+                                          setTempObservacionText('');
+                                        }}
+                                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                                      >
+                                        Guardar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingObservacionProductId(null);
+                                          setTempObservacionText('');
+                                        }}
+                                        className="px-2 py-1 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
                                   ) : (
                                     <div className="mt-1">
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const nota = window.prompt(`Observación para ${primerItem.modelName} (ej. hebilla dorada, suela especial):`);
-                                          if (nota !== null && nota.trim().length > 0) {
-                                            const nuevasLineas = lineasPedido.map(item => {
-                                              if (item.productId === primerItem.productId && item.tipoVenta === primerItem.tipoVenta) {
-                                                return { ...item, observacionModelo: nota.trim() };
-                                              }
-                                              return item;
-                                            });
-                                            setLineasPedido(nuevasLineas);
-                                          }
+                                          setEditingObservacionProductId(primerItem.productId);
+                                          setTempObservacionText('');
                                         }}
                                         className="text-[10px] font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
                                       >
@@ -4920,11 +4981,11 @@ export default function ComercialComponent({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  // Eliminar todas las líneas de este grupo
-                                  setLineasPedido(lineasPedido.filter((l) => !(l.productId === primerItem.productId && l.tipoVenta === primerItem.tipoVenta)));
+                                  // Eliminar todas las líneas de este modelo
+                                  setLineasPedido(lineasPedido.filter((l) => l.productId !== primerItem.productId));
                                 }}
                                 className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                title="Eliminar del pedido"
+                                title="Eliminar este modelo del pedido"
                               >
                                 <XCircle size={18} />
                               </button>
@@ -6846,19 +6907,34 @@ export default function ComercialComponent({
                 });
 
                 return (
-                  <div className="p-4 bg-slate-900 text-white rounded-xl flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                      <div className="text-xs text-slate-300">Total de pares a restituir al inventario:</div>
-                      <div className="text-lg font-black text-amber-400">
-                        {totalRevertirGeneral} pares
+                  <div className="space-y-3">
+                    <div className="p-4 bg-slate-900 text-white rounded-xl flex items-center justify-between flex-wrap gap-3">
+                      <div>
+                        <div className="text-xs text-slate-300">Total de pares a restituir al inventario:</div>
+                        <div className="text-lg font-black text-amber-400">
+                          {totalRevertirGeneral} pares
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-slate-300">Descuento total a reflejar en saldo:</div>
+                        <div className="text-lg font-black text-emerald-400">
+                          -${montoTotalRevertirGeneral.toFixed(2)}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-slate-300">Descuento total a reflejar en saldo:</div>
-                      <div className="text-lg font-black text-emerald-400">
-                        -${montoTotalRevertirGeneral.toFixed(2)}
+
+                    {/* Alerta de confirmación in-modal (100% sin alerts ni confirms de navegador) */}
+                    {confirmandoReversionPaso && (
+                      <div className="p-4 bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl space-y-2 animate-in fade-in duration-200">
+                        <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-extrabold text-xs">
+                          <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+                          <span>¿Confirmas la restitución de estos calzados al inventario?</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                          Se devolverán <strong>{totalRevertirGeneral} pares</strong> a la bodega física del local y se descontará automáticamente <strong>${montoTotalRevertirGeneral.toFixed(2)}</strong> del saldo de la cuenta corriente de este cliente.
+                        </p>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })()}
@@ -6866,29 +6942,61 @@ export default function ComercialComponent({
 
             {/* Pie del modal */}
             <div className="p-4 bg-[var(--muted)]/30 border-t border-[var(--border)] flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowRevertirEntregaModal(false);
-                  setPedidoRevertirSeleccionado(null);
-                  setRevertirItemsMap({});
-                }}
-                className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={
-                  procesandoReversion ||
-                  Object.values(revertirItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0) === 0
-                }
-                onClick={handleConfirmarRevertirEntrega}
-                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-extrabold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-              >
-                {procesandoReversion ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
-                <span>Confirmar Reversión al Inventario</span>
-              </button>
+              {confirmandoReversionPaso ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={procesandoReversion}
+                    onClick={() => setConfirmandoReversionPaso(false)}
+                    className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
+                  >
+                    Volver y Modificar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={procesandoReversion}
+                    onClick={handleEjecutarReversionDirecta}
+                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {procesandoReversion ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                    <span>Sí, Proceder con la Reversión</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRevertirEntregaModal(false);
+                      setPedidoRevertirSeleccionado(null);
+                      setRevertirItemsMap({});
+                      setConfirmandoReversionPaso(false);
+                    }}
+                    className="px-4 py-2 border border-[var(--border)] rounded-xl text-xs font-semibold hover:bg-[var(--muted)] cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      procesandoReversion ||
+                      Object.values(revertirItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0) === 0
+                    }
+                    onClick={() => {
+                      const totalPares = Object.values(revertirItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0);
+                      if (totalPares === 0) {
+                        showToast('Selecciona al menos 1 par para revertir al inventario.', 'warning');
+                        return;
+                      }
+                      setConfirmandoReversionPaso(true);
+                    }}
+                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-extrabold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw size={14} />
+                    <span>Continuar a Confirmación</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
