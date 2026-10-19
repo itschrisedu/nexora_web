@@ -292,6 +292,8 @@ export default function ComercialComponent({
     setBusquedaDebounced('');
     setShowDropdownCliente(false);
     verificarPedidoActivoCliente(nuevoCliente);
+    // Cliente recién creado → SIN_CREDITO → forzar CONTADO
+    setTipoPago('CONTADO');
     showToast(`¡Cliente ${nuevoCliente.nombre} registrado y seleccionado para el pedido!`, 'success');
     loadListaClientes();
   };
@@ -2404,6 +2406,7 @@ export default function ComercialComponent({
             setClienteSeleccionado(null);
             setLineasPedido([]);
             setNotasPedido('');
+            setTipoPago('CONTADO');
             setMetodoPagoContado('EFECTIVO');
             setReferenciaComprobante('');
             const targetSuc = selectedSucursalPedidoId || (activeSucursalId !== 'TODAS' ? activeSucursalId : sucursales?.[0]?.id) || '';
@@ -3160,6 +3163,7 @@ export default function ComercialComponent({
                                 setBusquedaDebounced('');
                                 setAlertaPedidoDuplicado(null);
                                 setIgnoroAlertaDuplicado(false);
+                                setTipoPago('CONTADO');
                               }}
                               className="text-xs font-semibold text-red-500 hover:underline"
                             >
@@ -3320,6 +3324,9 @@ export default function ComercialComponent({
                                       setClienteSeleccionado(c);
                                       setShowDropdownCliente(false);
                                       verificarPedidoActivoCliente(c);
+                                      // Preselección inteligente de forma de pago según nivel crediticio
+                                      const tieneCredito = c.nivelCredito && c.nivelCredito !== 'SIN_CREDITO' && Number(c.limiteCredito || 0) > 0;
+                                      setTipoPago(tieneCredito ? 'CREDITO' : 'CONTADO');
                                     }}
                                     className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex justify-between items-center gap-2"
                                   >
@@ -3390,24 +3397,41 @@ export default function ComercialComponent({
                         <DollarSign size={13} />
                         <span>Contado</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTipoPago('CREDITO');
-                          if (cuponAplicado?.promocion && cuponAplicado.promocion.aplicaPara === 'SOLO_CONTADO') {
-                            setCuponAplicado(null);
-                            setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para pagos de Contado.');
-                          }
-                        }}
-                        className={`h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          tipoPago === 'CREDITO'
-                            ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
-                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)]'
-                        }`}
-                      >
-                        <CreditCard size={13} />
-                        <span>Crédito</span>
-                      </button>
+                      {(() => {
+                        const clienteSinCredito = !clienteSeleccionado || !clienteSeleccionado.nivelCredito || clienteSeleccionado.nivelCredito === 'SIN_CREDITO' || Number(clienteSeleccionado.limiteCredito || 0) <= 0;
+                        return (
+                          <div className="relative group flex-1">
+                            <button
+                              type="button"
+                              disabled={clienteSinCredito}
+                              onClick={() => {
+                                if (clienteSinCredito) return;
+                                setTipoPago('CREDITO');
+                                if (cuponAplicado?.promocion && cuponAplicado.promocion.aplicaPara === 'SOLO_CONTADO') {
+                                  setCuponAplicado(null);
+                                  setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para pagos de Contado.');
+                                }
+                              }}
+                              className={`w-full h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                clienteSinCredito
+                                  ? 'opacity-40 cursor-not-allowed text-[var(--muted-foreground)]'
+                                  : tipoPago === 'CREDITO'
+                                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs cursor-pointer'
+                                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card)] cursor-pointer'
+                              }`}
+                            >
+                              <CreditCard size={13} />
+                              <span>Crédito</span>
+                              {clienteSinCredito && <span className="text-[9px]">🔒</span>}
+                            </button>
+                            {clienteSinCredito && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 font-semibold">
+                                {!clienteSeleccionado ? 'Selecciona un cliente primero' : 'Cliente sin crédito asignado'}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
