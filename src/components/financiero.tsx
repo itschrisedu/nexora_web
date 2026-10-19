@@ -3883,50 +3883,83 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           onClick={(e) => { if (e.target === e.currentTarget) setShowHistorialModal(false); }}
         >
           <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-4xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 sm:p-6 pr-32 sm:pr-40 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2 sm:p-2.5 bg-white/10 rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
-                  <History size={20} />
+            <div className="p-4 sm:p-6 border-b border-[var(--border)] bg-[#0F172A] text-white shrink-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 sm:p-2.5 bg-white/10 rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
+                    <History size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                      Historial Comercial y Financiero
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                      Detalle cronológico de compras, notas de venta y abonos del cliente
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
-                    Historial Comercial y Financiero
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Detalle cronológico de compras, notas de venta y abonos del cliente
-                  </p>
+
+                {/* Acciones en escritorio y botón de cierre */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="hidden sm:flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowHistorialModal(false);
+                        setShowCuentaModal(true);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-white/10 text-slate-200 hover:text-white hover:bg-white/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10 shadow-sm"
+                      title="Volver a la gestión de cobro"
+                    >
+                      <ArrowLeft size={14} />
+                      <span>Volver a Cobros</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAbrirCompartirHistorial}
+                      disabled={loadingHistorial || !historialCliente}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                      title="Compartir extracto de historial en PDF, WhatsApp o Correo"
+                    >
+                      <Share2 size={14} />
+                      <span>Compartir Historial</span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowHistorialModal(false)}
+                    className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Cerrar ventana"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
               </div>
-              <div className="absolute top-4 sm:top-5 right-4 sm:right-5 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleAbrirCompartirHistorial}
-                  disabled={loadingHistorial || !historialCliente}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
-                  title="Compartir extracto de historial en PDF, WhatsApp o Correo"
-                >
-                  <Share2 size={14} />
-                  <span className="hidden sm:inline">Compartir Historial</span>
-                </button>
+
+              {/* Botonera inferior adaptada para dispositivos móviles */}
+              <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-white/10 sm:hidden">
                 <button
                   type="button"
                   onClick={() => {
                     setShowHistorialModal(false);
                     setShowCuentaModal(true);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-white/10 text-slate-200 hover:text-white hover:bg-white/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10"
+                  className="w-full py-2 px-3 rounded-xl bg-white/10 text-slate-200 hover:text-white hover:bg-white/20 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-white/10 active:scale-95"
                   title="Volver a la gestión de cobro"
                 >
                   <ArrowLeft size={14} />
-                  <span className="hidden sm:inline">Volver a Cobros</span>
+                  <span>Volver a Cobros</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowHistorialModal(false)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Cerrar ventana"
+                  onClick={handleAbrirCompartirHistorial}
+                  disabled={loadingHistorial || !historialCliente}
+                  className="w-full py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 active:scale-95"
+                  title="Compartir extracto de historial en PDF, WhatsApp o Correo"
                 >
-                  <X size={18} />
+                  <Share2 size={14} />
+                  <span>Compartir</span>
                 </button>
               </div>
             </div>
