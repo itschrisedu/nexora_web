@@ -37,6 +37,7 @@ import {
   RefreshCw,
   Search,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 
 import { useToast } from './ui/toast';
@@ -330,6 +331,12 @@ export default function ComercialComponent({
   const [tallaCantidadesMap, setTallaCantidadesMap] = useState<Record<string, number>>({});
   const [observacionModeloActual, setObservacionModeloActual] = useState('');
   const [mostrarObsModeloActual, setMostrarObsModeloActual] = useState(false);
+  const [curvaSugeridaInfo, setCurvaSugeridaInfo] = useState<{
+    tipo: 'MEDIA_A' | 'MEDIA_B';
+    alternada: boolean;
+    razon: string;
+    ultimaCurvaUsada?: string | null;
+  } | null>(null);
 
   // Series Disponibles para Pedidos Especiales
   const [listaSeriesDisponibles, setListaSeriesDisponibles] = useState<any[]>([]);
@@ -1610,10 +1617,38 @@ export default function ComercialComponent({
       setFechaUltimaVenta(null);
       
       if (tipoVentaItem === 'SERIE_COMPLETA' && pObjSorted.tallas) {
-        const mejorCurva = detectarMejorCurvaSegunStock(pObjSorted.serieNombre, pObjSorted.tallas);
-        const mapCalculado = calcularCurvaParaTallas(pObjSorted.serieNombre, pObjSorted.tallas, mejorCurva);
+        let curvaBase: 'MEDIA_A' | 'MEDIA_B' = detectarMejorCurvaSegunStock(pObjSorted.serieNombre, pObjSorted.tallas) as any;
+        if (curvaBase !== 'MEDIA_A' && curvaBase !== 'MEDIA_B') {
+          curvaBase = 'MEDIA_A';
+        }
+        
+        // Consultar endpoint de alternancia automática inteligente (Fase 5.1)
+        ApiService.get(`/pedidos/curva-sugerida?productId=${pObjSorted.id}${pObjSorted.modelId ? `&modelId=${pObjSorted.modelId}` : ''}`)
+          .then((res: any) => {
+            if (res && res.curvaSugerida) {
+              const tipoCurva = res.curvaSugerida as 'MEDIA_A' | 'MEDIA_B';
+              setCurvaSugeridaInfo({
+                tipo: tipoCurva,
+                alternada: Boolean(res.alternada),
+                razon: res.razon,
+                ultimaCurvaUsada: res.ultimaCurvaUsada,
+              });
+              const mapSugerido = calcularCurvaParaTallas(pObjSorted.serieNombre, pObjSorted.tallas, tipoCurva);
+              setTallaCantidadesMap(mapSugerido);
+            }
+          })
+          .catch(() => {
+            setCurvaSugeridaInfo({
+              tipo: curvaBase,
+              alternada: false,
+              razon: 'STOCK_LOCAL',
+            });
+          });
+
+        const mapCalculado = calcularCurvaParaTallas(pObjSorted.serieNombre, pObjSorted.tallas, curvaBase);
         setTallaCantidadesMap(mapCalculado);
       } else if (pObjSorted.tallas) {
+        setCurvaSugeridaInfo(null);
         const initialMap: Record<string, number> = {};
         pObjSorted.tallas.forEach((t: any) => {
           const key = t.tallaId || t.id || `t-${t.numero ?? t.nombre}`;
@@ -1627,6 +1662,7 @@ export default function ComercialComponent({
       setPrecioItem(0);
       setPrecioItemInput('');
       setTallaCantidadesMap({});
+      setCurvaSugeridaInfo(null);
     }
   };
 
@@ -4539,6 +4575,16 @@ export default function ComercialComponent({
 
                                     return (
                                       <div className="space-y-1.5 pt-0.5">
+                                        {/* Banner informativo de alternancia inteligente (Fase 5.1) */}
+                                        {curvaSugeridaInfo && (
+                                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-200 text-[11px] font-semibold">
+                                            <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                            <span>
+                                              Curva <strong>{curvaSugeridaInfo.tipo === 'MEDIA_A' ? '½ Media Docena Serie A' : '½ Media Docena Serie B'}</strong> preseleccionada automáticamente {curvaSugeridaInfo.alternada ? '(alternando con el pedido anterior)' : '(por balance de stock en bodega)'}.
+                                            </span>
+                                          </div>
+                                        )}
+
                                         {evalStock && evalStock.mensajeAdvertencia && (
                                           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold">
                                             <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-500" />
@@ -4580,11 +4626,15 @@ export default function ComercialComponent({
                                                 {evalStock.maxMediasA} disp
                                               </span>
                                             )}
-                                            {evalStock?.recomendacion === 'SOLO_A' && (
+                                            {curvaSugeridaInfo?.tipo === 'MEDIA_A' ? (
+                                              <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase font-black tracking-wide">
+                                                {curvaSugeridaInfo.alternada ? 'Serie A (Alternada)' : 'Serie A (Auto)'}
+                                              </span>
+                                            ) : evalStock?.recomendacion === 'SOLO_A' ? (
                                               <span className="text-[9px] bg-emerald-600 text-white px-1 rounded uppercase font-black">
                                                 Recomendada
                                               </span>
-                                            )}
+                                            ) : null}
                                           </button>
 
                                           <button
@@ -4620,11 +4670,15 @@ export default function ComercialComponent({
                                                 {evalStock.maxMediasB} disp
                                               </span>
                                             )}
-                                            {evalStock?.recomendacion === 'SOLO_B' && (
+                                            {curvaSugeridaInfo?.tipo === 'MEDIA_B' ? (
+                                              <span className="text-[9px] bg-teal-600 text-white px-1.5 py-0.5 rounded uppercase font-black tracking-wide">
+                                                {curvaSugeridaInfo.alternada ? 'Serie B (Alternada)' : 'Serie B (Auto)'}
+                                              </span>
+                                            ) : evalStock?.recomendacion === 'SOLO_B' ? (
                                               <span className="text-[9px] bg-teal-600 text-white px-1 rounded uppercase font-black">
                                                 Recomendada
                                               </span>
-                                            )}
+                                            ) : null}
                                           </button>
 
                                           <button

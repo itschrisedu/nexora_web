@@ -429,6 +429,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [selectedOrder, setSelectedOrder] = useState<OrdenCompra | null>(null);
   const [editingOrder, setEditingOrder] = useState(false);
 
+  // Modal Consolidar Demanda Pendiente de Clientes (Fase 5.2)
+  const [showConsolidarDemandaModal, setShowConsolidarDemandaModal] = useState(false);
+  const [demandaPendienteData, setDemandaPendienteData] = useState<any | null>(null);
+  const [loadingDemanda, setLoadingDemanda] = useState(false);
+  const [proveedorConsolidarId, setProveedorConsolidarId] = useState('');
+  const [cantidadesConsolidadasMap, setCantidadesConsolidadasMap] = useState<Record<string, number>>({});
+  const [modelosSeleccionadosConsolidar, setModelosSeleccionadosConsolidar] = useState<Record<string, boolean>>({});
+  const [generandoOCConsolidada, setGenerandoOCConsolidada] = useState(false);
+  const [observacionesConsolidar, setObservacionesConsolidar] = useState('');
+
   // Modal Previsualizador de PDF
   const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
@@ -1136,6 +1146,82 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       showToast(err.message || 'Error al guardar los cambios.', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ──────────────────────────────────────────
+  // FASE 5.2 — Handlers para Consolidación de Demanda
+  // ──────────────────────────────────────────
+  const handleAbrirConsolidarDemanda = async () => {
+    setLoadingDemanda(true);
+    setShowConsolidarDemandaModal(true);
+    try {
+      const data = await ApiService.get('/proveedores/demanda-pendiente');
+      setDemandaPendienteData(data);
+      if (data && data.items) {
+        const cMap: Record<string, number> = {};
+        const sMap: Record<string, boolean> = {};
+        data.items.forEach((item: any) => {
+          cMap[item.productId] = item.totalParesFaltantes;
+          sMap[item.productId] = true;
+        });
+        setCantidadesConsolidadasMap(cMap);
+        setModelosSeleccionadosConsolidar(sMap);
+        if (data.items.length > 0 && data.items[0].supplierId) {
+          setProveedorConsolidarId(data.items[0].supplierId);
+        } else if (proveedores.length > 0) {
+          setProveedorConsolidarId(proveedores[0].id);
+        }
+      }
+    } catch (e: any) {
+      showToast(e.message || 'Error al obtener la demanda pendiente de pedidos.', 'error');
+    } finally {
+      setLoadingDemanda(false);
+    }
+  };
+
+  const handleGenerarOCConsolidada = async () => {
+    if (!proveedorConsolidarId) {
+      showToast('Por favor selecciona un proveedor destinatario para la orden.', 'warning');
+      return;
+    }
+    if (!demandaPendienteData || !demandaPendienteData.items) return;
+
+    const itemsAIncluir = demandaPendienteData.items.filter(
+      (it: any) => modelosSeleccionadosConsolidar[it.productId] && (cantidadesConsolidadasMap[it.productId] || 0) > 0
+    );
+
+    if (itemsAIncluir.length === 0) {
+      showToast('Debes seleccionar al menos un modelo con cantidad mayor a 0.', 'warning');
+      return;
+    }
+
+    setGenerandoOCConsolidada(true);
+    try {
+      const lines = itemsAIncluir.map((it: any) => ({
+        productId: it.productId,
+        cantidadPedida: cantidadesConsolidadasMap[it.productId] || it.totalParesFaltantes,
+        precioCosto: it.costPrice > 0 ? it.costPrice : 15.00,
+        observacionLinea: `Demanda clientes: ${it.tallas.map((t: any) => `T${t.tallaNumero}:${t.paresFaltantes}`).join(', ')}`,
+      }));
+
+      const res = await ApiService.post('/proveedores/ordenes-compra/consolidar-demanda', {
+        supplierId: proveedorConsolidarId,
+        lines,
+        observaciones: observacionesConsolidar || undefined,
+        estado: 'BORRADOR',
+      });
+
+      showToast(res.message || 'Orden de compra consolidada creada exitosamente.', 'success');
+      setShowConsolidarDemandaModal(false);
+      setObservacionesConsolidar('');
+      setFiltroEstadoOrden('BORRADOR');
+      setActiveTab('ordenes');
+      await loadData();
+    } catch (e: any) {
+      showToast(e.message || 'Error al consolidar la orden de compra.', 'error');
+    } finally {
+      setGenerandoOCConsolidada(false);
     }
   };
 
@@ -1915,6 +2001,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               <Plus size={14} className="text-amber-400" />
               <span>Emitir Orden de Compra</span>
             </button>
+            <button
+              onClick={handleAbrirConsolidarDemanda}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm border border-emerald-500/30 whitespace-nowrap cursor-pointer"
+              title="Consolidar pedidos de clientes en espera de stock y generar Orden de Compra"
+            >
+              <Package size={14} className="text-white" />
+              <span>Consolidar Demanda de Clientes</span>
+            </button>
           </div>
         )}
       </div>
@@ -2185,6 +2279,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 <span>Despachar Todo Ahora</span>
               </button>
             )}
+            <button
+              onClick={handleAbrirConsolidarDemanda}
+              className="shrink-0 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="Consolidar pedidos de clientes en espera de stock y generar Orden de Compra"
+            >
+              <Package size={13} />
+              <span>Consolidar Demanda</span>
+            </button>
           </div>
 
           {/* Barra de Filtros: Separación clara de Pendientes por Pedir y Enviadas */}
@@ -6491,6 +6593,315 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          MODAL CONSOLIDACIÓN DE DEMANDA DE CLIENTES (FASE 5.2)
+         ══════════════════════════════════════════ */}
+      {showConsolidarDemandaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/40">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600">
+                  <Package size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-[var(--foreground)]">
+                    Consolidación de Demanda para Órdenes de Compra
+                  </h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Agrupación automática de calzado faltante de pedidos de clientes en espera de stock.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConsolidarDemandaModal(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {loadingDemanda ? (
+                <div className="flex flex-col items-center justify-center py-16 text-[var(--muted-foreground)] space-y-2">
+                  <Loader2 className="animate-spin text-emerald-600" size={32} />
+                  <span className="text-xs">Analizando pedidos de clientes y stock en bodega...</span>
+                </div>
+              ) : !demandaPendienteData || !demandaPendienteData.items || demandaPendienteData.items.length === 0 ? (
+                <div className="text-center py-12 space-y-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl p-6">
+                  <CheckCircle2 size={36} className="mx-auto text-emerald-500" />
+                  <h4 className="font-bold text-sm text-[var(--foreground)]">
+                    No hay déficit de stock en pedidos pendientes
+                  </h4>
+                  <p className="text-xs text-[var(--muted-foreground)] max-w-md mx-auto">
+                    Todos los pedidos de clientes cuentan con inventario suficiente o ya se encuentran completados.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Selector de Proveedor Destinatario */}
+                  <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-[var(--foreground)] block mb-1">
+                        Proveedor Fabricante Destinatario:
+                      </label>
+                      <select
+                        value={proveedorConsolidarId}
+                        onChange={(e) => setProveedorConsolidarId(e.target.value)}
+                        className="px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="">-- Seleccionar Proveedor --</option>
+                        {proveedores.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.razonSocial || p.nombre} {p.contacto ? `(${p.contacto})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs font-semibold text-[var(--muted-foreground)]">
+                      <div>
+                        Total Modelos: <strong className="text-[var(--foreground)]">{demandaPendienteData.totalModelos}</strong>
+                      </div>
+                      <div>
+                        Pares Requeridos: <strong className="text-emerald-600 text-sm font-black">{demandaPendienteData.totalParesFaltantes}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lista de Modelos Faltantes (Rule 7 ModelTallaCurvaCard) */}
+                  <div className="space-y-3">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-[var(--muted-foreground)]">
+                      Modelos con Pedidos de Clientes en Espera de Mercancía:
+                    </div>
+
+                    {demandaPendienteData.items.map((item: any) => {
+                      const isSelected = Boolean(modelosSeleccionadosConsolidar[item.productId]);
+                      const cantPedir = cantidadesConsolidadasMap[item.productId] ?? item.totalParesFaltantes;
+                      const subtotal = cantPedir * (item.costPrice || 15);
+
+                      return (
+                        <div
+                          key={item.productId}
+                          className={`p-4 rounded-xl border transition-all ${
+                            isSelected
+                              ? 'bg-[var(--card)] border-emerald-500/40 shadow-xs ring-1 ring-emerald-500/20'
+                              : 'bg-[var(--muted)]/20 border-[var(--border)] opacity-60'
+                          }`}
+                        >
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            {/* Checkbox y Miniatura + Info */}
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) =>
+                                  setModelosSeleccionadosConsolidar((prev) => ({
+                                    ...prev,
+                                    [item.productId]: e.target.checked,
+                                  }))
+                                }
+                                className="mt-2.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                              />
+
+                              <div className="w-12 h-12 rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden shrink-0 flex items-center justify-center">
+                                {item.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <Package size={20} className="text-[var(--muted-foreground)]" />
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-black uppercase text-xs text-[var(--foreground)]">
+                                    {item.modelName}
+                                  </h4>
+                                  <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
+                                    • {item.color}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                    Serie: {item.serieNombre}
+                                  </span>
+                                </div>
+
+                                {/* Desglose de Curva y Tallas faltantes */}
+                                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                  {item.tallas.map((t: any) => (
+                                    <span
+                                      key={t.tallaId}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--muted)] border border-[var(--border)] text-[10px] font-mono"
+                                    >
+                                      <strong className="text-[var(--foreground)]">T{t.tallaNumero}:</strong>
+                                      <span className="text-rose-600 dark:text-rose-400 font-bold">
+                                        {t.paresFaltantes}p
+                                      </span>
+                                    </span>
+                                  ))}
+                                </div>
+
+                                <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5 pt-0.5">
+                                  <span>Proveedor sugerido: <strong>{item.supplierName}</strong></span>
+                                  <span>•</span>
+                                  <span>{item.pedidosAfectados?.length || 0} pedido(s) de clientes</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Control de Pares a Pedir y Subtotal (Rule 7 Resumen Derecho) */}
+                            <div className="flex items-center gap-5 justify-end pl-8 md:pl-0">
+                              <div className="text-right">
+                                <label className="text-[10px] font-bold text-[var(--muted-foreground)] block">
+                                  Pares a Pedir
+                                </label>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setCantidadesConsolidadasMap((prev) => ({
+                                        ...prev,
+                                        [item.productId]: Math.max(1, (prev[item.productId] ?? item.totalParesFaltantes) - 6),
+                                      }))
+                                    }
+                                    className="w-6 h-6 rounded bg-[var(--muted)] hover:bg-[var(--border)] text-xs font-bold flex items-center justify-center cursor-pointer"
+                                  >
+                                    -6
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={cantPedir}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      setCantidadesConsolidadasMap((prev) => ({
+                                        ...prev,
+                                        [item.productId]: val,
+                                      }));
+                                    }}
+                                    className="w-16 px-2 py-1 text-center font-mono font-bold text-xs bg-[var(--card)] border border-[var(--border)] rounded-md"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setCantidadesConsolidadasMap((prev) => ({
+                                        ...prev,
+                                        [item.productId]: (prev[item.productId] ?? item.totalParesFaltantes) + 6,
+                                      }))
+                                    }
+                                    className="w-6 h-6 rounded bg-[var(--muted)] hover:bg-[var(--border)] text-xs font-bold flex items-center justify-center cursor-pointer"
+                                  >
+                                    +6
+                                  </button>
+                                </div>
+                                <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">
+                                  {(cantPedir / 12).toFixed(1)} Docenas
+                                </span>
+                              </div>
+
+                              <div className="text-right min-w-[90px]">
+                                <span className="text-[10px] text-[var(--muted-foreground)] block">
+                                  ${(item.costPrice || 15).toFixed(2)} / par
+                                </span>
+                                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono block">
+                                  ${subtotal.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Observaciones generales */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--foreground)] block mb-1">
+                      Observaciones o Instrucciones de Fabricación:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Prioridad para entrega urgente fin de semana..."
+                      value={observacionesConsolidar}
+                      onChange={(e) => setObservacionesConsolidar(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            {demandaPendienteData && demandaPendienteData.items && demandaPendienteData.items.length > 0 && (
+              <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--muted)]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {(() => {
+                  const seleccionados = demandaPendienteData.items.filter(
+                    (it: any) => modelosSeleccionadosConsolidar[it.productId]
+                  );
+                  const totalPares = seleccionados.reduce(
+                    (acc: number, it: any) => acc + (cantidadesConsolidadasMap[it.productId] ?? it.totalParesFaltantes),
+                    0
+                  );
+                  const totalMonto = seleccionados.reduce(
+                    (acc: number, it: any) =>
+                      acc +
+                      (cantidadesConsolidadasMap[it.productId] ?? it.totalParesFaltantes) * (it.costPrice || 15),
+                    0
+                  );
+
+                  return (
+                    <>
+                      <div className="flex items-center gap-4 text-xs font-semibold">
+                        <span>
+                          Modelos: <strong>{seleccionados.length}</strong>
+                        </span>
+                        <span>
+                          Pares: <strong className="text-emerald-600 text-sm font-black">{totalPares}</strong> ({ (totalPares / 12).toFixed(1) } Doc.)
+                        </span>
+                        <span>
+                          Costo Est.: <strong className="text-emerald-600 font-mono text-sm font-black">${totalMonto.toFixed(2)}</strong>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowConsolidarDemandaModal(false)}
+                          className="px-4 py-2 border border-[var(--border)] text-xs font-semibold rounded-xl hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={generandoOCConsolidada || seleccionados.length === 0 || !proveedorConsolidarId}
+                          onClick={handleGenerarOCConsolidada}
+                          className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                        >
+                          {generandoOCConsolidada ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              <span>Generando Orden...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Package size={14} />
+                              <span>Generar Orden de Compra Consolidada</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}
