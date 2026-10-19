@@ -226,6 +226,8 @@ interface ClienteHistorial {
     estado?: string;
     fecha: string;
     detalles?: any;
+    saldoAnterior?: number;
+    nuevoSaldo?: number;
   }[];
 }
 
@@ -1315,39 +1317,23 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     setSavingAbono(true);
     try {
-      // 1. Obtener notas con deuda ordenadas por antigüedad (FIFO: la más antigua primero)
-      const notasPendientes = [...carteraSeleccionada.cobros]
-        .filter((c) => Number(c.saldoPendiente) > 0)
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      // 1. Registrar abono unificado a nivel de cliente en una sola transacción atómica
+      const resAbono = await ApiService.post(`/financiero/cliente/${carteraSeleccionada.clientId}/abono`, {
+        monto: valor,
+        metodo: metodoAbono,
+        notas: notasAbono.trim() || undefined,
+        sucursalId: selectedSucursalCobroId || miLocalId,
+      });
 
-      if (notasPendientes.length === 0 && cobroSeleccionado) {
-        await ApiService.post(`/financiero/cobros/${cobroSeleccionado.id}/abono`, {
-          monto: valor,
-          metodo: metodoAbono,
-          notas: notasAbono.trim() || undefined,
-        });
-      } else {
-        // Distribuir en cascada FIFO a la nota más antigua y excedentes a las siguientes
-        let restante = valor;
-        for (const n of notasPendientes) {
-          if (restante <= 0) break;
-          const saldoNota = Number(n.saldoPendiente);
-          const montoParaEstaNota = Math.min(saldoNota, restante);
-          await ApiService.post(`/financiero/cobros/${n.id}/abono`, {
-            monto: montoParaEstaNota,
-            metodo: metodoAbono,
-            notas: notasAbono.trim() || undefined,
-          });
-          restante -= montoParaEstaNota;
-        }
-      }
+      const nuevoSaldoStr = resAbono?.nuevoSaldo !== undefined ? `$${Number(resAbono.nuevoSaldo).toFixed(2)}` : 'actualizado';
+      showToast(`Abono unificado de $${valor.toFixed(2)} registrado exitosamente. Nuevo saldo deudor: ${nuevoSaldoStr}.`, 'success');
 
-      showToast(`Abono de $${valor.toFixed(2)} registrado exitosamente. La cuenta comercial ha sido actualizada.`, 'success');
-
-      // Nombre o número de nota asociada
-      const numNotaRef = cobroSeleccionado?.saleNote?.numero
-        ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
-        : undefined;
+      // Nombre o número de recibo unificado asociado
+      const numNotaRef = resAbono?.reciboRef
+        ? `Recibo #${resAbono.reciboRef}`
+        : (cobroSeleccionado?.saleNote?.numero
+            ? `Nota #${String(cobroSeleccionado.saleNote.numero).padStart(4, '0')}`
+            : undefined);
 
       const datosAbonoRegistrado = {
         monto: valor,
@@ -1355,6 +1341,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         fecha: new Date().toLocaleDateString('es-EC'),
         notas: notasAbono.trim() || undefined,
         numeroNota: numNotaRef,
+        saldoAnterior: resAbono?.saldoAnterior,
+        nuevoSaldo: resAbono?.nuevoSaldo,
       };
 
       const carteraParaEnvio = { ...carteraSeleccionada, clienteTelefono: telefonoCliente };
@@ -3756,12 +3744,24 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                     isAbono ? 'text-emerald-600' : 'text-blue-600'
                                   }`}
                                 >
-                                  {isAbono ? `+ $${m.monto.toFixed(2)}` : `$${m.monto.toFixed(2)}`}
+                                  {isAbono ? `− $${m.monto.toFixed(2)}` : `+ $${m.monto.toFixed(2)}`}
                                 </div>
                                 {m.metodo && (
-                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-1">
+                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
                                     {m.metodo}
                                   </span>
+                                )}
+
+                                {/* Trazabilidad Contable Rigurosa: Saldo Anterior y Nuevo Saldo */}
+                                {m.saldoAnterior !== undefined && (
+                                  <div className="mt-1.5 pt-1.5 border-t border-[var(--border)]/60 flex flex-col items-end gap-0.5 text-[10px]">
+                                    <div className="text-[var(--muted-foreground)]">
+                                      Saldo Anterior: <span className="font-semibold text-[var(--foreground)]">${Number(m.saldoAnterior).toFixed(2)}</span>
+                                    </div>
+                                    <div className="text-[var(--muted-foreground)]">
+                                      Nuevo Saldo: <span className={`font-bold ${Number(m.nuevoSaldo) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>${Number(m.nuevoSaldo).toFixed(2)}</span>
+                                    </div>
+                                  </div>
                                 )}
 
                                 {/* Botones para generar PDF y WhatsApp en el historial */}
