@@ -22,6 +22,7 @@ import {
   ArrowUpRight,
   TrendingUp,
   Receipt,
+  RotateCcw,
   Building,
   ChevronDown,
   ChevronUp,
@@ -217,7 +218,7 @@ interface ClienteHistorial {
   movimientos: {
     id: string;
     pedidoId?: string;
-    tipo: 'COMPRA_PEDIDO' | 'ABONO';
+    tipo: 'COMPRA_PEDIDO' | 'ABONO' | 'DEVOLUCION';
     titulo: string;
     numeroCodigo?: string;
     descripcion: string;
@@ -578,7 +579,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [showHistorialModal, setShowHistorialModal] = useState(false);
   const [historialCliente, setHistorialCliente] = useState<ClienteHistorial | null>(null);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
-  const [filtroHistorial, setFiltroHistorial] = useState<'TODOS' | 'COMPRAS' | 'ABONOS'>('TODOS');
+  const [filtroHistorial, setFiltroHistorial] = useState<'TODOS' | 'COMPRAS' | 'ABONOS' | 'DEVOLUCIONES'>('TODOS');
   const [pedidoHistorialExpandidoId, setPedidoHistorialExpandidoId] = useState<string | null>(null);
 
   // Modal Facturación SRI
@@ -3681,18 +3682,18 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     <span className="text-xs font-extrabold text-[var(--foreground)] uppercase tracking-wider">
                       Línea de Tiempo de Transacciones
                     </span>
-                    <div className="flex gap-1">
-                      {(['TODOS', 'COMPRAS', 'ABONOS'] as const).map((f) => (
+                    <div className="flex gap-1 flex-wrap">
+                      {(['TODOS', 'COMPRAS', 'ABONOS', 'DEVOLUCIONES'] as const).map((f) => (
                         <button
                           key={f}
                           onClick={() => setFiltroHistorial(f)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                             filtroHistorial === f
-                              ? 'bg-[#0F172A] text-white'
+                              ? 'bg-[#0F172A] text-white shadow-xs'
                               : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)]'
                           }`}
                         >
-                          {f === 'TODOS' ? 'Todos' : f === 'COMPRAS' ? 'Compras / Pedidos' : 'Abonos'}
+                          {f === 'TODOS' ? 'Todos' : f === 'COMPRAS' ? 'Compras / Pedidos' : f === 'ABONOS' ? 'Abonos' : 'Devoluciones'}
                         </button>
                       ))}
                     </div>
@@ -3703,22 +3704,25 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       .filter((m) => {
                         if (filtroHistorial === 'COMPRAS') return m.tipo === 'COMPRA_PEDIDO';
                         if (filtroHistorial === 'ABONOS') return m.tipo === 'ABONO';
+                        if (filtroHistorial === 'DEVOLUCIONES') return m.tipo === 'DEVOLUCION';
                         return true;
                       })
                       .map((m) => {
                         const isAbono = m.tipo === 'ABONO';
                         const isPedido = m.tipo === 'COMPRA_PEDIDO';
-                        const isExpanded = isPedido && (pedidoHistorialExpandidoId === m.id);
+                        const isDevolucion = m.tipo === 'DEVOLUCION';
+                        const canExpand = isPedido || isDevolucion;
+                        const isExpanded = canExpand && (pedidoHistorialExpandidoId === m.id);
                         const lineas = m.detalles?.lineas || [];
 
                         return (
                           <div
                             key={m.id}
                             className={`p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-xl transition-all shadow-xs ${
-                              isPedido ? 'cursor-pointer hover:border-[#0F172A]/40' : ''
+                              canExpand ? 'cursor-pointer hover:border-[#0F172A]/40' : ''
                             } ${isExpanded ? 'ring-2 ring-[#0F172A]/10 border-[#0F172A]/30' : ''}`}
                             onClick={() => {
-                              if (isPedido) {
+                              if (canExpand) {
                                 setPedidoHistorialExpandidoId(isExpanded ? null : m.id);
                               }
                             }}
@@ -3728,6 +3732,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 {isPedido ? (
                                   <div className="p-2 rounded-xl mt-0.5 bg-blue-500/10 text-blue-600 flex items-center justify-center">
                                     {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                  </div>
+                                ) : isDevolucion ? (
+                                  <div className="p-2 rounded-xl mt-0.5 bg-rose-500/10 text-rose-600 flex items-center justify-center">
+                                    {isExpanded ? <ChevronUp size={16} /> : <RotateCcw size={16} />}
                                   </div>
                                 ) : (
                                   <div className="p-2 rounded-xl mt-0.5 bg-emerald-500/10 text-emerald-600">
@@ -3753,14 +3761,23 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                               <div className="text-right shrink-0">
                                 <div
                                   className={`text-xs font-black ${
-                                    isAbono ? 'text-emerald-600' : 'text-blue-600'
+                                    isAbono
+                                      ? 'text-emerald-600'
+                                      : isDevolucion
+                                      ? 'text-rose-600'
+                                      : 'text-blue-600'
                                   }`}
                                 >
-                                  {isAbono ? `− $${m.monto.toFixed(2)}` : `+ $${m.monto.toFixed(2)}`}
+                                  {isAbono || isDevolucion ? `− ${m.monto.toFixed(2)}` : `+ ${m.monto.toFixed(2)}`}
                                 </div>
                                 {m.metodo && (
                                   <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
                                     {m.metodo}
+                                  </span>
+                                )}
+                                {isDevolucion && (
+                                  <span className="px-1.5 py-0.5 bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded text-[9px] font-bold border border-rose-500/20 inline-block mt-0.5">
+                                    DEVOLUCIÓN
                                   </span>
                                 )}
 

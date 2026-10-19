@@ -420,6 +420,16 @@ export default function ComercialComponent({
   const [preciosCorregirMap, setPreciosCorregirMap] = useState<Record<string, string>>({});
   const [guardandoCorreccionPrecio, setGuardandoCorreccionPrecio] = useState(false);
 
+  // ── Modal de Devolución de Calzado por Cliente (Fase 3) ──
+  const [showDevolucionModal, setShowDevolucionModal] = useState(false);
+  const [pedidoDevolucionSeleccionado, setPedidoDevolucionSeleccionado] = useState<Pedido | null>(null);
+  const [devolucionItemsMap, setDevolucionItemsMap] = useState<Record<string, number>>({});
+  const [devolucionDestinoStock, setDevolucionDestinoStock] = useState<'REINGRESO_INVENTARIO' | 'BAJA_POR_FALLA'>('REINGRESO_INVENTARIO');
+  const [devolucionMotivo, setDevolucionMotivo] = useState('Defecto de fábrica / Garantía');
+  const [devolucionObservacion, setDevolucionObservacion] = useState('');
+  const [procesandoDevolucion, setProcesandoDevolucion] = useState(false);
+  const [confirmandoDevolucionPaso, setConfirmandoDevolucionPaso] = useState(false);
+
   // Visor Lightbox de Foto de Calzado
   const [lightboxImage, setLightboxImage] = useState<{ url: string; title?: string } | null>(null);
 
@@ -2377,6 +2387,96 @@ export default function ComercialComponent({
     }
   };
 
+  // ── Handlers de Devolución de Calzado por Cliente (Fase 3) ──
+  const handleAbrirDevolucion = async (p: Pedido) => {
+    const pedidoTenantId = (p as any).tenantId || (p as any).sucursalId;
+    if (pedidoTenantId && miLocalId && pedidoTenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
+      showToast(`Solo la sucursal asignada a este pedido (${p.sucursalNombre || 'sucursal propietaria'}) puede registrar devoluciones.`, 'warning');
+      return;
+    }
+
+    let orderToUse = p;
+    try {
+      if (online) {
+        const fresh = await ApiService.get(`/pedidos/${p.id}`);
+        if (fresh && fresh.lines) orderToUse = fresh;
+      }
+    } catch (e) {}
+
+    const linesNormalizadas = (orderToUse.lines || []).map((l: any) => {
+      const yaEntregado = (l.cantidadEntregada !== undefined && l.cantidadEntregada !== null && l.cantidadEntregada > 0)
+        ? l.cantidadEntregada
+        : (orderToUse.estado === 'ENTREGADO' ? l.cantidad : 0);
+      const yaDevuelto = l.cantidadDevuelta || 0;
+      const disponible = Math.max(0, yaEntregado - yaDevuelto);
+      return { ...l, cantidadEntregada: yaEntregado, cantidadDevuelta: yaDevuelto, disponibleParaDevolver: disponible };
+    });
+
+    const hayParesDisponibles = linesNormalizadas.some((l: any) => l.disponibleParaDevolver > 0);
+    if (!hayParesDisponibles) {
+      showToast('Este pedido no tiene pares entregados disponibles para devolver (o ya fueron devueltos en su totalidad).', 'warning');
+      return;
+    }
+
+    orderToUse = { ...orderToUse, lines: linesNormalizadas };
+    setPedidoDevolucionSeleccionado(orderToUse);
+
+    const initialMap: Record<string, number> = {};
+    linesNormalizadas.forEach((l: any) => {
+      initialMap[l.id] = 0;
+    });
+    setDevolucionItemsMap(initialMap);
+    setDevolucionDestinoStock('REINGRESO_INVENTARIO');
+    setDevolucionMotivo('Defecto de fábrica / Garantía');
+    setDevolucionObservacion('');
+    setConfirmandoDevolucionPaso(false);
+    setShowDevolucionModal(true);
+  };
+
+  const handleEjecutarDevolucion = async () => {
+    if (!pedidoDevolucionSeleccionado) return;
+
+    const items = Object.entries(devolucionItemsMap)
+      .filter(([_, cant]) => Number(cant) > 0)
+      .map(([lineId, cantidadADevolver]) => ({
+        lineId,
+        cantidadADevolver: Number(cantidadADevolver),
+      }));
+
+    if (items.length === 0) {
+      showToast('Selecciona al menos 1 par para procesar la devolución.', 'warning');
+      return;
+    }
+
+    const totalPares = items.reduce((acc, it) => acc + it.cantidadADevolver, 0);
+
+    const motivoFinal = devolucionObservacion.trim()
+      ? `${devolucionMotivo} - ${devolucionObservacion.trim()}`
+      : devolucionMotivo;
+
+    setProcesandoDevolucion(true);
+    try {
+      const res: any = await ApiService.post(`/pedidos/${pedidoDevolucionSeleccionado.id}/devolucion`, {
+        motivo: motivoFinal,
+        destinoStock: devolucionDestinoStock,
+        items,
+      });
+
+      showToast(res.message || `Devolución exitosa: se procesaron ${totalPares} pares.`, 'success');
+      setShowDevolucionModal(false);
+      setPedidoDevolucionSeleccionado(null);
+      setDevolucionItemsMap({});
+      setDevolucionObservacion('');
+      setConfirmandoDevolucionPaso(false);
+      await loadPedidos();
+      await loadListaClientes();
+    } catch (err: any) {
+      showToast(err.message || 'Error al procesar la devolución del cliente', 'error');
+    } finally {
+      setProcesandoDevolucion(false);
+    }
+  };
+
     // ── Identificador del local propio del usuario ─────────
   const miLocalId = useMemo(() => {
     if (activeSucursalId && activeSucursalId !== 'TODAS') return activeSucursalId;
@@ -2878,6 +2978,17 @@ export default function ComercialComponent({
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        handleAbrirDevolucion(p);
+                                      }}
+                                      className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
+                                      title="Registrar devolución de calzado por garantía, defecto o cambio"
+                                    >
+                                      <RotateCcw size={12} /> Devolución
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         handleAbrirRevertirEntrega(p);
                                       }}
                                       className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1 cursor-pointer"
@@ -2910,6 +3021,17 @@ export default function ComercialComponent({
                                 <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
                                   <CheckCircle size={13} /> Entregado
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAbrirDevolucion(p);
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
+                                  title="Registrar devolución de calzado por garantía, defecto o cambio"
+                                >
+                                  <RotateCcw size={12} /> Devolución
+                                </button>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -7046,6 +7168,478 @@ export default function ComercialComponent({
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* MODAL: REGISTRAR DEVOLUCIÓN DE CALZADO POR CLIENTE (FASE 3)        */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {showDevolucionModal && pedidoDevolucionSeleccionado && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDevolucionModal(false);
+              setPedidoDevolucionSeleccionado(null);
+              setDevolucionItemsMap({});
+              setConfirmandoDevolucionPaso(false);
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDevolucionModal(false);
+              setPedidoDevolucionSeleccionado(null);
+              setDevolucionItemsMap({});
+              setConfirmandoDevolucionPaso(false);
+            }
+          }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-3xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Cabecera oscura institucional */}
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30 shrink-0">
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Registrar Devolución de Calzado</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
+                    Pedido #{pedidoDevolucionSeleccionado.numeroCodigo || pedidoDevolucionSeleccionado.id.slice(0, 8)} · {pedidoDevolucionSeleccionado.clienteNombre || 'Cliente'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDevolucionModal(false);
+                  setPedidoDevolucionSeleccionado(null);
+                  setDevolucionItemsMap({});
+                  setConfirmandoDevolucionPaso(false);
+                }}
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Contenido scrollable */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 min-h-0 text-xs">
+              {/* Selector de Destino de Stock */}
+              <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl space-y-2">
+                <label className="text-[11px] font-black uppercase tracking-wider text-[var(--foreground)] block">
+                  Destino de la Mercadería Devuelta:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDevolucionDestinoStock('REINGRESO_INVENTARIO')}
+                    className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                      devolucionDestinoStock === 'REINGRESO_INVENTARIO'
+                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-800 dark:text-emerald-300 font-bold shadow-xs'
+                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]'
+                    }`}
+                  >
+                    <Package size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+                    <div>
+                      <div className="text-xs font-bold text-[var(--foreground)]">📦 Reingreso a Bodega</div>
+                      <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                        Calzado en óptimo estado (talla no le quedó, cambio de modelo). Regresa al stock vendible.
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDevolucionDestinoStock('BAJA_POR_FALLA')}
+                    className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+                      devolucionDestinoStock === 'BAJA_POR_FALLA'
+                        ? 'bg-rose-500/10 border-rose-500 text-rose-800 dark:text-rose-300 font-bold shadow-xs'
+                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]'
+                    }`}
+                  >
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0 text-rose-600" />
+                    <div>
+                      <div className="text-xs font-bold text-[var(--foreground)]">⚠️ Falla / Garantía de Fábrica</div>
+                      <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                        Calzado con defecto o falla. Queda retenido como merma para reclamo y devolución al fabricante.
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Selector de Motivo de Devolución */}
+              <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl space-y-2">
+                <label className="text-[11px] font-black uppercase tracking-wider text-[var(--foreground)] block">
+                  Motivo de la Devolución:
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'Defecto de fábrica / Garantía',
+                    'Talla no le quedó al cliente',
+                    'Cambio de modelo o color',
+                    'Falla de pegado o costura',
+                    'Cancelación comercial',
+                  ].map((mot) => (
+                    <button
+                      key={mot}
+                      type="button"
+                      onClick={() => setDevolucionMotivo(mot)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        devolucionMotivo === mot
+                          ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                          : 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]'
+                      }`}
+                    >
+                      {mot}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-1">
+                  <input
+                    type="text"
+                    value={devolucionObservacion}
+                    onChange={(e) => setDevolucionObservacion(e.target.value)}
+                    placeholder="Detalles u observaciones adicionales (opcional)..."
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-1 focus:ring-rose-500"
+                  />
+                </div>
+              </div>
+
+              {/* Tarjetas de Modelos con Curva de Tallas entregadas (Rule 7 ModelTallaCurvaCard) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-[var(--foreground)]">
+                    Modelos Entregados en este Pedido:
+                  </label>
+                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                    Solo puedes devolver pares efectivamente entregados que no hayan sido devueltos antes.
+                  </span>
+                </div>
+
+                {(() => {
+                  const lineasEntregadas = (pedidoDevolucionSeleccionado.lines || []).filter(
+                    (l: any) => (l.disponibleParaDevolver !== undefined ? l.disponibleParaDevolver > 0 : (l.cantidadEntregada || 0) > 0)
+                  );
+
+                  if (lineasEntregadas.length === 0) {
+                    return (
+                      <div className="p-6 text-center text-xs text-[var(--muted-foreground)] bg-[var(--muted)]/20 rounded-2xl border border-dashed border-[var(--border)]">
+                        No hay pares entregados disponibles para devolver en este pedido.
+                      </div>
+                    );
+                  }
+
+                  // Agrupar por modelo/color
+                  const modelosGroup = new Map<string, any[]>();
+                  lineasEntregadas.forEach((l: any) => {
+                    const key = `${l.modelName || 'Calzado'}-${l.color || ''}-${l.serieNombre || ''}`;
+                    const list = modelosGroup.get(key) || [];
+                    list.push(l);
+                    modelosGroup.set(key, list);
+                  });
+
+                  return Array.from(modelosGroup.entries()).map(([mKey, tallasGroup]) => {
+                    const first = tallasGroup[0];
+                    const sortedTallas = [...tallasGroup].sort(
+                      (a, b) => (Number(a.numeroTalla) || 0) - (Number(b.numeroTalla) || 0)
+                    );
+
+                    const paresADevolverModelo = sortedTallas.reduce(
+                      (acc, l) => acc + (devolucionItemsMap[l.id] || 0),
+                      0
+                    );
+                    const subtotalDevolverModelo = sortedTallas.reduce(
+                      (acc, l) => acc + (devolucionItemsMap[l.id] || 0) * Number(l.precioUnitario || 0),
+                      0
+                    );
+
+                    return (
+                      <div
+                        key={mKey}
+                        className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-3.5 sm:p-4 flex flex-col gap-3 shadow-2xs hover:border-[var(--border)]/80 transition-all"
+                      >
+                        {/* Miniatura y Encabezado del Modelo */}
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-3">
+                            {first.imageUrl ? (
+                              <img
+                                src={first.imageUrl}
+                                alt={first.modelName}
+                                className="w-12 h-12 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center shrink-0">
+                                <Package size={20} className="text-[var(--muted-foreground)]" />
+                              </div>
+                            )}
+                            <div>
+                              <h4 className="font-black uppercase text-xs sm:text-sm text-[var(--foreground)] tracking-tight">
+                                {first.modelName || 'Calzado'}
+                              </h4>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                {first.color && (
+                                  <span className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+                                    Color: <span className="text-[var(--foreground)] font-bold">{first.color}</span>
+                                  </span>
+                                )}
+                                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  Serie: {first.serieNombre || 'Estándar'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-xs font-semibold text-[var(--muted-foreground)]">Precio Venta:</span>
+                            <div className="text-xs font-black font-mono text-[var(--foreground)]">
+                              ${Number(first.precioUnitario || 0).toFixed(2)} / par
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Curva de Tallas Entregadas y Controles de Devolución */}
+                        <div className="bg-[var(--muted)]/30 rounded-xl p-2.5 sm:p-3 border border-[var(--border)]/60">
+                          <div className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-foreground)] mb-2">
+                            Pares Entregados vs Cantidad a Devolver:
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {sortedTallas.map((l: any) => {
+                              const numTalla = l.numeroTalla || 0;
+                              const yaEntregado = l.cantidadEntregada || 0;
+                              const yaDevuelto = l.cantidadDevuelta || 0;
+                              const disponible = l.disponibleParaDevolver !== undefined
+                                ? l.disponibleParaDevolver
+                                : Math.max(0, yaEntregado - yaDevuelto);
+                              const aDevolver = devolucionItemsMap[l.id] || 0;
+
+                              return (
+                                <div
+                                  key={l.id}
+                                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 min-w-[76px] transition-all ${
+                                    aDevolver > 0
+                                      ? 'bg-rose-500/10 border-rose-500/40 text-rose-950 dark:text-rose-200'
+                                      : 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)]'
+                                  }`}
+                                >
+                                  <span className="text-xs font-black font-mono">T{numTalla}</span>
+                                  <span className="text-[9px] font-bold text-[var(--muted-foreground)]">
+                                    Disp: {disponible}
+                                  </span>
+                                  {yaDevuelto > 0 && (
+                                    <span className="text-[8px] font-semibold text-rose-600">
+                                      Dev: {yaDevuelto}
+                                    </span>
+                                  )}
+
+                                  {/* Controles numéricos − / + */}
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <button
+                                      type="button"
+                                      disabled={aDevolver <= 0}
+                                      onClick={() => {
+                                        setDevolucionItemsMap((prev) => ({
+                                          ...prev,
+                                          [l.id]: Math.max(0, aDevolver - 1),
+                                        }));
+                                      }}
+                                      className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-xs transition-colors ${
+                                        aDevolver <= 0
+                                          ? 'opacity-30 cursor-not-allowed bg-[var(--muted)] text-[var(--muted-foreground)]'
+                                          : 'bg-rose-500/20 text-rose-700 dark:text-rose-300 hover:bg-rose-500/30 cursor-pointer'
+                                      }`}
+                                      title={`Restar 1 par a devolver T${numTalla}`}
+                                    >
+                                      −
+                                    </button>
+                                    <span className="w-5 text-center font-black font-mono text-xs">
+                                      {aDevolver}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={aDevolver >= disponible}
+                                      onClick={() => {
+                                        setDevolucionItemsMap((prev) => ({
+                                          ...prev,
+                                          [l.id]: Math.min(disponible, aDevolver + 1),
+                                        }));
+                                      }}
+                                      className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-xs transition-colors ${
+                                        aDevolver >= disponible
+                                          ? 'opacity-30 cursor-not-allowed bg-[var(--muted)] text-[var(--muted-foreground)]'
+                                          : 'bg-rose-500/20 text-rose-700 dark:text-rose-300 hover:bg-rose-500/30 cursor-pointer'
+                                      }`}
+                                      title={`Sumar 1 par a devolver T${numTalla} (máx disponible: ${disponible})`}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Acciones Rápidas y Resumen del Modelo */}
+                        <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border)]/60 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextMap = { ...devolucionItemsMap };
+                                sortedTallas.forEach((l: any) => {
+                                  const disp = l.disponibleParaDevolver !== undefined
+                                    ? l.disponibleParaDevolver
+                                    : Math.max(0, (l.cantidadEntregada || 0) - (l.cantidadDevuelta || 0));
+                                  nextMap[l.id] = disp;
+                                });
+                                setDevolucionItemsMap(nextMap);
+                              }}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                              Devolver Todo el Modelo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextMap = { ...devolucionItemsMap };
+                                sortedTallas.forEach((l: any) => {
+                                  nextMap[l.id] = 0;
+                                });
+                                setDevolucionItemsMap(nextMap);
+                              }}
+                              className="px-2.5 py-1 bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--muted-foreground)] rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                            >
+                              Limpiar Modelo
+                            </button>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[11px] font-black text-rose-600 dark:text-rose-400">
+                              {paresADevolverModelo} {paresADevolverModelo === 1 ? 'par' : 'pares'} a devolver
+                            </span>
+                            {subtotalDevolverModelo > 0 && (
+                              <span className="text-[11px] font-mono font-bold text-[var(--muted-foreground)] ml-2">
+                                (-${subtotalDevolverModelo.toFixed(2)})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Barra de Totales Generales */}
+              {(() => {
+                const totalDevolucionGeneral = Object.values(devolucionItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0);
+                let montoTotalDevolucionGeneral = 0;
+                (pedidoDevolucionSeleccionado.lines || []).forEach((l: any) => {
+                  const cant = Number(devolucionItemsMap[l.id] || 0);
+                  if (cant > 0) {
+                    montoTotalDevolucionGeneral += cant * Number(l.precioUnitario || 0);
+                  }
+                });
+
+                return (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-slate-900 text-white rounded-xl flex items-center justify-between flex-wrap gap-3">
+                      <div>
+                        <div className="text-xs text-slate-300">Total pares seleccionados para devolución:</div>
+                        <div className="text-lg font-black text-rose-400 font-mono">
+                          {totalDevolucionGeneral} pares
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-slate-300">Descuento total a reflejar en cartera:</div>
+                        <div className="text-lg font-black text-emerald-400 font-mono">
+                          -${montoTotalDevolucionGeneral.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Paso de Confirmación dentro del Modal */}
+                    {confirmandoDevolucionPaso && (
+                      <div className="p-4 bg-rose-500/10 border-2 border-rose-500/30 rounded-2xl space-y-2 animate-in fade-in duration-200">
+                        <div className="flex items-center gap-2 text-rose-900 dark:text-rose-200 font-extrabold text-xs">
+                          <AlertTriangle size={18} className="text-rose-600 shrink-0" />
+                          <span>¿Confirmas el registro formal de esta devolución?</span>
+                        </div>
+                        <p className="text-[11px] text-rose-800 dark:text-rose-300 leading-relaxed">
+                          Se procesarán <strong>{totalDevolucionGeneral} pares</strong> con destino{' '}
+                          <strong>{devolucionDestinoStock === 'REINGRESO_INVENTARIO' ? 'REINGRESO A BODEGA' : 'BAJA POR FALLA / PROVEEDOR'}</strong>.
+                          Se descontarán automáticamente <strong>${montoTotalDevolucionGeneral.toFixed(2)}</strong> de la deuda o se registrarán a favor del cliente si ya estaba cancelado.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Pinned Footer */}
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+              {confirmandoDevolucionPaso ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={procesandoDevolucion}
+                    onClick={() => setConfirmandoDevolucionPaso(false)}
+                    className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                  >
+                    Volver y Modificar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={procesandoDevolucion}
+                    onClick={handleEjecutarDevolucion}
+                    className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                  >
+                    {procesandoDevolucion ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
+                    <span>Confirmar Devolución Definitiva</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDevolucionModal(false);
+                      setPedidoDevolucionSeleccionado(null);
+                      setDevolucionItemsMap({});
+                      setConfirmandoDevolucionPaso(false);
+                    }}
+                    className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center cursor-pointer transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      procesandoDevolucion ||
+                      Object.values(devolucionItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0) === 0
+                    }
+                    onClick={() => {
+                      const totalPares = Object.values(devolucionItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0);
+                      if (totalPares === 0) {
+                        showToast('Selecciona al menos 1 par para procesar la devolución.', 'warning');
+                        return;
+                      }
+                      setConfirmandoDevolucionPaso(true);
+                    }}
+                    className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
+                  >
+                    <RotateCcw size={15} />
+                    <span>Continuar a Confirmación</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Modal de Corrección de Precio Post-Venta / Post-Entrega */}
       {showCorregirPrecioModal && pedidoACorregir && (
