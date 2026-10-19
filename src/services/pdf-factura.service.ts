@@ -374,8 +374,19 @@ export function limpiarObservacionesOrden(obs?: string): string {
       if (lower.includes("demanda clientes")) return false;
       if (lower.includes("cliente:")) return false;
       if (lower.startsWith("nota:") && lower.includes("#")) return false;
+      if (lower.includes("curva:") || lower.startsWith("curva")) return false;
+      if (/^curva/i.test(lower)) return false;
+      if (/^t\d{2}\s*[:=]\s*\d+/i.test(p)) return false;
+      if (/^[-+]?\d+p\s*\(/i.test(lower)) return false;
+      if (lower.includes("anulación pedido") || lower.includes("anulacion pedido")) return false;
+      if (lower.includes("ajustada por anulación") || lower.includes("ajustada por anulacion")) return false;
       return true;
-    });
+    })
+    .map((p) => {
+      // Remover prefijos repetidos tipo "Nota:" o "Observación:"
+      return p.replace(/^(nota|observaci[oó]n):\s*/i, "").trim();
+    })
+    .filter(Boolean);
 
   return limpias.join(" • ").trim();
 }
@@ -712,12 +723,12 @@ export async function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): Promis
       });
     }
 
-    // Línea 4: Nota de taller si existe (limpia de clientes)
+    // Línea 4: Observación legítima de confección/entrega si existe
     if (obsLineaLimpia) {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(6.8);
       doc.setTextColor(180, 83, 9); // Amber 700
-      doc.text(`• Nota: ${obsLineaLimpia.substring(0, 80)}`, 34, y + rowHeight - 2.5);
+      doc.text(`• Observación: ${obsLineaLimpia.substring(0, 95)}`, 34, y + rowHeight - 2.5);
     }
 
     // ── Resumen Lateral Derecho ──

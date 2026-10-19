@@ -1173,18 +1173,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           ? tallas.reduce((s, t) => s + (Number(t.cantidad) || 0), 0)
           : c.cantidadPedida;
 
-        const curvaStr = tallas.length > 0
-          ? `Curva: ${tallas.map((t) => `T${t.talla}:${t.cantidad}`).join(', ')}`
-          : '';
-
+        // Limpiar cualquier residuo de curva que se haya podido concatenar antes
         let obs = (c.observacionLinea || '').trim();
-        if (curvaStr) {
-          if (obs.includes('Curva:')) {
-            obs = obs.replace(/Curva:\s*[^|;)]+/i, curvaStr).trim();
-          } else {
-            obs = obs ? `${obs} | ${curvaStr}` : curvaStr;
-          }
-        }
+        obs = obs.replace(/Curva:\s*[^|;)]+/gi, '').replace(/^\|\s*|\s*\|\s*$/g, '').trim();
 
         return {
           productId: c.productId,
@@ -3748,10 +3739,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   );
                                 }
 
+                                const obsLimpia = limpiarObservacionesOrden(obs);
+                                if (!obsLimpia) return null;
+
                                 return (
                                   <div className="mt-1.5">
                                     <p className="text-[10px] text-amber-600 dark:text-amber-400 italic">
-                                      Nota: {obs}
+                                      • Observación: {obsLimpia}
                                     </p>
                                   </div>
                                 );
@@ -3966,6 +3960,42 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 </span>
                               </div>
                             )}
+
+                            {/* Observación para taller (editable al modificar la orden) */}
+                            <div className="mt-2.5 pt-2 border-t border-[var(--border)]/40" onClick={(e) => e.stopPropagation()}>
+                              {editingOrder ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 shrink-0">
+                                    📝 Observación para taller:
+                                  </span>
+                                  <input
+                                    type="text"
+                                    placeholder="Ej: Hebilla dorada, suela caramelo en T38 y T39..."
+                                    value={line.observacionLinea || ''}
+                                    onChange={(e) => {
+                                      const updatedLines = [...(selectedOrder.lines || [])];
+                                      const target = updatedLines.find((l) => l.productId === line.productId);
+                                      if (target) {
+                                        target.observacionLinea = e.target.value;
+                                      }
+                                      setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                    }}
+                                    className="flex-1 px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs focus:outline-none focus:border-amber-500 text-[var(--foreground)]"
+                                  />
+                                </div>
+                              ) : (
+                                line.observacionLinea && (() => {
+                                  const obsLimpia = limpiarObservacionesOrden(line.observacionLinea);
+                                  if (!obsLimpia) return null;
+                                  return (
+                                    <div className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                      <span className="font-bold">📝 Observación taller:</span>
+                                      <span className="italic font-medium">{obsLimpia}</span>
+                                    </div>
+                                  );
+                                })()
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
