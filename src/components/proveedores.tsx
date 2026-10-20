@@ -265,8 +265,26 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
       (l as any).fotoUrl ||
       '';
 
-    // Si el usuario editó manualmente las tallas, usar esa versión
-    const tallasOverride = (l as any)._tallasOverride as Array<{ talla: string | number; cantidad: number }> | undefined;
+    // 1. Si el usuario editó manualmente las tallas en memoria durante la sesión activa:
+    let tallasOverride = (l as any)._tallasOverride as Array<{ talla: string | number; cantidad: number }> | undefined;
+
+    // 2. Si no hay override en memoria, verificar si la curva viene persistida en observacionLinea:
+    if (!tallasOverride && l.observacionLinea) {
+      const matchCurva = l.observacionLinea.match(/\[Curva:\s*([^\]]+)\]/i) || l.observacionLinea.match(/Curva:\s*([0-9:,\s]+)/i);
+      if (matchCurva) {
+        const partes = matchCurva[1].split(',').map((s: string) => s.trim()).filter(Boolean);
+        const parsedTallas = partes.map((pt: string) => {
+          const [tStr, cStr] = pt.split(':').map((x: string) => x.trim().replace(/^T/i, ''));
+          return {
+            talla: isNaN(Number(tStr)) ? tStr : Number(tStr),
+            cantidad: Number(cStr) || 0,
+          };
+        }).filter((t: any) => t.talla !== undefined && !isNaN(t.cantidad));
+        if (parsedTallas.length > 0) {
+          tallasOverride = parsedTallas;
+        }
+      }
+    }
 
     if (existing) {
       existing.cantidadPedida += l.cantidadPedida;
@@ -277,8 +295,25 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
       if (l.id) existing.ids.push(l.id);
 
       if (tallasOverride && tallasOverride.length > 0) {
-        // Usar las tallas editadas manualmente
-        existing.tallasDesglose = tallasOverride;
+        const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
+        if (Array.isArray(prodTallas) && prodTallas.length > 0) {
+          const sortedProdTallas = [...prodTallas].sort((a: any, b: any) => {
+            const numA = Number(a.numero ?? a.sizeNumber ?? a.talla ?? a.nombre) || 0;
+            const numB = Number(b.numero ?? b.sizeNumber ?? b.talla ?? b.nombre) || 0;
+            return numA - numB;
+          });
+          existing.tallasDesglose = sortedProdTallas.map((pt: any) => {
+            const num = pt.numero ?? pt.sizeNumber ?? pt.talla ?? pt.nombre ?? '38';
+            const found = tallasOverride?.find((to: any) => String(to.talla) === String(num));
+            return {
+              tallaId: pt.id || pt.tallaId || String(num),
+              talla: num,
+              cantidad: found ? Number(found.cantidad) || 0 : 0,
+            };
+          });
+        } else {
+          existing.tallasDesglose = tallasOverride;
+        }
       } else {
         // Recalcular tallas con la nueva cantidad total
         const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
@@ -301,8 +336,29 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
       let tallasCalc: Array<{ tallaId?: string; talla: string | number; cantidad: number }> = [];
 
       if (tallasOverride && tallasOverride.length > 0) {
-        // Usar las tallas editadas manualmente
-        tallasCalc = tallasOverride;
+        const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
+        if (Array.isArray(prodTallas) && prodTallas.length > 0) {
+          const sortedProdTallas = [...prodTallas].sort((a: any, b: any) => {
+            const numA = Number(a.numero ?? a.sizeNumber ?? a.talla ?? a.nombre) || 0;
+            const numB = Number(b.numero ?? b.sizeNumber ?? b.talla ?? b.nombre) || 0;
+            return numA - numB;
+          });
+          tallasCalc = sortedProdTallas.map((pt: any) => {
+            const num = pt.numero ?? pt.sizeNumber ?? pt.talla ?? pt.nombre ?? '38';
+            const found = tallasOverride?.find((to: any) => String(to.talla) === String(num));
+            return {
+              tallaId: pt.id || pt.tallaId || String(num),
+              talla: num,
+              cantidad: found ? Number(found.cantidad) || 0 : 0,
+            };
+          });
+        } else {
+          tallasCalc = tallasOverride.map((to: any) => ({
+            tallaId: (to as any).tallaId || String(to.talla),
+            talla: to.talla,
+            cantidad: Number(to.cantidad) || 0,
+          }));
+        }
       } else {
         const prodTallas = prodCat?.tallas || prodCat?.stockByTalla || l.producto?.tallas;
 
@@ -1200,24 +1256,41 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           ? tallas.reduce((s, t) => s + (Number(t.cantidad) || 0), 0)
           : c.cantidadPedida;
 
-        // Limpiar cualquier residuo de curva que se haya podido concatenar antes
+        // Limpiar cualquier residuo previo de curva
         let obs = (c.observacionLinea || '').trim();
-        obs = obs.replace(/Curva:\s*[^|;)]+/gi, '').replace(/^\|\s*|\s*\|\s*$/g, '').trim();
+        obs = obs
+          .replace(/\[Curva:\s*[^\]]+\]/gi, '')
+          .replace(/Curva:\s*[^|;)]+/gi, '')
+          .replace(/^\|\s*|\s*\|\s*$/g, '')
+          .trim();
+
+        // Serializar la curva exacta de tallas para que persista en BD
+        const curvaTag = tallas.length > 0
+          ? `[Curva: ${tallas.map((t) => `${t.talla}:${t.cantidad}`).join(', ')}]`
+          : '';
+
+        const obsFinal = [curvaTag, obs].filter(Boolean).join(' | ');
 
         return {
           productId: c.productId,
           cantidadPedida: cantFinal,
           precioCosto: c.precioCosto,
-          observacionLinea: obs || undefined,
+          observacionLinea: obsFinal || undefined,
         };
       });
 
+      // Añadir marca de ajuste manual si no la tiene para proteger la orden de auto-acumulaciones
+      let obsOrden = (selectedOrder.observaciones || '').trim();
+      if (!obsOrden.includes('[AJUSTE_MANUAL]')) {
+        obsOrden = obsOrden ? `[AJUSTE_MANUAL] ${obsOrden}` : '[AJUSTE_MANUAL]';
+      }
+
       await ApiService.put(`/proveedores/ordenes-compra/${selectedOrder.id}`, {
-        observaciones: selectedOrder.observaciones,
+        observaciones: obsOrden,
         lines: lineasAGuardar,
       });
 
-      showToast('Orden actualizada y sincronizada correctamente.', 'success');
+      showToast('Orden actualizada y guardada con éxito.', 'success');
       setEditingOrder(false);
       await handleVerDetalleOrden(selectedOrder.id);
       await loadData();
@@ -2496,22 +2569,29 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             </div>
                           </td>
                           <td className="px-4 py-3.5 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${
-                              o.estado === 'BORRADOR'
-                                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30'
-                                : o.estado === 'PENDIENTE'
-                                ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30'
-                                : o.estado === 'RECIBIDA_PARCIAL'
-                                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
-                                : o.estado === 'RECIBIDA'
-                                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                                : 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30'
-                            }`}>
-                              {o.estado === 'BORRADOR' && <Clock size={10} />}
-                              {o.estado === 'PENDIENTE' && <Send size={10} />}
-                              {o.estado === 'RECIBIDA' && <CheckCircle size={10} />}
-                              {o.estado === 'BORRADOR' ? 'Pendiente por Pedir' : o.estado === 'PENDIENTE' ? 'Enviada al Proveedor' : o.estado === 'RECIBIDA_PARCIAL' ? 'Recibida Parcial' : o.estado === 'RECIBIDA' ? 'Recibida en Bodega' : o.estado === 'CANCELADA' ? 'Cancelada' : o.estado}
-                            </span>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold ${
+                                o.estado === 'BORRADOR'
+                                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30'
+                                  : o.estado === 'PENDIENTE'
+                                  ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                                  : o.estado === 'RECIBIDA_PARCIAL'
+                                  ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                                  : o.estado === 'RECIBIDA'
+                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                                  : 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30'
+                              }`}>
+                                {o.estado === 'BORRADOR' && <Clock size={10} />}
+                                {o.estado === 'PENDIENTE' && <Send size={10} />}
+                                {o.estado === 'RECIBIDA' && <CheckCircle size={10} />}
+                                {o.estado === 'BORRADOR' ? 'Pendiente por Pedir' : o.estado === 'PENDIENTE' ? 'Enviada al Proveedor' : o.estado === 'RECIBIDA_PARCIAL' ? 'Recibida Parcial' : o.estado === 'RECIBIDA' ? 'Recibida en Bodega' : o.estado === 'CANCELADA' ? 'Cancelada' : o.estado}
+                              </span>
+                              {o.observaciones?.includes('[AJUSTE_MANUAL]') && (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20 text-[9px] font-bold" title="Orden fijada manualmente según presupuesto del local">
+                                  <span>🔒 Ajuste Manual</span>
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3.5 text-right font-bold text-[#0F172A] dark:text-amber-400 font-mono text-sm">
                             ${Number(o.total).toFixed(2)}
@@ -3607,8 +3687,18 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                         : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                     }`}>
-                      {selectedOrder.estado === 'BORRADOR' ? 'Borrador (Acumulándose)' : selectedOrder.estado === 'PENDIENTE' ? 'Enviada al Proveedor' : selectedOrder.estado}
+                      {selectedOrder.estado === 'BORRADOR' 
+                        ? (selectedOrder.observaciones?.includes('[AJUSTE_MANUAL]') ? 'Borrador Fijado' : 'Borrador (Acumulándose)') 
+                        : selectedOrder.estado === 'PENDIENTE' 
+                        ? 'Enviada al Proveedor' 
+                        : selectedOrder.estado}
                     </span>
+                    {selectedOrder.observaciones?.includes('[AJUSTE_MANUAL]') && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1" title="Esta orden fue ajustada manualmente según tu presupuesto y está protegida contra alteraciones automáticas">
+                        <span>🔒</span>
+                        <span>Ajustada Manualmente</span>
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5">
                     Proveedor: <strong className="text-white">{selectedOrder.supplier?.razonSocial || selectedOrder.supplier?.nombre}</strong> ({selectedOrder.supplier?.ruc})
@@ -3683,14 +3773,21 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 {editingOrder ? (
                   <textarea
                     rows={2}
-                    value={selectedOrder.observaciones || ''}
-                    onChange={(e) => setSelectedOrder({ ...selectedOrder, observaciones: e.target.value })}
+                    value={(selectedOrder.observaciones || '').replace(/\[AJUSTE_MANUAL\]\s*/g, '').trim()}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      const hasTag = (selectedOrder.observaciones || '').includes('[AJUSTE_MANUAL]');
+                      setSelectedOrder({
+                        ...selectedOrder,
+                        observaciones: hasTag ? `[AJUSTE_MANUAL] ${text}`.trim() : text,
+                      });
+                    }}
                     placeholder="Instrucciones al proveedor..."
                     className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
                   />
                 ) : (
                   <p className="text-xs text-[var(--foreground)] italic">
-                    {selectedOrder.observaciones || 'Sin observaciones registradas.'}
+                    {(selectedOrder.observaciones || '').replace(/\[AJUSTE_MANUAL\]\s*/g, '').trim() || 'Sin observaciones registradas.'}
                   </p>
                 )}
               </div>
@@ -3889,15 +3986,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                           const newTallas = [...(line.tallasDesglose || [])];
                                           newTallas[tIdx] = { ...newTallas[tIdx], cantidad: td.cantidad - 1 };
                                           const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
-                                          // Update the actual order lines
-                                          const updatedLines = [...(selectedOrder.lines || [])];
-                                          const target = updatedLines.find((l) => l.productId === line.productId);
-                                          if (target) {
-                                            target.cantidadPedida = newTotal;
-                                            // Store tallas breakdown in a temporary field for UI
-                                            (target as any)._tallasOverride = newTallas;
-                                          }
-                                          setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                          const otherLines = (selectedOrder.lines || []).filter((l) => l.productId !== line.productId);
+                                          const baseLine = (selectedOrder.lines || []).find((l) => l.productId === line.productId) || line;
+                                          const updatedLine = {
+                                            ...baseLine,
+                                            cantidadPedida: newTotal,
+                                            subtotal: newTotal * (baseLine.precioCosto || line.precioCosto || 0),
+                                            _tallasOverride: newTallas,
+                                            tallasDesglose: newTallas,
+                                          };
+                                          setSelectedOrder({ ...selectedOrder, lines: [...otherLines, updatedLine] });
                                         }}
                                         className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors"
                                         title={`Quitar 1 par T${td.talla}`}
@@ -3913,13 +4011,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                           const newTallas = [...(line.tallasDesglose || [])];
                                           newTallas[tIdx] = { ...newTallas[tIdx], cantidad: td.cantidad + 1 };
                                           const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
-                                          const updatedLines = [...(selectedOrder.lines || [])];
-                                          const target = updatedLines.find((l) => l.productId === line.productId);
-                                          if (target) {
-                                            target.cantidadPedida = newTotal;
-                                            (target as any)._tallasOverride = newTallas;
-                                          }
-                                          setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                          const otherLines = (selectedOrder.lines || []).filter((l) => l.productId !== line.productId);
+                                          const baseLine = (selectedOrder.lines || []).find((l) => l.productId === line.productId) || line;
+                                          const updatedLine = {
+                                            ...baseLine,
+                                            cantidadPedida: newTotal,
+                                            subtotal: newTotal * (baseLine.precioCosto || line.precioCosto || 0),
+                                            _tallasOverride: newTallas,
+                                            tallasDesglose: newTallas,
+                                          };
+                                          setSelectedOrder({ ...selectedOrder, lines: [...otherLines, updatedLine] });
                                         }}
                                         className="w-5 h-5 flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded text-xs font-black transition-colors"
                                         title={`Agregar 1 par T${td.talla}`}
@@ -3947,13 +4048,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       return { ...t, cantidad: t.cantidad + qty };
                                     });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
-                                    const updatedLines = [...(selectedOrder.lines || [])];
-                                    const target = updatedLines.find((l) => l.productId === line.productId);
-                                    if (target) {
-                                      target.cantidadPedida = newTotal;
-                                      (target as any)._tallasOverride = newTallas;
-                                    }
-                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                    const otherLines = (selectedOrder.lines || []).filter((l) => l.productId !== line.productId);
+                                    const baseLine = (selectedOrder.lines || []).find((l) => l.productId === line.productId) || line;
+                                    const updatedLine = {
+                                      ...baseLine,
+                                      cantidadPedida: newTotal,
+                                      subtotal: newTotal * (baseLine.precioCosto || line.precioCosto || 0),
+                                      _tallasOverride: newTallas,
+                                      tallasDesglose: newTallas,
+                                    };
+                                    setSelectedOrder({ ...selectedOrder, lines: [...otherLines, updatedLine] });
                                   }}
                                   className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                 >
@@ -3971,13 +4075,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       return { ...t, cantidad: t.cantidad + qty };
                                     });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
-                                    const updatedLines = [...(selectedOrder.lines || [])];
-                                    const target = updatedLines.find((l) => l.productId === line.productId);
-                                    if (target) {
-                                      target.cantidadPedida = newTotal;
-                                      (target as any)._tallasOverride = newTallas;
-                                    }
-                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                    const otherLines = (selectedOrder.lines || []).filter((l) => l.productId !== line.productId);
+                                    const baseLine = (selectedOrder.lines || []).find((l) => l.productId === line.productId) || line;
+                                    const updatedLine = {
+                                      ...baseLine,
+                                      cantidadPedida: newTotal,
+                                      subtotal: newTotal * (baseLine.precioCosto || line.precioCosto || 0),
+                                      _tallasOverride: newTallas,
+                                      tallasDesglose: newTallas,
+                                    };
+                                    setSelectedOrder({ ...selectedOrder, lines: [...otherLines, updatedLine] });
                                   }}
                                   className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                 >
@@ -3995,13 +4102,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
                                     });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
-                                    const updatedLines = [...(selectedOrder.lines || [])];
-                                    const target = updatedLines.find((l) => l.productId === line.productId);
-                                    if (target) {
-                                      target.cantidadPedida = newTotal;
-                                      (target as any)._tallasOverride = newTallas;
-                                    }
-                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                    const otherLines = (selectedOrder.lines || []).filter((l) => l.productId !== line.productId);
+                                    const baseLine = (selectedOrder.lines || []).find((l) => l.productId === line.productId) || line;
+                                    const updatedLine = {
+                                      ...baseLine,
+                                      cantidadPedida: newTotal,
+                                      subtotal: newTotal * (baseLine.precioCosto || line.precioCosto || 0),
+                                      _tallasOverride: newTallas,
+                                      tallasDesglose: newTallas,
+                                    };
+                                    setSelectedOrder({ ...selectedOrder, lines: [...otherLines, updatedLine] });
                                   }}
                                   className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                 >
@@ -4019,13 +4129,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       return { ...t, cantidad: Math.max(0, t.cantidad - qty) };
                                     });
                                     const newTotal = newTallas.reduce((s, t) => s + t.cantidad, 0);
-                                    const updatedLines = [...(selectedOrder.lines || [])];
-                                    const target = updatedLines.find((l) => l.productId === line.productId);
-                                    if (target) {
-                                      target.cantidadPedida = newTotal;
-                                      (target as any)._tallasOverride = newTallas;
-                                    }
-                                    setSelectedOrder({ ...selectedOrder, lines: updatedLines });
+                                    const otherLines = (selectedOrder.lines || []).filter((l) => l.productId !== line.productId);
+                                    const baseLine = (selectedOrder.lines || []).find((l) => l.productId === line.productId) || line;
+                                    const updatedLine = {
+                                      ...baseLine,
+                                      cantidadPedida: newTotal,
+                                      subtotal: newTotal * (baseLine.precioCosto || line.precioCosto || 0),
+                                      _tallasOverride: newTallas,
+                                      tallasDesglose: newTallas,
+                                    };
+                                    setSelectedOrder({ ...selectedOrder, lines: [...otherLines, updatedLine] });
                                   }}
                                   className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                 >

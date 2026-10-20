@@ -374,7 +374,8 @@ export function limpiarObservacionesOrden(obs?: string): string {
       if (lower.includes("demanda clientes")) return false;
       if (lower.includes("cliente:")) return false;
       if (lower.startsWith("nota:") && lower.includes("#")) return false;
-      if (lower.includes("curva:") || lower.startsWith("curva")) return false;
+      if (lower.includes("curva:") || lower.startsWith("curva") || lower.includes("[curva:")) return false;
+      if (lower.includes("[ajuste_manual]") || lower.includes("ajuste manual")) return false;
       if (/^curva/i.test(lower)) return false;
       if (/^t\d{2}\s*[:=]\s*\d+/i.test(p)) return false;
       if (/^[-+]?\d+p\s*\(/i.test(lower)) return false;
