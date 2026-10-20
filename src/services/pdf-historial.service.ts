@@ -610,7 +610,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
 
   (data.entregas || []).forEach((ent) => {
     const resumenModelos = ent.items.map((it) => `${it.totalPares}p ${it.modelo}`).join(', ');
-    const descCorta = resumenModelos.length > 26 ? resumenModelos.substring(0, 26) + '...' : resumenModelos;
+    const descCorta = resumenModelos.length > 58 ? resumenModelos.substring(0, 55) + '...' : resumenModelos;
     movimientosCronologicos.push({
       fecha: ent.fecha,
       fechaRaw: ent.fechaRaw || ent.fechaEntrega || ent.fecha,
@@ -707,71 +707,80 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.8);
     doc.setTextColor(71, 85, 105);
-    doc.text('FECHA', 16, y + 4.2);
-    doc.text('COMPROBANTE / REF.', 36, y + 4.2);
-    doc.text('DETALLE OPERATIVO', 70, y + 4.2);
-    doc.text('ENTREGA (+)', 142, y + 4.2, { align: 'right' });
-    doc.text('ABONO (-)', 168, y + 4.2, { align: 'right' });
-    doc.text('SALDO (=)', 194, y + 4.2, { align: 'right' });
+    doc.text('FECHA', 15, y + 4.2);
+    doc.text('COMPROBANTE', 33, y + 4.2);
+    doc.text('DETALLE OPERATIVO', 56, y + 4.2);
+    doc.text('ENTREGA (+)', 146, y + 4.2, { align: 'right' });
+    doc.text('ABONO (-)', 171, y + 4.2, { align: 'right' });
+    doc.text('SALDO (=)', 195, y + 4.2, { align: 'right' });
     y += 7.5;
 
     movimientosCronologicos.forEach((mov, idx) => {
-      checkSaltoPagina(6.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.8);
+      const colDetalleW = 72; // Ancho ampliado para que no se corten los modelos
+      const lineasDetalle = doc.splitTextToSize(mov.detalle, colDetalleW);
+      const numLineas = Math.max(1, lineasDetalle.length);
+      const rowHeight = numLineas > 1 ? 5.2 + (numLineas - 1) * 3.4 : 5.6;
+
+      checkSaltoPagina(rowHeight + 1);
+
       if (idx % 2 === 1) {
         doc.setFillColor(248, 250, 252);
-        doc.rect(12, y - 1, pageWidth - 24, 5.5, 'F');
+        doc.rect(12, y - 0.8, pageWidth - 24, rowHeight, 'F');
       }
 
+      // Fecha
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
+      doc.setFontSize(6.8);
       doc.setTextColor(30, 41, 59);
-      doc.text(mov.fecha, 16, y + 3);
+      doc.text(mov.fecha, 15, y + 3.2);
 
+      // Comprobante
       doc.setFont('helvetica', 'bold');
       if (mov.tipo === 'ENTREGA') {
         doc.setTextColor(37, 99, 235);
-        doc.text(mov.referencia, 36, y + 3);
       } else if (mov.tipo === 'ABONO') {
         doc.setTextColor(16, 185, 129);
-        doc.text(mov.referencia, 36, y + 3);
       } else {
         doc.setTextColor(225, 29, 72);
-        doc.text(mov.referencia, 36, y + 3);
       }
+      doc.text(mov.referencia, 33, y + 3.2);
 
+      // Detalle Operativo (adaptable a 1 o más líneas con interlineado perfecto)
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(71, 85, 105);
-      doc.text(mov.detalle, 70, y + 3, { maxWidth: 50 });
+      doc.text(lineasDetalle, 56, y + 3.2);
 
       // Columna Entrega (Cargo +)
       doc.setFont('helvetica', 'bold');
       if (mov.cargo > 0) {
         doc.setTextColor(37, 99, 235);
-        doc.text(`+$${mov.cargo.toFixed(2)}`, 142, y + 3, { align: 'right' });
+        doc.text(`+$${mov.cargo.toFixed(2)}`, 146, y + 3.2, { align: 'right' });
       } else {
         doc.setTextColor(148, 163, 184);
-        doc.text('—', 142, y + 3, { align: 'right' });
+        doc.text('—', 146, y + 3.2, { align: 'right' });
       }
 
       // Columna Abono (Pago -)
       if (mov.abono > 0) {
         doc.setTextColor(16, 185, 129);
-        doc.text(`-$${mov.abono.toFixed(2)}`, 168, y + 3, { align: 'right' });
+        doc.text(`-$${mov.abono.toFixed(2)}`, 171, y + 3.2, { align: 'right' });
       } else {
         doc.setTextColor(148, 163, 184);
-        doc.text('—', 168, y + 3, { align: 'right' });
+        doc.text('—', 171, y + 3.2, { align: 'right' });
       }
 
       // Columna Saldo Resultante (=)
       if (mov.saldoResultante !== undefined) {
         doc.setTextColor(mov.saldoResultante > 0 ? 225 : 5, mov.saldoResultante > 0 ? 29 : 150, mov.saldoResultante > 0 ? 72 : 105);
-        doc.text(`$${mov.saldoResultante.toFixed(2)}`, 194, y + 3, { align: 'right' });
+        doc.text(`$${mov.saldoResultante.toFixed(2)}`, 195, y + 3.2, { align: 'right' });
       } else {
         doc.setTextColor(148, 163, 184);
-        doc.text('—', 194, y + 3, { align: 'right' });
+        doc.text('—', 195, y + 3.2, { align: 'right' });
       }
 
-      y += 5.5;
+      y += rowHeight;
     });
 
     // ── Cuadro de Cierre Contable Matemático ──
