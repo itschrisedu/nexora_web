@@ -1724,40 +1724,45 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       filtroCompartirFechaInicio === rangoFechasHistorial.minFecha &&
       filtroCompartirFechaFin === rangoFechasHistorial.maxFecha;
 
-    return {
-      emisor: {
-        nombre: emisorNombre,
-        ruc: emisorRuc,
-        direccion: emisorDireccion,
-        telefono: emisorTelefono,
-        email: emisorEmail,
-        sucursal: 'Matriz Cevallos',
-      },
-      cliente: {
-        nombre: historialCliente.cliente.nombre,
-        cedula: historialCliente.cliente.cedula,
-        telefono: compartirTelefonoDestino || historialCliente.cliente.telefono,
-        email: compartirEmailDestino || historialCliente.cliente.email,
-        direccion: historialCliente.cliente.direccion,
-        nivelCredito: historialCliente.cliente.nivelCredito,
-        limiteCredito: historialCliente.cliente.limiteCredito,
-      },
-      periodo: {
-        fechaInicio: filtroCompartirFechaInicio || rangoFechasHistorial.minFecha,
-        fechaFin: filtroCompartirFechaFin || rangoFechasHistorial.maxFecha,
-        esHistoricoCompleto: esCompleto,
-      },
-      resumen: {
-        totalEntregasMonto,
-        totalParesEntregados,
-        totalAbonosMonto,
-        totalDevolucionesMonto,
-        saldoPendienteFinal: historialCliente.resumen.saldoPendienteTotal,
-      },
-      entregas,
-      abonos,
-      devoluciones,
-    };
+      const saldoPendienteCalculado = Math.max(
+        0,
+        Math.round((totalEntregasMonto - totalAbonosMonto - totalDevolucionesMonto) * 100) / 100
+      );
+
+      return {
+        emisor: {
+          nombre: emisorNombre,
+          ruc: emisorRuc,
+          direccion: emisorDireccion,
+          telefono: emisorTelefono,
+          email: emisorEmail,
+          sucursal: 'Matriz Cevallos',
+        },
+        cliente: {
+          nombre: historialCliente.cliente.nombre,
+          cedula: historialCliente.cliente.cedula,
+          telefono: compartirTelefonoDestino || historialCliente.cliente.telefono,
+          email: compartirEmailDestino || historialCliente.cliente.email,
+          direccion: historialCliente.cliente.direccion,
+          nivelCredito: historialCliente.cliente.nivelCredito,
+          limiteCredito: historialCliente.cliente.limiteCredito,
+        },
+        periodo: {
+          fechaInicio: filtroCompartirFechaInicio || rangoFechasHistorial.minFecha,
+          fechaFin: filtroCompartirFechaFin || rangoFechasHistorial.maxFecha,
+          esHistoricoCompleto: esCompleto,
+        },
+        resumen: {
+          totalEntregasMonto: Math.round(totalEntregasMonto * 100) / 100,
+          totalParesEntregados,
+          totalAbonosMonto: Math.round(totalAbonosMonto * 100) / 100,
+          totalDevolucionesMonto: Math.round(totalDevolucionesMonto * 100) / 100,
+          saldoPendienteFinal: saldoPendienteCalculado,
+        },
+        entregas,
+        abonos,
+        devoluciones,
+      };
   };
 
   const handleDescargarHistorialPdf = async () => {

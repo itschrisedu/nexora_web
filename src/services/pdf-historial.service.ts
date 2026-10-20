@@ -346,11 +346,15 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
 
   // ── 3. Resumen Financiero del Período (KPIs) ───────────────────
   const cardW = (pageWidth - 24 - 9) / 4;
+  const saldoMatematico = Math.max(
+    0,
+    Math.round((data.resumen.totalEntregasMonto - data.resumen.totalAbonosMonto - data.resumen.totalDevolucionesMonto) * 100) / 100
+  );
   const kpis = [
     { label: 'TOTAL ENTREGADO', val: `$${data.resumen.totalEntregasMonto.toFixed(2)}`, sub: `${data.resumen.totalParesEntregados} pares`, color: [37, 99, 235] },
     { label: 'TOTAL ABONADO', val: `-$${data.resumen.totalAbonosMonto.toFixed(2)}`, sub: `${data.abonos.length} pagos`, color: [16, 185, 129] },
     { label: 'DEVOLUCIONES', val: `-$${data.resumen.totalDevolucionesMonto.toFixed(2)}`, sub: `${data.devoluciones.length} reg.`, color: [225, 29, 72] },
-    { label: 'SALDO DEUDOR', val: `$${data.resumen.saldoPendienteFinal.toFixed(2)}`, sub: 'Saldo al corte', color: data.resumen.saldoPendienteFinal > 0 ? [225, 29, 72] : [16, 185, 129] },
+    { label: 'SALDO DEUDOR', val: `$${saldoMatematico.toFixed(2)}`, sub: 'Saldo al corte', color: saldoMatematico > 0 ? [225, 29, 72] : [16, 185, 129] },
   ];
 
   kpis.forEach((kpi, idx) => {
@@ -411,21 +415,10 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       doc.roundedRect(12, y, pageWidth - 24, 7, 1.2, 1.2, 'FD');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.8);
+      doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
       const numNota = ent.numeroNota ? `Nota #${ent.numeroNota}` : `Entrega #${index + 1}`;
-      doc.text(`📦 ${numNota} • Fecha: ${ent.fecha}`, 16, y + 4.8);
-
-      // Responsables de despacho
-      let respStr = '';
-      if (ent.entregadoPor) respStr += `Entregado por: ${ent.entregadoPor}`;
-      if (ent.vendedor) respStr += `${respStr ? ' | ' : ''}Vendedor: ${ent.vendedor}`;
-      if (respStr) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139);
-        doc.text(respStr, 85, y + 4.8);
-      }
+      doc.text(`${numNota} • Fecha: ${ent.fecha}`, 16, y + 4.8);
 
       // Total de la entrega
       doc.setFont('helvetica', 'bold');
@@ -605,25 +598,25 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
 
   (data.entregas || []).forEach((ent) => {
     const resumenModelos = ent.items.map((it) => `${it.totalPares}p ${it.modelo}`).join(', ');
+    const descCorta = resumenModelos.length > 26 ? resumenModelos.substring(0, 26) + '...' : resumenModelos;
     movimientosCronologicos.push({
       fecha: ent.fecha,
       fechaRaw: ent.fechaEntrega || ent.fecha,
       tipo: 'ENTREGA',
       referencia: ent.numeroNota ? `Nota #${ent.numeroNota}` : 'Nota de Entrega',
-      detalle: `Despacho de ${ent.totalPares} pares (${resumenModelos.substring(0, 45)}${resumenModelos.length > 45 ? '...' : ''})`,
+      detalle: descCorta ? `Despacho ${ent.totalPares}p (${descCorta})` : `Despacho de ${ent.totalPares} pares`,
       cargo: Number(ent.montoTotal || 0),
       abono: 0,
     });
   });
 
   (data.abonos || []).forEach((ab) => {
-    const cobStr = ab.cobradoPor ? ` • Cobrado: ${capitalizarNombreCompleto(ab.cobradoPor)}` : '';
     movimientosCronologicos.push({
       fecha: ab.fecha,
       fechaRaw: ab.fecha,
       tipo: 'ABONO',
       referencia: ab.numeroComprobante ? `Recibo #${ab.numeroComprobante}` : 'Recibo de Abono',
-      detalle: `Abono ${ab.formaPago}${cobStr}`,
+      detalle: `Abono ${ab.formaPago || 'EFECTIVO'}`,
       cargo: 0,
       abono: Number(ab.monto || 0),
     });
@@ -634,7 +627,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       fecha: dev.fecha,
       fechaRaw: dev.fecha,
       tipo: 'DEVOLUCION',
-      referencia: dev.motivo ? `Dev. ${dev.motivo.substring(0, 16)}` : 'Devolución',
+      referencia: dev.motivo ? `Dev. ${dev.motivo.substring(0, 14)}` : 'Devolución',
       detalle: dev.totalPares ? `Acreditación devolución (${dev.totalPares} pares)` : 'Acreditación por devolución',
       cargo: 0,
       abono: Number(dev.monto || 0),
@@ -669,10 +662,10 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     doc.setFontSize(6.8);
     doc.setTextColor(71, 85, 105);
     doc.text('FECHA', 16, y + 4.2);
-    doc.text('COMPROBANTE / REF.', 38, y + 4.2);
-    doc.text('DETALLE OPERATIVO', 76, y + 4.2);
-    doc.text('ENTREGA (+)', 144, y + 4.2, { align: 'right' });
-    doc.text('ABONO (−)', 168, y + 4.2, { align: 'right' });
+    doc.text('COMPROBANTE / REF.', 36, y + 4.2);
+    doc.text('DETALLE OPERATIVO', 70, y + 4.2);
+    doc.text('ENTREGA (+)', 142, y + 4.2, { align: 'right' });
+    doc.text('ABONO (-)', 168, y + 4.2, { align: 'right' });
     doc.text('SALDO (=)', 194, y + 4.2, { align: 'right' });
     y += 7.5;
 
@@ -691,27 +684,27 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       doc.setFont('helvetica', 'bold');
       if (mov.tipo === 'ENTREGA') {
         doc.setTextColor(37, 99, 235);
-        doc.text(`📦 ${mov.referencia}`, 38, y + 3);
+        doc.text(mov.referencia, 36, y + 3);
       } else if (mov.tipo === 'ABONO') {
         doc.setTextColor(16, 185, 129);
-        doc.text(`💳 ${mov.referencia}`, 38, y + 3);
+        doc.text(mov.referencia, 36, y + 3);
       } else {
         doc.setTextColor(225, 29, 72);
-        doc.text(`↩️ ${mov.referencia}`, 38, y + 3);
+        doc.text(mov.referencia, 36, y + 3);
       }
 
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(71, 85, 105);
-      doc.text(mov.detalle, 76, y + 3);
+      doc.text(mov.detalle, 70, y + 3, { maxWidth: 50 });
 
       // Columna Entrega (Cargo +)
       doc.setFont('helvetica', 'bold');
       if (mov.cargo > 0) {
         doc.setTextColor(37, 99, 235);
-        doc.text(`+$${mov.cargo.toFixed(2)}`, 144, y + 3, { align: 'right' });
+        doc.text(`+$${mov.cargo.toFixed(2)}`, 142, y + 3, { align: 'right' });
       } else {
         doc.setTextColor(148, 163, 184);
-        doc.text('—', 144, y + 3, { align: 'right' });
+        doc.text('—', 142, y + 3, { align: 'right' });
       }
 
       // Columna Abono (Pago -)
@@ -754,7 +747,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text('Total Abonos Recibidos (−):', cierreX + 4, y + 9.5);
+    doc.text('Total Abonos Recibidos (-):', cierreX + 4, y + 9.5);
     doc.setTextColor(16, 185, 129);
     doc.setFont('helvetica', 'bold');
     doc.text(`-$${data.resumen.totalAbonosMonto.toFixed(2)}`, cierreX + cierreW - 4, y + 9.5, { align: 'right' });
@@ -762,7 +755,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     if (data.resumen.totalDevolucionesMonto > 0) {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(71, 85, 105);
-      doc.text('Total Devoluciones Acreditadas (−):', cierreX + 4, y + 13.5);
+      doc.text('Total Devoluciones Acreditadas (-):', cierreX + 4, y + 13.5);
       doc.setTextColor(225, 29, 72);
       doc.setFont('helvetica', 'bold');
       doc.text(`-$${data.resumen.totalDevolucionesMonto.toFixed(2)}`, cierreX + cierreW - 4, y + 13.5, { align: 'right' });
@@ -776,10 +769,9 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     doc.setTextColor(15, 23, 42);
     doc.text('SALDO FINAL PENDIENTE (=):', cierreX + 4, y + 20.2);
 
-    const saldoFinal = data.resumen.saldoPendienteFinal;
-    if (saldoFinal > 0) {
+    if (saldoMatematico > 0) {
       doc.setTextColor(225, 29, 72); // Rose
-      doc.text(`$${saldoFinal.toFixed(2)}`, cierreX + cierreW - 4, y + 20.2, { align: 'right' });
+      doc.text(`$${saldoMatematico.toFixed(2)}`, cierreX + cierreW - 4, y + 20.2, { align: 'right' });
     } else {
       doc.setTextColor(5, 150, 105); // Emerald
       doc.text('$0.00 (AL DÍA)', cierreX + cierreW - 4, y + 20.2, { align: 'right' });
@@ -867,8 +859,7 @@ export async function armarMensajeWhatsAppHistorial(
     const ordenadas = [...data.entregas].sort((a, b) => new Date(a.fechaEntrega || a.fecha).getTime() - new Date(b.fechaEntrega || b.fecha).getTime());
     ordenadas.forEach((ent) => {
       const notaStr = ent.numeroNota ? ` (Nota ${ent.numeroNota})` : '';
-      const entregadorStr = ent.entregadoPor ? ` • Entregado por: ${ent.entregadoPor}` : '';
-      msg += `🔹 *${ent.fecha}*${notaStr}${entregadorStr}\n`;
+      msg += `🔹 *${ent.fecha}*${notaStr}\n`;
       ent.items.forEach((it) => {
         const colorStr = it.color ? ` (${it.color})` : '';
         const serieStr = it.serie && it.serie !== 'Estándar' ? ` • Serie: ${it.serie}` : '';
