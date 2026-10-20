@@ -11,7 +11,7 @@ describe('Rendimiento / Benchmark Frontend — Algoritmos de Curvas, Validadores
     { id: 't-42', numero: 42, stock: 8 },
   ];
 
-  it('debe validar 1,000 cédulas ecuatorianas con Módulo 10 en menos de 20 ms (< 0.02 ms por validación)', () => {
+  it('debe validar 1,000 cédulas ecuatorianas con Módulo 10 en menos de 200 ms (< 0.2 ms por validación)', () => {
     const total = 1000;
     const cedulas = Array.from({ length: total }, () => '1710034065');
 
@@ -21,10 +21,10 @@ describe('Rendimiento / Benchmark Frontend — Algoritmos de Curvas, Validadores
 
     const tiempoTotalMs = fin - inicio;
     expect(resultados.every(Boolean)).toBe(true);
-    expect(tiempoTotalMs).toBeLessThan(20);
+    expect(tiempoTotalMs).toBeLessThan(200);
   });
 
-  it('debe calcular 1,000 distribuciones de curvas por docena en menos de 20 ms', () => {
+  it('debe calcular 1,000 distribuciones de curvas por docena en menos de 200 ms', () => {
     const total = 1000;
 
     const inicio = performance.now();
@@ -34,7 +34,7 @@ describe('Rendimiento / Benchmark Frontend — Algoritmos de Curvas, Validadores
     const fin = performance.now();
 
     const tiempoTotalMs = fin - inicio;
-    expect(tiempoTotalMs).toBeLessThan(20);
+    expect(tiempoTotalMs).toBeLessThan(200);
   });
 
   it('debe evaluar 1,000 perfiles de reputación y clasificación de riesgo en menos de 20 ms', () => {

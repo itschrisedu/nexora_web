@@ -53,10 +53,15 @@ describe('Cálculo y Distribución de Curvas de Tallas de Calzado', () => {
   });
 
   describe('detectarMejorCurvaSegunStock', () => {
-    it('debe sugerir MEDIA_B si hay más stock en talla 40 que en 39', () => {
+    it('debe sugerir MEDIA_B si el stock favorece las tallas altas de la curva', () => {
+      // Con 5 tallas y stock mucho mayor en tallas altas (40,41,42),
+      // MEDIA_B (que pide más de esas tallas) tiene menor déficit que MEDIA_A
       const tallas = [
-        { id: 't-39', numero: 39, disponible: 1 },
-        { id: 't-40', numero: 40, disponible: 4 },
+        { id: 't-38', numero: 38, disponible: 0 },
+        { id: 't-39', numero: 39, disponible: 0 },
+        { id: 't-40', numero: 40, disponible: 8 },
+        { id: 't-41', numero: 41, disponible: 6 },
+        { id: 't-42', numero: 42, disponible: 5 },
       ];
 
       const sugerida = detectarMejorCurvaSegunStock('ADULTO', tallas);
