@@ -1826,6 +1826,7 @@ function MainApp() {
               />
             )
           )}
+          {vistaActual === 'pos' && <PosComponent />}
           {vistaActual === 'reportes' && (
             <ReportesComponent
               user={user}
