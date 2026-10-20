@@ -1058,6 +1058,36 @@ export default function ModelosComponent({
     });
   };
 
+  // Preselección estricta de serie por proveedor:
+  // Si el proveedor ya tiene variantes previas en este modelo, preseleccionar estrictamente solo sus series asignadas.
+  const getSeriesPreseleccionadasParaProveedor = (m: ModeloAgrupado, supId: string): string[] => {
+    if (!m || !m.products || m.products.length === 0) return [];
+
+    const prodsDelProveedor = m.products.filter(p => {
+      const pSupId = p.supplierId || (p.supplier as any)?.id;
+      if (supId) {
+        return pSupId === supId;
+      } else {
+        return !pSupId || pSupId === m.supplierId;
+      }
+    });
+
+    const seriesDelProveedor = Array.from(
+      new Set(prodsDelProveedor.map(p => (p.serie as any)?.id || (p as any).serieId).filter(Boolean))
+    ) as string[];
+
+    if (seriesDelProveedor.length > 0) {
+      return seriesDelProveedor;
+    }
+
+    // Si aún no tiene variantes en este modelo, usar las series generales del modelo
+    const todasSeriesModelo = Array.from(
+      new Set(m.products.map(p => (p.serie as any)?.id || (p as any).serieId).filter(Boolean))
+    ) as string[];
+
+    return todasSeriesModelo;
+  };
+
   const openAddColorModal = (m: ModeloAgrupado) => {
     setSelectedModelForColor(m);
     setNewColorName("");
@@ -1065,16 +1095,14 @@ export default function ModelosComponent({
     const defaultSupId = m.supplierId || (m.suppliers && m.suppliers.length > 0 ? m.suppliers[0].id : "");
     setNewColorSupplierId(defaultSupId);
 
-    const existingSerieIds = Array.from(
-      new Set((m.products || []).map(p => p.serie?.id).filter(Boolean))
-    ) as string[];
-
-    setNewColorSerieIds(existingSerieIds);
+    // Preselección estricta de serie según el proveedor inicial
+    const preselectedSerieIds = getSeriesPreseleccionadasParaProveedor(m, defaultSupId);
+    setNewColorSerieIds(preselectedSerieIds);
     
     const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
     const initialCustomTallas: Record<string, string[]> = {};
 
-    existingSerieIds.forEach(sid => {
+    preselectedSerieIds.forEach(sid => {
       // Buscar si este proveedor ya tiene precio registrado para esta serie
       const prod = m.products.find(p => (p.supplierId === defaultSupId || p.supplier?.id === defaultSupId) && p.serie?.id === sid)
         || (defaultSupId === m.supplierId ? m.products.find(p => p.serie?.id === sid) : undefined);
@@ -1102,10 +1130,14 @@ export default function ModelosComponent({
     setNewColorSupplierId(newSupId);
     if (!selectedModelForColor) return;
 
+    // Preselección estricta de serie según el proveedor seleccionado
+    const preselectedSerieIds = getSeriesPreseleccionadasParaProveedor(selectedModelForColor, newSupId);
+    setNewColorSerieIds(preselectedSerieIds);
+
     // Actualizar los precios para cada serie activa según el historial de este proveedor en el modelo o en knownSeriesCosts
     setNewColorSeriesPrices(prev => {
       const updated = { ...prev };
-      newColorSerieIds.forEach(sid => {
+      preselectedSerieIds.forEach(sid => {
         const cacheKey = `${sid}_${newSupId || 'default'}`;
         const matchingProd = selectedModelForColor.products?.find(
           p => (p.supplierId === newSupId || (p.supplier as any)?.id === newSupId) && ((p.serie as any)?.id === sid || (p as any).serieId === sid)
@@ -1128,6 +1160,20 @@ export default function ModelosComponent({
               costPrice: String(baseProd.precioCosto),
               salePrice: String(baseProd.precioVenta),
             };
+          }
+        }
+      });
+      return updated;
+    });
+
+    setNewColorCustomTallas(prev => {
+      const updated = { ...prev };
+      preselectedSerieIds.forEach(sid => {
+        if (!updated[sid] || updated[sid].length === 0) {
+          const sObj = series.find(s => s.id === sid);
+          if (sObj?.tallas) {
+            const docena = getDocenaBaseParaSerie(sObj);
+            updated[sid] = buildTallaIdsFromCurva(sObj, docena);
           }
         }
       });
@@ -1770,6 +1816,14 @@ export default function ModelosComponent({
         }));
       }
 
+      // Actualizar selección visual del color del modelo si cambió el nombre
+      if (editProduct.modelId) {
+        setSelectedColorForModel(prev => ({
+          ...prev,
+          [editProduct.modelId]: editProductColor.trim(),
+        }));
+      }
+
       setSuccess("Variante actualizada exitosamente.");
       setShowEditProduct(false);
       setEditProduct(null);
@@ -1790,7 +1844,8 @@ export default function ModelosComponent({
     setEditModelBaseCode(m.baseCode);
     setEditModelMaterial(m.material || "");
     setEditModelSupplierId(m.supplierId || "");
-    setEditModelAlternateIds(m.alternateSupplierIds || []);
+    // El proveedor principal nunca debe estar duplicado en los alternos
+    setEditModelAlternateIds((m.alternateSupplierIds || []).filter(id => id && id !== m.supplierId));
 
     const activeSerieIds: string[] = [];
     const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
@@ -1908,13 +1963,16 @@ export default function ModelosComponent({
 
     setSaving(true);
     try {
+      // El proveedor principal nunca debe duplicarse en los alternos
+      const cleanAlternates = editModelAlternateIds.filter(id => id && id !== editModelSupplierId);
+
       await ApiService.put(`/inventario/modelos/${editModel.id}`, {
         name: editModelName.trim(),
         brand: editModelBrand.trim(),
         baseCode: editModelBaseCode.trim(),
         material: editModelMaterial.trim() || undefined,
         supplierId: editModelSupplierId || null,
-        alternateSupplierIds: editModelAlternateIds.filter(Boolean),
+        alternateSupplierIds: cleanAlternates,
       });
 
       // Actualizar precios y serie SOLO en las variantes que corresponden al proveedor principal o sin proveedor específico
@@ -4668,7 +4726,27 @@ export default function ModelosComponent({
               <div>
                 <Lbl t="Proveedor Principal" />
                 <div className="flex gap-2">
-                  <select value={editModelSupplierId} onChange={e => setEditModelSupplierId(e.target.value)} className={`${INPUT} flex-1`}>
+                  <select
+                    value={editModelSupplierId}
+                    onChange={e => {
+                      const newPrincipal = e.target.value;
+                      const oldPrincipal = editModelSupplierId;
+                      setEditModelSupplierId(newPrincipal);
+                      setEditModelAlternateIds(prev => {
+                        let updated = [...prev];
+                        // Si el nuevo principal estaba en los alternos, removerlo de alternos
+                        if (newPrincipal) {
+                          updated = updated.filter(id => id !== newPrincipal);
+                        }
+                        // Si había un principal previo y es distinto al nuevo, pasa automáticamente a ser alterno para no perderlo
+                        if (oldPrincipal && oldPrincipal !== newPrincipal && !updated.includes(oldPrincipal)) {
+                          updated.push(oldPrincipal);
+                        }
+                        return updated;
+                      });
+                    }}
+                    className={`${INPUT} flex-1`}
+                  >
                     <option value="">-- Sin Proveedor --</option>
                     {listaProveedores.map(p => (
                       <option key={p.id} value={p.id}>{p.razonSocial} {p.ruc ? `(${p.ruc})` : ''}</option>
