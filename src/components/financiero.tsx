@@ -1682,6 +1682,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         totalParesEntregados += paresPedido;
         entregas.push({
           fecha: m.fecha ? m.fecha.split('T')[0] : '',
+          fechaRaw: m.fecha || m.fechaEntrega || '',
           pedidoId: m.pedidoId || m.id,
           numeroNota: m.numeroCodigo || (m.titulo ? m.titulo.replace(/[^0-9]/g, '') : ''),
           vendedor: m.vendedorNombre,
@@ -1695,6 +1696,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         totalAbonosMonto += m.monto || 0;
         abonos.push({
           fecha: m.fecha ? m.fecha.split('T')[0] : '',
+          fechaRaw: m.fecha || '',
           numeroComprobante: m.numeroCodigo || (m.titulo ? m.titulo.replace(/[^0-9]/g, '') : ''),
           formaPago: m.metodo || 'EFECTIVO',
           referencia: m.numeroCodigo,
@@ -1709,6 +1711,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         const devPares = devLineas.reduce((acc: number, l: any) => acc + (l.cantidad || l.totalPares || 0), 0);
         devoluciones.push({
           fecha: m.fecha ? m.fecha.split('T')[0] : '',
+          fechaRaw: m.fecha || '',
           monto: m.monto,
           procesadoPor: m.procesadoPor,
           motivo: m.detalles?.motivo || m.descripcion,
@@ -1719,6 +1722,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     // Ordenar entregas y abonos cronológicamente de la más antigua a la más actual
     entregas.sort((a, b) => {
+      if (a.fechaRaw && b.fechaRaw && a.fechaRaw !== b.fechaRaw) {
+        const tA = new Date(a.fechaRaw).getTime();
+        const tB = new Date(b.fechaRaw).getTime();
+        if (!isNaN(tA) && !isNaN(tB) && tA !== tB) return tA - tB;
+      }
       if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
       const numA = parseInt(a.numeroNota?.replace(/\D/g, '') || '0', 10);
       const numB = parseInt(b.numeroNota?.replace(/\D/g, '') || '0', 10);
@@ -1726,6 +1734,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     });
 
     abonos.sort((a, b) => {
+      if (a.fechaRaw && b.fechaRaw && a.fechaRaw !== b.fechaRaw) {
+        const tA = new Date(a.fechaRaw).getTime();
+        const tB = new Date(b.fechaRaw).getTime();
+        if (!isNaN(tA) && !isNaN(tB) && tA !== tB) return tA - tB;
+      }
       if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
       const numA = parseInt(a.numeroComprobante?.replace(/\D/g, '') || '0', 10);
       const numB = parseInt(b.numeroComprobante?.replace(/\D/g, '') || '0', 10);

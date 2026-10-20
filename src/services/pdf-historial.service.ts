@@ -24,6 +24,7 @@ export interface HistorialComercialItemEntrega {
 
 export interface HistorialEntregaDetallada {
   fecha: string;
+  fechaRaw?: string;
   pedidoId?: string;
   numeroNota?: string;
   vendedor?: string;
@@ -36,6 +37,7 @@ export interface HistorialEntregaDetallada {
 
 export interface HistorialAbonoDetallado {
   fecha: string;
+  fechaRaw?: string;
   numeroComprobante?: string;
   formaPago: string;
   referencia?: string;
@@ -47,6 +49,7 @@ export interface HistorialAbonoDetallado {
 
 export interface HistorialDevolucionDetallada {
   fecha: string;
+  fechaRaw?: string;
   monto: number;
   procesadoPor?: string;
   motivo?: string;
@@ -595,118 +598,88 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     cargo: number;
     abono: number;
     saldoResultante?: number;
+    secuenciaDoc?: number;
   }> = [];
+
+  function extraerNumeroSecuencia(texto?: string): number {
+    if (!texto) return 0;
+    const matches = texto.match(/\d+/g);
+    if (!matches || matches.length === 0) return 0;
+    return parseInt(matches[matches.length - 1], 10);
+  }
 
   (data.entregas || []).forEach((ent) => {
     const resumenModelos = ent.items.map((it) => `${it.totalPares}p ${it.modelo}`).join(', ');
     const descCorta = resumenModelos.length > 26 ? resumenModelos.substring(0, 26) + '...' : resumenModelos;
     movimientosCronologicos.push({
       fecha: ent.fecha,
-      fechaRaw: ent.fechaEntrega || ent.fecha,
+      fechaRaw: ent.fechaRaw || ent.fechaEntrega || ent.fecha,
       tipo: 'ENTREGA',
       referencia: ent.numeroNota ? `Nota #${ent.numeroNota}` : 'Nota de Entrega',
       detalle: descCorta ? `Despacho ${ent.totalPares}p (${descCorta})` : `Despacho de ${ent.totalPares} pares`,
       cargo: Number(ent.montoTotal || 0),
       abono: 0,
+      secuenciaDoc: extraerNumeroSecuencia(ent.numeroNota),
     });
   });
 
   (data.abonos || []).forEach((ab) => {
     movimientosCronologicos.push({
       fecha: ab.fecha,
-      fechaRaw: ab.fecha,
+      fechaRaw: ab.fechaRaw || ab.fecha,
       tipo: 'ABONO',
       referencia: ab.numeroComprobante ? `Recibo #${ab.numeroComprobante}` : 'Recibo de Abono',
       detalle: `Abono ${ab.formaPago || 'EFECTIVO'}`,
       cargo: 0,
       abono: Number(ab.monto || 0),
+      secuenciaDoc: extraerNumeroSecuencia(ab.numeroComprobante),
     });
   });
 
   (data.devoluciones || []).forEach((dev) => {
     movimientosCronologicos.push({
       fecha: dev.fecha,
-      fechaRaw: dev.fecha,
+      fechaRaw: dev.fechaRaw || dev.fecha,
       tipo: 'DEVOLUCION',
       referencia: dev.motivo ? `Dev. ${dev.motivo.substring(0, 14)}` : 'Devolución',
       detalle: dev.totalPares ? `Acreditación devolución (${dev.totalPares} pares)` : 'Acreditación por devolución',
       cargo: 0,
       abono: Number(dev.monto || 0),
+      secuenciaDoc: 0,
     });
   });
 
-  // Función de ponderación para ordenar la corrida contable en la secuencia comercial real
-  function obtenerPesoJerarquicoMovimiento(mov: {
-    fecha: string;
-    tipo: 'ENTREGA' | 'ABONO' | 'DEVOLUCION';
-    referencia: string;
-    cargo: number;
-    abono: number;
-  }): number {
-    const ref = (mov.referencia || '').toUpperCase();
-    const numMatches = ref.match(/\d+/g);
-    const num = numMatches ? parseInt(numMatches[numMatches.length - 1], 10) : 0;
-
-    // 1. Entrega PED-0001 (6p Puma grande $96) -> Saldo: 96
-    if (ref.includes('PED-0001') || ref.includes('NOTA #0001') || (mov.tipo === 'ENTREGA' && num === 1)) {
-      return 10;
-    }
-    // 2. Abono $60 (Recibo #51) -> Saldo: 36
-    if (ref.includes('51') || (mov.tipo === 'ABONO' && Math.abs(mov.abono - 60) < 0.01)) {
-      return 20;
-    }
-    // 3. Entrega PED-0002 (12p Puma grande, 6p Samba Jane $282) -> Saldo: 318
-    if (ref.includes('PED-0002') || ref.includes('NOTA #0002') || (mov.tipo === 'ENTREGA' && num === 2) || (mov.tipo === 'ENTREGA' && Math.abs(mov.cargo - 282) < 0.01)) {
-      return 30;
-    }
-    // 4. Abono $100 (Recibo #60) -> Saldo: 218
-    if (ref.includes('60') && mov.tipo === 'ABONO') {
-      return 40;
-    }
-    // 5. Abono $100 (Recibo #63) -> Saldo: 118
-    if (ref.includes('63') && mov.tipo === 'ABONO') {
-      return 50;
-    }
-    // 6. Entrega PED-0003 (12p Puma, 6p Vanz, 6p Sb $378) -> Saldo: 496
-    if (ref.includes('PED-0003') || ref.includes('NOTA #0003') || (mov.tipo === 'ENTREGA' && num === 3) || (mov.tipo === 'ENTREGA' && Math.abs(mov.cargo - 378) < 0.01)) {
-      return 60;
-    }
-    // 7. Abono $180 (Recibo #83 del 2026-10-17) -> Saldo: 316
-    if (ref.includes('83') && mov.tipo === 'ABONO' && Math.abs(mov.abono - 180) < 0.01) {
-      return 70;
-    }
-    // 8. Entrega PED-0004 (12p calzado $192) -> Saldo: 508
-    if (ref.includes('PED-0004') || ref.includes('NOTA #0004') || (mov.tipo === 'ENTREGA' && num === 4)) {
-      return 80;
-    }
-    // 9. Entrega PED-0005 (12p calzado $192) -> Saldo: 700
-    if (ref.includes('PED-0005') || ref.includes('NOTA #0005') || (mov.tipo === 'ENTREGA' && num === 5)) {
-      return 90;
-    }
-    // 10. Abono $170 (Recibo #83 del 2026-10-19) -> Saldo: 530
-    if (ref.includes('83') && mov.tipo === 'ABONO' && Math.abs(mov.abono - 170) < 0.01) {
-      return 100;
-    }
-
-    // Criterio de ordenación natural para cualquier otro movimiento:
-    if (mov.tipo === 'ENTREGA') {
-      return 200 + (num > 0 ? num : 50);
-    } else if (mov.tipo === 'ABONO') {
-      return 300 + (num > 0 ? num : 50);
-    }
-    return 400;
-  }
-
-  // Ordenar estrictamente de la fecha más antigua a la más actual respetando la jerarquía comercial
+  // Ordenar estrictamente de la fecha/hora más antigua a la más actual respetando la jerarquía comercial
   movimientosCronologicos.sort((a, b) => {
+    // 1. Comparar por timestamp ISO exacto con hora/minuto/segundo si está disponible
+    if (a.fechaRaw && b.fechaRaw && a.fechaRaw !== b.fechaRaw) {
+      const timeA = new Date(a.fechaRaw).getTime();
+      const timeB = new Date(b.fechaRaw).getTime();
+      if (!isNaN(timeA) && !isNaN(timeB) && timeA !== timeB) {
+        return timeA - timeB;
+      }
+    }
+
+    // 2. Comparar por fecha YYYY-MM-DD
     if (a.fecha !== b.fecha) {
       return a.fecha.localeCompare(b.fecha);
     }
-    const pesoA = obtenerPesoJerarquicoMovimiento(a);
-    const pesoB = obtenerPesoJerarquicoMovimiento(b);
-    if (pesoA !== pesoB) {
-      return pesoA - pesoB;
+
+    // 3. Jerarquía comercial universal: La entrega genera la deuda antes de que el abono la liquide
+    const prioridadTipo: Record<string, number> = { ENTREGA: 1, ABONO: 2, DEVOLUCION: 3 };
+    const pA = prioridadTipo[a.tipo] || 2;
+    const pB = prioridadTipo[b.tipo] || 2;
+    if (pA !== pB) {
+      return pA - pB;
     }
+
+    // 4. Si son del mismo tipo en la misma fecha: Correlativo numérico de comprobante
+    const secA = a.secuenciaDoc || 0;
+    const secB = b.secuenciaDoc || 0;
+    if (secA !== secB) {
+      return secA - secB;
+    }
+
     return 0;
   });
 
