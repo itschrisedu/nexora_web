@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ApiService } from "../services/api.service";
 import UnsavedChangesModal from "./ui/unsaved-changes-modal";
 import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary.service";
 import {
   Plus, Search, Loader2, ImageIcon, Package, Edit2, Edit3, Trash2, AlertTriangle,
   DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette,
-  Layers, Boxes, Truck, Sparkles, Copy, Building2, PackageCheck, Info, Check
+  Layers, Boxes, Truck, Sparkles, Copy, Building2, PackageCheck, Info, Check, TrendingUp
 } from "lucide-react";
 import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
 import { dividirDocenaEnMediaDocena } from "../utils/curvas";
@@ -613,6 +613,49 @@ export default function ModelosComponent({
     isDirtyPrice, isDirtyAddColor, isDirtyEditProduct, isDirtyEditModel, isDirtyCreate
   ]);
 
+  const isSuperAdmin = userRole === "ROL_SUPER_ADMIN";
+  const sucursalLabel = useMemo(() => {
+    if (activeSucursalId && activeSucursalId !== 'TODAS') {
+      const suc = sucursales?.find((s) => s.id === activeSucursalId);
+      return suc?.name || 'Local Seleccionado';
+    }
+    return isSuperAdmin ? 'Consolidado General (Todos los locales)' : 'Mi Bodega Local';
+  }, [activeSucursalId, sucursales, isSuperAdmin]);
+
+  const resumenInventario = useMemo(() => {
+    let totalPares = 0;
+    let capitalInvertido = 0;
+    let valorComercial = 0;
+    const totalModelosCount = modelos.length;
+
+    modelos.forEach((m: any) => {
+      (m.products || []).forEach((p: any) => {
+        const costo = Number(p.precioCosto || 0);
+        const venta = Number(p.precioVenta || 0);
+        (p.tallas || (p as any).stockPorTalla || []).forEach((t: any) => {
+          const qty = Number(t.cantidad ?? t.stock ?? t.disponible ?? 0);
+          if (qty > 0) {
+            totalPares += qty;
+            capitalInvertido += qty * costo;
+            valorComercial += qty * venta;
+          }
+        });
+      });
+    });
+
+    const gananciaBruta = Math.max(0, valorComercial - capitalInvertido);
+    const margenPct = valorComercial > 0 ? Math.round((gananciaBruta / valorComercial) * 100) : 0;
+
+    return {
+      totalPares,
+      capitalInvertido,
+      valorComercial,
+      gananciaBruta,
+      margenPct,
+      totalModelosCount,
+    };
+  }, [modelos]);
+
   useEffect(() => {
     loadData();
     const handleMarginUpdate = (e: any) => {
@@ -626,8 +669,9 @@ export default function ModelosComponent({
   const loadData = async () => {
     setLoading(true);
     try {
+      const sucParam = activeSucursalId ? `?sucursalId=${activeSucursalId}` : '';
       const [mdls, redRes] = await Promise.all([
-        ApiService.get("/inventario/modelos").catch(() => []),
+        ApiService.get(`/inventario/modelos${sucParam}`).catch(() => []),
         ApiService.get("/inventario/modelos/red").catch(() => null),
       ]);
       if (Array.isArray(mdls)) {
@@ -2202,6 +2246,76 @@ export default function ModelosComponent({
       {/* ═════════════════════════════════════════════════════════ */}
       {activeTab === 'local' && (
         <div className="space-y-4">
+          {/* ── Panel de Valoración Económica del Inventario ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  Stock Físico Total
+                </span>
+                <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Boxes size={14} />
+                </span>
+              </div>
+              <div className="text-lg sm:text-xl font-black text-[var(--foreground)] font-mono">
+                {resumenInventario.totalPares.toLocaleString('es-EC')} <span className="text-xs font-bold text-[var(--muted-foreground)]">pares</span>
+              </div>
+              <span className="text-[10px] text-[var(--muted-foreground)] block">
+                En {resumenInventario.totalModelosCount} modelos ({sucursalLabel})
+              </span>
+            </div>
+
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  Capital Invertido (Costo)
+                </span>
+                <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <DollarSign size={14} />
+                </span>
+              </div>
+              <div className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 font-mono">
+                ${resumenInventario.capitalInvertido.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-[var(--muted-foreground)] block">
+                Costo adquisición en bodega
+              </span>
+            </div>
+
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  Valor Comercial Venta
+                </span>
+                <span className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                  <TrendingUp size={14} />
+                </span>
+              </div>
+              <div className="text-lg sm:text-xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                ${resumenInventario.valorComercial.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-[var(--muted-foreground)] block">
+                Proyección a PVP vigente
+              </span>
+            </div>
+
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-3.5 sm:p-4 space-y-1 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                  Margen Bruto en Stock
+                </span>
+                <span className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                  <Sparkles size={14} />
+                </span>
+              </div>
+              <div className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                ${resumenInventario.gananciaBruta.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-bold block">
+                {resumenInventario.margenPct}% margen proyectado
+              </span>
+            </div>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={16} />
             <input
@@ -2286,74 +2400,86 @@ export default function ModelosComponent({
                       </div>
 
                       {/* Acciones principales */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between md:justify-end gap-3 sm:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
-                        <div className="text-left sm:text-right flex sm:block items-center justify-between">
-                          <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Precios Variantes</span>
-                          <span className="text-sm font-black text-slate-900 dark:text-white block">
-                            {activeProduct ? `$${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
-                          </span>
-                          {isAdmin && activeProduct && (
-                            <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold block">
-                              Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(activeProduct.precioCosto).toFixed(2)}</strong>
-                            </span>
-                          )}
-                        </div>
+                      {(() => {
+                        const modelTotalPares = products.reduce((acc, p) => {
+                          const tArr = p.tallas || (p as any).stockPorTalla || [];
+                          return acc + tArr.reduce((s: number, t: any) => s + (t.cantidad ?? t.disponible ?? 0), 0);
+                        }, 0);
+                        const modelTotalInvertido = products.reduce((acc, p) => {
+                          const tArr = p.tallas || (p as any).stockPorTalla || [];
+                          const pPares = tArr.reduce((s: number, t: any) => s + (t.cantidad ?? t.disponible ?? 0), 0);
+                          return acc + pPares * Number(p.precioCosto || 0);
+                        }, 0);
 
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {online && isAdmin && (
-                            <>
+                        return (
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between md:justify-end gap-3 sm:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+                            <div className="text-left sm:text-right flex sm:block items-center justify-between">
+                              <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Stock & Inversión</span>
+                              <span className="text-xs font-black text-slate-900 dark:text-white block font-mono">
+                                {modelTotalPares} pares • <span className="text-amber-600 dark:text-amber-400">${modelTotalInvertido.toFixed(2)}</span>
+                              </span>
+                              <span className="text-[10px] text-[var(--muted-foreground)] block">
+                                {activeProduct ? `PVP: $${Number(activeProduct.precioVenta).toFixed(2)}` : "—"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {online && isAdmin && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditModel(m)}
+                                    title="Editar nombre, marca, código base o material del modelo"
+                                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-blue-600/10 text-blue-600 border border-blue-600/20 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Edit2 size={13} />
+                                    <span>Editar</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openAddColorModal(m)}
+                                    title="Añadir un nuevo color a este modelo"
+                                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                                  >
+                                    <Plus size={13} />
+                                    <span>Añadir Color</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleModel(m.id, m.name, m.active)}
+                                    className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+                                      m.active
+                                        ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+                                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                                    }`}
+                                  >
+                                    {m.active ? "Deshabilitar" : "Habilitar"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteModel(m.id, m.name)}
+                                    title="Eliminar modelo de este local comercial"
+                                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Trash2 size={13} />
+                                    <span>Eliminar</span>
+                                  </button>
+                                </>
+                              )}
                               <button
-                                type="button"
-                                onClick={() => openEditModel(m)}
-                                title="Editar nombre, marca, código base o material del modelo"
-                                className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-blue-600/10 text-blue-600 border border-blue-600/20 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                                onClick={() => toggleExpandModel(m.id)}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-[11px] sm:text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                               >
-                                <Edit2 size={13} />
-                                <span>Editar</span>
+                                {isExpanded ? (
+                                  <><span>Ocultar Variantes</span><ChevronUp size={14} /></>
+                                ) : (
+                                  <><span>Ver Variantes ({products.length})</span><ChevronDown size={14} /></>
+                                )}
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => openAddColorModal(m)}
-                                title="Añadir un nuevo color a este modelo"
-                                className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-                              >
-                                <Plus size={13} />
-                                <span>Añadir Color</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleModel(m.id, m.name, m.active)}
-                                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
-                                  m.active
-                                    ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
-                                    : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
-                                }`}
-                              >
-                                {m.active ? "Deshabilitar" : "Habilitar"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteModel(m.id, m.name)}
-                                title="Eliminar modelo de este local comercial"
-                                className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
-                              >
-                                <Trash2 size={13} />
-                                <span>Eliminar</span>
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => toggleExpandModel(m.id)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] text-[11px] sm:text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                          >
-                            {isExpanded ? (
-                              <><span>Ocultar Variantes</span><ChevronUp size={14} /></>
-                            ) : (
-                              <><span>Ver Variantes ({products.length})</span><ChevronDown size={14} /></>
-                            )}
-                          </button>
-                        </div>
-                      </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Vista Detallada de Variantes (Expandible) */}
@@ -2458,8 +2584,15 @@ export default function ModelosComponent({
                                       </span>
                                     ))}
                                   </div>
-                                  <div className="text-[10px] text-[var(--muted-foreground)] pt-1 flex justify-between">
-                                    <span>Total: <b>{totalStock} pares</b></span>
+                                  <div className="text-[10px] text-[var(--muted-foreground)] pt-1 flex justify-between items-center flex-wrap gap-1">
+                                    <span>
+                                      Total: <b className="text-[var(--foreground)]">{totalStock} pares</b>
+                                      {totalStock > 0 && (
+                                        <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/20">
+                                          Invertido: ${(totalStock * Number(p.precioCosto || 0)).toFixed(2)}
+                                        </span>
+                                      )}
+                                    </span>
                                     {totalStock === 0 && <span className="text-red-500 font-bold">Sin Stock</span>}
                                   </div>
                                 </div>

@@ -59,6 +59,9 @@ export default function DashboardComponent({
     totalPedidos: 0,
     clientesActivos: 0,
     creditoPendiente: 0,
+    capitalInvertidoStock: 0,
+    totalParesEnStock: 0,
+    valorComercialStock: 0,
     stockBajoCount: 0,
     tallasAgotadasCount: 0,
     totalModelos: 0,
@@ -90,8 +93,11 @@ export default function DashboardComponent({
           totalFacturado: Number(kpisBackend.totalIngresos || 0),
           totalParesVendidos: Number(kpisBackend.totalParesVendidos || 0),
           totalPedidos: Number(kpisBackend.totalPedidos || 0),
-          clientesActivos: Number(kpisBackend.saldoCarteraTotal || 0) > 0 ? 1 : 0,
+          clientesActivos: Number(kpisBackend.clientesConDeudaCount ?? (Number(kpisBackend.saldoCarteraTotal || 0) > 0 ? 1 : 0)),
           creditoPendiente: Number(kpisBackend.saldoCarteraTotal || 0),
+          capitalInvertidoStock: Number(kpisBackend.capitalInvertidoStock || 0),
+          totalParesEnStock: Number(kpisBackend.totalParesEnStock || 0),
+          valorComercialStock: Number(kpisBackend.valorComercialStock || 0),
           stockBajoCount: Number(kpisBackend.stockBajoCount || 0),
           tallasAgotadasCount: Number(kpisBackend.tallasAgotadasCount || 0),
           totalModelos: Number(kpisBackend.totalModelos || 0),
@@ -167,6 +173,9 @@ export default function DashboardComponent({
           totalPedidos: 0,
           clientesActivos: 0,
           creditoPendiente: 0,
+          capitalInvertidoStock: 0,
+          totalParesEnStock: 0,
+          valorComercialStock: 0,
           stockBajoCount: 0,
           tallasAgotadasCount: 0,
           totalModelos: 0,
@@ -315,7 +324,7 @@ export default function DashboardComponent({
         <KpiCardCompact
           title="Cartera por Cobrar"
           value={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`${kpis.clientesActivos} clientes con saldo`}
+          subtitle={`${kpis.clientesActivos} ${kpis.clientesActivos === 1 ? 'cliente con saldo' : 'clientes con saldo'}`}
           icon={<CreditCard size={16} />}
           iconBg="bg-amber-500/10 text-amber-500"
           gaugePercent={pctCartera}
@@ -327,24 +336,28 @@ export default function DashboardComponent({
         <KpiCardCompact
           title="Salud de Inventario"
           value={
-            kpis.stockBajoCount > 0
+            kpis.capitalInvertidoStock > 0
+              ? `$${kpis.capitalInvertidoStock.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`
+              : kpis.stockBajoCount > 0
               ? `${kpis.stockBajoCount} modelos alerta`
               : "100% Óptimo"
           }
           subtitle={
-            kpis.tallasAgotadasCount > 0
+            kpis.capitalInvertidoStock > 0
+              ? `${kpis.totalParesEnStock} pares en bodega (${kpis.stockBajoCount} con stock bajo)`
+              : kpis.tallasAgotadasCount > 0
               ? `${kpis.tallasAgotadasCount} tallas en 0 / < 12 pares`
               : kpis.stockBajoCount > 0
               ? `${kpis.stockBajoCount} con stock bajo (< 12 p)`
               : "Stock completo por talla"
           }
           icon={<AlertTriangle size={16} />}
-          iconBg={kpis.stockBajoCount > 0 ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500"}
-          valueColor={kpis.stockBajoCount > 0 ? "text-rose-500" : "text-emerald-600"}
+          iconBg={kpis.stockBajoCount > 0 ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500"}
+          valueColor={kpis.stockBajoCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600"}
           gaugePercent={pctStock}
           gaugeColor={pctStock < 50 ? "#EF4444" : pctStock < 85 ? "#F59E0B" : "#10B981"}
-          gaugeLabel={`${pctStock}% disponible`}
-          trend={kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} de ${kpis.totalModelos || kpis.stockBajoCount} afectados` : "Inventario al día"}
+          gaugeLabel={kpis.capitalInvertidoStock > 0 ? "Costo invertido" : `${pctStock}% disponible`}
+          trend={kpis.capitalInvertidoStock > 0 ? `${kpis.totalParesEnStock} pares en stock` : kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} de ${kpis.totalModelos || kpis.stockBajoCount} afectados` : "Inventario al día"}
           trendPositive={kpis.stockBajoCount === 0}
         />
       </div>
