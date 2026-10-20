@@ -377,7 +377,17 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [devSupplierId, setDevSupplierId] = useState('');
   const [devClienteDevolucionId, setDevClienteDevolucionId] = useState('');
   const [devMotivo, setDevMotivo] = useState('');
-  const [devEntregadoPor, setDevEntregadoPor] = useState('Bodega / Despacho');
+  const [devEntregadoPor, setDevEntregadoPor] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u?.nombre || u?.name || 'Bodega / Despacho';
+      } catch {
+        return 'Bodega / Despacho';
+      }
+    }
+    return 'Bodega / Despacho';
+  });
   const [devRecibidoPor, setDevRecibidoPor] = useState('');
   const [devLines, setDevLines] = useState<Array<{
     productId: string;
@@ -580,7 +590,17 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [entrySupplierId, setEntrySupplierId] = useState('');
   const [entryOrderId, setEntryOrderId] = useState('');
   const [entryEntregadoPor, setEntryEntregadoPor] = useState('');
-  const [entryRecibidoPor, setEntryRecibidoPor] = useState('Bodega / Recepción');
+  const [entryRecibidoPor, setEntryRecibidoPor] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        return u?.nombre || u?.name || 'Bodega / Recepción';
+      } catch {
+        return 'Bodega / Recepción';
+      }
+    }
+    return 'Bodega / Recepción';
+  });
   const [entryObservaciones, setEntryObservaciones] = useState('');
   const [entryModelos, setEntryModelos] = useState<Array<{
     productId: string;
@@ -1507,6 +1527,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     setShowOrderDetailModal(false);
     setActiveTab('ingreso');
     setEntrySupplierId(order.supplierId);
+    if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        if (u?.nombre || u?.name) setEntryRecibidoPor(u.nombre || u.name);
+      } catch {}
+    }
     handleSelectOrderForEntry(order.id);
   };
 
@@ -1725,10 +1751,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           : 'Recepción completada exitosamente. Stock físico y saldo por pagar actualizados al instante.',
         'success'
       );
+      const uLogged = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
       setEntrySupplierId('');
       setEntryOrderId('');
       setEntryEntregadoPor('');
-      setEntryRecibidoPor('Bodega / Recepción');
+      setEntryRecibidoPor(uLogged?.nombre || uLogged?.name || 'Bodega / Recepción');
       setEntryObservaciones('');
       setEntryModelos([]);
 
@@ -1837,8 +1864,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       setDevSupplierId(targetSuppId);
 
       const provTarget = proveedores.find((p) => p.id === targetSuppId);
+      const uLogged = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
       setDevRecibidoPor(provTarget?.contacto || provTarget?.razonSocial || '');
-      setDevEntregadoPor('Bodega / Despacho');
+      setDevEntregadoPor(uLogged?.nombre || uLogged?.name || 'Bodega / Despacho');
 
       setDevLines(
         (item.lines || []).map((l: any) => ({
@@ -1857,9 +1885,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       setDevClienteDevolucionId('');
       setDevMotivo('');
       const firstSupp = proveedores[0];
+      const uLogged = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
       setDevSupplierId(firstSupp?.id || '');
       setDevRecibidoPor(firstSupp?.contacto || firstSupp?.razonSocial || '');
-      setDevEntregadoPor('Bodega / Despacho');
+      setDevEntregadoPor(uLogged?.nombre || uLogged?.name || 'Bodega / Despacho');
       setDevLines([]);
     }
     setShowDevolucionModal(true);

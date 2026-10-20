@@ -2113,10 +2113,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         notasModelos.length > 0 ? `[Notas: ${notasModelos.join('; ')}]` : ''
       ].filter(Boolean).join(' - ');
 
+      const uLogged = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
       const resultado = await ApiService.post('/devoluciones/cliente', {
         clientId: carteraSeleccionada.clientId,
         saleNoteId: selectedCobro?.saleNote?.id || undefined,
         motivo: motivoFinal,
+        recibidoPor: uLogged?.nombre || uLogged?.name || undefined,
         tipoDevolucion: 'TALLA_ESPECIFICA',
         destinoStock: devolucionDestino,
         lines: linesPayload,
@@ -4294,14 +4296,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                       </span>
                                     )}
 
-                                    {/* Procesado por (para devoluciones) */}
+                                    {/* Recibido por (para devoluciones) */}
                                     {isDevolucion && m.procesadoPor && (
                                       <span
                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-800 dark:text-rose-300 border border-rose-500/20"
-                                        title={`Procesado por ${m.procesadoPor}${m.procesadoPorRol ? ` (${m.procesadoPorRol})` : ''}`}
+                                        title={`Recibido por ${m.procesadoPor}${m.procesadoPorRol ? ` (${m.procesadoPorRol})` : ''}`}
                                       >
                                         <UserCheck size={10} className="shrink-0" />
-                                        <span>Procesado por: {m.procesadoPor}</span>
+                                        <span>Recibido por: {m.procesadoPor}</span>
                                       </span>
                                     )}
                                   </div>
