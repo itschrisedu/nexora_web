@@ -42,6 +42,7 @@ interface TallaStock {
 
 interface Producto {
   id: string;
+  modelId?: string;
   codigo: string;
   nombre: string;
   marca: string;
@@ -1624,8 +1625,8 @@ export default function ModelosComponent({
   };
 
   // ── Abrir modal de edición integral de variante ──
-  const openEditProduct = (p: Producto) => {
-    setEditProduct(p);
+  const openEditProduct = (p: Producto, modelId?: string) => {
+    setEditProduct({ ...p, modelId: modelId || p.modelId });
     setEditProductColor(p.color);
     setEditProductImage(p.fotoUrl || null);
     setEditProductImageChanged(false);
@@ -1817,10 +1818,11 @@ export default function ModelosComponent({
       }
 
       // Actualizar selección visual del color del modelo si cambió el nombre
-      if (editProduct.modelId) {
+      const targetModelId = editProduct.modelId;
+      if (targetModelId) {
         setSelectedColorForModel(prev => ({
           ...prev,
-          [editProduct.modelId]: editProductColor.trim(),
+          [targetModelId]: editProductColor.trim(),
         }));
       }
 
@@ -2671,7 +2673,7 @@ export default function ModelosComponent({
                                     </button>
                                   )}
                                   <button
-                                    onClick={() => openEditProduct(p)}
+                                    onClick={() => openEditProduct(p, m.id)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs cursor-pointer"
                                   >
                                     <Edit2 size={12} />
