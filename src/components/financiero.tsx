@@ -1717,8 +1717,20 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       }
     });
 
-    // Ordenar entregas cronológicamente de la más antigua a la más actual
-    entregas.sort((a, b) => new Date(a.fechaEntrega || a.fecha).getTime() - new Date(b.fechaEntrega || b.fecha).getTime());
+    // Ordenar entregas y abonos cronológicamente de la más antigua a la más actual
+    entregas.sort((a, b) => {
+      if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+      const numA = parseInt(a.numeroNota?.replace(/\D/g, '') || '0', 10);
+      const numB = parseInt(b.numeroNota?.replace(/\D/g, '') || '0', 10);
+      return numA - numB;
+    });
+
+    abonos.sort((a, b) => {
+      if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+      const numA = parseInt(a.numeroComprobante?.replace(/\D/g, '') || '0', 10);
+      const numB = parseInt(b.numeroComprobante?.replace(/\D/g, '') || '0', 10);
+      return numA - numB;
+    });
 
     const esCompleto =
       filtroCompartirFechaInicio === rangoFechasHistorial.minFecha &&
