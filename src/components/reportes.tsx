@@ -42,6 +42,7 @@ import {
 import { ApiService } from '@/services/api.service';
 import { useToast } from '@/components/ui/toast';
 import PdfPreviewModal from '@/components/ui/pdf-preview-modal';
+import { normalizarParaBusqueda } from '@/utils/text-formatters';
 import {
   generarReporteCobranzasPdf,
   generarReporteCampanasPdf,
@@ -2526,7 +2527,7 @@ export default function ReportesComponent({
                           const clientesFiltrados = (cobranzasData?.clientes || []).filter((c: ClienteDeudor) => {
                             const matchTexto =
                               !filtroDeudor ||
-                              c.nombre?.toLowerCase().includes(filtroDeudor.toLowerCase()) ||
+                              normalizarParaBusqueda(c.nombre).includes(normalizarParaBusqueda(filtroDeudor)) ||
                               c.cedula?.includes(filtroDeudor) ||
                               c.telefono?.includes(filtroDeudor);
                             const matchNivel =

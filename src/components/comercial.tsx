@@ -45,7 +45,7 @@ import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
 import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
 import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock, evaluarDisponibilidadMedias } from '../utils/curvas';
-import { capitalizarNombreCompleto, formatearNombreSerie } from '@/utils/text-formatters';
+import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 import ImageLightboxModal from './ui/image-lightbox-modal';
 import NuevoClienteModal from './ui/nuevo-cliente-modal';
@@ -3603,10 +3603,11 @@ export default function ComercialComponent({
                           <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto">
                             {listaClientes
                               .filter((c) => {
-                                const q = (busquedaDebounced || busquedaCliente).toLowerCase().trim();
+                                const q = normalizarParaBusqueda(busquedaDebounced || busquedaCliente);
                                 if (!q) return false;
+                                const nombreNorm = normalizarParaBusqueda(c.nombre);
                                 return (
-                                  c.nombre.toLowerCase().includes(q) ||
+                                  nombreNorm.includes(q) ||
                                   (c.cedula && c.cedula.toLowerCase().includes(q)) ||
                                   (c.telefono && c.telefono.toLowerCase().includes(q))
                                 );
@@ -3643,10 +3644,11 @@ export default function ComercialComponent({
                               })}
                             {busquedaDebounced.trim().length > 0 &&
                               listaClientes.filter((c) => {
-                                const q = busquedaDebounced.toLowerCase().trim();
+                                const q = normalizarParaBusqueda(busquedaDebounced);
                                 if (!q) return false;
+                                const nombreNorm = normalizarParaBusqueda(c.nombre);
                                 return (
-                                  c.nombre.toLowerCase().includes(q) ||
+                                  nombreNorm.includes(q) ||
                                   (c.cedula && c.cedula.toLowerCase().includes(q)) ||
                                   (c.telefono && c.telefono.toLowerCase().includes(q))
                                 );

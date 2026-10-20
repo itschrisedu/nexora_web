@@ -28,6 +28,7 @@ import {
   formatearTelefono,
   formatearDireccion,
   capitalizarNombreCompleto,
+  normalizarParaBusqueda,
 } from "../utils/text-formatters";
 import { abrirWhatsAppUniversal } from "../utils/whatsapp";
 
@@ -790,14 +791,19 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   // Filtrado y Ordenamiento Alfabético por Apellido (Directorio)
   const filtered = clientes
     .filter(c => {
-      const q = search.toLowerCase();
-      const fullName = `${c.nombre || ""} ${c.apellido || ""}`.toLowerCase();
+      const q = normalizarParaBusqueda(search);
+      if (!q) return true;
+      const fullName = normalizarParaBusqueda(`${c.nombre || ""} ${c.apellido || ""}`);
+      const email = normalizarParaBusqueda(c.email);
+      const cedula = (c.cedula || "").toLowerCase();
+      const ruc = (c.ruc || "").toLowerCase();
+      const telefono = (c.telefono || "").toLowerCase();
       return (
         fullName.includes(q) ||
-        (c.cedula && c.cedula.includes(q)) ||
-        (c.ruc && c.ruc.includes(q)) ||
-        (c.telefono && c.telefono.includes(q)) ||
-        (c.email && c.email.toLowerCase().includes(q))
+        cedula.includes(q) ||
+        ruc.includes(q) ||
+        telefono.includes(q) ||
+        email.includes(q)
       );
     })
     .sort((a, b) => {

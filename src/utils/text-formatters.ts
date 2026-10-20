@@ -408,3 +408,25 @@ export function formatearNombreSerie(serieNombre?: string | null): string {
     .join(" ");
 }
 
+/**
+ * Normaliza una cadena para búsquedas insensibles a mayúsculas, minúsculas y tildes/acentos diacríticos.
+ * Ejemplo: "Hernán Pérez" -> "hernan perez", "ÁLVAREZ" -> "alvarez", "RAÚL" -> "raul"
+ */
+export function normalizarParaBusqueda(texto?: string | null): string {
+  if (!texto) return '';
+  return texto
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Comprueba si el texto objetivo contiene el término de búsqueda ignorando mayúsculas y tildes.
+ */
+export function coincideBusqueda(objetivo?: string | null, termino?: string | null): boolean {
+  if (!termino || !termino.trim()) return true;
+  if (!objetivo) return false;
+  return normalizarParaBusqueda(objetivo).includes(normalizarParaBusqueda(termino));
+}

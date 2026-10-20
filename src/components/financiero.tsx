@@ -74,7 +74,7 @@ import {
 } from '../services/pdf-historial.service';
 import { generarUrlPublicaAbono, generarUrlPublicaHistorial } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
-import { capitalizarNombreCompleto, formatearNombreSerie } from '@/utils/text-formatters';
+import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 import { getCurvaDocena } from '../utils/curvas';
 
@@ -2513,12 +2513,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         ? c.saldoTotalPendiente > 0 && c.estadoGlobal !== 'VENCIDO'
         : c.estadoGlobal === filtro;
 
-    const q = busqueda.toLowerCase().trim();
+    const q = normalizarParaBusqueda(busqueda);
     if (!q) return cumpleEstado;
 
-    const nombre = c.clienteNombre.toLowerCase();
-    const cedula = c.clienteCedula.toLowerCase();
-    const cumpleBusqueda = nombre.includes(q) || cedula.includes(q);
+    const nombreNorm = normalizarParaBusqueda(c.clienteNombre);
+    const cedula = (c.clienteCedula || '').toLowerCase();
+    const cumpleBusqueda = nombreNorm.includes(q) || cedula.includes(q);
 
     return cumpleEstado && cumpleBusqueda;
   });
@@ -2527,17 +2527,18 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const facturasFiltradas = cobrosFiltradosPorSucursal
     .filter((c) => {
       const cumpleEstado = filtro === 'TODOS' ? true : c.estado === filtro;
-      const q = busqueda.toLowerCase().trim();
+      const q = normalizarParaBusqueda(busqueda);
       if (!q) return cumpleEstado;
 
       const cliDb = clientesRaw.find((cl) => cl.id === c.clientId);
       const nombreCompleto = cliDb && (cliDb.apellido || cliDb.nombre)
-        ? `${cliDb.apellido || ''} ${cliDb.nombre || ''}`.toLowerCase()
-        : (c.clienteNombre || '').toLowerCase();
+        ? `${cliDb.apellido || ''} ${cliDb.nombre || ''}`
+        : (c.clienteNombre || '');
+      const nombreNorm = normalizarParaBusqueda(nombreCompleto);
       const cedula = (c.clienteCedula || '').toLowerCase();
       const num = (c.numeroCobro || c.saleNote?.numero?.toString() || c.id || '').toLowerCase();
 
-      return cumpleEstado && (nombreCompleto.includes(q) || cedula.includes(q) || num.includes(q));
+      return cumpleEstado && (nombreNorm.includes(q) || cedula.includes(q) || num.includes(q));
     })
     .sort((a, b) => {
       const cliA = clientesRaw.find((cl) => cl.id === a.clientId);
