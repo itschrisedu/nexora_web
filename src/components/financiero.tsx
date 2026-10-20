@@ -1599,39 +1599,86 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         let paresPedido = 0;
         const rawLineas = (m.detalles?.lineas || m.detalles?.items || []) as any[];
 
-        // Agrupación limpia por variante de modelo (sin desglose par por par)
+        // Agrupación limpia con curva de tallas y código de producto para ModelTallaCurvaCard
         const variantesMap = new Map<string, any>();
         rawLineas.forEach((it: any) => {
-          const modNom = it.modeloNombre || it.modelName || it.modelo || 'Modelo de Calzado';
+          const modNom = it.modelName || it.modeloNombre || it.modelo || 'Calzado de Cuero';
           const col = it.color || '';
-          const ser = it.serieNombre || it.serie || '';
+          const ser = it.serieNombre || it.serie || 'ADULTO';
+          const cod = it.code || it.codigo || it.baseCode || '';
           const img = it.imageUrl || it.fotoUrl || null;
           const precio = Number(it.precioUnitario || 0);
-          const paresLinea = Number(it.cantidadPares || it.totalPares || it.cantidad || 0);
+          const paresLinea = Number(it.cantidad || it.cantidadPares || it.totalPares || 1);
+          const numTalla = it.numeroTalla || it.tallaNumero || it.talla || 38;
           paresPedido += paresLinea;
 
           const key = `${modNom}_${col}_${ser}_${precio}`;
           if (!variantesMap.has(key)) {
+            const tMap = new Map<string, number>();
+            if (paresLinea > 0) tMap.set(String(numTalla), paresLinea);
             variantesMap.set(key, {
               modelo: modNom,
               color: col,
               serie: ser,
+              codigo: cod,
               imageUrl: img,
               totalPares: paresLinea,
-              etiquetaVolumen: paresLinea ? `${paresLinea} pares` : undefined,
               precioUnitario: precio,
               subtotal: paresLinea * precio,
+              tallasMap: tMap,
             });
           } else {
             const exist = variantesMap.get(key);
             exist.totalPares += paresLinea;
             exist.subtotal = exist.totalPares * exist.precioUnitario;
-            exist.etiquetaVolumen = `${exist.totalPares} pares`;
             if (!exist.imageUrl && img) exist.imageUrl = img;
+            if (!exist.codigo && cod) exist.codigo = cod;
+            const strTalla = String(numTalla);
+            exist.tallasMap.set(strTalla, (exist.tallasMap.get(strTalla) || 0) + paresLinea);
           }
         });
 
-        const itemsEntrega = Array.from(variantesMap.values());
+        const itemsEntrega = Array.from(variantesMap.values()).map((v: any) => {
+          const tallasArray: { talla: string; pares: number }[] = [];
+          if (v.tallasMap) {
+            v.tallasMap.forEach((pares: number, talla: string) => {
+              if (Number(pares) > 0) {
+                tallasArray.push({ talla: String(talla), pares: Number(pares) });
+              }
+            });
+            tallasArray.sort((a, b) => Number(a.talla) - Number(b.talla));
+          }
+
+          const curvaStr = tallasArray.map((t) => `T${t.talla}: ${t.pares}p`).join('  ');
+
+          let etiquetaVolumen = '';
+          if (v.totalPares >= 12 && v.totalPares % 12 === 0) {
+            const doc = v.totalPares / 12;
+            etiquetaVolumen = doc === 1 ? '1 Docena' : `${doc} Docenas`;
+          } else if (v.totalPares === 6) {
+            etiquetaVolumen = '½ Docena';
+          } else if (v.totalPares >= 6 && v.totalPares % 6 === 0) {
+            const med = v.totalPares / 6;
+            etiquetaVolumen = `${med * 0.5} Docenas`;
+          } else {
+            etiquetaVolumen = `${v.totalPares} ${v.totalPares === 1 ? 'par' : 'pares'}`;
+          }
+
+          return {
+            modelo: v.modelo,
+            color: v.color,
+            serie: v.serie,
+            codigo: v.codigo,
+            imageUrl: v.imageUrl,
+            tallas: tallasArray,
+            curvaTallas: curvaStr,
+            totalPares: v.totalPares,
+            etiquetaVolumen,
+            precioUnitario: v.precioUnitario,
+            subtotal: v.subtotal,
+          };
+        });
+
         totalParesEntregados += paresPedido;
         entregas.push({
           fecha: m.fecha ? m.fecha.split('T')[0] : '',
@@ -1669,6 +1716,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         });
       }
     });
+
+    // Ordenar entregas cronológicamente de la más antigua a la más actual
+    entregas.sort((a, b) => new Date(a.fechaEntrega || a.fecha).getTime() - new Date(b.fechaEntrega || b.fecha).getTime());
 
     const esCompleto =
       filtroCompartirFechaInicio === rangoFechasHistorial.minFecha &&
@@ -1710,13 +1760,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     };
   };
 
-  const handleDescargarHistorialPdf = () => {
+  const handleDescargarHistorialPdf = async () => {
     const pdfData = construirHistorialPdfData();
     if (!pdfData) {
       showToast('No se puede generar el documento del historial.', 'error');
       return;
     }
-    descargarHistorialPdf(pdfData);
+    await descargarHistorialPdf(pdfData);
     showToast('Documento PDF generado y descargado exitosamente.', 'success');
   };
 
@@ -1744,7 +1794,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       // 2. Enviar en segundo plano al correo electrónico si fue especificado
       const emailTarget = compartirEmailDestino?.trim();
       if (emailTarget && emailTarget.includes('@')) {
-        const pdfBase64 = generarHistorialPdfBase64(pdfData);
+        const pdfBase64 = await generarHistorialPdfBase64(pdfData);
         const cleanCliente = pdfData.cliente.nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
         const nombreArchivo = `Historial_${cleanCliente}_${pdfData.periodo.fechaInicio}_${pdfData.periodo.fechaFin}.pdf`;
 

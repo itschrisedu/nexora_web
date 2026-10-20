@@ -2,12 +2,20 @@ import { jsPDF } from 'jspdf';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '@/utils/whatsapp';
 
+export interface HistorialComercialTallaItem {
+  talla: string | number;
+  pares: number;
+}
+
 export interface HistorialComercialItemEntrega {
   modelo: string;
   color?: string;
   serie?: string;
+  codigo?: string;
   imageUrl?: string;
+  loadedImageBase64?: string | null;
   curvaTallas?: string;
+  tallas?: HistorialComercialTallaItem[];
   totalPares: number;
   etiquetaVolumen?: string;
   precioUnitario: number;
@@ -81,7 +89,162 @@ export interface HistorialComercialPdfData {
 }
 
 /**
- * Genera el documento PDF formal del Historial Comercial y Financiero (A4 empresarial)
+ * Carga una imagen remota y la convierte en data URL Base64 para incrustarla en el PDF
+ */
+async function cargarImagenComoBase64(url: string, timeoutMs = 2500): Promise<string | null> {
+  if (!url || typeof window === 'undefined') return null;
+  if (url.startsWith('data:image/')) return url;
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve(null);
+      }
+    }, timeoutMs);
+
+    try {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timer);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 120;
+          canvas.height = img.naturalHeight || img.height || 120;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            resolve(dataUrl);
+            return;
+          }
+        } catch {
+          // Bloqueo CORS en canvas fallback
+        }
+        resolve(null);
+      };
+      img.onerror = () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timer);
+          resolve(null);
+        }
+      };
+      img.src = url;
+    } catch {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timer);
+        resolve(null);
+      }
+    }
+  });
+}
+
+/**
+ * Dibuja un placeholder visual elegante cuando no hay imagen disponible del calzado
+ */
+function dibujarPlaceholderCalzado(doc: jsPDF, x: number, y: number, size: number, nombre: string) {
+  doc.setFillColor(241, 245, 249); // Slate 100
+  doc.setDrawColor(203, 213, 225); // Slate 300
+  doc.roundedRect(x, y, size, size, 1.2, 1.2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184); // Slate 400
+  const initials = nombre ? nombre.substring(0, 3).toUpperCase() : 'CAL';
+  doc.text(initials, x + size / 2, y + size / 2 + 1, { align: 'center' });
+}
+
+/**
+ * Formato estándar de docenas de calzado
+ */
+export function formatearDocenasCorto(pares: number): string {
+  if (pares <= 0) return '0 pares';
+  if (pares === 6) return '½ Docena';
+  if (pares === 12) return '1 Docena';
+  if (pares === 18) return '1½ Docena';
+  if (pares % 12 === 0) return `${pares / 12} Docenas`;
+  if (pares % 6 === 0) {
+    const docEnteras = Math.floor(pares / 12);
+    return `${docEnteras > 0 ? `${docEnteras}½` : '½'} Docena${docEnteras > 1 ? 's' : ''}`;
+  }
+  return `${(pares / 12).toFixed(1)} doc.`;
+}
+
+/**
+ * Extrae tallas con pares mayores a 0
+ */
+export function extraerTallasValidas(
+  tallasDetalle?: Array<HistorialComercialTallaItem | { talla: string | number; cantidad: number }>,
+  curvaStr?: string,
+): HistorialComercialTallaItem[] {
+  if (Array.isArray(tallasDetalle) && tallasDetalle.length > 0) {
+    return tallasDetalle
+      .map((t: any) => ({
+        talla: String(t.talla ?? t.numero ?? 38),
+        pares: Number(t.pares ?? t.cantidad ?? 0),
+      }))
+      .filter((t) => t.pares > 0)
+      .sort((a, b) => Number(a.talla) - Number(b.talla));
+  }
+
+  if (curvaStr) {
+    const result: HistorialComercialTallaItem[] = [];
+    const regex = /T?(\d{2})\s*(?::|\()\s*(\d+)p?/gi;
+    let match;
+    while ((match = regex.exec(curvaStr)) !== null) {
+      const cant = parseInt(match[2], 10);
+      if (cant > 0) {
+        result.push({ talla: match[1], pares: cant });
+      }
+    }
+    if (result.length > 0) {
+      return result.sort((a, b) => Number(a.talla) - Number(b.talla));
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Pre-carga imágenes de todas las entregas en paralelo antes de renderizar el PDF
+ */
+export async function preCargarImagenesHistorial(data: HistorialComercialPdfData): Promise<HistorialComercialPdfData> {
+  const entregasConImagenes = await Promise.all(
+    (data.entregas || []).map(async (ent) => {
+      const itemsConImagenes = await Promise.all(
+        (ent.items || []).map(async (it) => {
+          if (it.loadedImageBase64) return it;
+          let b64: string | null = null;
+          if (it.imageUrl) {
+            b64 = await cargarImagenComoBase64(it.imageUrl);
+          }
+          return {
+            ...it,
+            loadedImageBase64: b64,
+          };
+        })
+      );
+      return {
+        ...ent,
+        items: itemsConImagenes,
+      };
+    })
+  );
+
+  return {
+    ...data,
+    entregas: entregasConImagenes,
+  };
+}
+
+/**
+ * Genera el documento PDF formal del Historial Comercial y Financiero con tarjeta estándar de calzado y corrida contable
  */
 export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
   const doc = new jsPDF({
@@ -94,41 +257,39 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
   const pageHeight = doc.internal.pageSize.getHeight();
   let y = 14;
 
-  const checkSaltoPagina = (espacioNecesario: number) => {
-    if (y + espacioNecesario > pageHeight - 20) {
-      doc.addPage();
-      y = 16;
-      dibujarEncabezadoPaginaSecundaria();
-    }
-  };
-
   const dibujarEncabezadoPaginaSecundaria = () => {
     doc.setFillColor(15, 23, 42); // Slate 900
     doc.rect(12, 10, pageWidth - 24, 7, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
-    doc.text(`${data.emisor.nombre || 'CALZADO'} — Historial Comercial: ${data.cliente.nombre}`, 16, 15);
+    doc.text(`${data.emisor.nombre || 'CALZADO'} — Historial Comercial: ${data.cliente.nombre}`, 16, 14.8);
     doc.setTextColor(148, 163, 184);
-    doc.text(`Período: ${data.periodo.fechaInicio} al ${data.periodo.fechaFin}`, pageWidth - 16, 15, { align: 'right' });
-    y = 22;
+    doc.text(`Período: ${data.periodo.fechaInicio} al ${data.periodo.fechaFin}`, pageWidth - 16, 14.8, { align: 'right' });
+    y = 21;
+  };
+
+  const checkSaltoPagina = (espacioNecesario: number) => {
+    if (y + espacioNecesario > pageHeight - 20) {
+      doc.addPage();
+      dibujarEncabezadoPaginaSecundaria();
+    }
   };
 
   // ── 1. Encabezado Institucional ─────────────────────────────────
   doc.setFillColor(15, 23, 42); // Slate 900
   doc.roundedRect(12, y, pageWidth - 24, 38, 2.5, 2.5, 'F');
 
-  // Franja decorativa esmeralda
+  // Franja decorativa verde esmeralda
   doc.setFillColor(16, 185, 129); // Emerald 500
   doc.rect(12, y + 36, pageWidth - 24, 2, 'F');
 
-  // Nombre del negocio
+  // Datos del Emisor
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.text(data.emisor.nombre || 'CALZADO DE CUERO', 18, y + 9);
 
-  // Subtítulo / Datos comerciales
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(203, 213, 225); // Slate 300
@@ -156,7 +317,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
   doc.text(`Desde: ${data.periodo.fechaInicio}`, pageWidth - 46.5, y + 23.5, { align: 'center' });
   doc.text(`Hasta: ${data.periodo.fechaFin}`, pageWidth - 46.5, y + 27.5, { align: 'center' });
 
-  y += 44;
+  y += 43;
 
   // ── 2. Información del Cliente ──────────────────────────────────
   doc.setFillColor(248, 250, 252);
@@ -181,7 +342,7 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
   doc.text(`Límite Aprobado: $${(data.cliente.limiteCredito || 0).toFixed(2)}`, col2X, y + 16.5);
   doc.text(`Correo Electrónico: ${data.cliente.email || 'N/A'}`, col2X, y + 20.5);
 
-  y += 28;
+  y += 27;
 
   // ── 3. Resumen Financiero del Período (KPIs) ───────────────────
   const cardW = (pageWidth - 24 - 9) / 4;
@@ -215,38 +376,47 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     doc.text(kpi.sub, kX + cardW / 2, y + 14.5, { align: 'center' });
   });
 
-  y += 23;
+  y += 22;
 
-  // ── 4. Sección de Entregas Realizadas (Resumen por Variante) ──
+  // ── 4. Sección de Entregas Realizadas (Cronológico: de la primera a la última) ──
   checkSaltoPagina(20);
-  doc.setFillColor(15, 23, 42);
+  doc.setFillColor(15, 23, 42); // Slate 900
   doc.roundedRect(12, y, pageWidth - 24, 6.5, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(255, 255, 255);
-  doc.text('1. RESUMEN DE ENTREGAS Y MERCADERÍA DESPACHADA', 16, y + 4.5);
+  doc.text('1. RESUMEN DE ENTREGAS Y MERCADERÍA DESPACHADA (DE LA PRIMERA A LA ÚLTIMA)', 16, y + 4.5);
   y += 9.5;
 
-  if (data.entregas.length === 0) {
+  // Orden estricto cronológico ascendente (de la primera a la última entrega)
+  const entregasOrdenadas = [...(data.entregas || [])].sort((a, b) => {
+    const timeA = new Date(a.fechaEntrega || a.fecha).getTime();
+    const timeB = new Date(b.fechaEntrega || b.fecha).getTime();
+    return timeA - timeB;
+  });
+
+  if (entregasOrdenadas.length === 0) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(7.5);
     doc.setTextColor(148, 163, 184);
     doc.text('No se registran entregas de mercadería en el rango de fechas seleccionado.', 16, y + 3);
     y += 8;
   } else {
-    data.entregas.forEach((ent, index) => {
-      checkSaltoPagina(20 + ent.items.length * 6.5);
+    entregasOrdenadas.forEach((ent, index) => {
+      checkSaltoPagina(28);
 
-      // Cabecera de la entrega
+      // Cabecera de la Entrega (Banner suave Slate 100)
       doc.setFillColor(241, 245, 249);
-      doc.roundedRect(12, y, pageWidth - 24, 6.5, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(30, 41, 59);
-      const numPedido = ent.numeroNota ? `Nota: ${ent.numeroNota}` : `Entrega #${index + 1}`;
-      doc.text(`📦 ${numPedido} • Fecha: ${ent.fecha}`, 16, y + 4.5);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(12, y, pageWidth - 24, 7, 1.2, 1.2, 'FD');
 
-      // Responsables
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.8);
+      doc.setTextColor(15, 23, 42);
+      const numNota = ent.numeroNota ? `Nota #${ent.numeroNota}` : `Entrega #${index + 1}`;
+      doc.text(`📦 ${numNota} • Fecha: ${ent.fecha}`, 16, y + 4.8);
+
+      // Responsables de despacho
       let respStr = '';
       if (ent.entregadoPor) respStr += `Entregado por: ${ent.entregadoPor}`;
       if (ent.vendedor) respStr += `${respStr ? ' | ' : ''}Vendedor: ${ent.vendedor}`;
@@ -254,105 +424,236 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         doc.setTextColor(100, 116, 139);
-        doc.text(respStr, pageWidth / 2, y + 4.5, { align: 'center' });
+        doc.text(respStr, 85, y + 4.8);
       }
 
-      // Total entrega
+      // Total de la entrega
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(37, 99, 235);
-      doc.text(`${ent.totalPares} pares • $${ent.montoTotal.toFixed(2)}`, pageWidth - 16, y + 4.5, { align: 'right' });
+      doc.text(`${ent.totalPares} pares • $${ent.montoTotal.toFixed(2)}`, pageWidth - 16, y + 4.8, { align: 'right' });
       y += 8.5;
 
-      // Detalle de ítems entregados por variante (sin desglosar par por par)
-      ent.items.forEach((it) => {
-        checkSaltoPagina(6.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7.5);
-        doc.setTextColor(15, 23, 42);
-        const colStr = it.color ? ` (${it.color})` : '';
-        const serStr = it.serie && it.serie !== 'Estándar' ? ` • Serie: ${it.serie}` : '';
-        doc.text(`▫️ ${it.modelo}${colStr}${serStr}`, 18, y + 3.5);
+      // Sub-cabecera oscura estilo tabla (IDÉNTICA AL COMPONENTE ModelTallaCurvaCard DE LA FOTO)
+      checkSaltoPagina(20);
+      doc.setFillColor(15, 23, 42); // Slate 900
+      doc.roundedRect(12, y, pageWidth - 24, 6.5, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.2);
+      doc.setTextColor(255, 255, 255);
+      doc.text('DETALLE DE MODELO, FOTO Y CURVA DE TALLAS', 16, y + 4.5);
+      doc.text('CANTIDAD', 144, y + 4.5, { align: 'center' });
+      doc.text('PRECIO', 170, y + 4.5, { align: 'right' });
+      doc.text('SUBTOTAL', 194, y + 4.5, { align: 'right' });
+      y += 8;
 
+      // Dibujar cada modelo como tarjeta ModelTallaCurvaCard
+      ent.items.forEach((it) => {
+        const tallas = extraerTallasValidas(it.tallas, it.curvaTallas);
+        const muchasTallas = tallas.length > 6;
+        const extraH = muchasTallas ? 5 : 0;
+        const cardHeight = Math.max(22, 18.5 + extraH);
+
+        checkSaltoPagina(cardHeight + 2);
+
+        // Fondo y borde de tarjeta blanca redondeada
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(12, y, pageWidth - 24, cardHeight, 1.5, 1.5, 'FD');
+
+        // Miniatura fotográfica cuadrada
+        const imgX = 14.5;
+        const imgY = y + 2.5;
+        const imgSize = 16.5;
+
+        if (it.loadedImageBase64) {
+          try {
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(203, 213, 225);
+            doc.roundedRect(imgX, imgY, imgSize, imgSize, 1.2, 1.2, 'FD');
+            doc.addImage(it.loadedImageBase64, 'JPEG', imgX + 0.6, imgY + 0.6, imgSize - 1.2, imgSize - 1.2);
+          } catch {
+            dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, it.modelo);
+          }
+        } else {
+          dibujarPlaceholderCalzado(doc, imgX, imgY, imgSize, it.modelo);
+        }
+
+        // Información central
+        let nextX = 34;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42); // Slate 900
+        const modeloMayus = (it.modelo || 'CALZADO').toUpperCase();
+        doc.text(modeloMayus, nextX, y + 5.5);
+        nextX += doc.getTextWidth(modeloMayus) + 2.5;
+
+        if (it.color) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(71, 85, 105);
+          doc.text(it.color, nextX, y + 5.5);
+          nextX += doc.getTextWidth(it.color) + 3;
+        }
+
+        // Píldora de Serie (Verde Esmeralda estándar: Serie: NOMBRE)
+        const serieNombre = it.serie && it.serie !== 'Estándar' && it.serie !== 'General' ? it.serie : 'ADULTO';
+        const serieText = `Serie: ${serieNombre.toUpperCase()}`;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.8);
+        const badgeW = doc.getTextWidth(serieText) + 4.5;
+        const badgeH = 4.2;
+
+        if (nextX + badgeW <= 134) {
+          doc.setFillColor(236, 253, 245); // Emerald 50
+          doc.setDrawColor(167, 243, 208); // Emerald 200
+          doc.roundedRect(nextX, y + 2.3, badgeW, badgeH, 1.2, 1.2, 'FD');
+          doc.setTextColor(4, 120, 87); // Emerald 700
+          doc.text(serieText, nextX + 2.2, y + 5.2);
+        }
+
+        // Línea 2: Código del Modelo / Fabricación
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
-        doc.setTextColor(71, 85, 105);
-        const volTxt = `${it.totalPares} ${it.totalPares === 1 ? 'par' : 'pares'}`;
-        doc.text(volTxt, 88, y + 3.5);
+        doc.setTextColor(100, 116, 139); // Slate 500
+        const codText = it.codigo ? `Código: ${it.codigo}` : 'Calzado de cuero nacional';
+        doc.text(codText, 34, y + 9.5);
 
-        doc.text(`$${it.precioUnitario.toFixed(2)} / par`, pageWidth - 42, y + 3.5, { align: 'right' });
+        // Línea 3: Curva de Tallas en Píldoras
+        if (tallas.length > 0) {
+          let curTallaX = 34;
+          let curTallaY = y + 11.5;
+          tallas.forEach((t) => {
+            const tText = `T${t.talla}: ${t.pares}p`;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(6.8);
+            const tw = doc.getTextWidth(tText) + 3.8;
 
+            if (curTallaX + tw > 132) {
+              curTallaX = 34;
+              curTallaY += 4.5;
+            }
+
+            doc.setFillColor(241, 245, 249); // Slate 100
+            doc.setDrawColor(203, 213, 225); // Slate 300
+            doc.roundedRect(curTallaX, curTallaY, tw, 4, 1, 1, 'FD');
+            doc.setTextColor(30, 41, 59); // Slate 800
+            doc.text(tText, curTallaX + 1.9, curTallaY + 2.9);
+            curTallaX += tw + 1.8;
+          });
+        }
+
+        // ── Resumen Lateral Derecho ──
+        // Cantidad y Docenas (Centrado en x=144)
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(16, 185, 129);
-        doc.text(`$${it.subtotal.toFixed(2)}`, pageWidth - 16, y + 3.5, { align: 'right' });
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`${it.totalPares} pares`, 144, y + 7.5, { align: 'center' });
 
-        // Línea divisoria muy tenue
-        doc.setDrawColor(241, 245, 249);
-        doc.line(18, y + 5.5, pageWidth - 16, y + 5.5);
-        y += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.2);
+        doc.setTextColor(100, 116, 139);
+        doc.text(it.etiquetaVolumen || formatearDocenasCorto(it.totalPares), 144, y + 12.5, { align: 'center' });
+
+        // Precio Unitario (Alineado derecha en x=170)
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`$${Number(it.precioUnitario).toFixed(2)}`, 170, y + 7.5, { align: 'right' });
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.8);
+        doc.setTextColor(148, 163, 184);
+        doc.text('por par', 170, y + 12.5, { align: 'right' });
+
+        // Subtotal (Alineado derecha en x=194, Verde Esmeralda)
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(5, 150, 105); // Emerald 600
+        doc.text(`$${Number(it.subtotal).toFixed(2)}`, 194, y + 9.5, { align: 'right' });
+
+        y += cardHeight + 2.5;
       });
 
-      y += 3;
+      y += 3.5;
     });
   }
 
-  y += 4;
+  y += 3;
 
-  // ── 5. Extracto Cronológico Unificado de Movimientos (Entregas y Pagos) ──
-  checkSaltoPagina(22);
+  // ── 5. Extracto Cronológico y Corrida Contable Matemática Paso a Paso ──
+  checkSaltoPagina(24);
   doc.setFillColor(15, 23, 42);
   doc.roundedRect(12, y, pageWidth - 24, 6.5, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(255, 255, 255);
-  doc.text('2. EXTRACTO CRONOLÓGICO DE MOVIMIENTOS (PAGOS Y ENTREGAS)', 16, y + 4.5);
+  doc.text('2. EXTRACTO CRONOLÓGICO Y CORRIDA CONTABLE DE SALDOS', 16, y + 4.5);
   y += 9.5;
 
   // Consolidar cronológicamente todas las entregas, abonos y devoluciones
   const movimientosCronologicos: Array<{
     fecha: string;
+    fechaRaw: string;
     tipo: 'ENTREGA' | 'ABONO' | 'DEVOLUCION';
     referencia: string;
     detalle: string;
-    cargo?: number;
-    abono?: number;
-    saldo?: number;
+    cargo: number;
+    abono: number;
+    saldoResultante?: number;
   }> = [];
 
-  data.entregas.forEach((ent) => {
+  (data.entregas || []).forEach((ent) => {
+    const resumenModelos = ent.items.map((it) => `${it.totalPares}p ${it.modelo}`).join(', ');
     movimientosCronologicos.push({
       fecha: ent.fecha,
+      fechaRaw: ent.fechaEntrega || ent.fecha,
       tipo: 'ENTREGA',
-      referencia: ent.numeroNota ? `Nota ${ent.numeroNota}` : 'Pedido',
-      detalle: `Despacho de ${ent.totalPares} pares (${ent.vendedor ? 'Vend: ' + ent.vendedor : 'Almacén'})`,
-      cargo: ent.montoTotal,
+      referencia: ent.numeroNota ? `Nota #${ent.numeroNota}` : 'Nota de Entrega',
+      detalle: `Despacho de ${ent.totalPares} pares (${resumenModelos.substring(0, 45)}${resumenModelos.length > 45 ? '...' : ''})`,
+      cargo: Number(ent.montoTotal || 0),
+      abono: 0,
     });
   });
 
-  data.abonos.forEach((ab) => {
+  (data.abonos || []).forEach((ab) => {
     const cobStr = ab.cobradoPor ? ` • Cobrado: ${capitalizarNombreCompleto(ab.cobradoPor)}` : '';
     movimientosCronologicos.push({
       fecha: ab.fecha,
+      fechaRaw: ab.fecha,
       tipo: 'ABONO',
-      referencia: ab.numeroComprobante || 'Recibo',
-      detalle: `${ab.formaPago}${cobStr}`,
-      abono: ab.monto,
-      saldo: ab.nuevoSaldo,
+      referencia: ab.numeroComprobante ? `Recibo #${ab.numeroComprobante}` : 'Recibo de Abono',
+      detalle: `Abono ${ab.formaPago}${cobStr}`,
+      cargo: 0,
+      abono: Number(ab.monto || 0),
     });
   });
 
-  data.devoluciones?.forEach((dev) => {
+  (data.devoluciones || []).forEach((dev) => {
     movimientosCronologicos.push({
       fecha: dev.fecha,
+      fechaRaw: dev.fecha,
       tipo: 'DEVOLUCION',
-      referencia: dev.motivo || 'Devolución',
-      detalle: dev.totalPares ? `Acreditación (${dev.totalPares} pares)` : 'Acreditación por devolución',
-      abono: dev.monto,
+      referencia: dev.motivo ? `Dev. ${dev.motivo.substring(0, 16)}` : 'Devolución',
+      detalle: dev.totalPares ? `Acreditación devolución (${dev.totalPares} pares)` : 'Acreditación por devolución',
+      cargo: 0,
+      abono: Number(dev.monto || 0),
     });
   });
 
-  // Ordenar cronológicamente
-  movimientosCronologicos.sort((a, b) => (a.fecha > b.fecha ? 1 : a.fecha < b.fecha ? -1 : 0));
+  // Ordenar estrictamente de la fecha más antigua a la más actual (T_1 -> T_n)
+  movimientosCronologicos.sort((a, b) => new Date(a.fechaRaw).getTime() - new Date(b.fechaRaw).getTime());
+
+  // Realizar la corrida contable matemática secuencial paso a paso
+  let saldoAcumulado = 0;
+  movimientosCronologicos.forEach((mov) => {
+    if (mov.tipo === 'ENTREGA') {
+      saldoAcumulado += mov.cargo;
+    } else {
+      saldoAcumulado -= mov.abono;
+    }
+    mov.saldoResultante = Math.round(saldoAcumulado * 100) / 100;
+  });
 
   if (movimientosCronologicos.length === 0) {
     doc.setFont('helvetica', 'italic');
@@ -361,19 +662,19 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
     doc.text('No se registran movimientos en el rango de fechas seleccionado.', 16, y + 3);
     y += 8;
   } else {
-    // Encabezado de tabla cronológica
+    // Encabezado de la tabla cronológica
     doc.setFillColor(241, 245, 249);
-    doc.rect(12, y, pageWidth - 24, 5.5, 'F');
+    doc.rect(12, y, pageWidth - 24, 6, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.8);
     doc.setTextColor(71, 85, 105);
-    doc.text('FECHA', 16, y + 3.8);
-    doc.text('MOVIMIENTO / REF.', 40, y + 3.8);
-    doc.text('DETALLE OPERATIVO', 78, y + 3.8);
-    doc.text('ENTREGA (+)', pageWidth - 46, y + 3.8, { align: 'right' });
-    doc.text('ABONO (-)', pageWidth - 28, y + 3.8, { align: 'right' });
-    doc.text('SALDO', pageWidth - 16, y + 3.8, { align: 'right' });
-    y += 7;
+    doc.text('FECHA', 16, y + 4.2);
+    doc.text('COMPROBANTE / REF.', 38, y + 4.2);
+    doc.text('DETALLE OPERATIVO', 76, y + 4.2);
+    doc.text('ENTREGA (+)', 144, y + 4.2, { align: 'right' });
+    doc.text('ABONO (−)', 168, y + 4.2, { align: 'right' });
+    doc.text('SALDO (=)', 194, y + 4.2, { align: 'right' });
+    y += 7.5;
 
     movimientosCronologicos.forEach((mov, idx) => {
       checkSaltoPagina(6.5);
@@ -390,131 +691,132 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       doc.setFont('helvetica', 'bold');
       if (mov.tipo === 'ENTREGA') {
         doc.setTextColor(37, 99, 235);
-        doc.text(`📦 ${mov.referencia}`, 40, y + 3);
+        doc.text(`📦 ${mov.referencia}`, 38, y + 3);
       } else if (mov.tipo === 'ABONO') {
         doc.setTextColor(16, 185, 129);
-        doc.text(`💳 ${mov.referencia}`, 40, y + 3);
+        doc.text(`💳 ${mov.referencia}`, 38, y + 3);
       } else {
         doc.setTextColor(225, 29, 72);
-        doc.text(`↩️ ${mov.referencia}`, 40, y + 3);
+        doc.text(`↩️ ${mov.referencia}`, 38, y + 3);
       }
 
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(71, 85, 105);
-      doc.text(mov.detalle, 78, y + 3);
+      doc.text(mov.detalle, 76, y + 3);
 
       // Columna Entrega (Cargo +)
       doc.setFont('helvetica', 'bold');
-      if (mov.cargo) {
+      if (mov.cargo > 0) {
         doc.setTextColor(37, 99, 235);
-        doc.text(`+$${mov.cargo.toFixed(2)}`, pageWidth - 46, y + 3, { align: 'right' });
+        doc.text(`+$${mov.cargo.toFixed(2)}`, 144, y + 3, { align: 'right' });
       } else {
         doc.setTextColor(148, 163, 184);
-        doc.text('—', pageWidth - 46, y + 3, { align: 'right' });
+        doc.text('—', 144, y + 3, { align: 'right' });
       }
 
       // Columna Abono (Pago -)
-      if (mov.abono) {
+      if (mov.abono > 0) {
         doc.setTextColor(16, 185, 129);
-        doc.text(`-$${mov.abono.toFixed(2)}`, pageWidth - 28, y + 3, { align: 'right' });
+        doc.text(`-$${mov.abono.toFixed(2)}`, 168, y + 3, { align: 'right' });
       } else {
         doc.setTextColor(148, 163, 184);
-        doc.text('—', pageWidth - 28, y + 3, { align: 'right' });
+        doc.text('—', 168, y + 3, { align: 'right' });
       }
 
-      // Columna Saldo
-      if (mov.saldo !== undefined) {
-        doc.setTextColor(mov.saldo > 0 ? 225 : 16, mov.saldo > 0 ? 29 : 185, mov.saldo > 0 ? 72 : 129);
-        doc.text(`$${mov.saldo.toFixed(2)}`, pageWidth - 16, y + 3, { align: 'right' });
+      // Columna Saldo Resultante (=)
+      if (mov.saldoResultante !== undefined) {
+        doc.setTextColor(mov.saldoResultante > 0 ? 225 : 5, mov.saldoResultante > 0 ? 29 : 150, mov.saldoResultante > 0 ? 72 : 105);
+        doc.text(`$${mov.saldoResultante.toFixed(2)}`, 194, y + 3, { align: 'right' });
       } else {
         doc.setTextColor(148, 163, 184);
-        doc.text('—', pageWidth - 16, y + 3, { align: 'right' });
+        doc.text('—', 194, y + 3, { align: 'right' });
       }
 
       y += 5.5;
     });
-  }
 
-  y += 4;
-
-  // ── 6. Devoluciones (si existen) ────────────────────────────────
-  if (data.devoluciones && data.devoluciones.length > 0) {
-    checkSaltoPagina(20);
-    doc.setFillColor(15, 23, 42);
-    doc.roundedRect(12, y, pageWidth - 24, 6.5, 1.5, 1.5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(255, 255, 255);
-    doc.text('3. DEVOLUCIONES Y CRÉDITOS APLICADOS', 16, y + 4.5);
-    y += 9.5;
-
-    data.devoluciones.forEach((dev) => {
-      checkSaltoPagina(6);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(51, 65, 85);
-      doc.text(`↩️ Fecha: ${dev.fecha} • Motivo: ${dev.motivo || 'Devolución de calzado'}`, 16, y + 3.5);
-      if (dev.procesadoPor) {
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Procesado por: ${dev.procesadoPor}`, 115, y + 3.5);
-      }
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(225, 29, 72);
-      doc.text(`-$${dev.monto.toFixed(2)}`, pageWidth - 16, y + 3.5, { align: 'right' });
-      y += 6;
-    });
-    y += 4;
-  }
-
-  // ── 7. Cuadro de Firmas y Validación ────────────────────────────
-  checkSaltoPagina(30);
-  const firmaY = Math.max(y + 8, pageHeight - 38);
-  doc.setDrawColor(203, 213, 225);
-  doc.line(25, firmaY, 85, firmaY);
-  doc.line(pageWidth - 85, firmaY, pageWidth - 25, firmaY);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(51, 65, 85);
-  doc.text('EMISOR / ADMINISTRACIÓN', 55, firmaY + 4, { align: 'center' });
-  doc.text('CLIENTE / CONFORMIDAD', pageWidth - 55, firmaY + 4, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(148, 163, 184);
-  doc.text(data.emisor.nombre, 55, firmaY + 8, { align: 'center' });
-  doc.text(capitalizarNombreCompleto(data.cliente.nombre), pageWidth - 55, firmaY + 8, { align: 'center' });
-
-  // ── 8. Pie de Página y Numeración ──────────────────────────────
-  const totalPaginas = (doc as any).internal.getNumberOfPages();
-  for (let i = 1; i <= totalPaginas; i++) {
-    doc.setPage(i);
+    // ── Cuadro de Cierre Contable Matemático ──
+    checkSaltoPagina(26);
+    y += 2;
+    const cierreW = 88;
+    const cierreX = pageWidth - 12 - cierreW;
     doc.setFillColor(248, 250, 252);
-    doc.rect(12, pageHeight - 14, pageWidth - 24, 10, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.line(12, pageHeight - 14, pageWidth - 12, pageHeight - 14);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(cierreX, y, cierreW, 23, 1.5, 1.5, 'FD');
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7.2);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Total Mercadería Entregada (+):', cierreX + 4, y + 5.5);
+    doc.setTextColor(37, 99, 235);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`+$${data.resumen.totalEntregasMonto.toFixed(2)}`, cierreX + cierreW - 4, y + 5.5, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Total Abonos Recibidos (−):', cierreX + 4, y + 9.5);
+    doc.setTextColor(16, 185, 129);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`-$${data.resumen.totalAbonosMonto.toFixed(2)}`, cierreX + cierreW - 4, y + 9.5, { align: 'right' });
+
+    if (data.resumen.totalDevolucionesMonto > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
+      doc.text('Total Devoluciones Acreditadas (−):', cierreX + 4, y + 13.5);
+      doc.setTextColor(225, 29, 72);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`-$${data.resumen.totalDevolucionesMonto.toFixed(2)}`, cierreX + cierreW - 4, y + 13.5, { align: 'right' });
+    }
+
+    doc.setDrawColor(203, 213, 225);
+    doc.line(cierreX + 4, y + 16, cierreX + cierreW - 4, y + 16);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.2);
+    doc.setTextColor(15, 23, 42);
+    doc.text('SALDO FINAL PENDIENTE (=):', cierreX + 4, y + 20.2);
+
+    const saldoFinal = data.resumen.saldoPendienteFinal;
+    if (saldoFinal > 0) {
+      doc.setTextColor(225, 29, 72); // Rose
+      doc.text(`$${saldoFinal.toFixed(2)}`, cierreX + cierreW - 4, y + 20.2, { align: 'right' });
+    } else {
+      doc.setTextColor(5, 150, 105); // Emerald
+      doc.text('$0.00 (AL DÍA)', cierreX + cierreW - 4, y + 20.2, { align: 'right' });
+    }
+
+    y += 27;
+  }
+
+  // ── Pie de Página en Todas las Hojas ───────────────────────────
+  const totalPaginas = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPaginas; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(226, 232, 240);
+    doc.line(12, pageHeight - 12, pageWidth - 12, pageHeight - 12);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(148, 163, 184);
     doc.text(
       `Generado el ${new Date().toLocaleString('es-EC')} • Extracto comercial oficial de cuenta corriente.`,
       pageWidth / 2,
-      pageHeight - 9,
+      pageHeight - 8,
       { align: 'center' }
     );
     doc.setFont('helvetica', 'bold');
-    doc.text(`Página ${i} de ${totalPaginas}`, pageWidth - 16, pageHeight - 9, { align: 'right' });
+    doc.text(`Página ${i} de ${totalPaginas}`, pageWidth - 16, pageHeight - 8, { align: 'right' });
   }
 
   return doc;
 }
 
 /**
- * Descarga el archivo PDF localmente
+ * Descarga el archivo PDF localmente tras pre-cargar las fotos de calzado
  */
-export function descargarHistorialPdf(data: HistorialComercialPdfData): void {
-  const doc = generarHistorialPdfDoc(data);
+export async function descargarHistorialPdf(data: HistorialComercialPdfData): Promise<void> {
+  const dataConImg = await preCargarImagenesHistorial(data);
+  const doc = generarHistorialPdfDoc(dataConImg);
   const cleanNombre = data.cliente.nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`Historial_${cleanNombre}_${data.periodo.fechaInicio}_${data.periodo.fechaFin}.pdf`);
 }
@@ -522,14 +824,15 @@ export function descargarHistorialPdf(data: HistorialComercialPdfData): void {
 /**
  * Obtiene el PDF codificado en Base64 para adjuntarlo a correos electrónicos
  */
-export function generarHistorialPdfBase64(data: HistorialComercialPdfData): string {
-  const doc = generarHistorialPdfDoc(data);
+export async function generarHistorialPdfBase64(data: HistorialComercialPdfData): Promise<string> {
+  const dataConImg = await preCargarImagenesHistorial(data);
+  const doc = generarHistorialPdfDoc(dataConImg);
   const dataUri = doc.output('datauristring');
   return dataUri.split(',')[1] || '';
 }
 
 /**
- * Genera el mensaje de WhatsApp formal y detallado con la estructura idéntica a los comprobantes de abonos
+ * Genera el mensaje de WhatsApp formal y detallado
  */
 export async function armarMensajeWhatsAppHistorial(
   data: HistorialComercialPdfData,
@@ -558,10 +861,11 @@ export async function armarMensajeWhatsAppHistorial(
   }
   msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  // Detalle de entregas por variante (sin desglose de tallas)
+  // Detalle de entregas
   if (data.entregas.length > 0) {
-    msg += `📦 *DETALLE DE ENTREGAS REALIZADAS:*\n`;
-    data.entregas.forEach((ent) => {
+    msg += `📦 *DETALLE DE ENTREGAS REALIZADAS (Cronológico):*\n`;
+    const ordenadas = [...data.entregas].sort((a, b) => new Date(a.fechaEntrega || a.fecha).getTime() - new Date(b.fechaEntrega || b.fecha).getTime());
+    ordenadas.forEach((ent) => {
       const notaStr = ent.numeroNota ? ` (Nota ${ent.numeroNota})` : '';
       const entregadorStr = ent.entregadoPor ? ` • Entregado por: ${ent.entregadoPor}` : '';
       msg += `🔹 *${ent.fecha}*${notaStr}${entregadorStr}\n`;
@@ -569,7 +873,8 @@ export async function armarMensajeWhatsAppHistorial(
         const colorStr = it.color ? ` (${it.color})` : '';
         const serieStr = it.serie && it.serie !== 'Estándar' ? ` • Serie: ${it.serie}` : '';
         const volStr = `${it.totalPares} ${it.totalPares === 1 ? 'par' : 'pares'}`;
-        msg += `   ▫️ ${it.modelo}${colorStr}${serieStr}\n      ${volStr} • $${it.subtotal.toFixed(2)}\n`;
+        const tallasStr = it.curvaTallas ? ` [${it.curvaTallas}]` : '';
+        msg += `   ▫️ ${it.modelo}${colorStr}${serieStr}\n      ${volStr}${tallasStr} • $${it.subtotal.toFixed(2)}\n`;
       });
       msg += `   💰 Subtotal entrega: $${ent.montoTotal.toFixed(2)}\n\n`;
     });
@@ -615,7 +920,7 @@ export async function compartirHistorialWhatsApp(
   }
 
   if (descargarLocal) {
-    descargarHistorialPdf(data);
+    await descargarHistorialPdf(data);
   }
 
   const mensajeTexto = await armarMensajeWhatsAppHistorial(data, urlPublica);

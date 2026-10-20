@@ -551,7 +551,7 @@ function ComprobanteContent() {
         })),
         devoluciones: [],
       };
-      descargarHistorialPdf(pdfData);
+      await descargarHistorialPdf(pdfData);
     }
   };
 
