@@ -1052,6 +1052,10 @@ export default function SaasLandingPage() {
                       <span>Solicitar {p.name}</span>
                       <ArrowRight size={14} />
                     </button>
+                    <p className="text-[10px] text-center text-slate-500 mt-2.5 flex items-center justify-center gap-1">
+                      <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
+                      <span>Sin contratos forzosos · Cancela en cualquier momento</span>
+                    </p>
                   </div>
                 </div>
               );
