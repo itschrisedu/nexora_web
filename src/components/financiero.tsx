@@ -70,6 +70,7 @@ import {
   generarHistorialPdfBase64,
   armarMensajeWhatsAppHistorial,
   compartirHistorialWhatsApp,
+  preCargarImagenesHistorial,
   HistorialComercialPdfData,
 } from '../services/pdf-historial.service';
 import { generarUrlPublicaAbono, generarUrlPublicaHistorial } from '../services/comprobante-url.service';
@@ -613,6 +614,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [compartirTelefonoDestino, setCompartirTelefonoDestino] = useState('');
   const [descargarCopiaPdfAlCompartir, setDescargarCopiaPdfAlCompartir] = useState(true);
   const [compartiendoHistorial, setCompartiendoHistorial] = useState(false);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [loadingPreviewPdf, setLoadingPreviewPdf] = useState<boolean>(false);
+  const [tabCompartirModal, setTabCompartirModal] = useState<'formulario' | 'preview'>('preview');
 
   // Modal Facturación SRI
   const [showFacturaModal, setShowFacturaModal] = useState(false);
@@ -1799,6 +1803,53 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     await descargarHistorialPdf(pdfData);
     showToast('Documento PDF generado y descargado exitosamente.', 'success');
   };
+
+  const generarPreviewHistorial = useCallback(async () => {
+    const pdfData = construirHistorialPdfData();
+    if (!pdfData) {
+      setPreviewPdfUrl(null);
+      return;
+    }
+
+    setLoadingPreviewPdf(true);
+    try {
+      const dataConImg = await preCargarImagenesHistorial(pdfData);
+      const doc = generarHistorialPdfDoc(dataConImg);
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      setPreviewPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+    } catch (err) {
+      console.error('Error generando preview de historial:', err);
+    } finally {
+      setLoadingPreviewPdf(false);
+    }
+  }, [
+    historialCliente,
+    filtroCompartirFechaInicio,
+    filtroCompartirFechaFin,
+    compartirTelefonoDestino,
+    compartirEmailDestino,
+    businessConfig,
+  ]);
+
+  useEffect(() => {
+    if (!showCompartirHistorialModal) {
+      if (previewPdfUrl) {
+        URL.revokeObjectURL(previewPdfUrl);
+        setPreviewPdfUrl(null);
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      generarPreviewHistorial();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [showCompartirHistorialModal, filtroCompartirFechaInicio, filtroCompartirFechaFin, generarPreviewHistorial]);
 
   const handleCompartirHistorial = async () => {
     const pdfData = construirHistorialPdfData();
@@ -6390,12 +6441,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         </div>
       )}
 
-      {/* Modal de Compartir Historial Comercial y Financiero */}
+      {/* Modal de Compartir Historial Comercial y Financiero con Previsualizador PDF Integrado */}
       {showCompartirHistorialModal && historialCliente && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden text-[var(--foreground)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-2xl max-w-6xl w-full h-[94vh] flex flex-col overflow-hidden text-[var(--foreground)] animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="p-5 sm:p-6 bg-[#0F172A] text-white flex items-center justify-between shrink-0 relative overflow-hidden">
+            <div className="p-4 sm:p-5 bg-[#0F172A] text-white flex items-center justify-between shrink-0 relative overflow-hidden">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                   <Share2 size={20} />
@@ -6405,184 +6456,306 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     Compartir Historial Comercial
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300">
-                    Extracto formal en PDF, WhatsApp y Correo electrónico
+                    Extracto formal en PDF con previsualización en vivo, WhatsApp y Correo
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowCompartirHistorialModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                title="Cerrar modal"
-              >
-                <X size={18} />
-              </button>
-            </div>
 
-            {/* Content */}
-            <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
-              {/* Tarjeta de información del cliente */}
-              <div className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-sm text-[var(--foreground)]">
-                      {historialCliente.cliente.nombre}
-                    </span>
-                    <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] border border-[#0F172A]/20 rounded-md text-[10px] font-bold">
-                      {historialCliente.cliente.nivelCredito}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Identificación: <strong>{historialCliente.cliente.cedula || '—'}</strong>
-                  </p>
-                </div>
-                <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
-                  <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold">
-                    Saldo Deudor Total
-                  </span>
-                  <span className="font-black text-base text-red-500">
-                    ${historialCliente.resumen.saldoPendienteTotal.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Selector de Rango de Fechas */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <Filter size={15} className="text-[#0F172A]" />
-                    <span className="text-xs font-black uppercase tracking-wider text-[var(--foreground)]">
-                      Período del Extracto
-                    </span>
-                  </div>
+              <div className="flex items-center gap-2">
+                {/* Selector de pestañas para móviles/tablets */}
+                <div className="flex lg:hidden bg-slate-800 p-1 rounded-xl border border-slate-700">
                   <button
                     type="button"
-                    onClick={() => {
-                      setFiltroCompartirFechaInicio(rangoFechasHistorial.minFecha);
-                      setFiltroCompartirFechaFin(rangoFechasHistorial.maxFecha);
-                    }}
-                    className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer flex items-center gap-1"
+                    onClick={() => setTabCompartirModal('formulario')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                      tabCompartirModal === 'formulario'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
                   >
-                    <span>Todo el histórico</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)]">
-                      ({rangoFechasHistorial.minFecha} al {rangoFechasHistorial.maxFecha})
-                    </span>
+                    Opciones
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTabCompartirModal('preview')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                      tabCompartirModal === 'preview'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Ver PDF
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
-                      Desde:
-                    </label>
-                    <input
-                      type="date"
-                      value={filtroCompartirFechaInicio}
-                      min={rangoFechasHistorial.minFecha}
-                      max={filtroCompartirFechaFin || rangoFechasHistorial.maxFecha}
-                      onChange={(e) => setFiltroCompartirFechaInicio(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
-                      Hasta:
-                    </label>
-                    <input
-                      type="date"
-                      value={filtroCompartirFechaFin}
-                      min={filtroCompartirFechaInicio || rangoFechasHistorial.minFecha}
-                      max={rangoFechasHistorial.maxFecha}
-                      onChange={(e) => setFiltroCompartirFechaFin(e.target.value)}
-                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]">
-                  <span>
-                    Transacciones en rango: <strong>{movimientosFiltradosCompartir.length}</strong> de {rangoFechasHistorial.total}
-                  </span>
-                  <span className="text-[10px] italic">
-                    Restringido estrictamente al historial del cliente
-                  </span>
-                </div>
-              </div>
-
-              {/* Destinatarios de Contacto */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
-                  <div className="flex items-center gap-2">
-                    <MessageCircle size={15} className="text-emerald-500" />
-                    <span className="text-xs font-extrabold text-[var(--foreground)]">
-                      Teléfono WhatsApp
-                    </span>
-                  </div>
-                  <input
-                    type="tel"
-                    placeholder="Ej: 0991234567 o +593991234567"
-                    value={compartirTelefonoDestino}
-                    onChange={(e) => setCompartirTelefonoDestino(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
-                  />
-                  <label className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)] cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={descargarCopiaPdfAlCompartir}
-                      onChange={(e) => setDescargarCopiaPdfAlCompartir(e.target.checked)}
-                      className="rounded accent-emerald-600"
-                    />
-                    <span>Descargar copia PDF al abrir WhatsApp</span>
-                  </label>
-                </div>
-
-                <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Mail size={15} className="text-blue-500" />
-                    <span className="text-xs font-extrabold text-[var(--foreground)]">
-                      Correo Electrónico
-                    </span>
-                  </div>
-                  <input
-                    type="email"
-                    placeholder="cliente@ejemplo.com"
-                    value={compartirEmailDestino}
-                    onChange={(e) => setCompartirEmailDestino(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-500"
-                  />
-                  <p className="text-[10px] text-[var(--muted-foreground)]">
-                    El documento PDF se generará y enviará adjunto por correo.
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCompartirHistorialModal(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Cerrar modal"
+                >
+                  <X size={18} />
+                </button>
               </div>
             </div>
 
-            {/* Footer con Acciones */}
-            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex flex-wrap items-center justify-end gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleDescargarHistorialPdf}
-                className="px-3.5 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] font-extrabold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                title="Descargar documento PDF local"
-              >
-                <Download size={15} />
-                <span>Descargar PDF</span>
-              </button>
+            {/* Body (Grid Split-View) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-[var(--border)]">
+              {/* Panel Izquierdo: Configuración, Filtros y Envíos (5 columnas) */}
+              <div className={`lg:col-span-5 flex flex-col justify-between overflow-y-auto p-4 sm:p-5 space-y-4 ${tabCompartirModal === 'preview' ? 'hidden lg:flex' : 'flex'}`}>
+                <div className="space-y-4">
+                  {/* Tarjeta de información del cliente */}
+                  <div className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm text-[var(--foreground)]">
+                          {historialCliente.cliente.nombre}
+                        </span>
+                        <span className="px-2 py-0.5 bg-[#0F172A]/10 text-[#0F172A] border border-[#0F172A]/20 rounded-md text-[10px] font-bold">
+                          {historialCliente.cliente.nivelCredito}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        Identificación: <strong>{historialCliente.cliente.cedula || '—'}</strong>
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
+                      <span className="text-[10px] text-[var(--muted-foreground)] block font-semibold">
+                        Saldo Deudor Total
+                      </span>
+                      <span className="font-black text-base text-red-500">
+                        ${historialCliente.resumen.saldoPendienteTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
 
-              <button
-                type="button"
-                onClick={handleCompartirHistorial}
-                disabled={compartiendoHistorial || !compartirTelefonoDestino}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                title="Compartir por WhatsApp y enviar por correo en segundo plano con enlace en línea"
-              >
-                {compartiendoHistorial ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Share2 size={15} />
-                )}
-                <span>Compartir</span>
-              </button>
+                  {/* Selector de Rango de Fechas */}
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Filter size={15} className="text-[#0F172A]" />
+                        <span className="text-xs font-black uppercase tracking-wider text-[var(--foreground)]">
+                          Período del Extracto
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFiltroCompartirFechaInicio(rangoFechasHistorial.minFecha);
+                          setFiltroCompartirFechaFin(rangoFechasHistorial.maxFecha);
+                        }}
+                        className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <span>Todo el histórico</span>
+                        <span className="text-[10px] text-[var(--muted-foreground)]">
+                          ({rangoFechasHistorial.minFecha} al {rangoFechasHistorial.maxFecha})
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                          Desde:
+                        </label>
+                        <input
+                          type="date"
+                          value={filtroCompartirFechaInicio}
+                          min={rangoFechasHistorial.minFecha}
+                          max={filtroCompartirFechaFin || rangoFechasHistorial.maxFecha}
+                          onChange={(e) => setFiltroCompartirFechaInicio(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[var(--muted-foreground)] mb-1">
+                          Hasta:
+                        </label>
+                        <input
+                          type="date"
+                          value={filtroCompartirFechaFin}
+                          min={filtroCompartirFechaInicio || rangoFechasHistorial.minFecha}
+                          max={rangoFechasHistorial.maxFecha}
+                          onChange={(e) => setFiltroCompartirFechaFin(e.target.value)}
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]">
+                      <span>
+                        Transacciones en rango: <strong>{movimientosFiltradosCompartir.length}</strong> de {rangoFechasHistorial.total}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                        <Check size={12} /> Actualización en vivo
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Destinatarios de Contacto */}
+                  <div className="space-y-3">
+                    <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <MessageCircle size={15} className="text-emerald-500" />
+                        <span className="text-xs font-extrabold text-[var(--foreground)]">
+                          Teléfono WhatsApp
+                        </span>
+                      </div>
+                      <input
+                        type="tel"
+                        placeholder="Ej: 0991234567 o +593991234567"
+                        value={compartirTelefonoDestino}
+                        onChange={(e) => setCompartirTelefonoDestino(e.target.value)}
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                      />
+                      <label className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)] cursor-pointer pt-1">
+                        <input
+                          type="checkbox"
+                          checked={descargarCopiaPdfAlCompartir}
+                          onChange={(e) => setDescargarCopiaPdfAlCompartir(e.target.checked)}
+                          className="rounded accent-emerald-600"
+                        />
+                        <span>Descargar copia PDF al abrir WhatsApp</span>
+                      </label>
+                    </div>
+
+                    <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Mail size={15} className="text-blue-500" />
+                        <span className="text-xs font-extrabold text-[var(--foreground)]">
+                          Correo Electrónico
+                        </span>
+                      </div>
+                      <input
+                        type="email"
+                        placeholder="cliente@ejemplo.com"
+                        value={compartirEmailDestino}
+                        onChange={(e) => setCompartirEmailDestino(e.target.value)}
+                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-500"
+                      />
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        El extracto PDF se generará y despachará por correo.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acciones principales en el panel izquierdo */}
+                <div className="pt-3 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleDescargarHistorialPdf}
+                    className="px-4 py-2.5 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] font-extrabold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    title="Descargar documento PDF oficial"
+                  >
+                    <Download size={15} />
+                    <span>Descargar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCompartirHistorial}
+                    disabled={compartiendoHistorial || !compartirTelefonoDestino}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    title="Compartir por WhatsApp y enviar por correo con enlace en línea"
+                  >
+                    {compartiendoHistorial ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <Share2 size={15} />
+                    )}
+                    <span>Compartir</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Panel Derecho: Previsualizador del PDF (7 columnas) */}
+              <div className={`lg:col-span-7 flex flex-col h-full bg-slate-100 dark:bg-slate-950/40 p-3 sm:p-4 overflow-hidden ${tabCompartirModal === 'formulario' ? 'hidden lg:flex' : 'flex'}`}>
+                {/* Barra de herramientas del visor */}
+                <div className="flex items-center justify-between pb-3 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600">
+                      <FileText size={15} />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black text-[var(--foreground)] block">
+                        Previsualización del PDF
+                      </span>
+                      <span className="text-[10px] text-[var(--muted-foreground)]">
+                        Documento listo para emisión y descarga
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => generarPreviewHistorial()}
+                      disabled={loadingPreviewPdf}
+                      className="p-1.5 px-2.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer text-xs flex items-center gap-1 shadow-xs"
+                      title="Regenerar previsualización"
+                    >
+                      <RotateCcw size={13} className={loadingPreviewPdf ? 'animate-spin' : ''} />
+                      <span className="hidden sm:inline text-[11px] font-bold">Actualizar</span>
+                    </button>
+
+                    {previewPdfUrl && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const w = window.open(previewPdfUrl, '_blank');
+                            w?.focus();
+                          }}
+                          className="p-1.5 px-2.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer text-xs flex items-center gap-1 shadow-xs"
+                          title="Abrir en pestaña nueva o imprimir"
+                        >
+                          <ExternalLink size={13} />
+                          <span className="hidden sm:inline text-[11px] font-bold">Pestaña</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleDescargarHistorialPdf}
+                          className="p-1.5 px-3 rounded-lg bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white transition-colors cursor-pointer text-xs flex items-center gap-1 font-bold shadow-xs"
+                          title="Descargar este archivo"
+                        >
+                          <Download size={13} />
+                          <span className="text-[11px]">Guardar</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Visor interactivo */}
+                <div className="flex-1 w-full rounded-2xl border border-[var(--border)] shadow-inner bg-slate-200/50 dark:bg-slate-900/50 overflow-hidden relative flex items-center justify-center">
+                  {loadingPreviewPdf ? (
+                    <div className="flex flex-col items-center justify-center gap-3 p-6 text-center animate-in fade-in">
+                      <Loader2 size={32} className="animate-spin text-emerald-600" />
+                      <p className="text-xs font-bold text-[var(--foreground)]">
+                        Generando vista previa del extracto...
+                      </p>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Cargando modelos, curvas de tallas y corrida de saldos
+                      </p>
+                    </div>
+                  ) : previewPdfUrl ? (
+                    <iframe
+                      src={previewPdfUrl}
+                      title="Previsualizador de Historial Comercial PDF"
+                      className="w-full h-full rounded-2xl border-none bg-white"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-2 p-6 text-center">
+                      <FileText size={32} className="text-slate-400" />
+                      <p className="text-xs font-bold text-[var(--muted-foreground)]">
+                        No hay información suficiente para previsualizar el PDF
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
