@@ -1276,10 +1276,10 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
           ? Number(datosLiquidez.efectivoPersonalizado)
           : datosLiquidez.efectivoRecaudado;
 
-        // Activo Líquido Inmediato para compras directas: Efectivo + Anticipos a talleres ya entregados
+        // Activo Líquido Inmediato para compras directas: Efectivo + Anticipos a proveedores ya entregados
         const activoLiquidoInmediato = efectivoEfectivo + (datosLiquidez.adelantosAProveedores || 0);
 
-        // Pasivo exigible inmediato: Cuentas pendientes a talleres + Egresos operativos del mes
+        // Pasivo exigible inmediato: Cuentas pendientes a proveedores + Egresos operativos del mes
         const compromisosInmediatos = datosLiquidez.deudaProveedores + datosLiquidez.totalGastos;
 
         // Capital Neto Libre para Nuevos Pedidos (Líquido puro)

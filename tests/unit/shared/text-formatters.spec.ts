@@ -82,7 +82,7 @@ describe('Normalizadores y Formateadores de Texto', () => {
 
   describe('validarEmailEstricto', () => {
     it('debe validar correos válidos y permitir vacío cuando es opcional', () => {
-      expect(validarEmailEstricto('proveedor@taller.com').valido).toBe(true);
+      expect(validarEmailEstricto('proveedor@calzado.com').valido).toBe(true);
       expect(validarEmailEstricto('').valido).toBe(true);
       expect(validarEmailEstricto('invalido-sin-arroba').valido).toBe(false);
     });

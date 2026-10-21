@@ -2009,7 +2009,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                           className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-[var(--foreground)] focus:outline-none focus:border-indigo-500"
                         />
                       </div>
-                      <span className="text-[10px] text-[var(--muted-foreground)] block leading-tight">Para talleres y locales individuales.</span>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block leading-tight">Para comercios y locales individuales.</span>
                     </div>
 
                     {/* Input Plan Pro */}
@@ -2090,7 +2090,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                         </span>
                       </div>
                       <p className="text-[11px] text-[var(--muted-foreground)] leading-snug">
-                        Ideal para talleres artesanales y comercios individuales con 1 sucursal.
+                        Ideal para comercios de calzado y locales individuales con 1 sucursal.
                       </p>
                       <ul className="text-[10px] text-[var(--muted-foreground)] space-y-1">
                         <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> 1 Sucursal / 2 Usuarios</li>
@@ -2372,7 +2372,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       <span>Imagen de Fondo de la Portada Principal (Con Encuadre Panorámico)</span>
                     </label>
                     <span className="text-[10px] text-[var(--muted-foreground)]">
-                      Fotografía de tu local, taller o exhibición para el fondo del inicio
+                      Fotografía de tu local comercial o exhibición para el fondo del inicio
                     </span>
                   </div>
 
@@ -2584,7 +2584,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
 
               <div>
                 <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
-                  🛡️ Garantía de Fábrica & Servicio de Taller
+                  🛡️ Garantía de Calidad & Servicio del Local
                 </label>
                 <textarea
                   rows={Math.max(3, (config.garantiaTaller || "").split("\n").length)}
@@ -2594,7 +2594,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     e.target.style.height = "auto";
                     e.target.style.height = `${e.target.scrollHeight}px`;
                   }}
-                  placeholder="Describe las garantías de calidad, durabilidad del cuero, mantenimiento de taller o políticas de cambio..."
+                  placeholder="Describe las garantías de calidad, durabilidad del cuero, servicio de atención o políticas de cambio..."
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 resize-none overflow-hidden transition-[height]"
                 />
               </div>

@@ -145,7 +145,7 @@ export default function ReportesComponent({
   const [loadingMl, setLoadingMl] = useState(false);
   const [proyeccionMl, setProyeccionMl] = useState<any>(null);
 
-  // Estado de Reporte de Abastecimiento de Talleres / Fabricantes
+  // Estado de Reporte de Abastecimiento de Proveedores / Fabricantes
   const [loadingProveedores, setLoadingProveedores] = useState(false);
   const [proveedoresData, setProveedoresData] = useState<any>(null);
   const [filtroProveedorBusqueda, setFiltroProveedorBusqueda] = useState('');
@@ -748,7 +748,7 @@ export default function ReportesComponent({
     }
   };
 
-  // 11. REPORTE DE ABASTECIMIENTO DE TALLERES & PROVEEDORES
+  // 11. REPORTE DE ABASTECIMIENTO DE PROVEEDORES
   const handleReporteProveedoresPdf = (modo: 'preview' | 'download') => {
     if (!proveedoresData) {
       showToast('No hay datos de abastecimiento para generar el PDF.', 'warning');
@@ -3210,7 +3210,7 @@ export default function ReportesComponent({
           )}
 
           {/* ════════════════════════════════════════════════════════════════ */}
-          {/* TAB 10: ABASTECIMIENTO DE TALLERES & PROVEEDORES                  */}
+          {/* TAB 10: ABASTECIMIENTO DE PROVEEDORES                           */}
           {/* ════════════════════════════════════════════════════════════════ */}
           {tabActiva === 'proveedores' && (
             <div className="space-y-6 animate-in fade-in duration-200">

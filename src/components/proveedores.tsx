@@ -1385,7 +1385,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     const emisorDireccion = sucursalActual?.direccion || "Cevallos, Tungurahua, Ecuador";
     const emisorTelefono = sucursalActual?.telefono || "0998765432";
 
-    // Limpieza estricta de observaciones para no filtrar textos internos al taller
+    // Limpieza estricta de observaciones para no filtrar textos internos al proveedor
     const obsOrdenLimpia = limpiarObservacionesOrden(order.observaciones);
 
     return {

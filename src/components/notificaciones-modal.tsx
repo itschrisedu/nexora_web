@@ -773,7 +773,7 @@ export default function NotificacionesModal({
             </div>
           )}
 
-          {/* ═════════ TAB 3: PEDIDOS A TALLERES, GARANTÍAS & DESPACHOS ═════════ */}
+          {/* ═════════ TAB 3: PEDIDOS A PROVEEDORES, GARANTÍAS & DESPACHOS ═════════ */}
           {activeTab === 'ordenes' && (
             <div className="space-y-5">
 
@@ -782,7 +782,7 @@ export default function NotificacionesModal({
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
                   <h3 className="text-xs font-black uppercase text-violet-500 tracking-wider flex items-center gap-1.5">
                     <Factory size={14} />
-                    Órdenes por Pedir a Talleres / Fabricantes
+                    Órdenes por Pedir a Proveedores
                   </h3>
                   {onNavigateToView && (
                     <button
@@ -803,7 +803,7 @@ export default function NotificacionesModal({
                   <div className="text-center py-6 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)]">
                     <CheckCircle2 size={28} className="mx-auto text-emerald-500 mb-1.5" />
                     <div className="text-xs font-bold text-[var(--foreground)]">Sin ordenes pendientes de pedir</div>
-                    <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">Todas las ordenes de compra a talleres han sido gestionadas.</p>
+                    <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">Todas las órdenes de compra a proveedores han sido gestionadas.</p>
                   </div>
                 ) : (
                   <div className="space-y-2.5">

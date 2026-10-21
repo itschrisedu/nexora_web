@@ -262,7 +262,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
   // Map de modelos del inventario para enriquecimiento local
   const [modelosInventarioMap, setModelosInventarioMap] = useState<Map<string, any>>(new Map());
 
-  // Modal para ordenar reabastecimiento rápido a proveedor/taller
+  // Modal para ordenar reabastecimiento rápido a proveedor
   const [pedidoModalItem, setPedidoModalItem] = useState<ItemPrediccion | null>(null);
   const [pedidoCantidad, setPedidoCantidad] = useState<number>(12);
   const [pedidoGuardando, setPedidoGuardando] = useState<boolean>(false);
@@ -433,7 +433,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
     }
   };
 
-  const handleCrearPedidoTaller = async (e: React.FormEvent) => {
+  const handleCrearPedidoProveedor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pedidoModalItem) return;
     setPedidoGuardando(true);
@@ -1304,7 +1304,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
                         )}
                       </div>
 
-                      {/* Botón de acción: Pedir a Taller/Proveedor */}
+                      {/* Botón de acción: Pedir a Proveedor */}
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -1662,7 +1662,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
         )}
       </div>
 
-      {/* ══════ MODAL DE REABASTECIMIENTO A TALLER / PROVEEDOR ══════ */}
+      {/* ══════ MODAL DE REABASTECIMIENTO A PROVEEDOR ══════ */}
       {pedidoModalItem && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -1729,7 +1729,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
               </div>
             </div>
 
-            <form onSubmit={handleCrearPedidoTaller} className="p-5 space-y-4 text-xs">
+            <form onSubmit={handleCrearPedidoProveedor} className="p-5 space-y-4 text-xs">
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1 text-amber-900 dark:text-amber-300">
                 <p className="font-bold flex items-center gap-1.5">
                   <Sparkles size={13} /> Recomendación Inteligente

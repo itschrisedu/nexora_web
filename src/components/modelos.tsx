@@ -2606,10 +2606,10 @@ export default function ModelosComponent({
                                   </div>
                                 </div>
 
-                                {/* Insignia Discreta de Taller y Costo */}
+                                {/* Insignia Discreta de Proveedor y Costo */}
                                 <div className="flex items-center justify-between text-[11px] px-1">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">Taller:</span>
+                                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">Proveedor:</span>
                                     {p.supplier ? (
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
                                         <Truck size={10} />
@@ -2619,7 +2619,7 @@ export default function ModelosComponent({
                                         )}
                                       </span>
                                     ) : (
-                                      <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin taller asignado</span>
+                                      <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin proveedor asignado</span>
                                     )}
                                   </div>
                                   <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
@@ -2818,7 +2818,7 @@ export default function ModelosComponent({
                           {m.supplier && (
                             <div className="flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-xl w-fit">
                               <Truck size={13} className="shrink-0" />
-                              <span>Taller Proveedor: <strong>{m.supplier.razonSocial}</strong> {m.supplier.ruc ? `(${m.supplier.ruc})` : ''}</span>
+                              <span>Proveedor Fabricante: <strong>{m.supplier.razonSocial}</strong> {m.supplier.ruc ? `(${m.supplier.ruc})` : ''}</span>
                               <span className="text-[10px] opacity-75 font-normal">· Se auto-vinculará a tu local</span>
                             </div>
                           )}
@@ -2923,7 +2923,7 @@ export default function ModelosComponent({
                               <div className="text-[10px] text-[var(--muted-foreground)] flex items-center justify-between gap-1 mt-0.5">
                                 <span>{getNombreSerie(v.serieNombre)}</span>
                                 {v.supplier?.razonSocial && (
-                                  <span className="truncate text-blue-600 text-[9px]">Taller: {v.supplier.razonSocial}</span>
+                                  <span className="truncate text-blue-600 text-[9px]">Proveedor: {v.supplier.razonSocial}</span>
                                 )}
                               </div>
                             </div>
@@ -3051,7 +3051,7 @@ export default function ModelosComponent({
                         <div>
                           <div className="font-bold text-xs text-[var(--foreground)]">{v.color}</div>
                           <div className="text-[10px] text-[var(--muted-foreground)]">
-                            {getNombreSerie(v.serieNombre)} {v.supplier?.razonSocial ? `· Taller: ${v.supplier.razonSocial}` : ''}
+                            {getNombreSerie(v.serieNombre)} {v.supplier?.razonSocial ? `· Proveedor: ${v.supplier.razonSocial}` : ''}
                           </div>
                         </div>
                       </div>
@@ -3662,16 +3662,16 @@ export default function ModelosComponent({
                 </div>
               </div>
 
-              {/* Sección 2: Proveedor / Taller Fabricante de esta Variante */}
+              {/* Sección 2: Proveedor Fabricante de esta Variante */}
               <div className="space-y-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-4">
                 <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
                   <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest flex items-center gap-1.5">
                     <Truck size={14} className="text-emerald-600" />
-                    <span>2. Proveedor / Taller Fabricante</span>
+                    <span>2. Proveedor Fabricante</span>
                   </h5>
                 </div>
                 <p className="text-[10px] text-[var(--muted-foreground)] -mt-1">
-                  Selecciona el taller o proveedor que suministra esta variante. El precio de costo que ingreses abajo corresponderá al valor entregado por este proveedor.
+                  Selecciona el proveedor que suministra esta variante. El precio de costo que ingreses abajo corresponderá al valor entregado por este proveedor.
                 </p>
                 <div className="space-y-2">
                   <Lbl t="Proveedor Asignado a esta Variante" />
@@ -3696,7 +3696,7 @@ export default function ModelosComponent({
                       type="button"
                       onClick={() => { setQsContext('addColor'); setShowQuickSupplier(true); }}
                       className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl flex items-center gap-1 shrink-0 transition-colors shadow-xs cursor-pointer"
-                      title="Registrar nuevo taller o proveedor al vuelo"
+                      title="Registrar nuevo proveedor al vuelo"
                     >
                       <Plus size={13} />
                       <span>Nuevo</span>
@@ -4493,10 +4493,10 @@ export default function ModelosComponent({
                 </div>
               </div>
 
-              {/* Taller / Proveedor Fabricante de la Variante */}
+              {/* Proveedor Fabricante de la Variante */}
               <div className="space-y-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-3.5">
                 <div className="flex items-center justify-between">
-                  <Lbl t="Taller / Proveedor Fabricante" />
+                  <Lbl t="Proveedor Fabricante" />
                   <span className="text-[10px] text-[var(--muted-foreground)]">Asignación por variante</span>
                 </div>
                 <select
@@ -4504,7 +4504,7 @@ export default function ModelosComponent({
                   onChange={(e) => {
                     const newSupId = e.target.value;
                     setEditProductSupplierId(newSupId);
-                    // Auto-propagar precio conocido para este taller y serie si existe
+                    // Auto-propagar precio conocido para este proveedor y serie si existe
                     const cacheKey = `${editProductSerieId}_${newSupId || 'default'}`;
                     if (knownSeriesCosts[cacheKey]) {
                       setEditProductCosto(knownSeriesCosts[cacheKey].costPrice);
@@ -4529,7 +4529,7 @@ export default function ModelosComponent({
                   return (
                     <div className="flex items-center gap-1.5 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
                       <Truck size={12} className="shrink-0" />
-                      <span>Taller: <strong>{selSup?.razonSocial}</strong></span>
+                      <span>Proveedor: <strong>{selSup?.razonSocial}</strong></span>
                       {sigla && <span className="bg-blue-600 text-white px-1.5 py-0.2 rounded text-[9px] font-mono font-black">{sigla}</span>}
                     </div>
                   );
@@ -4633,7 +4633,7 @@ export default function ModelosComponent({
                         <Lbl t="Motivo del Ajuste de Precio (Opcional)" />
                         <input
                           type="text"
-                          placeholder="Ej: Cambio en tarifa de mano de obra del taller"
+                          placeholder="Ej: Cambio en tarifa de mano de obra del proveedor"
                           value={editProductMotivo}
                           onChange={e => setEditProductMotivo(e.target.value)}
                           className={INPUT}
@@ -5057,8 +5057,8 @@ export default function ModelosComponent({
                   <Truck size={18} />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Nuevo Proveedor / Taller</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Crea y asigna inmediatamente el taller o proveedor</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Nuevo Proveedor</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Crea y asigna inmediatamente el proveedor</p>
                 </div>
               </div>
               <button type="button" onClick={() => safeDismiss(() => setShowQuickSupplier(false), isDirtyQuickSupplier())} className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer" aria-label="Cerrar modal">
@@ -5106,7 +5106,7 @@ export default function ModelosComponent({
 
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Nombre Comercial / Taller
+                    Nombre Comercial / Proveedor
                   </label>
                   <input type="text" placeholder="Ej. Calzados Artesanales Cevallos (Dejar vacío si es persona natural)" value={qsNombreComercial} onChange={e => setQsNombreComercial(e.target.value)} className={INPUT} />
                   <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
@@ -5126,7 +5126,7 @@ export default function ModelosComponent({
                 </div>
 
                 <div>
-                  <Lbl t="Dirección de Taller / Fábrica (Opcional)" />
+                  <Lbl t="Dirección del Proveedor (Opcional)" />
                   <input type="text" placeholder="Ej. Parque Industrial / Av. Principal" value={qsDireccion} onChange={e => setQsDireccion(e.target.value)} onBlur={() => setQsDireccion(formatearDireccion(qsDireccion))} className={INPUT} />
                 </div>
               </div>

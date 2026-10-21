@@ -354,7 +354,7 @@ async function cargarImagenComoBase64(url: string, timeoutMs = 2500): Promise<st
 
 /**
  * Limpia y filtra observaciones para que NUNCA aparezcan referencias a pedidos sin stock,
- * clientes particulares ni textos internos del sistema en la orden de compra del taller.
+ * clientes particulares ni textos internos del sistema en la orden de compra del proveedor.
  */
 export function limpiarObservacionesOrden(obs?: string): string {
   if (!obs) return "";
