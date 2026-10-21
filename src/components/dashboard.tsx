@@ -22,6 +22,10 @@ import {
   ShieldCheck,
   ChevronRight,
   Package,
+  Layers,
+  Truck,
+  ArrowRight,
+  BadgeCheck,
 } from "lucide-react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "@/components/ui/toast";
@@ -211,16 +215,29 @@ export default function DashboardComponent({
           setMetodosPago([]);
         }
 
+        // Consolidación de Modelos Más Vendidos (evita que un modelo con varias variantes se duplique)
         if (Array.isArray(data.topModelos) && data.topModelos.length > 0) {
-          setTopModelos(
-            data.topModelos.slice(0, 4).map((m: any) => ({
-              id: m.productId || "",
-              nombre: m.modelName || "Calzado de Cuero",
-              marca: m.serieNombre || m.color || "Estándar",
-              pares: Number(m.pares || 0),
-              total: Number(m.ingresos || 0),
-            }))
-          );
+          const mapConsolidado: { [key: string]: { id: string; nombre: string; marca: string; pares: number; total: number } } = {};
+          data.topModelos.forEach((m: any) => {
+            const rawNom = (m.modelName || m.nombre || "Calzado de Cuero").trim();
+            const key = rawNom.toLowerCase();
+            if (!mapConsolidado[key]) {
+              mapConsolidado[key] = {
+                id: m.productId || m.id || key,
+                nombre: rawNom,
+                marca: m.serieNombre || m.color || "Estándar",
+                pares: Number(m.pares || 0),
+                total: Number(m.ingresos || m.total || 0),
+              };
+            } else {
+              mapConsolidado[key].pares += Number(m.pares || 0);
+              mapConsolidado[key].total += Number(m.ingresos || m.total || 0);
+            }
+          });
+          const unicos = Object.values(mapConsolidado)
+            .sort((a, b) => b.pares - a.pares)
+            .slice(0, 4);
+          setTopModelos(unicos);
         } else {
           setTopModelos([]);
         }
@@ -260,17 +277,17 @@ export default function DashboardComponent({
             const utilNeta = Math.round((gananciaBruta - gMes) * 100) / 100;
             const margenNeto = ingresos > 0 ? Math.round((utilNeta / ingresos) * 1000) / 10 : 0;
 
-            let diagTitulo = "Capacidad Óptima de Compra";
-            let diagTexto = "Cuentas con liquidez holgada para ordenar nuevos pedidos a proveedores.";
+            let diagTitulo = "Capacidad Óptima";
+            let diagTexto = "Liquidez holgada para ordenar lotes de calzado a proveedores sin comprometer obligaciones.";
             let diagNivel: "ALTO" | "MEDIO" | "CRITICO" = "ALTO";
 
             if (capNeto < 0) {
-              diagTitulo = "Atención: Liquidez Comprometida";
-              diagTexto = "Prioriza el cobro de cartera y saldo a proveedores antes de nuevos pedidos.";
+              diagTitulo = "Liquidez Comprometida";
+              diagTexto = "Prioriza el cobro de cartera y saldo a proveedores antes de generar nuevos pedidos.";
               diagNivel = "CRITICO";
             } else if (capNeto < 800) {
               diagTitulo = "Capacidad Moderada";
-              diagTexto = "Se aconseja rotar calzado de alta demanda y recaudar cartera pendiente.";
+              diagTexto = "Se recomienda rotar calzado de alta demanda y recaudar las cuotas pendientes.";
               diagNivel = "MEDIO";
             }
 
@@ -347,6 +364,7 @@ export default function DashboardComponent({
       : 1800;
 
   const pctIngresos = Math.min(Math.round((kpis.totalFacturado / metaPeriodo) * 100), 100);
+  const pctPares = Math.min(Math.round((kpis.totalParesVendidos / metaPares) * 100), 100);
   const pctCartera =
     kpis.totalFacturado > 0
       ? Math.min(Math.round((kpis.creditoPendiente / (kpis.totalFacturado + kpis.creditoPendiente)) * 100), 100)
@@ -356,7 +374,7 @@ export default function DashboardComponent({
   // COORDENADAS Y PUNTOS PARA EL GRÁFICO SPLINE WAVE
   // ════════════════════════════════════════════════════════════════
   const svgWidth = 650;
-  const svgHeight = 150;
+  const svgHeight = 145;
   const padLeft = 45;
   const padRight = 20;
   const padTop = 15;
@@ -381,7 +399,6 @@ export default function DashboardComponent({
   const refSplinePoints = useMemo(() => {
     if (splinePoints.length === 0) return [];
     return splinePoints.map((p, i) => {
-      // Modulación orgánica suave para representar la comparativa histórica / meta
       const factor = 0.72 + 0.24 * Math.sin(i * 1.3);
       const refY = padTop + (p.y - padTop) * factor;
       return { x: p.x, y: Math.max(padTop + 2, Math.min(refY, padTop + plotH - 2)) };
@@ -396,23 +413,30 @@ export default function DashboardComponent({
 
   const activePoint = hoverIndex !== null && splinePoints[hoverIndex] ? splinePoints[hoverIndex] : null;
 
+  // Máximo de pares para la gráfica relativa en el top de modelos
+  const maxParesModelos = useMemo(() => {
+    return Math.max(...topModelos.map((m) => m.pares), 1);
+  }, [topModelos]);
+
   return (
-    <div className="space-y-3 max-w-full pb-2">
+    <div className="space-y-2.5 max-w-full pb-2">
       {/* ─── 1. BANNER COMPACTO CON SELECTORES DE SUCURSAL Y PERIODO ─── */}
-      <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-2xl border border-slate-700/80 text-white relative overflow-hidden shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
+      <div className="px-3.5 py-2 sm:px-4 sm:py-2.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-2xl border border-slate-700/80 text-white relative overflow-hidden shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <div className="flex items-center gap-2 sm:gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-xs shrink-0">
-            <Sparkles size={16} />
+          <div className="w-7 h-7 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-xs shrink-0">
+            <Sparkles size={14} />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <h2 className="text-sm font-black tracking-tight text-white">Control Comercial e Inventario</h2>
-              <span className="px-2 py-0.2 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                En Vivo
+              <span className="px-2 py-0.2 rounded-full text-[8.5px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {isGlobalAdmin && activeSucursalId === "TODAS" ? "Admin General" : isAdmin ? "Admin Sucursal" : "Vendedor"}
               </span>
             </div>
-            <p className="text-[10px] text-slate-300">
-              Ventas directas por par, pedidos comerciales y balance operativo del local
+            <p className="text-[9.5px] text-slate-300">
+              {isGlobalAdmin && activeSucursalId === "TODAS"
+                ? "Consolidado de toda la red comercial de calzado"
+                : `Operaciones y balance comercial de ${sucursales.find((s) => s.id === activeSucursalId)?.name || "la sucursal"}`}
             </p>
           </div>
         </div>
@@ -423,7 +447,7 @@ export default function DashboardComponent({
             <select
               value={activeSucursalId}
               onChange={(e) => onSucursalChange(e.target.value)}
-              className="px-2 py-1 bg-slate-900/90 border border-slate-700 rounded-lg text-[10.5px] font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer shadow-inner pr-6"
+              className="px-2 py-1 bg-slate-900/90 border border-slate-700 rounded-lg text-[10px] font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer shadow-inner pr-6"
             >
               <option value="TODAS">🏢 Consolidado</option>
               {sucursales.map((s) => (
@@ -433,7 +457,7 @@ export default function DashboardComponent({
               ))}
             </select>
           ) : (
-            <span className="px-2 py-1 rounded-lg text-[10.5px] font-bold bg-slate-900/90 text-slate-200 border border-slate-700 flex items-center gap-1 shadow-inner">
+            <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-900/90 text-slate-200 border border-slate-700 flex items-center gap-1 shadow-inner">
               <MapPin size={10} className="text-amber-400" />
               {sucursales.find((s) => s.id === activeSucursalId)?.name || "Sucursal Local"}
             </span>
@@ -453,7 +477,7 @@ export default function DashboardComponent({
               <button
                 key={p.id}
                 onClick={() => setPeriodo(p.id)}
-                className={`px-2 py-0.5 rounded-md text-[9.5px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   periodo === p.id
                     ? "bg-amber-500 text-slate-950 font-black shadow-xs"
                     : "text-slate-400 hover:text-white"
@@ -467,92 +491,147 @@ export default function DashboardComponent({
           <button
             onClick={cargarDashboard}
             disabled={loading}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors shrink-0"
+            className="p-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors shrink-0"
             title="Recargar Métricas"
           >
-            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
-      {/* ─── 2. FILA PRINCIPAL DE 4 KPIS EJECUTIVOS (ESTRICTAMENTE NO REPETITIVOS) ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-        {/* KPI 1: Ventas / Ingresos Totales */}
+      {/* ─── 2. FILA DE 5 KPIS EJECUTIVOS (CLARA SEPARACIÓN DE DINERO VS PARES) ─── */}
+      <div className={`grid grid-cols-2 ${isAdmin ? "lg:grid-cols-5" : "lg:grid-cols-4"} gap-2`}>
+        {/* KPI 1: Ventas / Ingresos [DINERO] */}
         <KpiExecutiveCard
-          title={isVendedor ? "Mis Ventas" : "Ventas del Local"}
+          title={isVendedor ? "Mis Ventas" : isGlobalAdmin && activeSucursalId === "TODAS" ? "Ventas Totales" : "Ventas de Sucursal"}
           value={`$${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`${kpis.totalPedidos} transacciones registradas`}
+          subtitle={`${kpis.totalPedidos} transacciones`}
           badgeText={kpis.totalFacturado > 0 ? `$${(kpis.totalFacturado / (kpis.totalPedidos || 1)).toFixed(2)} prom.` : "Sin ventas"}
           badgePositive={kpis.totalFacturado > 0}
-          icon={<DollarSign size={15} />}
+          icon={<DollarSign size={14} />}
           accentColor="#10B981"
           progressPercent={pctIngresos}
           progressLabel={`Meta: $${metaPeriodo.toLocaleString()}`}
         />
 
-        {/* KPI 2: Utilidad Neta Real (Costo de Calzado & Egresos ya deducidos) */}
+        {/* KPI 2: Calzado Vendido [PARES - VOLUMEN FÍSICO] */}
         <KpiExecutiveCard
-          title="Utilidad Neta Real"
-          value={`$${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`Margen: ${liquidezIndices.margenNetoPct}% · Excedente del local`}
-          badgeText={liquidezIndices.utilidadNeta >= 0 ? `+${liquidezIndices.margenNetoPct}% margen` : "Déficit"}
-          badgePositive={liquidezIndices.utilidadNeta >= 0}
-          icon={<TrendingUp size={15} />}
-          accentColor="#059669"
-          progressPercent={Math.min(Math.max(liquidezIndices.margenNetoPct * 2.5, 0), 100)}
-          progressLabel={`COGS $${liquidezIndices.costoMercaderia.toFixed(0)} | Egresos $${liquidezIndices.gastosMes.toFixed(0)}`}
+          title={isVendedor ? "Mis Pares" : "Calzado Vendido"}
+          value={`${kpis.totalParesVendidos} pares`}
+          subtitle="Rotación comercial en el local"
+          badgeText={kpis.totalParesVendidos > 0 ? "Demanda activa" : "Sin salidas"}
+          badgePositive={kpis.totalParesVendidos > 0}
+          icon={<ShoppingBag size={14} />}
+          accentColor="#3B82F6"
+          progressPercent={pctPares}
+          progressLabel={`Meta: ${metaPares} pares`}
         />
 
-        {/* KPI 3: Cartera por Cobrar (Créditos a Clientes) */}
+        {/* KPI 3: Disponibilidad de Inventario [DINERO EN BODEGA + PARES EN SUBTÍTULO] */}
+        <KpiExecutiveCard
+          title="Inventario en Bodega"
+          value={`$${(kpis.capitalInvertidoStock || 0).toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
+          subtitle={`${kpis.totalParesEnStock} pares físicos en bodega`}
+          badgeText={kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} mod. stock bajo` : "100% óptimo"}
+          badgePositive={kpis.stockBajoCount === 0}
+          icon={<Package size={14} />}
+          accentColor="#F97316"
+          progressPercent={kpis.saludInventarioPct}
+          progressLabel={`${kpis.saludInventarioPct}% disponible`}
+        />
+
+        {/* KPI 4: Cartera por Cobrar [DINERO] */}
         <KpiExecutiveCard
           title="Cartera por Cobrar"
           value={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`${kpis.clientesActivos} ${kpis.clientesActivos === 1 ? "cliente con saldo" : "clientes con saldo"}`}
+          subtitle={`${kpis.clientesActivos} clientes con crédito activo`}
           badgeText={kpis.creditoPendiente > 0 ? `${pctCartera}% exp. crédito` : "Cartera al día"}
           badgePositive={kpis.creditoPendiente === 0}
-          icon={<CreditCard size={15} />}
-          accentColor="#F59E0B"
+          icon={<CreditCard size={14} />}
+          accentColor="#EAB308"
           progressPercent={pctCartera}
-          progressLabel="Seguimiento de cuotas"
+          progressLabel="Cobranzas activas"
         />
 
-        {/* KPI 4: Rotación de Calzado & Stock Físico */}
-        <KpiExecutiveCard
-          title="Calzado & Inventario"
-          value={`${kpis.totalParesVendidos} pares`}
-          subtitle={`${kpis.totalParesEnStock} pares en stock ($${(kpis.capitalInvertidoStock || 0).toLocaleString("es-EC", { minimumFractionDigits: 0 })})`}
-          badgeText={kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} modelos alerta` : "100% óptimo"}
-          badgePositive={kpis.stockBajoCount === 0}
-          icon={<Package size={15} />}
-          accentColor="#3B82F6"
-          progressPercent={kpis.saludInventarioPct}
-          progressLabel={`Meta: ${metaPares} pares`}
-        />
+        {/* KPI 5: Utilidad Neta Real [DINERO & MARGEN - SÓLO ADMINS] */}
+        {isAdmin && (
+          <KpiExecutiveCard
+            title="Utilidad Neta Real"
+            value={`$${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
+            subtitle={`Margen neto: ${liquidezIndices.margenNetoPct}%`}
+            badgeText={liquidezIndices.utilidadNeta >= 0 ? `+${liquidezIndices.margenNetoPct}% margen` : "Déficit"}
+            badgePositive={liquidezIndices.utilidadNeta >= 0}
+            icon={<TrendingUp size={14} />}
+            accentColor="#059669"
+            progressPercent={Math.min(Math.max(liquidezIndices.margenNetoPct * 2.5, 0), 100)}
+            progressLabel={`COGS $${liquidezIndices.costoMercaderia.toFixed(0)} | Egr $${liquidezIndices.gastosMes.toFixed(0)}`}
+          />
+        )}
       </div>
 
-      {/* ─── 3. SECCIÓN MEDIA: GRÁFICO SPLINE WAVE ESTILO FINTECH + CANALES & LIQUIDEZ ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 sm:gap-3">
+      {/* ─── 3. CINTA EJECUTIVA DE TRAZABILIDAD FINANCIERA & PROVEEDORES (PARA ADMINISTRADORES) ─── */}
+      {isAdmin && (
+        <div className="px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xs flex flex-wrap items-center justify-between gap-2 text-[10px]">
+          {/* Trazabilidad de Rentabilidad */}
+          <div className="flex items-center gap-2 flex-wrap text-[var(--muted-foreground)] font-medium">
+            <span className="font-bold text-[var(--foreground)] uppercase flex items-center gap-1">
+              <BadgeCheck size={12} className="text-emerald-500" /> Trazabilidad:
+            </span>
+            <span className="text-[var(--foreground)] font-mono font-bold">
+              (+) Ventas: ${kpis.totalFacturado.toFixed(2)}
+            </span>
+            <ArrowRight size={10} className="text-[var(--muted-foreground)] opacity-50" />
+            <span className="text-orange-500 font-mono font-bold">
+              (-) Costo Calzado: ${liquidezIndices.costoMercaderia.toFixed(2)}
+            </span>
+            <ArrowRight size={10} className="text-[var(--muted-foreground)] opacity-50" />
+            <span className="text-purple-600 dark:text-purple-400 font-mono font-bold">
+              (-) Egresos: ${liquidezIndices.gastosMes.toFixed(2)}
+            </span>
+            <ArrowRight size={10} className="text-[var(--muted-foreground)] opacity-50" />
+            <span className="text-emerald-600 dark:text-emerald-400 font-mono font-black">
+              (=) Utilidad Neta: ${liquidezIndices.utilidadNeta.toFixed(2)} ({liquidezIndices.margenNetoPct}%)
+            </span>
+          </div>
+
+          {/* Estado de Proveedores & Capacidad de Compra */}
+          <div className="flex items-center gap-2 font-mono text-[10px]">
+            <span className="text-orange-500 font-bold">
+              Deuda Proveedores: ${liquidezIndices.deudaProveedores.toFixed(2)}
+            </span>
+            {liquidezIndices.adelantosAProveedores > 0 && (
+              <span className="text-blue-600 dark:text-blue-400 font-bold">
+                Anticipos: +${liquidezIndices.adelantosAProveedores.toFixed(2)}
+              </span>
+            )}
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black border border-emerald-500/20">
+              Capacidad Compra: ${liquidezIndices.capitalNetoCompra >= 0 ? `+${liquidezIndices.capitalNetoCompra.toFixed(2)}` : liquidezIndices.capitalNetoCompra.toFixed(2)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 4. SECCIÓN MEDIA: GRÁFICO SPLINE WAVE ESTILO FINTECH + CANALES DE COBRO ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
         {/* GRÁFICO SPLINE WAVE (2/3 columnas en desktop) */}
-        <div className="lg:col-span-2 p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-2 p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between">
           {/* Cabecera del Gráfico con Toggle de Métrica */}
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-emerald-500/10 text-emerald-600 rounded-lg">
-                <Activity size={14} />
+          <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
+            <div className="flex items-center gap-1.5">
+              <div className="p-1 bg-emerald-500/10 text-emerald-600 rounded-lg">
+                <Activity size={13} />
               </div>
-              <div>
-                <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
-                  <span>Evolución de Ventas & Proyección</span>
-                  <span className="text-[9.5px] font-semibold text-[var(--muted-foreground)]">
-                    ({periodo.toLowerCase()})
-                  </span>
-                </h3>
-              </div>
+              <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                <span>Evolución de Ventas & Proyección</span>
+                <span className="text-[9px] font-semibold text-[var(--muted-foreground)]">
+                  ({periodo.toLowerCase()})
+                </span>
+              </h3>
             </div>
 
             {/* Selector de Métrica: Monto ($) vs Pares */}
             <div className="flex items-center gap-2">
-              <div className="flex bg-[var(--muted)]/50 p-0.5 rounded-lg border border-[var(--border)] text-[9.5px] font-bold">
+              <div className="flex bg-[var(--muted)]/50 p-0.5 rounded-lg border border-[var(--border)] text-[9px] font-bold">
                 <button
                   type="button"
                   onClick={() => setTipoMetricaGrafico("MONTO")}
@@ -578,35 +657,33 @@ export default function DashboardComponent({
               </div>
 
               {/* Leyenda */}
-              <div className="hidden sm:flex items-center gap-2 text-[9px] text-[var(--muted-foreground)] font-semibold">
+              <div className="hidden sm:flex items-center gap-2 text-[8.5px] text-[var(--muted-foreground)] font-semibold">
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-1 rounded-full bg-emerald-500 inline-block" /> Actual
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-0.5 border-b border-dashed border-slate-400 inline-block" /> Tendencia
+                  <span className="w-2.5 h-0.5 border-b border-dashed border-slate-400 inline-block" /> Comparativa
                 </span>
               </div>
             </div>
           </div>
 
           {/* Área de Gráfico SVG Spline */}
-          <div className="relative pt-2">
+          <div className="relative pt-1.5">
             {splinePoints.length > 0 ? (
               <div className="w-full relative">
                 <svg
                   viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-                  className="w-full h-36 sm:h-40 overflow-visible select-none"
+                  className="w-full h-32 sm:h-36 overflow-visible select-none"
                   onMouseLeave={() => setHoverIndex(null)}
                 >
                   <defs>
-                    {/* Gradiente Esmeralda de la curva de ventas */}
                     <linearGradient id="splineEmeraldGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#10B981" stopOpacity="0.32" />
                       <stop offset="65%" stopColor="#10B981" stopOpacity="0.08" />
                       <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
                     </linearGradient>
 
-                    {/* Sombra suave para la línea */}
                     <filter id="splineShadow" x="-10%" y="-10%" width="120%" height="130%">
                       <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#10B981" floodOpacity="0.25" />
                     </filter>
@@ -634,7 +711,7 @@ export default function DashboardComponent({
                           x={padLeft - 6}
                           y={y + 3}
                           textAnchor="end"
-                          className="text-[9px] fill-[var(--muted-foreground)] font-mono font-semibold"
+                          className="text-[8.5px] fill-[var(--muted-foreground)] font-mono font-semibold"
                         >
                           {valAtLine}
                         </text>
@@ -648,7 +725,7 @@ export default function DashboardComponent({
                     fill="url(#splineEmeraldGrad)"
                   />
 
-                  {/* 2. Curva punteada de tendencia / comparativa (Gris/Slate suave) */}
+                  {/* 2. Curva punteada de comparativa / tendencia (Gris/Slate suave) */}
                   {refSplinePoints.length > 0 && (
                     <path
                       d={getSplinePath(refSplinePoints)}
@@ -673,7 +750,6 @@ export default function DashboardComponent({
                   {/* 4. Puntos interactivos invisibles para captura de hover y etiquetas X */}
                   {splinePoints.map((pt, i) => (
                     <g key={i}>
-                      {/* Línea vertical guía en hover activo */}
                       {hoverIndex === i && (
                         <line
                           x1={pt.x}
@@ -687,7 +763,6 @@ export default function DashboardComponent({
                         />
                       )}
 
-                      {/* Punto visible en el vértice */}
                       <circle
                         cx={pt.x}
                         cy={pt.y}
@@ -698,7 +773,6 @@ export default function DashboardComponent({
                         className="transition-all duration-150 cursor-pointer"
                       />
 
-                      {/* Área invisible amplia para detectar el mouse */}
                       <rect
                         x={pt.x - plotW / (splinePoints.length * 2)}
                         y={padTop}
@@ -709,12 +783,11 @@ export default function DashboardComponent({
                         onMouseEnter={() => setHoverIndex(i)}
                       />
 
-                      {/* Etiqueta del Eje X */}
                       <text
                         x={pt.x}
-                        y={padTop + plotH + 16}
+                        y={padTop + plotH + 15}
                         textAnchor="middle"
-                        className={`text-[9.5px] font-semibold transition-colors ${
+                        className={`text-[9px] font-semibold transition-colors ${
                           hoverIndex === i
                             ? "fill-emerald-600 dark:fill-emerald-400 font-bold"
                             : "fill-[var(--muted-foreground)]"
@@ -726,10 +799,10 @@ export default function DashboardComponent({
                   ))}
                 </svg>
 
-                {/* Tooltip Flotante de Alta Definición */}
+                {/* Tooltip Flotante */}
                 {activePoint && (
                   <div
-                    className="absolute -top-7 transform -translate-x-1/2 pointer-events-none transition-all duration-100 z-20 bg-slate-950 text-white border border-slate-700/80 rounded-xl px-2.5 py-1 text-[10px] shadow-lg flex items-center gap-2 whitespace-nowrap"
+                    className="absolute -top-7 transform -translate-x-1/2 pointer-events-none transition-all duration-100 z-20 bg-slate-950 text-white border border-slate-700/80 rounded-xl px-2.5 py-1 text-[9.5px] shadow-lg flex items-center gap-2 whitespace-nowrap"
                     style={{
                       left: `${(activePoint.x / svgWidth) * 100}%`,
                     }}
@@ -743,31 +816,30 @@ export default function DashboardComponent({
                 )}
               </div>
             ) : (
-              <div className="h-36 sm:h-40 flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-1.5">
-                <BarChart3 size={24} className="opacity-25" />
-                <p className="text-xs font-bold">Sin registros de ventas en este periodo</p>
+              <div className="h-32 sm:h-36 flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-1">
+                <BarChart3 size={20} className="opacity-25" />
+                <p className="text-[11px] font-bold">Sin registros de ventas en este periodo</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* CANALES DE COBRO & LIQUIDEZ RÁPIDA (1/3 columna en desktop) */}
-        <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between space-y-2.5">
-          {/* Métodos de Pago */}
+        {/* CANALES DE COBRO (1/3 columna en desktop) */}
+        <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between space-y-2">
           <div className="space-y-2">
             <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
               <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
                 <PieChart size={13} className="text-amber-500" />
                 <span>Canales de Cobro</span>
               </h3>
-              <span className="text-[9.5px] text-[var(--muted-foreground)] font-semibold">Caja & Bancos</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] font-semibold">Caja & Bancos</span>
             </div>
 
             <div className="space-y-1.5">
               {metodosPago.length > 0 ? (
                 metodosPago.map((item, idx) => (
                   <div key={idx} className="space-y-0.5">
-                    <div className="flex items-center justify-between text-[10.5px]">
+                    <div className="flex items-center justify-between text-[10px]">
                       <span className="font-medium text-[var(--foreground)] flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                         {item.metodo}
@@ -785,86 +857,90 @@ export default function DashboardComponent({
                   </div>
                 ))
               ) : (
-                <div className="py-3 text-center text-[10.5px] text-[var(--muted-foreground)]">
+                <div className="py-4 text-center text-[10px] text-[var(--muted-foreground)]">
                   Sin transacciones conciliadas
                 </div>
               )}
             </div>
           </div>
 
-          {/* Mini-Resumen Financiero Ejecutivo (Sustituye bloques repetidos sin abultar espacio) */}
-          {isAdmin && (
-            <div className="p-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-1.5">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="font-bold text-[var(--muted-foreground)] uppercase flex items-center gap-1">
-                  <ShieldCheck size={12} className="text-emerald-500" />
-                  Capacidad de Compra:
-                </span>
-                <span className="font-black font-mono text-emerald-600 dark:text-emerald-400">
-                  ${liquidezIndices.capitalNetoCompra >= 0 ? `+${liquidezIndices.capitalNetoCompra.toFixed(2)}` : liquidezIndices.capitalNetoCompra.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[9px] text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]/60">
-                <span>Deuda a Proveedores: <strong className="text-orange-500 font-mono">${liquidezIndices.deudaProveedores.toFixed(2)}</strong></span>
-                {liquidezIndices.adelantosAProveedores > 0 && (
-                  <span>Anticipos: <strong className="text-blue-600 font-mono">+${liquidezIndices.adelantosAProveedores.toFixed(2)}</strong></span>
-                )}
-              </div>
-            </div>
-          )}
+          <div className="p-2 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-[9.5px] text-[var(--muted-foreground)] flex items-center gap-1.5">
+            <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+            <span>Conciliado con comprobantes y arqueos de caja.</span>
+          </div>
         </div>
       </div>
 
-      {/* ─── 4. SECCIÓN INFERIOR: TOP MODELOS MÁS VENDIDOS & RED DE SUCURSALES ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
-        {/* TOP MODELOS DE CALZADO */}
-        <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-2">
-          <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
+      {/* ─── 5. SECCIÓN INFERIOR: TOP MODELOS MÁS VENDIDOS (CON GRÁFICA DE ROTACIÓN) & SUCURSALES ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+        {/* TOP MODELOS DE CALZADO (CON MINI GRÁFICA COMPARATIVA) */}
+        <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1.5">
+          <div className="flex items-center justify-between pb-1 border-b border-[var(--border)]">
             <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
-              <Award size={14} className="text-amber-500" />
+              <Award size={13} className="text-amber-500" />
               <span>Modelos Más Vendidos (Calzado de Cuero)</span>
             </h3>
-            <span className="text-[9.5px] font-semibold text-[var(--muted-foreground)]">Top 4</span>
+            <span className="text-[9px] font-semibold text-[var(--muted-foreground)]">Ranking de Rotación</span>
           </div>
 
           {topModelos.length > 0 ? (
-            <div className="divide-y divide-[var(--border)]">
+            <div className="space-y-1.5 pt-0.5">
               {topModelos.map((m, idx) => (
-                <div key={m.id || idx} className="py-1.5 flex items-center justify-between gap-2.5 text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-5 h-5 rounded-md bg-slate-900 text-amber-400 font-black text-[9px] flex items-center justify-center shrink-0">
-                      #{idx + 1}
+                <div key={m.id || idx} className="space-y-1 p-1.5 rounded-xl hover:bg-[var(--muted)]/30 transition-colors">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className={`w-5 h-5 rounded-md font-black text-[9px] flex items-center justify-center shrink-0 ${
+                          idx === 0
+                            ? "bg-amber-500 text-slate-950 shadow-xs"
+                            : idx === 1
+                            ? "bg-slate-300 dark:bg-slate-700 text-slate-900 dark:text-white"
+                            : idx === 2
+                            ? "bg-amber-700 text-amber-100"
+                            : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        #{idx + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-bold text-[var(--foreground)] truncate">{m.nombre}</div>
+                        <div className="text-[9px] text-[var(--muted-foreground)] truncate">{m.marca}</div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-[var(--foreground)] truncate">{m.nombre}</div>
-                      <div className="text-[9px] text-[var(--muted-foreground)]">{m.marca}</div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[11px] font-black text-[var(--foreground)] font-mono">{m.pares} pares</span>
+                      <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold block font-mono">
+                        ${Number(m.total || 0).toFixed(2)}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-[11px] font-black text-[var(--foreground)] font-mono">{m.pares} p.</span>
-                    <span className="text-[9.5px] text-emerald-600 font-bold block font-mono">
-                      ${Number(m.total || 0).toFixed(2)}
-                    </span>
+
+                  {/* Barra Gráfica de Rotación Relativa */}
+                  <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round((m.pares / maxParesModelos) * 100)}%` }}
+                    />
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="py-4 text-center text-[10.5px] text-[var(--muted-foreground)]">
+            <div className="py-4 text-center text-[10px] text-[var(--muted-foreground)]">
               Sin rotación en este periodo
             </div>
           )}
         </div>
 
-        {/* COMPARATIVO DE SUCURSALES O RESUMEN OPERATIVO */}
-        {isAdmin ? (
-          <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-2">
-            <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
+        {/* COMPARATIVO DE SUCURSALES (ADMIN GENERAL) O RENDIMIENTO OPERATIVO (ADMIN SUCURSAL / VENDEDOR) */}
+        {isAdmin && isGlobalAdmin ? (
+          <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1.5">
+            <div className="flex items-center justify-between pb-1 border-b border-[var(--border)]">
               <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
-                <Building2 size={14} className="text-amber-500" />
+                <Building2 size={13} className="text-amber-500" />
                 <span>Rendimiento por Sucursal</span>
               </h3>
-              <span className="text-[9.5px] font-semibold text-[var(--muted-foreground)]">Red Comercial</span>
+              <span className="text-[9px] font-semibold text-[var(--muted-foreground)]">Red Comercial</span>
             </div>
 
             {comparativoSucursales.length > 0 ? (
@@ -890,7 +966,7 @@ export default function DashboardComponent({
                 ))}
               </div>
             ) : (
-              <div className="py-4 text-center text-[10.5px] text-[var(--muted-foreground)]">
+              <div className="py-4 text-center text-[10px] text-[var(--muted-foreground)]">
                 Sin ventas registradas en sucursales
               </div>
             )}
@@ -903,7 +979,7 @@ export default function DashboardComponent({
               </span>
               <h4 className="text-xs font-bold">Rendimiento Operativo Local</h4>
               <p className="text-[9.5px] text-slate-300 leading-relaxed">
-                Métricas de tu sucursal. Registra ventas por par y atiende pedidos comerciales.
+                Métricas del local. Registra ventas por par y atiende pedidos comerciales para maximizar el margen de utilidad.
               </p>
             </div>
             <div className="pt-1.5 border-t border-slate-700/80 flex items-center justify-between text-[9px] text-slate-400">
@@ -943,18 +1019,17 @@ function KpiExecutiveCard({
   progressPercent,
   progressLabel,
 }: KpiExecutiveCardProps) {
-  // Cálculo SVG del semicírculo del gauge
-  const radius = 18;
+  const radius = 17;
   const circumference = Math.PI * radius;
   const strokeDashoffset = circumference - (Math.min(progressPercent, 100) / 100) * circumference;
 
   return (
-    <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs hover:shadow-xs transition-all relative overflow-hidden flex flex-col justify-between">
+    <div className="p-2.5 sm:p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs hover:shadow-xs transition-all relative overflow-hidden flex flex-col justify-between">
       {/* Semicírculo Gauge en la esquina superior derecha */}
       <div className="absolute right-2 top-2 flex flex-col items-center pointer-events-none opacity-85">
-        <svg width="44" height="26" viewBox="0 0 44 26" className="overflow-visible">
+        <svg width="40" height="24" viewBox="0 0 40 24" className="overflow-visible">
           <path
-            d="M 4,23 A 18,18 0 0,1 40,23"
+            d="M 3,21 A 17,17 0 0,1 37,21"
             fill="none"
             stroke="currentColor"
             strokeWidth="3"
@@ -962,7 +1037,7 @@ function KpiExecutiveCard({
             className="text-[var(--muted)]/50"
           />
           <path
-            d="M 4,23 A 18,18 0 0,1 40,23"
+            d="M 3,21 A 17,17 0 0,1 37,21"
             fill="none"
             stroke={accentColor}
             strokeWidth="3"
@@ -977,26 +1052,26 @@ function KpiExecutiveCard({
         </span>
       </div>
 
-      <div className="space-y-1 pr-10">
-        <div className="flex items-center gap-1.5 text-[var(--muted-foreground)]">
+      <div className="space-y-1 pr-9">
+        <div className="flex items-center gap-1 text-[var(--muted-foreground)]">
           <div
-            className="p-1.5 rounded-lg flex items-center justify-center"
+            className="p-1 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: `${accentColor}18`, color: accentColor }}
           >
             {icon}
           </div>
-          <span className="text-[9.5px] font-bold uppercase tracking-wider truncate">{title}</span>
+          <span className="text-[9px] sm:text-[9.5px] font-bold uppercase tracking-wider truncate">{title}</span>
         </div>
 
         <div>
           <div className="text-base sm:text-lg font-black tracking-tight text-[var(--foreground)] font-mono">
             {value}
           </div>
-          <div className="text-[9px] text-[var(--muted-foreground)] font-medium truncate">{subtitle}</div>
+          <div className="text-[8.5px] sm:text-[9px] text-[var(--muted-foreground)] font-medium truncate">{subtitle}</div>
         </div>
       </div>
 
-      <div className="pt-1.5 mt-1.5 border-t border-[var(--border)] flex items-center justify-between text-[8.5px] font-bold">
+      <div className="pt-1 mt-1 border-t border-[var(--border)] flex items-center justify-between text-[8px] sm:text-[8.5px] font-bold">
         <span
           className={`flex items-center gap-0.5 ${
             badgePositive ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
@@ -1005,7 +1080,7 @@ function KpiExecutiveCard({
           {badgePositive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
           {badgeText}
         </span>
-        <span className="text-[8px] text-[var(--muted-foreground)] truncate max-w-[85px] font-normal">
+        <span className="text-[7.5px] sm:text-[8px] text-[var(--muted-foreground)] truncate max-w-[85px] font-normal">
           {progressLabel}
         </span>
       </div>
