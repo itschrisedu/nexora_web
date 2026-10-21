@@ -421,19 +421,19 @@ export default function DashboardComponent({
   return (
     <div className="space-y-2.5 max-w-full pb-2">
       {/* ─── 1. BANNER COMPACTO CON SELECTORES DE SUCURSAL Y PERIODO ─── */}
-      <div className="px-3.5 py-2 sm:px-4 sm:py-2.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-2xl border border-slate-700/80 text-white relative overflow-hidden shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+      <div className="px-3.5 py-2 sm:px-4 sm:py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-[var(--foreground)] relative overflow-hidden shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <div className="flex items-center gap-2 sm:gap-2.5">
-          <div className="w-7 h-7 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-xs shrink-0">
+          <div className="w-7 h-7 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 font-black text-xs shrink-0">
             <Sparkles size={14} />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h2 className="text-sm font-black tracking-tight text-white">Control Comercial e Inventario</h2>
-              <span className="px-2 py-0.2 rounded-full text-[8.5px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <h2 className="text-sm font-black tracking-tight text-[var(--foreground)]">Control Comercial e Inventario</h2>
+              <span className="px-2 py-0.2 rounded-full text-[8.5px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
                 {isGlobalAdmin && activeSucursalId === "TODAS" ? "Admin General" : isAdmin ? "Admin Sucursal" : "Vendedor"}
               </span>
             </div>
-            <p className="text-[9.5px] text-slate-300">
+            <p className="text-[9.5px] text-[var(--muted-foreground)]">
               {isGlobalAdmin && activeSucursalId === "TODAS"
                 ? "Consolidado de toda la red comercial de calzado"
                 : `Operaciones y balance comercial de ${sucursales.find((s) => s.id === activeSucursalId)?.name || "la sucursal"}`}
@@ -447,7 +447,7 @@ export default function DashboardComponent({
             <select
               value={activeSucursalId}
               onChange={(e) => onSucursalChange(e.target.value)}
-              className="px-2 py-1 bg-slate-900/90 border border-slate-700 rounded-lg text-[10px] font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer shadow-inner pr-6"
+              className="px-2 py-1 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[10px] font-bold text-[var(--foreground)] focus:outline-none focus:border-amber-400 cursor-pointer shadow-2xs pr-6"
             >
               <option value="TODAS">🏢 Consolidado</option>
               {sucursales.map((s) => (
@@ -457,14 +457,14 @@ export default function DashboardComponent({
               ))}
             </select>
           ) : (
-            <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-900/90 text-slate-200 border border-slate-700 flex items-center gap-1 shadow-inner">
-              <MapPin size={10} className="text-amber-400" />
+            <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-[var(--background)] text-[var(--foreground)] border border-[var(--border)] flex items-center gap-1 shadow-2xs">
+              <MapPin size={10} className="text-amber-500" />
               {sucursales.find((s) => s.id === activeSucursalId)?.name || "Sucursal Local"}
             </span>
           )}
 
           {/* Periodo de tiempo */}
-          <div className="flex bg-slate-900/90 p-0.5 rounded-lg border border-slate-700 overflow-x-auto scrollbar-none">
+          <div className="flex bg-[var(--muted)]/50 p-0.5 rounded-lg border border-[var(--border)] overflow-x-auto scrollbar-none">
             {(
               [
                 { id: "HOY", label: "Hoy" },
@@ -480,7 +480,7 @@ export default function DashboardComponent({
                 className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   periodo === p.id
                     ? "bg-amber-500 text-slate-950 font-black shadow-xs"
-                    : "text-slate-400 hover:text-white"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 }`}
               >
                 {p.label}
@@ -491,7 +491,7 @@ export default function DashboardComponent({
           <button
             onClick={cargarDashboard}
             disabled={loading}
-            className="p-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors shrink-0"
+            className="p-1 bg-[var(--background)] hover:bg-[var(--muted)] border border-[var(--border)] rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors shrink-0 cursor-pointer"
             title="Recargar Métricas"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
@@ -958,7 +958,7 @@ export default function DashboardComponent({
                     </div>
                     <div className="w-full h-1 bg-[var(--muted)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-slate-900 to-amber-500 rounded-full transition-all"
+                        className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all"
                         style={{ width: `${s.porcentaje}%` }}
                       />
                     </div>
@@ -972,19 +972,77 @@ export default function DashboardComponent({
             )}
           </div>
         ) : (
-          <div className="p-3 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700 flex flex-col justify-between space-y-1.5">
+          <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs text-[var(--foreground)] flex flex-col justify-between space-y-2">
             <div className="space-y-1">
-              <span className="px-2 py-0.2 rounded-full text-[8.5px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                PUNTO DE ATENCIÓN ACTIVO
-              </span>
-              <h4 className="text-xs font-bold">Rendimiento Operativo Local</h4>
-              <p className="text-[9.5px] text-slate-300 leading-relaxed">
-                Métricas del local. Registra ventas por par y atiende pedidos comerciales para maximizar el margen de utilidad.
+              <div className="flex items-center justify-between pb-1 border-b border-[var(--border)]">
+                <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                  <Store size={13} className="text-amber-500" />
+                  <span>Rendimiento Operativo del Local</span>
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25">
+                  Punto Activo
+                </span>
+              </div>
+              <p className="text-[9.5px] text-[var(--muted-foreground)] leading-relaxed">
+                Métricas directas de mostrador y despacho para {sucursales.find((s) => s.id === activeSucursalId)?.name || "el local"}.
               </p>
             </div>
-            <div className="pt-1.5 border-t border-slate-700/80 flex items-center justify-between text-[9px] text-slate-400">
-              <span>Inteligencia Comercial</span>
-              <span className="text-amber-400 font-bold">En línea</span>
+
+            {/* Cuadrícula de Indicadores Operativos Clave */}
+            <div className="grid grid-cols-2 gap-2 my-auto pt-0.5">
+              <div className="p-2 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] space-y-0.5">
+                <div className="flex items-center gap-1 text-[9px] text-[var(--muted-foreground)] font-semibold">
+                  <DollarSign size={11} className="text-emerald-500" />
+                  <span>Ticket Promedio</span>
+                </div>
+                <div className="text-xs sm:text-sm font-black font-mono text-[var(--foreground)]">
+                  ${(kpis.totalPedidos > 0 ? kpis.totalFacturado / kpis.totalPedidos : 0).toLocaleString("es-EC", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span className="text-[8px] text-[var(--muted-foreground)] block">Por venta cerrada</span>
+              </div>
+
+              <div className="p-2 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] space-y-0.5">
+                <div className="flex items-center gap-1 text-[9px] text-[var(--muted-foreground)] font-semibold">
+                  <ShoppingBag size={11} className="text-blue-500" />
+                  <span>Pares x Venta</span>
+                </div>
+                <div className="text-xs sm:text-sm font-black font-mono text-[var(--foreground)]">
+                  {(kpis.totalPedidos > 0 ? (kpis.totalParesVendidos / kpis.totalPedidos) : 0).toFixed(1)} pares
+                </div>
+                <span className="text-[8px] text-[var(--muted-foreground)] block">Rotación promedio</span>
+              </div>
+
+              <div className="p-2 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] space-y-0.5">
+                <div className="flex items-center gap-1 text-[9px] text-[var(--muted-foreground)] font-semibold">
+                  <BadgeCheck size={11} className="text-purple-500" />
+                  <span>Transacciones</span>
+                </div>
+                <div className="text-xs sm:text-sm font-black font-mono text-[var(--foreground)]">
+                  {kpis.totalPedidos} ventas
+                </div>
+                <span className="text-[8px] text-[var(--muted-foreground)] block">{kpis.clientesActivos} clientes</span>
+              </div>
+
+              <div className="p-2 rounded-xl bg-[var(--muted)]/20 border border-[var(--border)] space-y-0.5">
+                <div className="flex items-center gap-1 text-[9px] text-[var(--muted-foreground)] font-semibold">
+                  <Package size={11} className="text-amber-500" />
+                  <span>Salud de Bodega</span>
+                </div>
+                <div className="text-xs sm:text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
+                  {kpis.saludInventarioPct}%
+                </div>
+                <span className="text-[8px] text-[var(--muted-foreground)] block truncate">
+                  {kpis.tallasAgotadasCount > 0 ? `${kpis.tallasAgotadasCount} sin stock` : "Curvas al 100%"}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-1.5 border-t border-[var(--border)] flex items-center justify-between text-[9px] text-[var(--muted-foreground)]">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Punto de Atención: <strong className="text-[var(--foreground)]">{sucursales.find((s) => s.id === activeSucursalId)?.name || "Sucursal Local"}</strong></span>
+              </span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">En línea</span>
             </div>
           </div>
         )}
