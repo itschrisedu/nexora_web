@@ -54,16 +54,18 @@ import {
   generarReporteGeneralIntegralPdf,
   generarReportePosPdf,
   generarReporteRendimientoSucursalesPdf,
+  generarReporteAbastecimientoPdf,
   ClienteDeudor,
   CampanaReporte,
   ModeloReporte,
   VendedorReporte,
+  ProveedorAbastecimientoReporte,
 } from '@/services/pdf-reportes.service';
 import { formatearNombreSerie } from '@/utils/text-formatters';
 import { jsPDF } from 'jspdf';
 
 type PeriodoTipo = 'HOY' | 'SEMANAL' | 'MENSUAL' | 'TRIMESTRAL' | 'ANUAL' | 'PERSONALIZADO';
-type TabReporte = 'resumen' | 'pos' | 'sucursales' | 'modelos' | 'vendedores' | 'finanzas' | 'cobranzas' | 'campanas' | 'proyeccion_ml';
+type TabReporte = 'resumen' | 'pos' | 'sucursales' | 'modelos' | 'vendedores' | 'finanzas' | 'cobranzas' | 'campanas' | 'proyeccion_ml' | 'proveedores';
 
 interface Vendedor {
   id: string;
@@ -142,6 +144,13 @@ export default function ReportesComponent({
   // Estado de Proyección ML
   const [loadingMl, setLoadingMl] = useState(false);
   const [proyeccionMl, setProyeccionMl] = useState<any>(null);
+
+  // Estado de Reporte de Abastecimiento de Talleres / Fabricantes
+  const [loadingProveedores, setLoadingProveedores] = useState(false);
+  const [proveedoresData, setProveedoresData] = useState<any>(null);
+  const [filtroProveedorBusqueda, setFiltroProveedorBusqueda] = useState('');
+  const [filtroProveedorSolvencia, setFiltroProveedorSolvencia] = useState('TODOS');
+  const [generandoProveedoresPdf, setGenerandoProveedoresPdf] = useState(false);
 
   // Estado del Modal de Previsualización de PDF Universal
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -368,6 +377,30 @@ export default function ReportesComponent({
       showToast('Error al conectar con el motor de predicción ML.', 'warning');
     } finally {
       setLoadingMl(false);
+    }
+  };
+
+  const cargarReporteProveedores = async () => {
+    setLoadingProveedores(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      const data = await ApiService.get(`/reportes/abastecimiento-proveedores?${params.toString()}`);
+      if (data) {
+        setProveedoresData(data);
+      }
+    } catch (err: any) {
+      console.warn('Error al cargar reporte de abastecimiento:', err);
+      showToast('Error al obtener reporte de abastecimiento de talleres.', 'warning');
+    } finally {
+      setLoadingProveedores(false);
     }
   };
 
@@ -715,6 +748,49 @@ export default function ReportesComponent({
     }
   };
 
+  // 11. REPORTE DE ABASTECIMIENTO DE TALLERES & PROVEEDORES
+  const handleReporteProveedoresPdf = (modo: 'preview' | 'download') => {
+    if (!proveedoresData) {
+      showToast('No hay datos de abastecimiento para generar el PDF.', 'warning');
+      return;
+    }
+    setGenerandoProveedoresPdf(true);
+    try {
+      const doc = generarReporteAbastecimientoPdf({
+        negocio: obtenerNegocioPayload(),
+        periodo: periodo === 'PERSONALIZADO' ? `${fechaDesde} al ${fechaHasta}` : periodo,
+        fechaGeneracion: new Date().toLocaleString('es-EC'),
+        kpis: proveedoresData.kpis || {
+          totalComprado: 0,
+          totalLotes: 0,
+          totalPares: 0,
+          deudaTotal: 0,
+          anticiposTotal: 0,
+          totalDevoluciones: 0,
+          montoDevoluciones: 0,
+        },
+        proveedores: (proveedoresData.porProveedor || []) as ProveedorAbastecimientoReporte[],
+      });
+
+      const nombre = `reporte_abastecimiento_talleres_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      if (modo === 'preview') {
+        setPdfDocPreview(doc);
+        setPreviewTitulo('Reporte de Abastecimiento & Talleres');
+        setPreviewNombreArchivo(nombre);
+        setPreviewModalOpen(true);
+      } else {
+        doc.save(nombre);
+        showToast('Reporte de abastecimiento descargado exitosamente.', 'success');
+      }
+    } catch (err: any) {
+      console.error('Error generando PDF de Abastecimiento:', err);
+      showToast('Error al generar PDF de Abastecimiento.', 'error');
+    } finally {
+      setGenerandoProveedoresPdf(false);
+    }
+  };
+
   const handleImprimirReporte = () => {
     window.print();
   };
@@ -961,6 +1037,7 @@ export default function ReportesComponent({
           { id: 'cobranzas' as TabReporte, label: 'Cobranzas & Clientes Deudores', icon: <Receipt size={15} /> },
           { id: 'campanas' as TabReporte, label: 'Rendimiento de Campañas & Promos', icon: <Megaphone size={15} /> },
           { id: 'finanzas' as TabReporte, label: 'Finanzas & Métodos de Pago', icon: <DollarSign size={15} /> },
+          { id: 'proveedores' as TabReporte, label: 'Abastecimiento & Talleres', icon: <Package size={15} /> },
           { id: 'proyeccion_ml' as TabReporte, label: 'Proyección IA / Machine Learning', icon: <BrainCircuit size={15} /> },
         ].map((tab) => (
           <button
@@ -972,6 +1049,8 @@ export default function ReportesComponent({
                 cargarReportePos();
               } else if (tab.id === 'sucursales' && !sucursalesReporteData) {
                 cargarReporteSucursales();
+              } else if (tab.id === 'proveedores' && !proveedoresData) {
+                cargarReporteProveedores();
               } else if (tab.id === 'proyeccion_ml' && !proyeccionMl) {
                 cargarProyeccionMl();
               } else if (tab.id === 'cobranzas' && !cobranzasData) {
@@ -3125,6 +3204,263 @@ export default function ReportesComponent({
               ) : (
                 <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
                   Presiona «Recalcular Proyección IA» para consultar la predicción de ventas.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB 10: ABASTECIMIENTO DE TALLERES & PROVEEDORES                  */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'proveedores' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Cabecera del Módulo */}
+              <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                      CICLO COMPLETO DE COMERCIALIZACIÓN
+                    </span>
+                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
+                      Proveedores → Stock → Ventas → Cobranzas
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+                    <Package size={18} className="text-emerald-600" />
+                    <span>Reporte de Abastecimiento & Talleres de Calzado</span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Control de compras a fabricantes artesanales de Cevallos, lotes de calzado recibidos, anticipos entregados y cuentas pendientes.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProveedoresPdf('preview')}
+                    disabled={generandoProveedoresPdf || loadingProveedores}
+                    className="px-3.5 py-2 bg-[var(--card)] hover:bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    {generandoProveedoresPdf ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+                    <span>Previsualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleReporteProveedoresPdf('download')}
+                    disabled={generandoProveedoresPdf || loadingProveedores}
+                    className="px-3.5 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    <Download size={13} />
+                    <span>Descargar PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingProveedores ? (
+                <div className="p-12 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-2">
+                  <Loader2 size={24} className="animate-spin text-emerald-600" />
+                  <span>Cargando datos de abastecimiento de talleres...</span>
+                </div>
+              ) : proveedoresData ? (
+                <>
+                  {/* Tarjetas KPI de Abastecimiento */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                        Total Comprado a Talleres
+                      </span>
+                      <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                        ${Number(proveedoresData.kpis?.totalComprado || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+                        {proveedoresData.kpis?.totalLotes || 0} lotes / {proveedoresData.kpis?.totalPares || 0} pares de calzado
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                        Deuda Pendiente a Talleres
+                      </span>
+                      <div className="text-2xl font-black font-mono text-orange-500">
+                        ${Number(proveedoresData.kpis?.deudaTotal || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+                        Cuentas por pagar a fabricantes
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                        Anticipos Entregados (A Favor)
+                      </span>
+                      <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+                        +${Number(proveedoresData.kpis?.anticiposTotal || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+                        Dinero adelantado p/ confección
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
+                      <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
+                        Devoluciones / Garantías
+                      </span>
+                      <div className="text-2xl font-black font-mono text-red-500">
+                        ${Number(proveedoresData.kpis?.montoDevoluciones || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] block">
+                        {proveedoresData.kpis?.totalDevoluciones || 0} pares con observación de fábrica
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tabla de Talleres y Fabricantes */}
+                  <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-[var(--foreground)]">
+                          Relación de Talleres Artesanales & Estado de Cuenta
+                        </h4>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          {(proveedoresData.porProveedor || []).length} talleres registrados en el cantón Cevallos y la región
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Buscador */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Buscar taller o RUC..."
+                            value={filtroProveedorBusqueda}
+                            onChange={(e) => setFiltroProveedorBusqueda(e.target.value)}
+                            className="text-xs px-3 py-1.5 pl-8 bg-[var(--background)] border border-[var(--border)] rounded-xl w-48 focus:outline-none focus:border-emerald-500"
+                          />
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                        </div>
+
+                        {/* Filtro Solvencia */}
+                        <select
+                          value={filtroProveedorSolvencia}
+                          onChange={(e) => setFiltroProveedorSolvencia(e.target.value)}
+                          className="text-xs px-2.5 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-xl font-bold cursor-pointer focus:outline-none"
+                        >
+                          <option value="TODOS">Todos los Estados</option>
+                          <option value="AL_DIA">Al Día</option>
+                          <option value="CON_ANTICIPO">Con Saldo a Favor</option>
+                          <option value="CON_DEUDA">Con Deuda Pendiente</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-[var(--border)] text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
+                            <th className="py-2.5 px-3">Taller / Fabricante</th>
+                            <th className="py-2.5 px-3">RUC / Cédula</th>
+                            <th className="py-2.5 px-3">Ubicación</th>
+                            <th className="py-2.5 px-3 text-center">Lotes Recibidos</th>
+                            <th className="py-2.5 px-3 text-right">Total Comprado</th>
+                            <th className="py-2.5 px-3 text-right">Saldo a Favor</th>
+                            <th className="py-2.5 px-3 text-right">Deuda Pendiente</th>
+                            <th className="py-2.5 px-3 text-center">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {(proveedoresData.porProveedor || [])
+                            .filter((p: any) => {
+                              if (filtroProveedorSolvencia !== 'TODOS' && p.estadoSolvencia !== filtroProveedorSolvencia) return false;
+                              if (filtroProveedorBusqueda.trim()) {
+                                const q = filtroProveedorBusqueda.toLowerCase().trim();
+                                const nom = (p.nombre || '').toLowerCase();
+                                const ruc = (p.rucCedula || '').toLowerCase();
+                                const ciu = (p.ciudad || '').toLowerCase();
+                                if (!nom.includes(q) && !ruc.includes(q) && !ciu.includes(q)) return false;
+                              }
+                              return true;
+                            })
+                            .map((p: any) => (
+                              <tr key={p.id} className="hover:bg-[var(--muted)]/30 transition-colors">
+                                <td className="py-3 px-3 font-bold text-[var(--foreground)]">
+                                  {p.nombre}
+                                </td>
+                                <td className="py-3 px-3 font-mono text-[var(--muted-foreground)]">
+                                  {p.rucCedula || 'S/RUC'}
+                                </td>
+                                <td className="py-3 px-3 text-[var(--muted-foreground)]">
+                                  {p.ciudad || 'Cevallos'}
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <span className="font-bold">{p.totalLotes}</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] block">({p.totalPares} pares)</span>
+                                </td>
+                                <td className="py-3 px-3 text-right font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                  ${Number(p.totalComprado || 0).toFixed(2)}
+                                </td>
+                                <td className="py-3 px-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                                  {Number(p.saldoAFavor || 0) > 0 ? `+$${Number(p.saldoAFavor).toFixed(2)}` : '—'}
+                                </td>
+                                <td className="py-3 px-3 text-right font-mono font-bold text-orange-500">
+                                  {Number(p.saldoPendiente || 0) > 0 ? `$${Number(p.saldoPendiente).toFixed(2)}` : '$0.00'}
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  {p.estadoSolvencia === 'CON_ANTICIPO' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
+                                      Saldo a Favor
+                                    </span>
+                                  ) : p.estadoSolvencia === 'AL_DIA' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                      Al Día
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-600 border border-orange-500/20">
+                                      Con Deuda
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Lotes Recientes de Calzado Recibidos */}
+                  {Array.isArray(proveedoresData.lotesRecientes) && proveedoresData.lotesRecientes.length > 0 && (
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs space-y-3">
+                      <h4 className="text-sm font-bold text-[var(--foreground)]">
+                        Lotes y Comprobantes de Calzado Recibidos Recientemente
+                      </h4>
+                      <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden">
+                        {proveedoresData.lotesRecientes.slice(0, 8).map((lote: any) => (
+                          <div key={lote.id} className="p-3 flex items-center justify-between text-xs bg-[var(--card)]">
+                            <div>
+                              <div className="font-bold text-[var(--foreground)]">
+                                Comprobante #{lote.numeroFactura || 'S/N'} — {lote.proveedorNombre}
+                              </div>
+                              <div className="text-[10px] text-[var(--muted-foreground)]">
+                                Fecha: {new Date(lote.fechaCompra).toLocaleDateString('es-EC')} · {lote.itemsCount || 0} modelos/curvas
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                ${Number(lote.total || 0).toFixed(2)}
+                              </span>
+                              <span className="text-[10px] text-[var(--muted-foreground)] block">
+                                Estado: {lote.estado || 'RECIBIDO'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
+                  Selecciona la pestaña para consultar el abastecimiento de talleres.
                 </div>
               )}
             </div>

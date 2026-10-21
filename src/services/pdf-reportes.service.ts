@@ -1742,3 +1742,174 @@ export function generarReporteRendimientoSucursalesPdf(data: ReporteRendimientoS
   dibujarPie(doc, 'Informe Rendimiento por Sucursal — NEXORA');
   return doc;
 }
+
+// ══════════════════════════════════════════════════════════════
+// 11. REPORTE DE ABASTECIMIENTO DE TALLERES & PROVEEDORES
+// ══════════════════════════════════════════════════════════════
+
+export interface ProveedorAbastecimientoReporte {
+  id: string;
+  nombre: string;
+  rucCedula: string;
+  telefono?: string;
+  ciudad?: string;
+  direccion?: string;
+  totalComprado: number;
+  totalLotes: number;
+  totalPares: number;
+  saldoPendiente: number;
+  saldoAFavor: number;
+  devolucionesCount: number;
+  devolucionesMonto: number;
+  estadoSolvencia: 'AL_DIA' | 'CON_DEUDA' | 'CON_ANTICIPO';
+}
+
+export interface ReporteAbastecimientoData {
+  negocio: NegocioInfo;
+  periodo: string;
+  fechaGeneracion: string;
+  kpis: {
+    totalComprado: number;
+    totalLotes: number;
+    totalPares: number;
+    deudaTotal: number;
+    anticiposTotal: number;
+    totalDevoluciones: number;
+    montoDevoluciones: number;
+  };
+  proveedores: ProveedorAbastecimientoReporte[];
+}
+
+export function generarReporteAbastecimientoPdf(data: ReporteAbastecimientoData): jsPDF {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const marginLeft = 14;
+  const contentWidth = 182;
+
+  let y = dibujarEncabezado(
+    doc,
+    data.negocio,
+    'REPORTE DE ABASTECIMIENTO & TALLERES',
+    data.periodo,
+    data.fechaGeneracion
+  );
+
+  // Bloque de Resumen de KPIs
+  const kpiW = (contentWidth - 6) / 4;
+  const kpiH = 15;
+
+  const kpis = [
+    { label: 'TOTAL COMPRADO', val: `$${data.kpis.totalComprado.toFixed(2)}`, sub: `${data.kpis.totalLotes} lotes / ${data.kpis.totalPares} pares`, color: [16, 185, 129] },
+    { label: 'DEUDA PENDIENTE', val: `$${data.kpis.deudaTotal.toFixed(2)}`, sub: 'Cuentas por pagar', color: [249, 115, 22] },
+    { label: 'ANTICIPOS A FAVOR', val: `+$${data.kpis.anticiposTotal.toFixed(2)}`, sub: 'Saldos entregados', color: [99, 102, 241] },
+    { label: 'DEVOLUCIONES', val: `$${data.kpis.montoDevoluciones.toFixed(2)}`, sub: `${data.kpis.totalDevoluciones} pares observados`, color: [239, 68, 68] },
+  ];
+
+  kpis.forEach((k, idx) => {
+    const kx = marginLeft + idx * (kpiW + 2);
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(kx, y, kpiW, kpiH, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(k.label, kx + 2.5, y + 4);
+
+    doc.setFontSize(9);
+    doc.setTextColor(k.color[0], k.color[1], k.color[2]);
+    doc.text(k.val, kx + 2.5, y + 8.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(148, 163, 184);
+    doc.text(k.sub, kx + 2.5, y + 12.5);
+  });
+
+  y += kpiH + 6;
+
+  // Título de la tabla
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text('1. RELACIÓN DE COMPRAS Y ESTADO DE CUENTA POR TALLER DE CALZADO', marginLeft, y);
+  y += 4.5;
+
+  const colW = [8, 48, 24, 20, 26, 26, 30];
+  const headers = ['#', 'Taller / Fabricante', 'RUC / Identif.', 'Lotes', 'Total Comprado', 'Saldo a Pagar', 'Estado'];
+
+  doc.setFillColor(15, 23, 42);
+  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6.5);
+
+  let x = marginLeft + 2;
+  headers.forEach((h, i) => {
+    doc.text(h, x, y + 3.8);
+    x += colW[i];
+  });
+  y += 5.5;
+
+  const provs = data.proveedores || [];
+  if (provs.length === 0) {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(marginLeft, y, contentWidth, 8, 'F');
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'normal');
+    doc.text('No se registran compras ni talleres en el periodo consultado.', marginLeft + 4, y + 5);
+    y += 8;
+  } else {
+    provs.forEach((p, idx) => {
+      if (y > 270) {
+        dibujarPie(doc, 'Página 1');
+        doc.addPage();
+        y = 15;
+        doc.setFillColor(15, 23, 42);
+        doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(6.5);
+        let xh = marginLeft + 2;
+        headers.forEach((h, i) => {
+          doc.text(h, xh, y + 3.8);
+          xh += colW[i];
+        });
+        y += 5.5;
+      }
+
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, 6, 'F');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(6.5);
+
+      x = marginLeft + 2;
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${idx + 1}`, x, y + 4.2); x += colW[0];
+      doc.text(p.nombre.substring(0, 28), x, y + 4.2); x += colW[1];
+      doc.setFont('helvetica', 'normal');
+      doc.text(p.rucCedula || 'S/RUC', x, y + 4.2); x += colW[2];
+      doc.text(`${p.totalLotes} (${p.totalPares}p)`, x, y + 4.2); x += colW[3];
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(16, 185, 129);
+      doc.text(`$${p.totalComprado.toFixed(2)}`, x, y + 4.2); x += colW[4];
+      doc.setTextColor(p.saldoPendiente > 0 ? 239 : 100, p.saldoPendiente > 0 ? 68 : 116, p.saldoPendiente > 0 ? 68 : 139);
+      doc.text(`$${p.saldoPendiente.toFixed(2)}`, x, y + 4.2); x += colW[5];
+      
+      doc.setFont('helvetica', 'bold');
+      if (p.saldoPendiente === 0 && p.saldoAFavor > 0) {
+        doc.setTextColor(99, 102, 241);
+        doc.text(`Saldo a favor: +$${p.saldoAFavor.toFixed(2)}`, x, y + 4.2);
+      } else if (p.saldoPendiente === 0) {
+        doc.setTextColor(16, 185, 129);
+        doc.text('AL DÍA', x, y + 4.2);
+      } else {
+        doc.setTextColor(249, 115, 22);
+        doc.text('DEUDA PENDIENTE', x, y + 4.2);
+      }
+
+      y += 6;
+    });
+  }
+
+  dibujarPie(doc, 'Reporte de Abastecimiento & Talleres — Sistema Comercial');
+  return doc;
+}

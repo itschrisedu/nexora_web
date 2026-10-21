@@ -78,8 +78,8 @@ export default function DashboardComponent({
 
   // Índices Financieros de Liquidez Operativa y Rentabilidad (Admin General y Sucursal)
   const [liquidezIndices, setLiquidezIndices] = useState<{
-    razonLiquidez: number;
-    pruebaAcida: number;
+    efectivoCaja: number;
+    carteraCobro: number;
     capitalNetoCompra: number;
     deudaProveedores: number;
     gastosMes: number;
@@ -87,9 +87,12 @@ export default function DashboardComponent({
     utilidadNeta: number;
     margenNetoPct: number;
     costoMercaderia: number;
+    diagnosticoTitulo: string;
+    diagnosticoTexto: string;
+    diagnosticoNivel: 'ALTO' | 'MEDIO' | 'CRITICO';
   }>({
-    razonLiquidez: 1,
-    pruebaAcida: 1,
+    efectivoCaja: 0,
+    carteraCobro: 0,
     capitalNetoCompra: 0,
     deudaProveedores: 0,
     gastosMes: 0,
@@ -97,6 +100,9 @@ export default function DashboardComponent({
     utilidadNeta: 0,
     margenNetoPct: 0,
     costoMercaderia: 0,
+    diagnosticoTitulo: 'Capacidad Óptima de Compra',
+    diagnosticoTexto: 'Disponibilidad de efectivo suficiente para compra de pedidos y abastecimiento.',
+    diagnosticoNivel: 'ALTO',
   });
 
   useEffect(() => {
@@ -203,7 +209,7 @@ export default function DashboardComponent({
             const adelantos = Array.isArray(prvs)
               ? prvs.reduce((acc: number, p: any) => acc + Number(p.saldoAFavor || 0), 0)
               : 0;
-            const gMes = Number(gStats?.totalMonto || 0);
+            const gMes = Number(gStats?.totalMes ?? gStats?.totalMonto ?? 0);
             const pasivoInmediato = dProveedores + gMes;
             const ingresos = Number(kpisBackend.totalIngresos || 0);
             const cartera = Number(kpisBackend.saldoCarteraTotal || 0);
@@ -211,9 +217,6 @@ export default function DashboardComponent({
 
             // Activo disponible inmediato sumando adelantos ya entregados a fabricantes
             const activoInmediato = ingresos + cartera + adelantos;
-
-            const ratio = pasivoInmediato > 0 ? Number((activoInmediato / pasivoInmediato).toFixed(2)) : (activoInmediato > 0 ? 3.0 : 1.0);
-            const acida = pasivoInmediato > 0 ? Number((ingresos / pasivoInmediato).toFixed(2)) : (ingresos > 0 ? 2.5 : 1.0);
             const capNeto = activoInmediato - pasivoInmediato;
 
             // Utilidad Neta Real = Total Ingresos - Costo Mercadería - Gastos Operativos
@@ -221,9 +224,23 @@ export default function DashboardComponent({
             const utilNeta = Math.round((gananciaBruta - gMes) * 100) / 100;
             const margenNeto = ingresos > 0 ? Math.round((utilNeta / ingresos) * 1000) / 10 : 0;
 
+            let diagTitulo = 'Capacidad Óptima de Compra';
+            let diagTexto = 'Cuentas con liquidez holgada para ordenar nuevos lotes a fabricantes sin comprometer compromisos fijos.';
+            let diagNivel: 'ALTO' | 'MEDIO' | 'CRITICO' = 'ALTO';
+
+            if (capNeto < 0) {
+              diagTitulo = 'Atención: Liquidez Comprometida';
+              diagTexto = 'Prioriza el cobro de cartera y el pago a talleres antes de comprometer más pedidos de calzado.';
+              diagNivel = 'CRITICO';
+            } else if (capNeto < 800) {
+              diagTitulo = 'Capacidad de Compra Moderada';
+              diagTexto = 'Se aconseja producir sólo modelos de alta rotación y recaudar los créditos pendientes.';
+              diagNivel = 'MEDIO';
+            }
+
             setLiquidezIndices({
-              razonLiquidez: ratio,
-              pruebaAcida: acida,
+              efectivoCaja: ingresos,
+              carteraCobro: cartera,
               capitalNetoCompra: capNeto,
               deudaProveedores: dProveedores,
               gastosMes: gMes,
@@ -231,6 +248,9 @@ export default function DashboardComponent({
               utilidadNeta: utilNeta,
               margenNetoPct: margenNeto,
               costoMercaderia: costoCalzado,
+              diagnosticoTitulo: diagTitulo,
+              diagnosticoTexto: diagTexto,
+              diagnosticoNivel: diagNivel,
             });
           } catch (e) {
             console.warn('Error calculando índices de liquidez en dashboard:', e);
@@ -474,26 +494,26 @@ export default function DashboardComponent({
               </span>
               <div>
                 <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                  <span>Índices Financieros & Liquidez Operativa</span>
+                  <span>Capacidad de Compra & Liquidez Disponible</span>
                   <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                    liquidezIndices.razonLiquidez >= 1.30
+                    liquidezIndices.diagnosticoNivel === 'ALTO'
                       ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/25'
-                      : liquidezIndices.razonLiquidez >= 1.00
+                      : liquidezIndices.diagnosticoNivel === 'MEDIO'
                       ? 'bg-amber-500/15 text-amber-600 border border-amber-500/25'
                       : 'bg-red-500/15 text-red-600 border border-red-500/25'
                   }`}>
-                    {liquidezIndices.razonLiquidez >= 1.30 ? 'Liquidez Óptima' : liquidezIndices.razonLiquidez >= 1.00 ? 'Liquidez Ajustada' : 'Liquidez Crítica'}
+                    {liquidezIndices.diagnosticoTitulo}
                   </span>
                 </h3>
                 <p className="text-[10px] text-[var(--muted-foreground)]">
-                  Disponibilidad de efectivo inmediato para compra de pedidos y abastecimiento con talleres de calzado
+                  {liquidezIndices.diagnosticoTexto}
                 </p>
               </div>
             </div>
 
             <div className="text-left sm:text-right">
               <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">
-                Capital Neto de Compra Disponible:
+                Capital Neto para Nuevos Pedidos:
               </span>
               <span className={`text-base font-black font-mono ${
                 liquidezIndices.capitalNetoCompra >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'
@@ -505,24 +525,24 @@ export default function DashboardComponent({
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
             <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Razón de Liquidez</span>
-              <span className="text-sm font-black text-[var(--foreground)] font-mono">{liquidezIndices.razonLiquidez.toFixed(2)} veces</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Por $1 de deuda a corto plazo</span>
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Efectivo en Caja / Bancos</span>
+              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">${liquidezIndices.efectivoCaja.toFixed(2)}</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Dinero líquido cobrado</span>
             </div>
             <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Prueba Ácida</span>
-              <span className="text-sm font-black text-blue-600 font-mono">{liquidezIndices.pruebaAcida.toFixed(2)} veces</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Efectivo líquido sin cobros</span>
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Cobros Pendientes (Cartera)</span>
+              <span className="text-sm font-black text-blue-600 font-mono">${liquidezIndices.carteraCobro.toFixed(2)}</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Por cobrar a clientes</span>
             </div>
             <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Deuda a Proveedores</span>
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Deuda a Talleres</span>
               <span className="text-sm font-black text-orange-500 font-mono">${liquidezIndices.deudaProveedores.toFixed(2)}</span>
               <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Pendiente a fabricantes</span>
             </div>
             <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Egresos Operativos</span>
-              <span className="text-sm font-black text-slate-600 dark:text-slate-300 font-mono">${liquidezIndices.gastosMes.toFixed(2)}</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Servicios y arriendos mes</span>
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Egresos del Mes</span>
+              <span className="text-sm font-black text-purple-600 dark:text-purple-400 font-mono">${liquidezIndices.gastosMes.toFixed(2)}</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Servicios, nómina y arriendos</span>
             </div>
           </div>
 
@@ -550,36 +570,38 @@ export default function DashboardComponent({
         </div>
       )}
 
-      {/* ─── TARJETA DE UTILIDAD NETA & GANANCIA OPERATIVA (ADMINS) ─── */}
+      {/* ─── TARJETA DE UTILIDAD NETA & GANANCIA OPERATIVA (ADAPTADA A TEMA CLARO Y OSCURO) ─── */}
       {isAdmin && (
-        <div className="p-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-900 border border-slate-700/80 rounded-2xl shadow-md text-white space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm text-[var(--foreground)] space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+              <div className="p-2 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/25">
                 <DollarSign size={18} />
               </div>
               <div>
-                <h3 className="text-xs sm:text-sm font-black text-white flex items-center gap-2">
-                  <span>Utilidad Neta & Rendimiento Operativo</span>
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                  <span>Utilidad Neta & Rendimiento Comercial</span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
                     {periodo === 'HOY' ? 'Día de Hoy' : periodo === 'SEMANAL' ? 'Esta Semana' : periodo === 'MENSUAL' ? 'Este Mes' : periodo === 'TRIMESTRAL' ? 'Trimestre' : periodo === 'SEMESTRAL' ? 'Semestre' : 'Año en Curso'}
                   </span>
                 </h3>
-                <p className="text-[10px] text-slate-400">
-                  Ganancia neta real descontando costo de calzado a talleres y egresos operativos
+                <p className="text-[10px] text-[var(--muted-foreground)]">
+                  Ganancia neta real descontando costo de calzado a talleres y egresos operativos del negocio
                 </p>
               </div>
             </div>
 
             <div className="flex items-baseline gap-2">
-              <span className="text-[10px] text-slate-400 uppercase font-bold">Ganancia Neta:</span>
+              <span className="text-[10px] text-[var(--muted-foreground)] uppercase font-bold">Ganancia Neta:</span>
               <span className={`text-xl sm:text-2xl font-black font-mono ${
-                liquidezIndices.utilidadNeta >= 0 ? 'text-emerald-400' : 'text-red-400'
+                liquidezIndices.utilidadNeta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
               }`}>
                 ${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
               </span>
               <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                liquidezIndices.margenNetoPct >= 20 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                liquidezIndices.margenNetoPct >= 20 
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
               }`}>
                 {liquidezIndices.margenNetoPct}% margen
               </span>
@@ -588,25 +610,25 @@ export default function DashboardComponent({
 
           {/* Desglose de Rentabilidad Operativa */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
-            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">(+) Ventas Brutas</span>
-              <span className="text-sm font-black text-white font-mono">${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5">{kpis.totalPedidos} transacciones</span>
+            <div className="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">(+) Ventas Brutas</span>
+              <span className="text-sm font-black text-[var(--foreground)] font-mono">${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">{kpis.totalPedidos} transacciones</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">(-) Costo Calzado (COGS)</span>
-              <span className="text-sm font-black text-orange-400 font-mono">${liquidezIndices.costoMercaderia.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5">Pagado a fabricantes</span>
+            <div className="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">(-) Costo Calzado (COGS)</span>
+              <span className="text-sm font-black text-orange-500 font-mono">${liquidezIndices.costoMercaderia.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Pagado a fabricantes</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">(-) Gastos Operativos</span>
-              <span className="text-sm font-black text-blue-400 font-mono">${liquidezIndices.gastosMes.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
-              <span className="text-[9px] text-slate-400 block mt-0.5">Luz, arriendo, nómina</span>
+            <div className="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">(-) Egresos Operativos</span>
+              <span className="text-sm font-black text-purple-600 dark:text-purple-400 font-mono">${liquidezIndices.gastosMes.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Luz, arriendo, nómina</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              <span className="text-[10px] text-emerald-400 font-bold uppercase block">(=) Utilidad Neta</span>
-              <span className="text-sm font-black text-emerald-300 font-mono">${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
-              <span className="text-[9px] text-emerald-400/80 block mt-0.5">Excedente real del negocio</span>
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase block">(=) Utilidad Neta Real</span>
+              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
+              <span className="text-[9px] text-emerald-600/80 dark:text-emerald-400/80 block mt-0.5">Excedente real del negocio</span>
             </div>
           </div>
         </div>

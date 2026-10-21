@@ -217,12 +217,16 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
   const [success, setSuccess] = useState('');
 
   // Datos para Índices Financieros de Liquidez Operativa
+  // Datos para Índices Financieros de Liquidez Operativa y Patrimonio Comercial
   const [datosLiquidez, setDatosLiquidez] = useState<{
     efectivoRecaudado: number;
     saldoCartera: number;
     deudaProveedores: number;
     adelantosAProveedores: number;
     totalGastos: number;
+    stockValorCosto: number;
+    stockPares: number;
+    efectivoPersonalizado: string;
     simulacionMonto: string;
   }>({
     efectivoRecaudado: 0,
@@ -230,6 +234,9 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
     deudaProveedores: 0,
     adelantosAProveedores: 0,
     totalGastos: 0,
+    stockValorCosto: 0,
+    stockPares: 0,
+    efectivoPersonalizado: '',
     simulacionMonto: '500',
   });
 
@@ -341,7 +348,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
         setGastosList(rawGastos);
         setGastosStats(statsRes || null);
 
-        // Procesar deuda con proveedores e índices de liquidez
+        // Procesar deuda con proveedores e índices de liquidez y solvencia
         const totalDeudaProveedores = Array.isArray(proveedoresRes)
           ? proveedoresRes.reduce((acc: number, p: any) => acc + Number(p.saldoPendiente || 0), 0)
           : 0;
@@ -350,7 +357,9 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
           : 0;
         const totalRecaudado = Number(reporteRes?.kpis?.totalIngresos || 0);
         const saldoCartera = Number(reporteRes?.kpis?.saldoCarteraTotal || 0);
-        const totalGastosMes = Number(statsRes?.totalMonto || 0);
+        const totalGastosMes = Number(statsRes?.totalMes ?? statsRes?.totalMonto ?? 0);
+        const stockCosto = Number(reporteRes?.kpis?.capitalInvertidoStock || 0);
+        const stockParesTot = Number(reporteRes?.kpis?.totalParesEnStock || 0);
 
         setDatosLiquidez((prev) => ({
           ...prev,
@@ -359,6 +368,8 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
           deudaProveedores: totalDeudaProveedores,
           adelantosAProveedores: totalAdelantosProveedores,
           totalGastos: totalGastosMes,
+          stockValorCosto: stockCosto,
+          stockPares: stockParesTot,
         }));
 
         // Procesar pedidos con envíos/fletes
@@ -1257,251 +1268,264 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
       {/* ════════════════════════════════════════════════════════════════ */}
       {/* VISTA 4: ÍNDICES FINANCIEROS & LIQUIDEZ OPERATIVA (ADMINS)       */}
       {/* ════════════════════════════════════════════════════════════════ */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* VISTA 4: SOLVENCIA FINANCIERA & CAPACIDAD OPERATIVA DE COMPRA    */}
+      {/* ════════════════════════════════════════════════════════════════ */}
       {vista === 'INDICES_FINANCIEROS' && (() => {
-        const activoCirculanteDisponible = datosLiquidez.efectivoRecaudado + datosLiquidez.saldoCartera + (datosLiquidez.adelantosAProveedores || 0);
-        const pasivoCortoPlazo = datosLiquidez.deudaProveedores + datosLiquidez.totalGastos;
-        
-        const razonCorriente = pasivoCortoPlazo > 0
-          ? Number((activoCirculanteDisponible / pasivoCortoPlazo).toFixed(2))
-          : (activoCirculanteDisponible > 0 ? 3.5 : 1.0);
+        const efectivoEfectivo = datosLiquidez.efectivoPersonalizado !== '' && !isNaN(Number(datosLiquidez.efectivoPersonalizado))
+          ? Number(datosLiquidez.efectivoPersonalizado)
+          : datosLiquidez.efectivoRecaudado;
 
-        const pruebaAcida = pasivoCortoPlazo > 0
-          ? Number((datosLiquidez.efectivoRecaudado / pasivoCortoPlazo).toFixed(2))
-          : (datosLiquidez.efectivoRecaudado > 0 ? 2.5 : 1.0);
+        // Activo Líquido Inmediato para compras directas: Efectivo + Anticipos a talleres ya entregados
+        const activoLiquidoInmediato = efectivoEfectivo + (datosLiquidez.adelantosAProveedores || 0);
 
-        const capitalNetoCompras = activoCirculanteDisponible - pasivoCortoPlazo;
+        // Pasivo exigible inmediato: Cuentas pendientes a talleres + Egresos operativos del mes
+        const compromisosInmediatos = datosLiquidez.deudaProveedores + datosLiquidez.totalGastos;
+
+        // Capital Neto Libre para Nuevos Pedidos (Líquido puro)
+        const capitalNetoCompras = activoLiquidoInmediato - compromisosInmediatos;
+
+        // Patrimonio Operativo Total: Efectivo + Anticipos + Stock en Bodega + Cartera por cobrar - Compromisos
+        const activoOperativoTotal = efectivoEfectivo + (datosLiquidez.adelantosAProveedores || 0) + (datosLiquidez.stockValorCosto || 0) + datosLiquidez.saldoCartera;
+        const patrimonioOperativoNeto = activoOperativoTotal - compromisosInmediatos;
+
+        const ratioCobertura = compromisosInmediatos > 0
+          ? Number((activoOperativoTotal / compromisosInmediatos).toFixed(2))
+          : (activoOperativoTotal > 0 ? 3.0 : 1.0);
 
         return (
           <div className="space-y-5 animate-in fade-in duration-150">
-            {/* Banner de Contexto Operativo para Compra de Calzado */}
-            <div className="p-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-2xl border border-slate-700/80 text-white relative overflow-hidden shadow-md">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 relative z-10">
+            {/* Banner Superior con Capacidad de Compra y Patrimonio Operativo */}
+            <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm text-[var(--foreground)] relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      SOLVENCIA Y DISPONIBILIDAD INMEDIATA
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                      Cálculo Financiero & Capacidad Real de Compra
                     </span>
-                    <span className="text-xs text-slate-400 font-mono">
+                    <span className="text-xs text-[var(--muted-foreground)] font-mono">
                       Sucursal: {nombreSucursalActiva}
                     </span>
                   </div>
-                  <h3 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
-                    <span>Índices Financieros & Capacidad de Compra</span>
+                  <h3 className="text-base sm:text-lg font-bold tracking-tight text-[var(--foreground)] flex items-center gap-2">
+                    <span>Solvencia Operativa & Disponibilidad de Capital</span>
                   </h3>
-                  <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                    Evaluación cuantitativa de liquidez inmediata para determinar si el local comercial dispone de efectivo suficiente para emitir órdenes de compra a talleres/proveedores de calzado y responder a la demanda de pedidos sin comprometer los compromisos fijos del negocio.
+                  <p className="text-xs text-[var(--muted-foreground)] max-w-2xl leading-relaxed">
+                    Evaluación real integrando efectivo en caja/bancos, anticipos entregados a talleres y mercadería en bodega para decidir órdenes de confección sin descapitalizarte.
                   </p>
                 </div>
 
-                <div className="text-right shrink-0 bg-white/5 border border-white/10 p-3 rounded-xl backdrop-blur-xs">
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Capital Neto de Compra</span>
-                  <span className={`text-xl sm:text-2xl font-black font-mono ${capitalNetoCompras >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    ${capitalNetoCompras >= 0 ? `+${capitalNetoCompras.toFixed(2)}` : capitalNetoCompras.toFixed(2)}
-                  </span>
-                  <span className="text-[9px] text-slate-400 block">
-                    {capitalNetoCompras >= 0 ? 'Disponible para pedidos' : 'Déficit de liquidez'}
-                  </span>
+                <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                  <div className="text-left sm:text-right p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl">
+                    <span className="text-[10px] text-[var(--muted-foreground)] block font-bold uppercase">Capital Libre p/ Pedidos</span>
+                    <span className={`text-xl font-black font-mono ${capitalNetoCompras >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                      ${capitalNetoCompras >= 0 ? `+${capitalNetoCompras.toFixed(2)}` : capitalNetoCompras.toFixed(2)}
+                    </span>
+                    <span className="text-[9px] text-[var(--muted-foreground)] block">
+                      {capitalNetoCompras >= 0 ? 'Liquidez disponible' : 'Déficit en caja'}
+                    </span>
+                  </div>
+
+                  <div className="text-left sm:text-right p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl">
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-bold uppercase">Patrimonio Operativo Total</span>
+                    <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                      ${patrimonioOperativoNeto.toFixed(2)}
+                    </span>
+                    <span className="text-[9px] text-emerald-600/80 dark:text-emerald-400/80 block">
+                      Incluye stock y cartera
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Tarjetas Principales de Índices Financieros */}
+            {/* 4 Tarjetas Operativas Clave */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              {/* 1. Razón Corriente / Razón de Liquidez */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative overflow-hidden">
+              {/* 1. Efectivo en Caja / Bancos (Personalizable) */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Razón de Liquidez
+                    Efectivo en Caja / Bancos
                   </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                    razonCorriente >= 1.30
-                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                      : razonCorriente >= 1.00
-                      ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-                      : 'bg-red-500/10 text-red-600 border border-red-500/20'
-                  }`}>
-                    {razonCorriente >= 1.30 ? 'ÓPTIMA' : razonCorriente >= 1.00 ? 'AJUSTADA' : 'CRÍTICA'}
+                  <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500">
+                    <DollarSign size={14} />
                   </span>
                 </div>
-                <div className="text-2xl font-black font-mono text-[var(--foreground)]">
-                  {razonCorriente.toFixed(2)} <span className="text-xs font-normal text-[var(--muted-foreground)]">veces</span>
+                <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                  ${efectivoEfectivo.toFixed(2)}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
+                    <span>Recaudado mes: ${datosLiquidez.efectivoRecaudado.toFixed(2)}</span>
+                  </div>
+                  {/* Input rápido para ajustar saldo bancario real si el usuario lo desea */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <input
+                      type="number"
+                      step="50"
+                      min="0"
+                      placeholder="Ajustar saldo real ($)"
+                      value={datosLiquidez.efectivoPersonalizado}
+                      onChange={(e) => setDatosLiquidez({ ...datosLiquidez, efectivoPersonalizado: e.target.value })}
+                      className="w-full text-[11px] px-2 py-1 bg-[var(--background)] border border-[var(--border)] rounded-lg font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                    {datosLiquidez.efectivoPersonalizado !== '' && (
+                      <button
+                        type="button"
+                        onClick={() => setDatosLiquidez({ ...datosLiquidez, efectivoPersonalizado: '' })}
+                        className="text-[10px] text-[var(--muted-foreground)] hover:text-red-500 px-1 py-1"
+                        title="Restablecer a recaudado"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Calzado en Stock (Mercadería en Bodega) */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                    Mercadería en Stock (Bodega)
+                  </span>
+                  <span className="p-1 rounded-lg bg-blue-500/10 text-blue-500">
+                    <Package size={14} />
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-mono text-blue-600 dark:text-blue-400">
+                  ${datosLiquidez.stockValorCosto.toFixed(2)}
                 </div>
                 <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
-                  Por cada $1.00 adeudado a proveedores y en gastos, dispones de <strong>${razonCorriente.toFixed(2)}</strong> de respaldo operativo.
+                  Valoración a precio de costo de los <strong>{datosLiquidez.stockPares} pares</strong> disponibles en tienda y bodega.
                 </p>
               </div>
 
-              {/* 2. Prueba Ácida Operativa */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative overflow-hidden">
+              {/* 3. Anticipos Entregados a Talleres (Saldo a Favor) */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Prueba Ácida Inmediata
+                    Anticipos a Talleres (A Favor)
                   </span>
-                  <span className="p-1 rounded-lg bg-blue-500/10 text-blue-500">
+                  <span className="p-1 rounded-lg bg-indigo-500/10 text-indigo-500">
                     <ShieldAlert size={14} />
                   </span>
                 </div>
-                <div className="text-2xl font-black font-mono text-blue-600">
-                  {pruebaAcida.toFixed(2)} <span className="text-xs font-normal text-[var(--muted-foreground)]">veces</span>
+                <div className="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+                  +${datosLiquidez.adelantosAProveedores.toFixed(2)}
                 </div>
                 <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
-                  Respaldo en efectivo líquido en caja pura sin depender del cobro de cartera a clientes.
+                  Dinero ya entregado a fabricantes que cubre y amortiza pedidos de calzado en confección.
                 </p>
               </div>
 
-              {/* 3. Compromisos a Corto Plazo */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative overflow-hidden">
+              {/* 4. Compromisos a Pagar (Talleres + Gastos) */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Pasivo Exigible Inmediato
+                    Compromisos Inmediatos
                   </span>
                   <span className="p-1 rounded-lg bg-orange-500/10 text-orange-500">
                     <CreditCard size={14} />
                   </span>
                 </div>
                 <div className="text-2xl font-black font-mono text-orange-500">
-                  ${pasivoCortoPlazo.toFixed(2)}
+                  ${compromisosInmediatos.toFixed(2)}
                 </div>
                 <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
-                  Deuda pendiente a proveedores (${datosLiquidez.deudaProveedores.toFixed(2)}) + Egresos del mes (${datosLiquidez.totalGastos.toFixed(2)}).
-                </p>
-              </div>
-
-              {/* 4. Activo Circulante Disponible */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Activo Líquido Inmediato
-                  </span>
-                  <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500">
-                    <DollarSign size={14} />
-                  </span>
-                </div>
-                <div className="text-2xl font-black font-mono text-emerald-600">
-                  ${activoCirculanteDisponible.toFixed(2)}
-                </div>
-                <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
-                  Recaudación en caja (${datosLiquidez.efectivoRecaudado.toFixed(2)}) + Cartera exigible de clientes (${datosLiquidez.saldoCartera.toFixed(2)})${datosLiquidez.adelantosAProveedores > 0 ? ` + Anticipos a talleres ($${datosLiquidez.adelantosAProveedores.toFixed(2)})` : ''}.
+                  Deuda a talleres (${datosLiquidez.deudaProveedores.toFixed(2)}) + Gastos del mes (${datosLiquidez.totalGastos.toFixed(2)}).
                 </p>
               </div>
             </div>
 
-            {/* KPI CONDICIONAL DE ANTICIPOS A PROVEEDORES: SÓLO APARECE SI SE TIENEN ADELANTOS DADOS */}
-            {datosLiquidez.adelantosAProveedores > 0 && (
-              <div className="p-3 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex items-center justify-between animate-in fade-in shadow-2xs">
-                <div className="flex items-center gap-2.5">
-                  <span className="p-1.5 rounded-xl bg-blue-500/20 text-blue-600 dark:text-blue-400">
-                    <ShieldAlert size={16} />
-                  </span>
-                  <div>
-                    <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase block tracking-wider">
-                      Anticipos Entregados a Talleres (Saldo a Favor)
-                    </span>
-                    <span className="text-[11px] text-[var(--muted-foreground)]">
-                      Adelantos entregados a fabricantes que amortizan cuentas por pagar y respaldan pedidos en confección
-                    </span>
-                  </div>
-                </div>
-                <span className="text-base font-black text-blue-600 dark:text-blue-400 font-mono">
-                  +${datosLiquidez.adelantosAProveedores.toFixed(2)}
-                </span>
-              </div>
-            )}
-
-            {/* Panel de Viabilidad Operativa y Recomendación para Compra de Pedidos */}
+            {/* Desglose de la Fórmula Integral y Semáforo de Decisión */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Semáforo Operativo y Diagnóstico */}
+              {/* Diagnóstico y Decisión Operativa */}
               <div className="lg:col-span-2 p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3.5">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                     <Activity size={16} className="text-emerald-500" />
-                    <span>Diagnóstico de Liquidez para Compras de Calzado</span>
+                    <span>Diagnóstico Operativo para Mandar a Confeccionar Calzado</span>
                   </h4>
                   <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                    Regla de Decisión Comercial
+                    Guía de Decisión
                   </span>
                 </div>
 
-                {razonCorriente >= 1.30 ? (
-                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-900 dark:text-emerald-200 space-y-2">
+                {capitalNetoCompras >= 800 ? (
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-800 dark:text-emerald-200 space-y-2">
                     <div className="flex items-center gap-2 font-bold text-xs text-emerald-700 dark:text-emerald-300">
                       <CheckCircle size={16} />
-                      <span>CAPACIDAD DE COMPRA ÓPTIMA CONFIRMADA</span>
+                      <span>CAPACIDAD DE COMPRA EXCELENTE</span>
                     </div>
                     <p className="text-xs leading-relaxed">
-                      Tu local dispone de liquidez holgada. Puedes emitir órdenes de compra a los talleres de calzado para surtir pedidos de clientes o reponer curvas de tallas en stock sin riesgo de descapitalización.
+                      El negocio cuenta con <strong>${capitalNetoCompras.toFixed(2)}</strong> de efectivo líquido libre. Puedes contratar nuevos lotes de calzado con talleres artesanales de Cevallos sin riesgo financiero para el sostenimiento del local.
                     </p>
                   </div>
-                ) : razonCorriente >= 1.00 ? (
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-900 dark:text-amber-200 space-y-2">
+                ) : capitalNetoCompras >= 0 ? (
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-800 dark:text-amber-200 space-y-2">
                     <div className="flex items-center gap-2 font-bold text-xs text-amber-700 dark:text-amber-300">
                       <AlertCircle size={16} />
-                      <span>LIQUIDEZ AJUSTADA — COMPRA CONDICIONADA CON ANTICIPOS</span>
+                      <span>CAPACIDAD AJUSTADA — PRIORIZAR PEDIDOS DE ALTA ROTACIÓN</span>
                     </div>
                     <p className="text-xs leading-relaxed">
-                      La liquidez cubre los compromisos actuales pero con margen estrecho. Para nuevos pedidos de clientes por encargo, se recomienda exigir un anticipo mínimo del 30% al 50% antes de ordenar la producción al taller.
+                      Tu margen libre es de <strong>${capitalNetoCompras.toFixed(2)}</strong>. Se aconseja producir únicamente modelos de calzado con pedidos en firme de clientes o reposición de tallas agotadas (curvas clave).
                     </p>
                   </div>
                 ) : (
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-900 dark:text-red-200 space-y-2">
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-800 dark:text-red-200 space-y-2">
                     <div className="flex items-center gap-2 font-bold text-xs text-red-700 dark:text-red-300">
                       <AlertCircle size={16} />
-                      <span>LIQUIDEZ CRÍTICA — SUSPENDER COMPRAS A CRÉDITO</span>
+                      <span>ATENCIÓN: DÉFICIT DE LIQUIDEZ INMEDIATA</span>
                     </div>
                     <p className="text-xs leading-relaxed">
-                      Los pasivos exigibles inmediatos superan tus activos líquidos disponibles. Se sugiere priorizar la cobranza de saldos de clientes y evitar nuevas deudas con proveedores de calzado hasta nivelar la caja.
+                      Los compromisos actuales superan el efectivo disponible en <strong>${Math.abs(capitalNetoCompras).toFixed(2)}</strong>. Se recomienda cobrar los créditos a clientes (${datosLiquidez.saldoCartera.toFixed(2)}) y liquidar calzado en stock antes de solicitar nuevos lotes a crédito.
                     </p>
                   </div>
                 )}
 
-                {/* Comparativa Visual de Activos vs Pasivos */}
-                <div className="space-y-2 pt-2 border-t border-[var(--border)]">
-                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">
-                    Proporción de Cobertura Inmediata:
+                {/* Resumen del Balance de Operación */}
+                <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl space-y-2 text-xs">
+                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase block">
+                    Estructura del Patrimonio Comercial:
                   </span>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="font-semibold text-emerald-600">Activo Líquido ($)</span>
-                      <span className="font-mono font-bold">${activoCirculanteDisponible.toFixed(2)}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-[var(--muted-foreground)] block">(+) Caja & Bancos</span>
+                      <span className="font-bold font-mono">${efectivoEfectivo.toFixed(2)}</span>
                     </div>
-                    <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, Math.round((activoCirculanteDisponible / (pasivoCortoPlazo || 1)) * 50))}%` }}
-                      />
+                    <div>
+                      <span className="text-[var(--muted-foreground)] block">(+) Anticipos Talleres</span>
+                      <span className="font-bold font-mono text-indigo-500">+${(datosLiquidez.adelantosAProveedores || 0).toFixed(2)}</span>
                     </div>
-
-                    <div className="flex justify-between text-xs pt-1">
-                      <span className="font-semibold text-orange-500">Pasivo Exigible ($)</span>
-                      <span className="font-mono font-bold">${pasivoCortoPlazo.toFixed(2)}</span>
+                    <div>
+                      <span className="text-[var(--muted-foreground)] block">(+) Stock en Bodega</span>
+                      <span className="font-bold font-mono text-blue-500">+${(datosLiquidez.stockValorCosto || 0).toFixed(2)}</span>
                     </div>
-                    <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-orange-500 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, Math.round((pasivoCortoPlazo / (activoCirculanteDisponible || 1)) * 50))}%` }}
-                      />
+                    <div>
+                      <span className="text-[var(--muted-foreground)] block">(-) Deudas & Gastos</span>
+                      <span className="font-bold font-mono text-orange-500">-${compromisosInmediatos.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Simulador de Pedidos a Proveedor */}
+              {/* Simulador de Compra de Pedidos */}
               <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3.5 flex flex-col justify-between">
                 <div>
                   <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2 mb-1">
                     <Calculator size={16} className="text-blue-500" />
-                    <span>Simulador de Compra de Pedidos</span>
+                    <span>Simulador de Compra de Calzado</span>
                   </h4>
                   <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
-                    Calcula si puedes costear un pedido o lote de calzado hoy:
+                    Calcula si puedes costear un nuevo lote o pedido de calzado hoy:
                   </p>
 
-                  {/* Input de Monto */}
                   <div className="mt-3 space-y-1.5">
                     <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                      Monto estimado del pedido ($ USD):
+                      Monto a confeccionar con el taller ($ USD):
                     </label>
-                    <div className="flex items-center gap-1.5 bg-[var(--muted)]/30 border border-[var(--border)] px-3 py-2 rounded-xl">
+                    <div className="flex items-center gap-1.5 bg-[var(--background)] border border-[var(--border)] px-3 py-2 rounded-xl">
                       <DollarSign size={14} className="text-slate-400" />
                       <input
                         type="number"
@@ -1515,11 +1539,10 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                     </div>
                   </div>
 
-                  {/* Presets Rápidos */}
                   <div className="flex gap-1.5 mt-2 flex-wrap">
                     {[
-                      { label: '1 Docena (~$250)', val: '250' },
-                      { label: '2 Docenas (~$500)', val: '500' },
+                      { label: '1 Docena (~$240)', val: '240' },
+                      { label: '2 Docenas (~$480)', val: '480' },
                       { label: 'Lote (~$1,200)', val: '1200' },
                     ].map((p) => (
                       <button
@@ -1553,7 +1576,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                       </div>
                       <p className="text-[11px] leading-relaxed">
                         {esFactible ? (
-                          <span>Tu capital de trabajo cubre el pedido. Te quedará un saldo disponible de <strong>${saldoRestante.toFixed(2)}</strong>.</span>
+                          <span>Tu efectivo libre cubre el pedido a talleres. Te quedará un saldo disponible de <strong>${saldoRestante.toFixed(2)}</strong>.</span>
                         ) : (
                           <span>Para no descapitalizarte, solicita al cliente un anticipo de mínimo <strong>${anticipoSugerido.toFixed(2)}</strong> ({Math.round((anticipoSugerido / (montoSim || 1)) * 100)}%).</span>
                         )}
