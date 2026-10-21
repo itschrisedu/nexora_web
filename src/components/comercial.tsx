@@ -22,6 +22,7 @@ import {
   MessageCircle,
   ShoppingBag,
   AlertCircle,
+  Calendar,
   User,
   Building,
   FileText,
@@ -206,6 +207,18 @@ export default function ComercialComponent({
   });
   const [selectedOrderSucursalId, setSelectedOrderSucursalId] = useState<string>('');
   const [pedidoExpandidoId, setPedidoExpandidoId] = useState<string | null>(null);
+
+  // Filtro de rango de fechas para pedidos en 'ENTREGADO' y 'TODOS' (por defecto último mes)
+  const fechaHoy = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [filtroFechaHasta, setFiltroFechaHasta] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [verTodoElHistorial, setVerTodoElHistorial] = useState<boolean>(false);
 
   // Auto-expandir y enfocar el pedido solicitado desde Cobros y Cartera o Notificaciones
   useEffect(() => {
@@ -2626,11 +2639,40 @@ export default function ComercialComponent({
     });
   }, [pedidos, selectedSucursalPedidoId, listaSucursalesDisponibles, miLocalId, userRole, activeSucursalId]);
 
+  // Fecha del primer pedido registrado en la sucursal seleccionada (límite inferior estricto)
+  const fechaMinimaHistorica = useMemo(() => {
+    if (pedidosDeSucursal.length === 0) return '';
+    const fechas = pedidosDeSucursal
+      .map((p) => {
+        const raw = (p as any).fecha || p.createdAt;
+        return raw ? raw.split('T')[0] : '';
+      })
+      .filter(Boolean)
+      .sort();
+    return fechas[0] || '';
+  }, [pedidosDeSucursal]);
+
   const pedidosFiltrados = useMemo(() => {
     return pedidosDeSucursal.filter((p) => {
-      return filtroEstado === 'TODOS' || p.estado === filtroEstado;
+      // 1. Filtro por estado
+      if (filtroEstado !== 'TODOS' && p.estado !== filtroEstado) {
+        return false;
+      }
+
+      // 2. Filtro por fecha: aplica en 'TODOS' y 'ENTREGADO' cuando no está activo verTodoElHistorial
+      const aplicaFiltroFecha = (filtroEstado === 'TODOS' || filtroEstado === 'ENTREGADO') && !verTodoElHistorial;
+      if (aplicaFiltroFecha) {
+        const raw = (p as any).fecha || p.createdAt;
+        const fechaP = raw ? raw.split('T')[0] : '';
+        if (fechaP) {
+          if (filtroFechaDesde && fechaP < filtroFechaDesde) return false;
+          if (filtroFechaHasta && fechaP > filtroFechaHasta) return false;
+        }
+      }
+
+      return true;
     });
-  }, [pedidosDeSucursal, filtroEstado]);
+  }, [pedidosDeSucursal, filtroEstado, filtroFechaDesde, filtroFechaHasta, verTodoElHistorial]);
 
   const getNumeroPedido = (p: Pedido, index?: number) => {
     if (p.numeroCodigo) return p.numeroCodigo;
@@ -2790,6 +2832,93 @@ export default function ComercialComponent({
             );
           })}
         </div>
+
+        {/* Componente de Filtro de Rango de Fechas para 'ENTREGADO' y 'TODOS' */}
+        {(filtroEstado === 'TODOS' || filtroEstado === 'ENTREGADO') && (
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs mt-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--foreground)] mr-1">
+                <Calendar size={14} className="text-emerald-500" />
+                <span>Filtrar por período:</span>
+              </div>
+
+              {/* Input Desde */}
+              <div className="flex items-center gap-1.5 bg-[var(--background)] border border-[var(--border)] px-2.5 py-1 rounded-xl">
+                <span className="text-[11px] text-[var(--muted-foreground)] font-semibold">Desde:</span>
+                <input
+                  type="date"
+                  value={filtroFechaDesde}
+                  min={fechaMinimaHistorica || undefined}
+                  max={filtroFechaHasta || fechaHoy}
+                  disabled={verTodoElHistorial}
+                  onChange={(e) => {
+                    setFiltroFechaDesde(e.target.value);
+                    setVerTodoElHistorial(false);
+                  }}
+                  className="bg-transparent text-xs font-mono font-medium focus:outline-none disabled:opacity-40 cursor-pointer"
+                />
+              </div>
+
+              {/* Input Hasta */}
+              <div className="flex items-center gap-1.5 bg-[var(--background)] border border-[var(--border)] px-2.5 py-1 rounded-xl">
+                <span className="text-[11px] text-[var(--muted-foreground)] font-semibold">Hasta:</span>
+                <input
+                  type="date"
+                  value={filtroFechaHasta}
+                  min={filtroFechaDesde || fechaMinimaHistorica || undefined}
+                  max={fechaHoy}
+                  disabled={verTodoElHistorial}
+                  onChange={(e) => {
+                    setFiltroFechaHasta(e.target.value);
+                    setVerTodoElHistorial(false);
+                  }}
+                  className="bg-transparent text-xs font-mono font-medium focus:outline-none disabled:opacity-40 cursor-pointer"
+                />
+              </div>
+
+              {/* Botón Preset: Último Mes */}
+              <button
+                type="button"
+                onClick={() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() - 30);
+                  setFiltroFechaDesde(d.toISOString().split('T')[0]);
+                  setFiltroFechaHasta(fechaHoy);
+                  setVerTodoElHistorial(false);
+                }}
+                className={`px-3 py-1 text-xs font-bold rounded-xl transition-all border ${
+                  !verTodoElHistorial
+                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 shadow-2xs'
+                    : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                Último mes (por defecto)
+              </button>
+
+              {/* Botón Preset: Ver Todo el Historial */}
+              <button
+                type="button"
+                onClick={() => setVerTodoElHistorial(!verTodoElHistorial)}
+                className={`px-3 py-1 text-xs font-bold rounded-xl transition-all border ${
+                  verTodoElHistorial
+                    ? 'bg-blue-500/10 text-blue-600 border-blue-500/25 shadow-2xs font-black'
+                    : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                {verTodoElHistorial ? '✓ Mostrando todo el histórico' : 'Ver todo el histórico'}
+              </button>
+            </div>
+
+            {/* Contador explicativo */}
+            <div className="text-xs font-semibold text-[var(--muted-foreground)]">
+              {verTodoElHistorial ? (
+                <span>Mostrando <strong className="text-[var(--foreground)]">{pedidosFiltrados.length}</strong> pedidos (historial completo)</span>
+              ) : (
+                <span>Mostrando <strong className="text-emerald-600 dark:text-emerald-400">{pedidosFiltrados.length}</strong> pedidos en el rango seleccionado</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Banner Informativo de Visibilidad Inter-Sucursal Restringida (Fase 2B) */}

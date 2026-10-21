@@ -74,6 +74,21 @@ export default function DashboardComponent({
   const [topModelos, setTopModelos] = useState<{ id: string; nombre: string; marca: string; pares: number; total: number }[]>([]);
   const [comparativoSucursales, setComparativoSucursales] = useState<{ sucursalNombre: string; total: number; porcentaje: number }[]>([]);
 
+  // Índices Financieros de Liquidez Operativa (Admin General y Sucursal)
+  const [liquidezIndices, setLiquidezIndices] = useState<{
+    razonLiquidez: number;
+    pruebaAcida: number;
+    capitalNetoCompra: number;
+    deudaProveedores: number;
+    gastosMes: number;
+  }>({
+    razonLiquidez: 1,
+    pruebaAcida: 1,
+    capitalNetoCompra: 0,
+    deudaProveedores: 0,
+    gastosMes: 0,
+  });
+
   useEffect(() => {
     cargarDashboard();
   }, [activeSucursalId, periodo, online]);
@@ -81,9 +96,9 @@ export default function DashboardComponent({
   const cargarDashboard = async () => {
     setLoading(true);
     try {
+      const sucParam = activeSucursalId ? `&sucursalId=${activeSucursalId}` : '';
       let data = null;
       if (online) {
-        const sucParam = activeSucursalId ? `&sucursalId=${activeSucursalId}` : '';
         data = await ApiService.get(`/reportes/resumen-ejecutivo?periodo=${periodo}${sucParam}`).catch(() => null);
       }
 
@@ -164,6 +179,36 @@ export default function DashboardComponent({
             setComparativoSucursales(data.ventasPorSucursal);
           } else {
             setComparativoSucursales([]);
+          }
+
+          // Cargar datos complementarios para Índices Financieros de Liquidez Operativa
+          try {
+            const [prvs, gStats] = await Promise.all([
+              ApiService.get('/proveedores').catch(() => []),
+              ApiService.get(`/gastos/stats?mes=${new Date().getMonth()}&anio=${new Date().getFullYear()}${sucParam}`).catch(() => null),
+            ]);
+            const dProveedores = Array.isArray(prvs)
+              ? prvs.reduce((acc: number, p: any) => acc + Number(p.saldoPendiente || 0), 0)
+              : 0;
+            const gMes = Number(gStats?.totalMonto || 0);
+            const pasivoInmediato = dProveedores + gMes;
+            const ingresos = Number(kpisBackend.totalIngresos || 0);
+            const cartera = Number(kpisBackend.saldoCarteraTotal || 0);
+            const activoInmediato = ingresos + cartera;
+
+            const ratio = pasivoInmediato > 0 ? Number((activoInmediato / pasivoInmediato).toFixed(2)) : (activoInmediato > 0 ? 3.0 : 1.0);
+            const acida = pasivoInmediato > 0 ? Number((ingresos / pasivoInmediato).toFixed(2)) : (ingresos > 0 ? 2.5 : 1.0);
+            const capNeto = activoInmediato - pasivoInmediato;
+
+            setLiquidezIndices({
+              razonLiquidez: ratio,
+              pruebaAcida: acida,
+              capitalNetoCompra: capNeto,
+              deudaProveedores: dProveedores,
+              gastosMes: gMes,
+            });
+          } catch (e) {
+            console.warn('Error calculando índices de liquidez en dashboard:', e);
           }
         }
       } else {
@@ -334,7 +379,7 @@ export default function DashboardComponent({
           trendPositive={false}
         />
         <KpiCardCompact
-          title="Salud de Inventario"
+          title="Disponibilidad de Inventario"
           value={
             kpis.capitalInvertidoStock > 0
               ? `$${kpis.capitalInvertidoStock.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`
@@ -361,6 +406,70 @@ export default function DashboardComponent({
           trendPositive={kpis.stockBajoCount === 0}
         />
       </div>
+
+      {/* ─── ÍNDICES FINANCIEROS & LIQUIDEZ OPERATIVA (ADMIN GENERAL Y ADMIN SUCURSAL) ─── */}
+      {isAdmin && (
+        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-emerald-500/10 text-emerald-600 rounded-xl">
+                <Activity size={16} />
+              </span>
+              <div>
+                <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                  <span>Índices Financieros & Liquidez Operativa</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                    liquidezIndices.razonLiquidez >= 1.30
+                      ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/25'
+                      : liquidezIndices.razonLiquidez >= 1.00
+                      ? 'bg-amber-500/15 text-amber-600 border border-amber-500/25'
+                      : 'bg-red-500/15 text-red-600 border border-red-500/25'
+                  }`}>
+                    {liquidezIndices.razonLiquidez >= 1.30 ? 'Liquidez Óptima' : liquidezIndices.razonLiquidez >= 1.00 ? 'Liquidez Ajustada' : 'Liquidez Crítica'}
+                  </span>
+                </h3>
+                <p className="text-[10px] text-[var(--muted-foreground)]">
+                  Disponibilidad de efectivo inmediato para compra de pedidos y abastecimiento con talleres de calzado
+                </p>
+              </div>
+            </div>
+
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">
+                Capital Neto de Compra Disponible:
+              </span>
+              <span className={`text-base font-black font-mono ${
+                liquidezIndices.capitalNetoCompra >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'
+              }`}>
+                ${liquidezIndices.capitalNetoCompra >= 0 ? `+${liquidezIndices.capitalNetoCompra.toFixed(2)}` : liquidezIndices.capitalNetoCompra.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+            <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Razón de Liquidez</span>
+              <span className="text-sm font-black text-[var(--foreground)] font-mono">{liquidezIndices.razonLiquidez.toFixed(2)} veces</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Por $1 de deuda a corto plazo</span>
+            </div>
+            <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Prueba Ácida</span>
+              <span className="text-sm font-black text-blue-600 font-mono">{liquidezIndices.pruebaAcida.toFixed(2)} veces</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Efectivo líquido sin cobros</span>
+            </div>
+            <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Deuda a Proveedores</span>
+              <span className="text-sm font-black text-orange-500 font-mono">${liquidezIndices.deudaProveedores.toFixed(2)}</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Pendiente a fabricantes</span>
+            </div>
+            <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
+              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Egresos Operativos</span>
+              <span className="text-sm font-black text-slate-600 dark:text-slate-300 font-mono">${liquidezIndices.gastosMes.toFixed(2)}</span>
+              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Servicios y arriendos mes</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── SECCIÓN DE GRÁFICOS Y ANALÍTICA COMPACTA ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">

@@ -2981,10 +2981,10 @@ export default function ReportesComponent({
                   </div>
                 </div>
 
-                {/* Resumen de Cartera y Salud Financiera */}
+                {/* Resumen de Cartera e Índices Financieros */}
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
                   <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                    Salud Crediticia & Cartera de Clientes
+                    Índices Financieros & Cartera de Clientes
                   </h3>
 
                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl space-y-1">
