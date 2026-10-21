@@ -9,9 +9,11 @@ import {
   AlertCircle, CheckCircle, Edit2, Trash2, X, Loader2,
   TrendingDown, TrendingUp, Calendar, FileText, ChevronRight,
   PieChart, BarChart3, Check, ArrowUpRight, ArrowDownRight,
-  ShieldAlert, Layers, Receipt, CreditCard, Activity, Calculator
+  ShieldAlert, Layers, Receipt, CreditCard, Activity, Calculator,
+  RotateCcw
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
+import { useToast } from "@/components/ui/toast";
 
 interface FinanzasProps {
   online: boolean;
@@ -217,9 +219,12 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
   const [success, setSuccess] = useState('');
 
   // Datos para Índices Financieros de Liquidez Operativa
+  const { showToast } = useToast();
+
   // Datos para Índices Financieros de Liquidez Operativa y Patrimonio Comercial
   const [datosLiquidez, setDatosLiquidez] = useState<{
     efectivoRecaudado: number;
+    costoMercaderia: number;
     saldoCartera: number;
     deudaProveedores: number;
     adelantosAProveedores: number;
@@ -230,6 +235,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
     simulacionMonto: string;
   }>({
     efectivoRecaudado: 0,
+    costoMercaderia: 0,
     saldoCartera: 0,
     deudaProveedores: 0,
     adelantosAProveedores: 0,
@@ -239,6 +245,24 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
     efectivoPersonalizado: '',
     simulacionMonto: '500',
   });
+
+  // Saldo real temporal ingresado en el input
+  const [tempEfectivoInput, setTempEfectivoInput] = useState<string>('');
+
+  // Cargar saldo guardado de localStorage al cambiar de sucursal
+  useEffect(() => {
+    const storageKey = `nexora_saldo_caja_${activeSucursalId || 'global'}`;
+    try {
+      const guardado = localStorage.getItem(storageKey);
+      if (guardado !== null && guardado !== '') {
+        setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: guardado }));
+        setTempEfectivoInput(guardado);
+      } else {
+        setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: '' }));
+        setTempEfectivoInput('');
+      }
+    } catch (e) {}
+  }, [activeSucursalId]);
 
   // Filtros de fecha y categoría
   const currentMonth = new Date().getMonth();
@@ -356,21 +380,33 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
           ? proveedoresRes.reduce((acc: number, p: any) => acc + Number(p.saldoAFavor || 0), 0)
           : 0;
         const totalRecaudado = Number(reporteRes?.kpis?.totalIngresos || 0);
+        const costoMercaderiaVendida = Number(reporteRes?.kpis?.costoEstimadoTotal || 0);
         const saldoCartera = Number(reporteRes?.kpis?.saldoCarteraTotal || 0);
         const totalGastosMes = Number(statsRes?.totalMes ?? statsRes?.totalMonto ?? 0);
         const stockCosto = Number(reporteRes?.kpis?.capitalInvertidoStock || 0);
         const stockParesTot = Number(reporteRes?.kpis?.totalParesEnStock || 0);
 
+        const storageKey = `nexora_saldo_caja_${activeSucursalId || 'global'}`;
+        let saldoGuardado = '';
+        try {
+          saldoGuardado = localStorage.getItem(storageKey) || '';
+        } catch (e) {}
+
         setDatosLiquidez((prev) => ({
           ...prev,
           efectivoRecaudado: totalRecaudado,
+          costoMercaderia: costoMercaderiaVendida,
           saldoCartera: saldoCartera,
           deudaProveedores: totalDeudaProveedores,
           adelantosAProveedores: totalAdelantosProveedores,
           totalGastos: totalGastosMes,
           stockValorCosto: stockCosto,
           stockPares: stockParesTot,
+          efectivoPersonalizado: saldoGuardado || prev.efectivoPersonalizado || '',
         }));
+        if (saldoGuardado) {
+          setTempEfectivoInput(saldoGuardado);
+        }
 
         // Procesar pedidos con envíos/fletes
         const rawPedidos = Array.isArray(pedidosRes) ? pedidosRes : (pedidosRes?.pedidos || []);
@@ -583,6 +619,32 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
     const found = sucursales.find((s) => s.id === activeSucursalId);
     return found ? (found.isMatriz ? `🏢 Matriz: ${found.name}` : `🏪 Sucursal: ${found.name}`) : 'Sucursal Actual';
   }, [activeSucursalId, sucursales]);
+
+  // Manejador para guardar saldo real verificado en caja/bancos en localStorage
+  const handleGuardarSaldoReal = () => {
+    const storageKey = `nexora_saldo_caja_${activeSucursalId || 'global'}`;
+    const valor = tempEfectivoInput.trim();
+    if (valor !== '' && !isNaN(Number(valor)) && Number(valor) >= 0) {
+      try {
+        localStorage.setItem(storageKey, valor);
+      } catch (e) {}
+      setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: valor }));
+      showToast(`Saldo real en caja/bancos ($${Number(valor).toFixed(2)}) guardado para ${nombreSucursalActiva}.`, 'success');
+    } else {
+      showToast('Por favor ingresa un monto numérico válido mayor o igual a 0.', 'warning');
+    }
+  };
+
+  // Restablecer saldo al flujo neto calculado
+  const handleRestablecerSaldo = () => {
+    const storageKey = `nexora_saldo_caja_${activeSucursalId || 'global'}`;
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (e) {}
+    setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: '' }));
+    setTempEfectivoInput('');
+    showToast(`Saldo restablecido al flujo neto calculado para ${nombreSucursalActiva}.`, 'info');
+  };
 
   const mesesNombres = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -1272,9 +1334,12 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
       {/* VISTA 4: SOLVENCIA FINANCIERA & CAPACIDAD OPERATIVA DE COMPRA    */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {vista === 'INDICES_FINANCIEROS' && (() => {
-        const efectivoEfectivo = datosLiquidez.efectivoPersonalizado !== '' && !isNaN(Number(datosLiquidez.efectivoPersonalizado))
+        // Flujo neto real de caja estimado: Recaudado - Costo de Calzado/Compras - Gastos Operativos
+        const flujoNetoCalculado = Math.max(0, datosLiquidez.efectivoRecaudado - (datosLiquidez.costoMercaderia || 0) - datosLiquidez.totalGastos);
+        const esSaldoPersonalizado = datosLiquidez.efectivoPersonalizado !== '' && !isNaN(Number(datosLiquidez.efectivoPersonalizado));
+        const efectivoEfectivo = esSaldoPersonalizado
           ? Number(datosLiquidez.efectivoPersonalizado)
-          : datosLiquidez.efectivoRecaudado;
+          : flujoNetoCalculado;
 
         // Activo Líquido Inmediato para compras directas: Efectivo + Anticipos a proveedores ya entregados
         const activoLiquidoInmediato = efectivoEfectivo + (datosLiquidez.adelantosAProveedores || 0);
@@ -1341,45 +1406,109 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
 
             {/* 4 Tarjetas Operativas Clave */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              {/* 1. Efectivo en Caja / Bancos (Personalizable) */}
-              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Efectivo en Caja / Bancos
-                  </span>
-                  <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500">
-                    <DollarSign size={14} />
-                  </span>
-                </div>
-                <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                  ${efectivoEfectivo.toFixed(2)}
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
-                    <span>Recaudado mes: ${datosLiquidez.efectivoRecaudado.toFixed(2)}</span>
+              {/* 1. Efectivo en Caja / Bancos (Personalizable con Persistencia y Desglose) */}
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2.5 relative flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                      Efectivo en Caja / Bancos
+                    </span>
+                    <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500">
+                      <DollarSign size={14} />
+                    </span>
                   </div>
-                  {/* Input rápido para ajustar saldo bancario real si el usuario lo desea */}
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <input
-                      type="number"
-                      step="50"
-                      min="0"
-                      placeholder="Ajustar saldo real ($)"
-                      value={datosLiquidez.efectivoPersonalizado}
-                      onChange={(e) => setDatosLiquidez({ ...datosLiquidez, efectivoPersonalizado: e.target.value })}
-                      className="w-full text-[11px] px-2 py-1 bg-[var(--background)] border border-[var(--border)] rounded-lg font-mono focus:outline-none focus:border-emerald-500"
-                    />
-                    {datosLiquidez.efectivoPersonalizado !== '' && (
+
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                      ${efectivoEfectivo.toFixed(2)}
+                    </span>
+                    {esSaldoPersonalizado ? (
+                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                        Saldo Real Guardado
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25">
+                        Flujo Calculado
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Desglose de ingresos vs compras y egresos */}
+                  <div className="space-y-1 pt-1.5 text-[9.5px] border-t border-[var(--border)] mt-2">
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                      <span>(+) Cobrado de Clientes:</span>
+                      <span className="font-mono font-bold text-[var(--foreground)]">${datosLiquidez.efectivoRecaudado.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                      <span>(-) Costo Calzado / Compras:</span>
+                      <span className="font-mono font-bold text-orange-500">-${(datosLiquidez.costoMercaderia || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)]">
+                      <span>(-) Egresos del Local:</span>
+                      <span className="font-mono font-bold text-purple-600 dark:text-purple-400">-${datosLiquidez.totalGastos.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between font-bold pt-0.5 border-t border-[var(--border)]/50 text-[10px]">
+                      <span className="text-[var(--foreground)]">(=) Flujo Neto Estimado:</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                        ${flujoNetoCalculado.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Formulario para Ajustar y Guardar Saldo Real en Bancos / Caja Chica */}
+                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase">
+                      Ajustar Saldo Real en Banco / Caja:
+                    </label>
+                    {esSaldoPersonalizado && (
                       <button
                         type="button"
-                        onClick={() => setDatosLiquidez({ ...datosLiquidez, efectivoPersonalizado: '' })}
-                        className="text-[10px] text-[var(--muted-foreground)] hover:text-red-500 px-1 py-1"
-                        title="Restablecer a recaudado"
+                        onClick={handleRestablecerSaldo}
+                        className="text-[9px] text-[var(--muted-foreground)] hover:text-red-500 font-semibold flex items-center gap-0.5 cursor-pointer transition-colors"
+                        title="Restablecer al flujo neto calculado"
                       >
-                        <X size={12} />
+                        <RotateCcw size={10} />
+                        <span>Restablecer</span>
                       </button>
                     )}
                   </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)] font-mono">$</span>
+                      <input
+                        type="number"
+                        step="10"
+                        min="0"
+                        placeholder="Ej: 4500.00"
+                        value={tempEfectivoInput}
+                        onChange={(e) => setTempEfectivoInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleGuardarSaldoReal();
+                          }
+                        }}
+                        className="w-full text-xs pl-6 pr-2 py-1.5 bg-[var(--background)] border border-[var(--border)] rounded-lg font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGuardarSaldoReal}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shrink-0 shadow-xs"
+                      title="Guardar saldo real verificado en caja/bancos para esta sucursal"
+                    >
+                      <Check size={13} />
+                      <span>Guardar</span>
+                    </button>
+                  </div>
+                  <p className="text-[8.5px] text-[var(--muted-foreground)] leading-tight">
+                    {esSaldoPersonalizado
+                      ? 'Saldo real guardado para esta sucursal. Presiona restablecer para volver al cálculo.'
+                      : 'Ingresa el saldo real en banco o cajón y haz clic en Guardar.'}
+                  </p>
                 </div>
               </div>
 
