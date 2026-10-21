@@ -23,6 +23,7 @@ import {
   Layers,
   Award,
   Activity,
+  ShieldAlert,
 } from "lucide-react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "@/components/ui/toast";
@@ -51,7 +52,8 @@ export default function DashboardComponent({
   const isVendedor = userRole === "ROL_VENDEDOR";
 
   // Estados de Filtro y Datos
-  const [periodo, setPeriodo] = useState<"SEMANAL" | "MENSUAL" | "ANUAL">("MENSUAL");
+  type PeriodoDashboard = "HOY" | "SEMANAL" | "MENSUAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL";
+  const [periodo, setPeriodo] = useState<PeriodoDashboard>("MENSUAL");
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({
     totalFacturado: 0,
@@ -74,19 +76,27 @@ export default function DashboardComponent({
   const [topModelos, setTopModelos] = useState<{ id: string; nombre: string; marca: string; pares: number; total: number }[]>([]);
   const [comparativoSucursales, setComparativoSucursales] = useState<{ sucursalNombre: string; total: number; porcentaje: number }[]>([]);
 
-  // Índices Financieros de Liquidez Operativa (Admin General y Sucursal)
+  // Índices Financieros de Liquidez Operativa y Rentabilidad (Admin General y Sucursal)
   const [liquidezIndices, setLiquidezIndices] = useState<{
     razonLiquidez: number;
     pruebaAcida: number;
     capitalNetoCompra: number;
     deudaProveedores: number;
     gastosMes: number;
+    adelantosAProveedores: number;
+    utilidadNeta: number;
+    margenNetoPct: number;
+    costoMercaderia: number;
   }>({
     razonLiquidez: 1,
     pruebaAcida: 1,
     capitalNetoCompra: 0,
     deudaProveedores: 0,
     gastosMes: 0,
+    adelantosAProveedores: 0,
+    utilidadNeta: 0,
+    margenNetoPct: 0,
+    costoMercaderia: 0,
   });
 
   useEffect(() => {
@@ -181,7 +191,7 @@ export default function DashboardComponent({
             setComparativoSucursales([]);
           }
 
-          // Cargar datos complementarios para Índices Financieros de Liquidez Operativa
+          // Cargar datos complementarios para Índices Financieros de Liquidez Operativa y Rentabilidad
           try {
             const [prvs, gStats] = await Promise.all([
               ApiService.get('/proveedores').catch(() => []),
@@ -190,15 +200,26 @@ export default function DashboardComponent({
             const dProveedores = Array.isArray(prvs)
               ? prvs.reduce((acc: number, p: any) => acc + Number(p.saldoPendiente || 0), 0)
               : 0;
+            const adelantos = Array.isArray(prvs)
+              ? prvs.reduce((acc: number, p: any) => acc + Number(p.saldoAFavor || 0), 0)
+              : 0;
             const gMes = Number(gStats?.totalMonto || 0);
             const pasivoInmediato = dProveedores + gMes;
             const ingresos = Number(kpisBackend.totalIngresos || 0);
             const cartera = Number(kpisBackend.saldoCarteraTotal || 0);
-            const activoInmediato = ingresos + cartera;
+            const costoCalzado = Number(kpisBackend.costoEstimadoTotal || 0);
+
+            // Activo disponible inmediato sumando adelantos ya entregados a fabricantes
+            const activoInmediato = ingresos + cartera + adelantos;
 
             const ratio = pasivoInmediato > 0 ? Number((activoInmediato / pasivoInmediato).toFixed(2)) : (activoInmediato > 0 ? 3.0 : 1.0);
             const acida = pasivoInmediato > 0 ? Number((ingresos / pasivoInmediato).toFixed(2)) : (ingresos > 0 ? 2.5 : 1.0);
             const capNeto = activoInmediato - pasivoInmediato;
+
+            // Utilidad Neta Real = Total Ingresos - Costo Mercadería - Gastos Operativos
+            const gananciaBruta = Number(kpisBackend.gananciaBruta || (ingresos - costoCalzado));
+            const utilNeta = Math.round((gananciaBruta - gMes) * 100) / 100;
+            const margenNeto = ingresos > 0 ? Math.round((utilNeta / ingresos) * 1000) / 10 : 0;
 
             setLiquidezIndices({
               razonLiquidez: ratio,
@@ -206,6 +227,10 @@ export default function DashboardComponent({
               capitalNetoCompra: capNeto,
               deudaProveedores: dProveedores,
               gastosMes: gMes,
+              adelantosAProveedores: adelantos,
+              utilidadNeta: utilNeta,
+              margenNetoPct: margenNeto,
+              costoMercaderia: costoCalzado,
             });
           } catch (e) {
             console.warn('Error calculando índices de liquidez en dashboard:', e);
@@ -242,8 +267,31 @@ export default function DashboardComponent({
   const maxVentaChart = Math.max(...ventasChart.map((v) => v.monto), 1);
 
   // Metas dinámicas para los medidores de rendimiento
-  const metaPeriodo = periodo === "SEMANAL" ? 1500 : periodo === "MENSUAL" ? 6000 : 70000;
-  const metaPares = periodo === "SEMANAL" ? 40 : periodo === "MENSUAL" ? 160 : 1800;
+  const metaPeriodo =
+    periodo === "HOY"
+      ? 200
+      : periodo === "SEMANAL"
+      ? 1500
+      : periodo === "MENSUAL"
+      ? 6000
+      : periodo === "TRIMESTRAL"
+      ? 18000
+      : periodo === "SEMESTRAL"
+      ? 35000
+      : 70000;
+
+  const metaPares =
+    periodo === "HOY"
+      ? 6
+      : periodo === "SEMANAL"
+      ? 40
+      : periodo === "MENSUAL"
+      ? 160
+      : periodo === "TRIMESTRAL"
+      ? 480
+      : periodo === "SEMESTRAL"
+      ? 900
+      : 1800;
 
   const pctIngresos = Math.min(Math.round((kpis.totalFacturado / metaPeriodo) * 100), 100);
   const pctPares = Math.min(Math.round((kpis.totalParesVendidos / metaPares) * 100), 100);
@@ -299,19 +347,28 @@ export default function DashboardComponent({
               </span>
             )}
 
-            {/* Selector de Periodo */}
-            <div className="flex bg-slate-900/90 p-0.5 rounded-xl border border-slate-700">
-              {(["SEMANAL", "MENSUAL", "ANUAL"] as const).map((p) => (
+            {/* Selector de Periodo Ampliado: Hoy, Semana, Mes, Trimestre, Semestre, Año */}
+            <div className="flex bg-slate-900/90 p-0.5 rounded-xl border border-slate-700 overflow-x-auto scrollbar-none">
+              {(
+                [
+                  { id: "HOY", label: "Hoy" },
+                  { id: "SEMANAL", label: "Semana" },
+                  { id: "MENSUAL", label: "Mes" },
+                  { id: "TRIMESTRAL", label: "Trimestre" },
+                  { id: "SEMESTRAL", label: "Semestre" },
+                  { id: "ANUAL", label: "Año" },
+                ] as const
+              ).map((p) => (
                 <button
-                  key={p}
-                  onClick={() => setPeriodo(p)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                    periodo === p
-                      ? "bg-amber-500 text-slate-950 shadow-sm"
+                  key={p.id}
+                  onClick={() => setPeriodo(p.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    periodo === p.id
+                      ? "bg-amber-500 text-slate-950 shadow-sm font-black"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  {p === "SEMANAL" ? "Semanal" : p === "MENSUAL" ? "Mensual" : "Anual"}
+                  {p.label}
                 </button>
               ))}
             </div>
@@ -466,6 +523,90 @@ export default function DashboardComponent({
               <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Egresos Operativos</span>
               <span className="text-sm font-black text-slate-600 dark:text-slate-300 font-mono">${liquidezIndices.gastosMes.toFixed(2)}</span>
               <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Servicios y arriendos mes</span>
+            </div>
+          </div>
+
+          {/* KPI CONDICIONAL DE ANTICIPOS A PROVEEDORES: SÓLO APARECE SI SE TIENEN ADELANTOS DADOS */}
+          {liquidezIndices.adelantosAProveedores > 0 && (
+            <div className="p-2.5 bg-blue-500/10 border border-blue-500/25 rounded-xl flex items-center justify-between animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-lg bg-blue-500/20 text-blue-500">
+                  <ShieldAlert size={14} />
+                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase block">
+                    Anticipos Entregados a Talleres (Saldo a Favor)
+                  </span>
+                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                    Dinero ya adelantado a fabricantes que reduce tu deuda y cubre pedidos en confección
+                  </span>
+                </div>
+              </div>
+              <span className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
+                +${liquidezIndices.adelantosAProveedores.toFixed(2)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── TARJETA DE UTILIDAD NETA & GANANCIA OPERATIVA (ADMINS) ─── */}
+      {isAdmin && (
+        <div className="p-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-900 border border-slate-700/80 rounded-2xl shadow-md text-white space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                <DollarSign size={18} />
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-black text-white flex items-center gap-2">
+                  <span>Utilidad Neta & Rendimiento Operativo</span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {periodo === 'HOY' ? 'Día de Hoy' : periodo === 'SEMANAL' ? 'Esta Semana' : periodo === 'MENSUAL' ? 'Este Mes' : periodo === 'TRIMESTRAL' ? 'Trimestre' : periodo === 'SEMESTRAL' ? 'Semestre' : 'Año en Curso'}
+                  </span>
+                </h3>
+                <p className="text-[10px] text-slate-400">
+                  Ganancia neta real descontando costo de calzado a talleres y egresos operativos
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10px] text-slate-400 uppercase font-bold">Ganancia Neta:</span>
+              <span className={`text-xl sm:text-2xl font-black font-mono ${
+                liquidezIndices.utilidadNeta >= 0 ? 'text-emerald-400' : 'text-red-400'
+              }`}>
+                ${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
+              </span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                liquidezIndices.margenNetoPct >= 20 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+              }`}>
+                {liquidezIndices.margenNetoPct}% margen
+              </span>
+            </div>
+          </div>
+
+          {/* Desglose de Rentabilidad Operativa */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">(+) Ventas Brutas</span>
+              <span className="text-sm font-black text-white font-mono">${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5">{kpis.totalPedidos} transacciones</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">(-) Costo Calzado (COGS)</span>
+              <span className="text-sm font-black text-orange-400 font-mono">${liquidezIndices.costoMercaderia.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5">Pagado a fabricantes</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">(-) Gastos Operativos</span>
+              <span className="text-sm font-black text-blue-400 font-mono">${liquidezIndices.gastosMes.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
+              <span className="text-[9px] text-slate-400 block mt-0.5">Luz, arriendo, nómina</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <span className="text-[10px] text-emerald-400 font-bold uppercase block">(=) Utilidad Neta</span>
+              <span className="text-sm font-black text-emerald-300 font-mono">${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
+              <span className="text-[9px] text-emerald-400/80 block mt-0.5">Excedente real del negocio</span>
             </div>
           </div>
         </div>

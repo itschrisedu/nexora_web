@@ -221,12 +221,14 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
     efectivoRecaudado: number;
     saldoCartera: number;
     deudaProveedores: number;
+    adelantosAProveedores: number;
     totalGastos: number;
     simulacionMonto: string;
   }>({
     efectivoRecaudado: 0,
     saldoCartera: 0,
     deudaProveedores: 0,
+    adelantosAProveedores: 0,
     totalGastos: 0,
     simulacionMonto: '500',
   });
@@ -343,6 +345,9 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
         const totalDeudaProveedores = Array.isArray(proveedoresRes)
           ? proveedoresRes.reduce((acc: number, p: any) => acc + Number(p.saldoPendiente || 0), 0)
           : 0;
+        const totalAdelantosProveedores = Array.isArray(proveedoresRes)
+          ? proveedoresRes.reduce((acc: number, p: any) => acc + Number(p.saldoAFavor || 0), 0)
+          : 0;
         const totalRecaudado = Number(reporteRes?.kpis?.totalIngresos || 0);
         const saldoCartera = Number(reporteRes?.kpis?.saldoCarteraTotal || 0);
         const totalGastosMes = Number(statsRes?.totalMonto || 0);
@@ -352,6 +357,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
           efectivoRecaudado: totalRecaudado,
           saldoCartera: saldoCartera,
           deudaProveedores: totalDeudaProveedores,
+          adelantosAProveedores: totalAdelantosProveedores,
           totalGastos: totalGastosMes,
         }));
 
@@ -1252,7 +1258,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
       {/* VISTA 4: ÍNDICES FINANCIEROS & LIQUIDEZ OPERATIVA (ADMINS)       */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {vista === 'INDICES_FINANCIEROS' && (() => {
-        const activoCirculanteDisponible = datosLiquidez.efectivoRecaudado + datosLiquidez.saldoCartera;
+        const activoCirculanteDisponible = datosLiquidez.efectivoRecaudado + datosLiquidez.saldoCartera + (datosLiquidez.adelantosAProveedores || 0);
         const pasivoCortoPlazo = datosLiquidez.deudaProveedores + datosLiquidez.totalGastos;
         
         const razonCorriente = pasivoCortoPlazo > 0
@@ -1375,10 +1381,32 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                   ${activoCirculanteDisponible.toFixed(2)}
                 </div>
                 <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
-                  Recaudación en caja (${datosLiquidez.efectivoRecaudado.toFixed(2)}) + Cartera exigible de clientes (${datosLiquidez.saldoCartera.toFixed(2)}).
+                  Recaudación en caja (${datosLiquidez.efectivoRecaudado.toFixed(2)}) + Cartera exigible de clientes (${datosLiquidez.saldoCartera.toFixed(2)})${datosLiquidez.adelantosAProveedores > 0 ? ` + Anticipos a talleres ($${datosLiquidez.adelantosAProveedores.toFixed(2)})` : ''}.
                 </p>
               </div>
             </div>
+
+            {/* KPI CONDICIONAL DE ANTICIPOS A PROVEEDORES: SÓLO APARECE SI SE TIENEN ADELANTOS DADOS */}
+            {datosLiquidez.adelantosAProveedores > 0 && (
+              <div className="p-3 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex items-center justify-between animate-in fade-in shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-xl bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                    <ShieldAlert size={16} />
+                  </span>
+                  <div>
+                    <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase block tracking-wider">
+                      Anticipos Entregados a Talleres (Saldo a Favor)
+                    </span>
+                    <span className="text-[11px] text-[var(--muted-foreground)]">
+                      Adelantos entregados a fabricantes que amortizan cuentas por pagar y respaldan pedidos en confección
+                    </span>
+                  </div>
+                </div>
+                <span className="text-base font-black text-blue-600 dark:text-blue-400 font-mono">
+                  +${datosLiquidez.adelantosAProveedores.toFixed(2)}
+                </span>
+              </div>
+            )}
 
             {/* Panel de Viabilidad Operativa y Recomendación para Compra de Pedidos */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

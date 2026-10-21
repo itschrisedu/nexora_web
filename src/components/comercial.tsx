@@ -192,7 +192,11 @@ export default function ComercialComponent({
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [filtroEstado, setFiltroEstado] = useState<EstadoPedido | 'TODOS'>('TODOS');
+  // Estados Canónicos de la Tesis (4 Estados) + Botón de Acceso Rápido 'TODOS'
+  type EstadoTesis = 'PENDIENTE' | 'EN_PREPARACION' | 'ENTREGADO' | 'CANCELADO';
+  const [filtroEstadoTesis, setFiltroEstadoTesis] = useState<'TODOS' | EstadoTesis>('TODOS');
+  const [subFiltroPrep, setSubFiltroPrep] = useState<'TODOS_PREP' | 'EN_PREPARACION' | 'EN_ESPERA_STOCK'>('TODOS_PREP');
+  const [subFiltroEntrega, setSubFiltroEntrega] = useState<'TODOS_ENTREGADOS' | 'ENTREGADO' | 'ENTREGADO_PARCIAL'>('TODOS_ENTREGADOS');
   const [selectedSucursalPedidoId, setSelectedSucursalPedidoId] = useState<string>(() => {
     if (activeSucursalId && activeSucursalId !== 'TODAS') return activeSucursalId;
     if (typeof window !== 'undefined') {
@@ -232,7 +236,7 @@ export default function ComercialComponent({
     );
     if (pedidoEncontrado) {
       setPedidoExpandidoId(pedidoEncontrado.id);
-      setFiltroEstado('TODOS');
+      setFiltroEstadoTesis('TODOS');
       try {
         localStorage.removeItem('comercial_selected_pedido_id');
       } catch (e) {}
@@ -2654,13 +2658,26 @@ export default function ComercialComponent({
 
   const pedidosFiltrados = useMemo(() => {
     return pedidosDeSucursal.filter((p) => {
-      // 1. Filtro por estado
-      if (filtroEstado !== 'TODOS' && p.estado !== filtroEstado) {
+      // 1. Filtro por los 4 Estados Canónicos de la Tesis o Acceso Rápido 'TODOS'
+      if (filtroEstadoTesis === 'PENDIENTE' && p.estado !== 'PENDIENTE') {
+        return false;
+      }
+      if (filtroEstadoTesis === 'EN_PREPARACION') {
+        if (subFiltroPrep === 'EN_PREPARACION' && p.estado !== 'EN_PREPARACION') return false;
+        if (subFiltroPrep === 'EN_ESPERA_STOCK' && p.estado !== 'EN_ESPERA_STOCK') return false;
+        if (subFiltroPrep === 'TODOS_PREP' && p.estado !== 'EN_PREPARACION' && p.estado !== 'EN_ESPERA_STOCK') return false;
+      }
+      if (filtroEstadoTesis === 'ENTREGADO') {
+        if (subFiltroEntrega === 'ENTREGADO' && p.estado !== 'ENTREGADO') return false;
+        if (subFiltroEntrega === 'ENTREGADO_PARCIAL' && p.estado !== 'ENTREGADO_PARCIAL') return false;
+        if (subFiltroEntrega === 'TODOS_ENTREGADOS' && p.estado !== 'ENTREGADO' && p.estado !== 'ENTREGADO_PARCIAL') return false;
+      }
+      if (filtroEstadoTesis === 'CANCELADO' && p.estado !== 'CANCELADO') {
         return false;
       }
 
-      // 2. Filtro por fecha: aplica en 'TODOS' y 'ENTREGADO' cuando no está activo verTodoElHistorial
-      const aplicaFiltroFecha = (filtroEstado === 'TODOS' || filtroEstado === 'ENTREGADO') && !verTodoElHistorial;
+      // 2. Filtro por fecha: aplica en Acceso Rápido 'TODOS' y en Estado 'ENTREGADO' cuando no está activo verTodoElHistorial
+      const aplicaFiltroFecha = (filtroEstadoTesis === 'TODOS' || filtroEstadoTesis === 'ENTREGADO') && !verTodoElHistorial;
       if (aplicaFiltroFecha) {
         const raw = (p as any).fecha || p.createdAt;
         const fechaP = raw ? raw.split('T')[0] : '';
@@ -2672,7 +2689,7 @@ export default function ComercialComponent({
 
       return true;
     });
-  }, [pedidosDeSucursal, filtroEstado, filtroFechaDesde, filtroFechaHasta, verTodoElHistorial]);
+  }, [pedidosDeSucursal, filtroEstadoTesis, subFiltroPrep, subFiltroEntrega, filtroFechaDesde, filtroFechaHasta, verTodoElHistorial]);
 
   const getNumeroPedido = (p: Pedido, index?: number) => {
     if (p.numeroCodigo) return p.numeroCodigo;
@@ -2799,42 +2816,193 @@ export default function ComercialComponent({
           </div>
         )}
 
-        {/* Filtros de Estado: autoajustables en la siguiente línea */}
-        <div className="flex flex-wrap items-center gap-1.5 w-full pt-0.5">
-          <button
-            onClick={() => setFiltroEstado('TODOS')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              filtroEstado === 'TODOS'
-                ? 'bg-[#0F172A] text-white shadow-xs'
-                : 'bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            Todos ({pedidosDeSucursal.length})
-          </button>
-          {(['PENDIENTE', 'EN_PREPARACION', 'EN_ESPERA_STOCK', 'ENTREGADO_PARCIAL', 'ENTREGADO', 'CANCELADO'] as EstadoPedido[]).map((st) => {
-            const cfg = ESTADO_CONFIG[st];
-            const count = pedidosDeSucursal.filter((p) => p.estado === st).length;
-            const active = filtroEstado === st;
-            return (
-              <button
-                key={st}
-                onClick={() => setFiltroEstado(st)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                  active
-                    ? `${cfg.color} shadow-xs font-black`
-                    : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                }`}
-              >
-                {cfg.icon}
-                <span>{cfg.label}</span>
-                <span className="text-[10px] opacity-75">({count})</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Conteo de los 4 Estados Canónicos de la Tesis */}
+        {(() => {
+          const countPendiente = pedidosDeSucursal.filter((p) => p.estado === 'PENDIENTE').length;
+          const countEnPreparacion = pedidosDeSucursal.filter((p) => p.estado === 'EN_PREPARACION' || p.estado === 'EN_ESPERA_STOCK').length;
+          const countPrepDirecta = pedidosDeSucursal.filter((p) => p.estado === 'EN_PREPARACION').length;
+          const countEnEsperaStock = pedidosDeSucursal.filter((p) => p.estado === 'EN_ESPERA_STOCK').length;
+          const countEntregado = pedidosDeSucursal.filter((p) => p.estado === 'ENTREGADO' || p.estado === 'ENTREGADO_PARCIAL').length;
+          const countEntregaTotal = pedidosDeSucursal.filter((p) => p.estado === 'ENTREGADO').length;
+          const countEntregaParcial = pedidosDeSucursal.filter((p) => p.estado === 'ENTREGADO_PARCIAL').length;
+          const countCancelado = pedidosDeSucursal.filter((p) => p.estado === 'CANCELADO').length;
 
-        {/* Componente de Filtro de Rango de Fechas para 'ENTREGADO' y 'TODOS' */}
-        {(filtroEstado === 'TODOS' || filtroEstado === 'ENTREGADO') && (
+          return (
+            <>
+              {/* Barra Superior: Acceso Rápido + Estados Canónicos del Flujo (Tesis) */}
+              <div className="flex flex-wrap items-center gap-3 w-full pt-0.5">
+                {/* 1. MÓDULO DE ACCESO RÁPIDO (Atajo operativo, no es un estado del ciclo) */}
+                <div className="flex items-center gap-1.5 p-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs">
+                  <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] px-2 tracking-wider hidden sm:inline">
+                    Acceso Rápido:
+                  </span>
+                  <button
+                    type="button"
+                    title="Atajo de acceso rápido para consultar todos los pedidos sin restricción de estado"
+                    onClick={() => setFiltroEstadoTesis('TODOS')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      filtroEstadoTesis === 'TODOS'
+                        ? 'bg-[#0F172A] text-white shadow-xs font-black ring-2 ring-slate-400/40'
+                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/50'
+                    }`}
+                  >
+                    <Layers size={13} className={filtroEstadoTesis === 'TODOS' ? 'text-amber-400' : 'text-slate-400'} />
+                    <span>Todos</span>
+                    <span className="text-[10px] opacity-80 font-mono font-normal">({pedidosDeSucursal.length})</span>
+                  </button>
+                </div>
+
+                {/* Separador Visual */}
+                <div className="h-6 w-px bg-[var(--border)] hidden lg:block" />
+
+                {/* 2. LOS 4 ESTADOS CANÓNICOS DEL CICLO (ALINEADOS A LA TESIS) */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] px-1 tracking-wider hidden md:inline">
+                    Estados del Ciclo:
+                  </span>
+
+                {/* 1. ESTADO PENDIENTE */}
+                <button
+                  type="button"
+                  onClick={() => setFiltroEstadoTesis('PENDIENTE')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    filtroEstadoTesis === 'PENDIENTE'
+                      ? 'bg-amber-500/15 text-amber-600 border-amber-500/30 shadow-xs font-black'
+                      : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <Clock size={12} className="text-amber-500" />
+                  <span>1. Pendiente</span>
+                  <span className="text-[10px] opacity-80 font-mono">({countPendiente})</span>
+                </button>
+
+                {/* 2. ESTADO EN PREPARACIÓN */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroEstadoTesis('EN_PREPARACION');
+                    setSubFiltroPrep('TODOS_PREP');
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    filtroEstadoTesis === 'EN_PREPARACION'
+                      ? 'bg-blue-500/15 text-blue-600 border-blue-500/30 shadow-xs font-black'
+                      : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <ShoppingBag size={12} className="text-blue-500" />
+                  <span>2. En Preparación</span>
+                  <span className="text-[10px] opacity-80 font-mono">({countEnPreparacion})</span>
+                </button>
+
+                {/* 3. ESTADO ENTREGADO */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroEstadoTesis('ENTREGADO');
+                    setSubFiltroEntrega('TODOS_ENTREGADOS');
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    filtroEstadoTesis === 'ENTREGADO'
+                      ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30 shadow-xs font-black'
+                      : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <CheckCircle size={12} className="text-emerald-500" />
+                  <span>3. Entregado</span>
+                  <span className="text-[10px] opacity-80 font-mono">({countEntregado})</span>
+                </button>
+
+                {/* 4. ESTADO CANCELADO */}
+                <button
+                  type="button"
+                  onClick={() => setFiltroEstadoTesis('CANCELADO')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    filtroEstadoTesis === 'CANCELADO'
+                      ? 'bg-red-500/15 text-red-600 border-red-500/30 shadow-xs font-black'
+                      : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <XCircle size={12} className="text-red-500" />
+                  <span>4. Cancelado</span>
+                  <span className="text-[10px] opacity-80 font-mono">({countCancelado})</span>
+                </button>
+              </div>
+            </div>
+
+              {/* Sub-filtros Operativos Dinámicos para 'EN_PREPARACION' */}
+              {filtroEstadoTesis === 'EN_PREPARACION' && (
+                <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-blue-500/5 border border-blue-500/20 rounded-xl text-xs mt-1 animate-in fade-in">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider px-1">Fase operativa:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSubFiltroPrep('TODOS_PREP')}
+                    className={`px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                      subFiltroPrep === 'TODOS_PREP' ? 'bg-blue-600 text-white font-bold shadow-2xs' : 'text-blue-700/80 hover:bg-blue-500/10'
+                    }`}
+                  >
+                    Todos en fase ({countEnPreparacion})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSubFiltroPrep('EN_PREPARACION')}
+                    className={`px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                      subFiltroPrep === 'EN_PREPARACION' ? 'bg-blue-600 text-white font-bold shadow-2xs' : 'text-blue-700/80 hover:bg-blue-500/10'
+                    }`}
+                  >
+                    En Taller / Alistamiento ({countPrepDirecta})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSubFiltroPrep('EN_ESPERA_STOCK')}
+                    className={`px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                      subFiltroPrep === 'EN_ESPERA_STOCK' ? 'bg-purple-600 text-white font-bold shadow-2xs' : 'text-purple-700/80 hover:bg-purple-500/10'
+                    }`}
+                  >
+                    En Espera de Stock ({countEnEsperaStock})
+                  </button>
+                </div>
+              )}
+
+              {/* Sub-filtros Operativos Dinámicos para 'ENTREGADO' */}
+              {filtroEstadoTesis === 'ENTREGADO' && (
+                <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-xs mt-1 animate-in fade-in">
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider px-1">Fase de entrega:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSubFiltroEntrega('TODOS_ENTREGADOS')}
+                    className={`px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                      subFiltroEntrega === 'TODOS_ENTREGADOS' ? 'bg-emerald-600 text-white font-bold shadow-2xs' : 'text-emerald-700/80 hover:bg-emerald-500/10'
+                    }`}
+                  >
+                    Todos entregados ({countEntregado})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSubFiltroEntrega('ENTREGADO')}
+                    className={`px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                      subFiltroEntrega === 'ENTREGADO' ? 'bg-emerald-600 text-white font-bold shadow-2xs' : 'text-emerald-700/80 hover:bg-emerald-500/10'
+                    }`}
+                  >
+                    Entrega Completa ({countEntregaTotal})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSubFiltroEntrega('ENTREGADO_PARCIAL')}
+                    className={`px-2.5 py-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                      subFiltroEntrega === 'ENTREGADO_PARCIAL' ? 'bg-cyan-600 text-white font-bold shadow-2xs' : 'text-cyan-700/80 hover:bg-cyan-500/10'
+                    }`}
+                  >
+                    Entrega Parcial ({countEntregaParcial})
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
+      </div>
+
+      {/* Componente de Filtro de Rango de Fechas para 'ENTREGADO' y Acceso Rápido 'TODOS' */}
+      {(filtroEstadoTesis === 'TODOS' || filtroEstadoTesis === 'ENTREGADO') && (
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs mt-1">
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--foreground)] mr-1">
@@ -2919,7 +3087,6 @@ export default function ComercialComponent({
             </div>
           </div>
         )}
-      </div>
 
       {/* Banner Informativo de Visibilidad Inter-Sucursal Restringida (Fase 2B) */}
       {(() => {
