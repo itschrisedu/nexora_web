@@ -1311,7 +1311,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                     <span>Solvencia Operativa & Disponibilidad de Capital</span>
                   </h3>
                   <p className="text-xs text-[var(--muted-foreground)] max-w-2xl leading-relaxed">
-                    Evaluación real integrando efectivo en caja/bancos, anticipos entregados a talleres y mercadería en bodega para decidir órdenes de confección sin descapitalizarte.
+                    Evaluación real integrando efectivo en caja/bancos, anticipos a proveedores y mercadería en bodega para decidir órdenes de calzado sin descapitalizar el local.
                   </p>
                 </div>
 
@@ -1401,11 +1401,11 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                 </p>
               </div>
 
-              {/* 3. Anticipos Entregados a Talleres (Saldo a Favor) */}
+              {/* 3. Anticipos a Proveedores (Saldo a Favor) */}
               <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Anticipos a Talleres (A Favor)
+                    Anticipos a Proveedores (A Favor)
                   </span>
                   <span className="p-1 rounded-lg bg-indigo-500/10 text-indigo-500">
                     <ShieldAlert size={14} />
@@ -1415,11 +1415,11 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                   +${datosLiquidez.adelantosAProveedores.toFixed(2)}
                 </div>
                 <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
-                  Dinero ya entregado a fabricantes que cubre y amortiza pedidos de calzado en confección.
+                  Dinero ya entregado a proveedores que cubre y amortiza pedidos de calzado en confección.
                 </p>
               </div>
 
-              {/* 4. Compromisos a Pagar (Talleres + Gastos) */}
+              {/* 4. Compromisos a Pagar (Proveedores + Gastos) */}
               <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2 relative">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
@@ -1433,7 +1433,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                   ${compromisosInmediatos.toFixed(2)}
                 </div>
                 <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
-                  Deuda a talleres (${datosLiquidez.deudaProveedores.toFixed(2)}) + Gastos del mes (${datosLiquidez.totalGastos.toFixed(2)}).
+                  Deuda a proveedores (${datosLiquidez.deudaProveedores.toFixed(2)}) + Gastos del mes (${datosLiquidez.totalGastos.toFixed(2)}).
                 </p>
               </div>
             </div>
@@ -1445,7 +1445,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                     <Activity size={16} className="text-emerald-500" />
-                    <span>Diagnóstico Operativo para Mandar a Confeccionar Calzado</span>
+                    <span>Diagnóstico Operativo para Pedidos de Calzado</span>
                   </h4>
                   <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
                     Guía de Decisión
@@ -1459,7 +1459,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                       <span>CAPACIDAD DE COMPRA EXCELENTE</span>
                     </div>
                     <p className="text-xs leading-relaxed">
-                      El negocio cuenta con <strong>${capitalNetoCompras.toFixed(2)}</strong> de efectivo líquido libre. Puedes contratar nuevos lotes de calzado con talleres artesanales de Cevallos sin riesgo financiero para el sostenimiento del local.
+                      El negocio cuenta con <strong>${capitalNetoCompras.toFixed(2)}</strong> de efectivo líquido libre. Puedes contratar nuevos lotes de calzado con proveedores sin riesgo financiero para el sostenimiento del local.
                     </p>
                   </div>
                 ) : capitalNetoCompras >= 0 ? (
@@ -1495,7 +1495,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                       <span className="font-bold font-mono">${efectivoEfectivo.toFixed(2)}</span>
                     </div>
                     <div>
-                      <span className="text-[var(--muted-foreground)] block">(+) Anticipos Talleres</span>
+                      <span className="text-[var(--muted-foreground)] block">(+) Anticipos Proveedores</span>
                       <span className="font-bold font-mono text-indigo-500">+${(datosLiquidez.adelantosAProveedores || 0).toFixed(2)}</span>
                     </div>
                     <div>
@@ -1523,7 +1523,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
 
                   <div className="mt-3 space-y-1.5">
                     <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                      Monto a confeccionar con el taller ($ USD):
+                      Monto del pedido al proveedor ($ USD):
                     </label>
                     <div className="flex items-center gap-1.5 bg-[var(--background)] border border-[var(--border)] px-3 py-2 rounded-xl">
                       <DollarSign size={14} className="text-slate-400" />
@@ -1576,7 +1576,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                       </div>
                       <p className="text-[11px] leading-relaxed">
                         {esFactible ? (
-                          <span>Tu efectivo libre cubre el pedido a talleres. Te quedará un saldo disponible de <strong>${saldoRestante.toFixed(2)}</strong>.</span>
+                          <span>Tu efectivo libre cubre el pedido a proveedores. Te quedará un saldo disponible de <strong>${saldoRestante.toFixed(2)}</strong>.</span>
                         ) : (
                           <span>Para no descapitalizarte, solicita al cliente un anticipo de mínimo <strong>${anticipoSugerido.toFixed(2)}</strong> ({Math.round((anticipoSugerido / (montoSim || 1)) * 100)}%).</span>
                         )}

@@ -1744,7 +1744,7 @@ export function generarReporteRendimientoSucursalesPdf(data: ReporteRendimientoS
 }
 
 // ══════════════════════════════════════════════════════════════
-// 11. REPORTE DE ABASTECIMIENTO DE TALLERES & PROVEEDORES
+// 11. REPORTE DE ABASTECIMIENTO & PROVEEDORES
 // ══════════════════════════════════════════════════════════════
 
 export interface ProveedorAbastecimientoReporte {
@@ -1788,7 +1788,7 @@ export function generarReporteAbastecimientoPdf(data: ReporteAbastecimientoData)
   let y = dibujarEncabezado(
     doc,
     data.negocio,
-    'REPORTE DE ABASTECIMIENTO & TALLERES',
+    'REPORTE DE ABASTECIMIENTO & PROVEEDORES',
     data.periodo,
     data.fechaGeneracion
   );
@@ -1831,11 +1831,11 @@ export function generarReporteAbastecimientoPdf(data: ReporteAbastecimientoData)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text('1. RELACIÓN DE COMPRAS Y ESTADO DE CUENTA POR TALLER DE CALZADO', marginLeft, y);
+  doc.text('1. RELACIÓN DE COMPRAS Y ESTADO DE CUENTA POR PROVEEDOR', marginLeft, y);
   y += 4.5;
 
   const colW = [8, 48, 24, 20, 26, 26, 30];
-  const headers = ['#', 'Taller / Fabricante', 'RUC / Identif.', 'Lotes', 'Total Comprado', 'Saldo a Pagar', 'Estado'];
+  const headers = ['#', 'Proveedor', 'RUC / Identif.', 'Lotes', 'Total Comprado', 'Saldo a Pagar', 'Estado'];
 
   doc.setFillColor(15, 23, 42);
   doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
@@ -1855,7 +1855,7 @@ export function generarReporteAbastecimientoPdf(data: ReporteAbastecimientoData)
     doc.rect(marginLeft, y, contentWidth, 8, 'F');
     doc.setTextColor(148, 163, 184);
     doc.setFont('helvetica', 'normal');
-    doc.text('No se registran compras ni talleres en el periodo consultado.', marginLeft + 4, y + 5);
+    doc.text('No se registran compras ni proveedores en el periodo consultado.', marginLeft + 4, y + 5);
     y += 8;
   } else {
     provs.forEach((p, idx) => {
@@ -1910,6 +1910,6 @@ export function generarReporteAbastecimientoPdf(data: ReporteAbastecimientoData)
     });
   }
 
-  dibujarPie(doc, 'Reporte de Abastecimiento & Talleres — Sistema Comercial');
+  dibujarPie(doc, 'Reporte de Abastecimiento & Proveedores — Sistema Comercial');
   return doc;
 }

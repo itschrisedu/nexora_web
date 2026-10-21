@@ -4150,12 +4150,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               </div>
                             )}
 
-                            {/* Observación para taller (editable al modificar la orden) */}
+                            {/* Observación para proveedor (editable al modificar la orden) */}
                             <div className="mt-2.5 pt-2 border-t border-[var(--border)]/40" onClick={(e) => e.stopPropagation()}>
                               {editingOrder ? (
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 shrink-0">
-                                    📝 Observación para taller:
+                                    📝 Observación para proveedor:
                                   </span>
                                   <input
                                     type="text"
@@ -4178,7 +4178,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   if (!obsLimpia) return null;
                                   return (
                                     <div className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                                      <span className="font-bold">📝 Observación taller:</span>
+                                      <span className="font-bold">📝 Observación proveedor:</span>
                                       <span className="italic font-medium">{obsLimpia}</span>
                                     </div>
                                   );
@@ -5942,7 +5942,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Registrar Nuevo Proveedor</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Taller de fabricación o curtiduría de calzado</p>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Proveedor de calzado o insumos</p>
                 </div>
               </div>
 
@@ -6045,7 +6045,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Nombre Comercial / Taller
+                  Nombre Comercial / Proveedor
                 </label>
                 <input
                   type="text"
@@ -6088,7 +6088,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Dirección de Taller / Fábrica (Opcional)
+                  Dirección del Proveedor (Opcional)
                 </label>
                 <input
                   type="text"
@@ -6157,7 +6157,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {[
                             'Saldo anterior pendiente',
-                            'Arrastre de libreta de taller',
+                            'Arrastre de libreta anterior',
                             'Entrega previa sin liquidar',
                             'Cheque / pagaré comercial',
                           ].map((sug) => (
@@ -6336,7 +6336,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Dirección de Taller / Fábrica
+                  Dirección del Proveedor
                 </label>
                 <input
                   type="text"
@@ -6405,7 +6405,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {[
                             'Saldo anterior pendiente',
-                            'Arrastre de libreta de taller',
+                            'Arrastre de libreta anterior',
                             'Entrega previa sin liquidar',
                             'Cheque / pagaré comercial',
                           ].map((sug) => (

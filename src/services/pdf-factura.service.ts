@@ -554,7 +554,7 @@ export async function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): Promis
 
   y += 38;
 
-  // ── 2. Datos del Proveedor / Taller de Producción ──
+  // ── 2. Datos del Proveedor ──
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(12, y, pageWidth - 24, 23, 1.5, 1.5, "FD");
@@ -562,7 +562,7 @@ export async function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): Promis
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(51, 65, 85);
-  doc.text("DESTINATARIO / TALLER DE PRODUCCIÓN", 16, y + 5);
+  doc.text("DESTINATARIO / PROVEEDOR", 16, y + 5);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -805,7 +805,7 @@ export async function generarOrdenCompraPdfDoc(data: OrdenCompraPdfData): Promis
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   doc.text("Autorizado por (Comprador)", 50, y + 12, { align: "center" });
-  doc.text("Recibido y Conforme (Proveedor / Taller)", pageWidth - 50, y + 12, { align: "center" });
+  doc.text("Recibido y Conforme (Proveedor)", pageWidth - 50, y + 12, { align: "center" });
 
   // Pie de Página
   y += 18;

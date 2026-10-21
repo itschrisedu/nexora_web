@@ -398,7 +398,7 @@ export default function ReportesComponent({
       }
     } catch (err: any) {
       console.warn('Error al cargar reporte de abastecimiento:', err);
-      showToast('Error al obtener reporte de abastecimiento de talleres.', 'warning');
+      showToast('Error al obtener reporte de abastecimiento de proveedores.', 'warning');
     } finally {
       setLoadingProveedores(false);
     }
@@ -772,11 +772,11 @@ export default function ReportesComponent({
         proveedores: (proveedoresData.porProveedor || []) as ProveedorAbastecimientoReporte[],
       });
 
-      const nombre = `reporte_abastecimiento_talleres_${new Date().toISOString().split('T')[0]}.pdf`;
+      const nombre = `reporte_abastecimiento_proveedores_${new Date().toISOString().split('T')[0]}.pdf`;
 
       if (modo === 'preview') {
         setPdfDocPreview(doc);
-        setPreviewTitulo('Reporte de Abastecimiento & Talleres');
+        setPreviewTitulo('Reporte de Abastecimiento & Proveedores');
         setPreviewNombreArchivo(nombre);
         setPreviewModalOpen(true);
       } else {
@@ -1037,7 +1037,7 @@ export default function ReportesComponent({
           { id: 'cobranzas' as TabReporte, label: 'Cobranzas & Clientes Deudores', icon: <Receipt size={15} /> },
           { id: 'campanas' as TabReporte, label: 'Rendimiento de Campañas & Promos', icon: <Megaphone size={15} /> },
           { id: 'finanzas' as TabReporte, label: 'Finanzas & Métodos de Pago', icon: <DollarSign size={15} /> },
-          { id: 'proveedores' as TabReporte, label: 'Abastecimiento & Talleres', icon: <Package size={15} /> },
+          { id: 'proveedores' as TabReporte, label: 'Abastecimiento & Proveedores', icon: <Package size={15} /> },
           { id: 'proyeccion_ml' as TabReporte, label: 'Proyección IA / Machine Learning', icon: <BrainCircuit size={15} /> },
         ].map((tab) => (
           <button
@@ -3227,10 +3227,10 @@ export default function ReportesComponent({
                   </div>
                   <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
                     <Package size={18} className="text-emerald-600" />
-                    <span>Reporte de Abastecimiento & Talleres de Calzado</span>
+                    <span>Reporte de Abastecimiento & Proveedores</span>
                   </h3>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    Control de compras a fabricantes artesanales de Cevallos, lotes de calzado recibidos, anticipos entregados y cuentas pendientes.
+                    Control de compras a proveedores de calzado, lotes recibidos, anticipos entregados y cuentas pendientes del local.
                   </p>
                 </div>
 
@@ -3260,7 +3260,7 @@ export default function ReportesComponent({
               {loadingProveedores ? (
                 <div className="p-12 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl flex flex-col items-center justify-center gap-2">
                   <Loader2 size={24} className="animate-spin text-emerald-600" />
-                  <span>Cargando datos de abastecimiento de talleres...</span>
+                  <span>Cargando datos de abastecimiento de proveedores...</span>
                 </div>
               ) : proveedoresData ? (
                 <>
@@ -3268,7 +3268,7 @@ export default function ReportesComponent({
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                     <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
                       <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
-                        Total Comprado a Talleres
+                        Total Comprado a Proveedores
                       </span>
                       <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
                         ${Number(proveedoresData.kpis?.totalComprado || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
@@ -3280,13 +3280,13 @@ export default function ReportesComponent({
 
                     <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-1">
                       <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase tracking-wider block">
-                        Deuda Pendiente a Talleres
+                        Deuda Pendiente a Proveedores
                       </span>
                       <div className="text-2xl font-black font-mono text-orange-500">
                         ${Number(proveedoresData.kpis?.deudaTotal || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
                       </div>
                       <span className="text-[10px] text-[var(--muted-foreground)] block">
-                        Cuentas por pagar a fabricantes
+                        Cuentas por pagar del local a proveedores
                       </span>
                     </div>
 
@@ -3298,7 +3298,7 @@ export default function ReportesComponent({
                         +${Number(proveedoresData.kpis?.anticiposTotal || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
                       </div>
                       <span className="text-[10px] text-[var(--muted-foreground)] block">
-                        Dinero adelantado p/ confección
+                        Dinero adelantado a proveedores
                       </span>
                     </div>
 
@@ -3310,20 +3310,20 @@ export default function ReportesComponent({
                         ${Number(proveedoresData.kpis?.montoDevoluciones || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })}
                       </div>
                       <span className="text-[10px] text-[var(--muted-foreground)] block">
-                        {proveedoresData.kpis?.totalDevoluciones || 0} pares con observación de fábrica
+                        {proveedoresData.kpis?.totalDevoluciones || 0} pares con observación de proveedor
                       </span>
                     </div>
                   </div>
 
-                  {/* Tabla de Talleres y Fabricantes */}
+                  {/* Tabla de Proveedores */}
                   <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
                       <div>
                         <h4 className="text-sm font-bold text-[var(--foreground)]">
-                          Relación de Talleres Artesanales & Estado de Cuenta
+                          Relación de Proveedores & Estado de Cuenta
                         </h4>
                         <p className="text-[11px] text-[var(--muted-foreground)]">
-                          {(proveedoresData.porProveedor || []).length} talleres registrados en el cantón Cevallos y la región
+                          {(proveedoresData.porProveedor || []).length} proveedores registrados del local
                         </p>
                       </div>
 
@@ -3332,7 +3332,7 @@ export default function ReportesComponent({
                         <div className="relative">
                           <input
                             type="text"
-                            placeholder="Buscar taller o RUC..."
+                            placeholder="Buscar proveedor o RUC..."
                             value={filtroProveedorBusqueda}
                             onChange={(e) => setFiltroProveedorBusqueda(e.target.value)}
                             className="text-xs px-3 py-1.5 pl-8 bg-[var(--background)] border border-[var(--border)] rounded-xl w-48 focus:outline-none focus:border-emerald-500"
@@ -3358,7 +3358,7 @@ export default function ReportesComponent({
                       <table className="w-full text-xs text-left">
                         <thead>
                           <tr className="border-b border-[var(--border)] text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                            <th className="py-2.5 px-3">Taller / Fabricante</th>
+                            <th className="py-2.5 px-3">Proveedor</th>
                             <th className="py-2.5 px-3">RUC / Cédula</th>
                             <th className="py-2.5 px-3">Ubicación</th>
                             <th className="py-2.5 px-3 text-center">Lotes Recibidos</th>
@@ -3460,7 +3460,7 @@ export default function ReportesComponent({
                 </>
               ) : (
                 <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-3xl">
-                  Selecciona la pestaña para consultar el abastecimiento de talleres.
+                  Selecciona la pestaña para consultar el abastecimiento de proveedores.
                 </div>
               )}
             </div>

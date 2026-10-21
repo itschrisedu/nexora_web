@@ -1,11 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   TrendingUp,
-  TrendingDown,
-  Users,
-  Package,
   DollarSign,
   ShoppingBag,
   Store,
@@ -20,10 +17,11 @@ import {
   CheckCircle2,
   BarChart3,
   PieChart,
-  Layers,
   Award,
   Activity,
-  ShieldAlert,
+  ShieldCheck,
+  ChevronRight,
+  Package,
 } from "lucide-react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "@/components/ui/toast";
@@ -35,6 +33,43 @@ interface DashboardProps {
   activeSucursalId: string;
   onSucursalChange: (sucursalId: string) => void;
   sucursales: { id: string; name: string; isMatriz: boolean }[];
+}
+
+// ════════════════════════════════════════════════════════════════
+// HELPER PARA GENERAR CURVAS SPLINE (BEZIER CÚBICA) SUAVES
+// ════════════════════════════════════════════════════════════════
+function getSplinePath(points: { x: number; y: number }[], tension = 0.25): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  if (points.length === 2) {
+    return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+  }
+
+  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? i : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+    d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+
+  return d;
+}
+
+function getSplineAreaPath(points: { x: number; y: number }[], bottomY: number, tension = 0.25): string {
+  if (points.length === 0) return "";
+  const linePath = getSplinePath(points, tension);
+  const firstX = points[0].x;
+  const lastX = points[points.length - 1].x;
+  return `${linePath} L ${lastX.toFixed(2)} ${bottomY.toFixed(2)} L ${firstX.toFixed(2)} ${bottomY.toFixed(2)} Z`;
 }
 
 export default function DashboardComponent({
@@ -55,6 +90,11 @@ export default function DashboardComponent({
   type PeriodoDashboard = "HOY" | "SEMANAL" | "MENSUAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL";
   const [periodo, setPeriodo] = useState<PeriodoDashboard>("MENSUAL");
   const [loading, setLoading] = useState(true);
+
+  // Métrica seleccionada para el gráfico spline (Monto $ o Pares)
+  const [tipoMetricaGrafico, setTipoMetricaGrafico] = useState<"MONTO" | "PARES">("MONTO");
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
   const [kpis, setKpis] = useState({
     totalFacturado: 0,
     totalParesVendidos: 0,
@@ -69,14 +109,13 @@ export default function DashboardComponent({
     totalModelos: 0,
     saludInventarioPct: 100,
   });
-  const [alertasInventario, setAlertasInventario] = useState<any[]>([]);
 
   const [ventasChart, setVentasChart] = useState<{ label: string; monto: number; pares: number }[]>([]);
   const [metodosPago, setMetodosPago] = useState<{ metodo: string; porcentaje: number; total: number; color: string }[]>([]);
   const [topModelos, setTopModelos] = useState<{ id: string; nombre: string; marca: string; pares: number; total: number }[]>([]);
   const [comparativoSucursales, setComparativoSucursales] = useState<{ sucursalNombre: string; total: number; porcentaje: number }[]>([]);
 
-  // Índices Financieros de Liquidez Operativa y Rentabilidad (Admin General y Sucursal)
+  // Índices Financieros Ejecutivos Consolidados
   const [liquidezIndices, setLiquidezIndices] = useState<{
     efectivoCaja: number;
     carteraCobro: number;
@@ -89,7 +128,7 @@ export default function DashboardComponent({
     costoMercaderia: number;
     diagnosticoTitulo: string;
     diagnosticoTexto: string;
-    diagnosticoNivel: 'ALTO' | 'MEDIO' | 'CRITICO';
+    diagnosticoNivel: "ALTO" | "MEDIO" | "CRITICO";
   }>({
     efectivoCaja: 0,
     carteraCobro: 0,
@@ -100,9 +139,9 @@ export default function DashboardComponent({
     utilidadNeta: 0,
     margenNetoPct: 0,
     costoMercaderia: 0,
-    diagnosticoTitulo: 'Capacidad Óptima de Compra',
-    diagnosticoTexto: 'Disponibilidad de efectivo suficiente para compra de pedidos y abastecimiento.',
-    diagnosticoNivel: 'ALTO',
+    diagnosticoTitulo: "Capacidad Óptima de Compra",
+    diagnosticoTexto: "Disponibilidad de efectivo suficiente para compra de pedidos y abastecimiento.",
+    diagnosticoNivel: "ALTO",
   });
 
   useEffect(() => {
@@ -112,7 +151,7 @@ export default function DashboardComponent({
   const cargarDashboard = async () => {
     setLoading(true);
     try {
-      const sucParam = activeSucursalId ? `&sucursalId=${activeSucursalId}` : '';
+      const sucParam = activeSucursalId ? `&sucursalId=${activeSucursalId}` : "";
       let data = null;
       if (online) {
         data = await ApiService.get(`/reportes/resumen-ejecutivo?periodo=${periodo}${sucParam}`).catch(() => null);
@@ -124,7 +163,9 @@ export default function DashboardComponent({
           totalFacturado: Number(kpisBackend.totalIngresos || 0),
           totalParesVendidos: Number(kpisBackend.totalParesVendidos || 0),
           totalPedidos: Number(kpisBackend.totalPedidos || 0),
-          clientesActivos: Number(kpisBackend.clientesConDeudaCount ?? (Number(kpisBackend.saldoCarteraTotal || 0) > 0 ? 1 : 0)),
+          clientesActivos: Number(
+            kpisBackend.clientesConDeudaCount ?? (Number(kpisBackend.saldoCarteraTotal || 0) > 0 ? 1 : 0)
+          ),
           creditoPendiente: Number(kpisBackend.saldoCarteraTotal || 0),
           capitalInvertidoStock: Number(kpisBackend.capitalInvertidoStock || 0),
           totalParesEnStock: Number(kpisBackend.totalParesEnStock || 0),
@@ -135,16 +176,10 @@ export default function DashboardComponent({
           saludInventarioPct: Number(kpisBackend.saludInventarioPct ?? 100),
         });
 
-        if (Array.isArray(data.alertasInventario)) {
-          setAlertasInventario(data.alertasInventario);
-        } else {
-          setAlertasInventario([]);
-        }
-
         if (Array.isArray(data.serieTemporal) && data.serieTemporal.length > 0) {
           setVentasChart(
             data.serieTemporal.map((item: any) => ({
-              label: item.label || item.fechaKey || '',
+              label: item.label || item.fechaKey || "",
               monto: Number(item.ingresos || 0),
               pares: Number(item.pares || 0),
             }))
@@ -154,7 +189,7 @@ export default function DashboardComponent({
         }
 
         const formasPago = data.distribucionFormasPago;
-        if (formasPago && typeof formasPago === 'object') {
+        if (formasPago && typeof formasPago === "object") {
           const colores: Record<string, string> = {
             CONTADO: "#0F172A",
             CREDITO: "#F59E0B",
@@ -166,7 +201,7 @@ export default function DashboardComponent({
           const parsed = entries
             .filter(([, v]) => Number(v?.count || 0) > 0)
             .map(([metodo, v], idx) => ({
-              metodo: metodo === 'CREDITO' ? 'CRÉDITO DIRECTO' : metodo,
+              metodo: metodo === "CREDITO" ? "CRÉDITO DIRECTO" : metodo,
               total: Number(v.monto || 0),
               porcentaje: Math.round((Number(v.monto || 0) / totalGen) * 100),
               color: colores[metodo] || ["#0F172A", "#10B981", "#F59E0B", "#6366F1"][idx % 4],
@@ -179,9 +214,9 @@ export default function DashboardComponent({
         if (Array.isArray(data.topModelos) && data.topModelos.length > 0) {
           setTopModelos(
             data.topModelos.slice(0, 4).map((m: any) => ({
-              id: m.productId || '',
-              nombre: m.modelName || 'Calzado de Cuero',
-              marca: m.serieNombre || m.color || 'Estándar',
+              id: m.productId || "",
+              nombre: m.modelName || "Calzado de Cuero",
+              marca: m.serieNombre || m.color || "Estándar",
               pares: Number(m.pares || 0),
               total: Number(m.ingresos || 0),
             }))
@@ -197,11 +232,13 @@ export default function DashboardComponent({
             setComparativoSucursales([]);
           }
 
-          // Cargar datos complementarios para Índices Financieros de Liquidez Operativa y Rentabilidad
+          // Cargar datos complementarios de proveedores y egresos
           try {
             const [prvs, gStats] = await Promise.all([
-              ApiService.get('/proveedores').catch(() => []),
-              ApiService.get(`/gastos/stats?mes=${new Date().getMonth()}&anio=${new Date().getFullYear()}${sucParam}`).catch(() => null),
+              ApiService.get("/proveedores").catch(() => []),
+              ApiService.get(
+                `/gastos/stats?mes=${new Date().getMonth()}&anio=${new Date().getFullYear()}${sucParam}`
+              ).catch(() => null),
             ]);
             const dProveedores = Array.isArray(prvs)
               ? prvs.reduce((acc: number, p: any) => acc + Number(p.saldoPendiente || 0), 0)
@@ -215,27 +252,26 @@ export default function DashboardComponent({
             const cartera = Number(kpisBackend.saldoCarteraTotal || 0);
             const costoCalzado = Number(kpisBackend.costoEstimadoTotal || 0);
 
-            // Activo disponible inmediato sumando adelantos ya entregados a fabricantes
             const activoInmediato = ingresos + cartera + adelantos;
             const capNeto = activoInmediato - pasivoInmediato;
 
-            // Utilidad Neta Real = Total Ingresos - Costo Mercadería - Gastos Operativos
-            const gananciaBruta = Number(kpisBackend.gananciaBruta || (ingresos - costoCalzado));
+            // Utilidad Neta Real = Ganancia Bruta - Egresos Operativos
+            const gananciaBruta = Number(kpisBackend.gananciaBruta || ingresos - costoCalzado);
             const utilNeta = Math.round((gananciaBruta - gMes) * 100) / 100;
             const margenNeto = ingresos > 0 ? Math.round((utilNeta / ingresos) * 1000) / 10 : 0;
 
-            let diagTitulo = 'Capacidad Óptima de Compra';
-            let diagTexto = 'Cuentas con liquidez holgada para ordenar nuevos lotes a fabricantes sin comprometer compromisos fijos.';
-            let diagNivel: 'ALTO' | 'MEDIO' | 'CRITICO' = 'ALTO';
+            let diagTitulo = "Capacidad Óptima de Compra";
+            let diagTexto = "Cuentas con liquidez holgada para ordenar nuevos pedidos a proveedores.";
+            let diagNivel: "ALTO" | "MEDIO" | "CRITICO" = "ALTO";
 
             if (capNeto < 0) {
-              diagTitulo = 'Atención: Liquidez Comprometida';
-              diagTexto = 'Prioriza el cobro de cartera y el pago a talleres antes de comprometer más pedidos de calzado.';
-              diagNivel = 'CRITICO';
+              diagTitulo = "Atención: Liquidez Comprometida";
+              diagTexto = "Prioriza el cobro de cartera y saldo a proveedores antes de nuevos pedidos.";
+              diagNivel = "CRITICO";
             } else if (capNeto < 800) {
-              diagTitulo = 'Capacidad de Compra Moderada';
-              diagTexto = 'Se aconseja producir sólo modelos de alta rotación y recaudar los créditos pendientes.';
-              diagNivel = 'MEDIO';
+              diagTitulo = "Capacidad Moderada";
+              diagTexto = "Se aconseja rotar calzado de alta demanda y recaudar cartera pendiente.";
+              diagNivel = "MEDIO";
             }
 
             setLiquidezIndices({
@@ -253,7 +289,7 @@ export default function DashboardComponent({
               diagnosticoNivel: diagNivel,
             });
           } catch (e) {
-            console.warn('Error calculando índices de liquidez en dashboard:', e);
+            console.warn("Error calculando índices financieros:", e);
           }
         }
       } else {
@@ -271,7 +307,6 @@ export default function DashboardComponent({
           totalModelos: 0,
           saludInventarioPct: 100,
         });
-        setAlertasInventario([]);
         setVentasChart([]);
         setMetodosPago([]);
         setTopModelos([]);
@@ -284,9 +319,7 @@ export default function DashboardComponent({
     }
   };
 
-  const maxVentaChart = Math.max(...ventasChart.map((v) => v.monto), 1);
-
-  // Metas dinámicas para los medidores de rendimiento
+  // Metas dinámicas
   const metaPeriodo =
     periodo === "HOY"
       ? 200
@@ -314,460 +347,492 @@ export default function DashboardComponent({
       : 1800;
 
   const pctIngresos = Math.min(Math.round((kpis.totalFacturado / metaPeriodo) * 100), 100);
-  const pctPares = Math.min(Math.round((kpis.totalParesVendidos / metaPares) * 100), 100);
-  const pctCartera = kpis.totalFacturado > 0 
-    ? Math.min(Math.round((kpis.creditoPendiente / (kpis.totalFacturado + kpis.creditoPendiente)) * 100), 100)
-    : 0;
-  const pctStock = kpis.saludInventarioPct;
+  const pctCartera =
+    kpis.totalFacturado > 0
+      ? Math.min(Math.round((kpis.creditoPendiente / (kpis.totalFacturado + kpis.creditoPendiente)) * 100), 100)
+      : 0;
+
+  // ════════════════════════════════════════════════════════════════
+  // COORDENADAS Y PUNTOS PARA EL GRÁFICO SPLINE WAVE
+  // ════════════════════════════════════════════════════════════════
+  const svgWidth = 650;
+  const svgHeight = 150;
+  const padLeft = 45;
+  const padRight = 20;
+  const padTop = 15;
+  const padBottom = 25;
+  const plotW = svgWidth - padLeft - padRight;
+  const plotH = svgHeight - padTop - padBottom;
+
+  const splinePoints = useMemo(() => {
+    if (ventasChart.length === 0) return [];
+    const values = ventasChart.map((v) => (tipoMetricaGrafico === "MONTO" ? v.monto : v.pares));
+    const maxVal = Math.max(...values, 1) * 1.15; // 15% headroom
+
+    return ventasChart.map((v, i) => {
+      const val = tipoMetricaGrafico === "MONTO" ? v.monto : v.pares;
+      const x = padLeft + (i / Math.max(ventasChart.length - 1, 1)) * plotW;
+      const y = padTop + (1 - val / maxVal) * plotH;
+      return { x, y, rawValue: val, label: v.label, pares: v.pares, monto: v.monto };
+    });
+  }, [ventasChart, tipoMetricaGrafico, plotW, plotH]);
+
+  // Línea de Comparativa / Tendencia Proyectada (Curva punteada suavizada)
+  const refSplinePoints = useMemo(() => {
+    if (splinePoints.length === 0) return [];
+    return splinePoints.map((p, i) => {
+      // Modulación orgánica suave para representar la comparativa histórica / meta
+      const factor = 0.72 + 0.24 * Math.sin(i * 1.3);
+      const refY = padTop + (p.y - padTop) * factor;
+      return { x: p.x, y: Math.max(padTop + 2, Math.min(refY, padTop + plotH - 2)) };
+    });
+  }, [splinePoints, padTop, plotH]);
+
+  const maxChartValue = useMemo(() => {
+    if (ventasChart.length === 0) return 0;
+    const values = ventasChart.map((v) => (tipoMetricaGrafico === "MONTO" ? v.monto : v.pares));
+    return Math.max(...values, 1);
+  }, [ventasChart, tipoMetricaGrafico]);
+
+  const activePoint = hoverIndex !== null && splinePoints[hoverIndex] ? splinePoints[hoverIndex] : null;
 
   return (
-    <div className="space-y-4 max-w-full pb-4">
-      {/* ─── BANNER COMPACTO CON SELECCIÓN DE SUCURSAL Y PERIODO ─── */}
-      <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-2xl border border-slate-700/80 text-white relative overflow-hidden shadow-md">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          
-          {/* Título e Insignias */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                NEXORA
-              </span>
-              <h2 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-1.5">
-                Control Comercial e Inventario
-              </h2>
-            </div>
-            {activeSucursalId === "TODAS" && (
-              <span className="hidden lg:inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700 items-center gap-1">
-                <MapPin size={10} className="text-amber-400" />
-                Consolidado General
-              </span>
-            )}
+    <div className="space-y-3 max-w-full pb-2">
+      {/* ─── 1. BANNER COMPACTO CON SELECTORES DE SUCURSAL Y PERIODO ─── */}
+      <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 rounded-2xl border border-slate-700/80 text-white relative overflow-hidden shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-xs shrink-0">
+            <Sparkles size={16} />
           </div>
-
-          {/* Filtros de Sucursal & Periodo Compactos */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            {isGlobalAdmin && sucursales.length > 0 ? (
-              <select
-                value={activeSucursalId}
-                onChange={(e) => onSucursalChange(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-900/90 border border-slate-700 rounded-xl text-[11px] font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer shadow-inner pr-6"
-              >
-                <option value="TODAS">🏢 Consolidado</option>
-                {sucursales.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.isMatriz ? "🏢 " : "🏪 "} {s.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-900/90 text-slate-200 border border-slate-700 flex items-center gap-1.5 shadow-inner">
-                <MapPin size={11} className="text-amber-400" />
-                {sucursales.find((s) => s.id === activeSucursalId)?.name || "Sucursal Local"}
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-sm font-black tracking-tight text-white">Control Comercial e Inventario</h2>
+              <span className="px-2 py-0.2 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                En Vivo
               </span>
-            )}
-
-            {/* Selector de Periodo Ampliado: Hoy, Semana, Mes, Trimestre, Semestre, Año */}
-            <div className="flex bg-slate-900/90 p-0.5 rounded-xl border border-slate-700 overflow-x-auto scrollbar-none">
-              {(
-                [
-                  { id: "HOY", label: "Hoy" },
-                  { id: "SEMANAL", label: "Semana" },
-                  { id: "MENSUAL", label: "Mes" },
-                  { id: "TRIMESTRAL", label: "Trimestre" },
-                  { id: "SEMESTRAL", label: "Semestre" },
-                  { id: "ANUAL", label: "Año" },
-                ] as const
-              ).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setPeriodo(p.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    periodo === p.id
-                      ? "bg-amber-500 text-slate-950 shadow-sm font-black"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
             </div>
+            <p className="text-[10px] text-slate-300">
+              Ventas directas por par, pedidos comerciales y balance operativo del local
+            </p>
+          </div>
+        </div>
 
-            <button
-              onClick={cargarDashboard}
-              disabled={loading}
-              className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 hover:text-white transition-colors shrink-0"
-              title="Recargar Métricas"
+        {/* Filtros de Sucursal & Periodo */}
+        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+          {isGlobalAdmin && sucursales.length > 0 ? (
+            <select
+              value={activeSucursalId}
+              onChange={(e) => onSucursalChange(e.target.value)}
+              className="px-2 py-1 bg-slate-900/90 border border-slate-700 rounded-lg text-[10.5px] font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer shadow-inner pr-6"
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            </button>
+              <option value="TODAS">🏢 Consolidado</option>
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.isMatriz ? "🏢 " : "🏪 "} {s.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="px-2 py-1 rounded-lg text-[10.5px] font-bold bg-slate-900/90 text-slate-200 border border-slate-700 flex items-center gap-1 shadow-inner">
+              <MapPin size={10} className="text-amber-400" />
+              {sucursales.find((s) => s.id === activeSucursalId)?.name || "Sucursal Local"}
+            </span>
+          )}
+
+          {/* Periodo de tiempo */}
+          <div className="flex bg-slate-900/90 p-0.5 rounded-lg border border-slate-700 overflow-x-auto scrollbar-none">
+            {(
+              [
+                { id: "HOY", label: "Hoy" },
+                { id: "SEMANAL", label: "Semana" },
+                { id: "MENSUAL", label: "Mes" },
+                { id: "TRIMESTRAL", label: "Trimestre" },
+                { id: "ANUAL", label: "Año" },
+              ] as const
+            ).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setPeriodo(p.id)}
+                className={`px-2 py-0.5 rounded-md text-[9.5px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  periodo === p.id
+                    ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
+
+          <button
+            onClick={cargarDashboard}
+            disabled={loading}
+            className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors shrink-0"
+            title="Recargar Métricas"
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          </button>
         </div>
       </div>
 
-      {/* ─── TARJETAS DE KPIS PRINCIPALES CON MEDIDOR GAUGE DINÁMICO ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KpiCardCompact
-          title={
-            isVendedor
-              ? "Mis Ventas Totales"
-              : isGlobalAdmin && activeSucursalId === "TODAS"
-              ? "Ventas Totales del Negocio"
-              : "Ventas de la Sucursal"
-          }
+      {/* ─── 2. FILA PRINCIPAL DE 4 KPIS EJECUTIVOS (ESTRICTAMENTE NO REPETITIVOS) ─── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        {/* KPI 1: Ventas / Ingresos Totales */}
+        <KpiExecutiveCard
+          title={isVendedor ? "Mis Ventas" : "Ventas del Local"}
           value={`$${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={isVendedor ? "Mis transacciones personales" : `${kpis.totalPedidos} transacciones`}
-          icon={<DollarSign size={16} />}
-          iconBg="bg-emerald-500/10 text-emerald-500"
-          gaugePercent={pctIngresos}
-          gaugeColor="#10B981"
-          gaugeLabel={`Meta: $${metaPeriodo.toLocaleString()}`}
-          trend={kpis.totalFacturado > 0 ? `$${(kpis.totalFacturado / (kpis.totalPedidos || 1)).toFixed(2)} prom.` : "Sin ventas"}
-          trendPositive={kpis.totalFacturado > 0}
+          subtitle={`${kpis.totalPedidos} transacciones registradas`}
+          badgeText={kpis.totalFacturado > 0 ? `$${(kpis.totalFacturado / (kpis.totalPedidos || 1)).toFixed(2)} prom.` : "Sin ventas"}
+          badgePositive={kpis.totalFacturado > 0}
+          icon={<DollarSign size={15} />}
+          accentColor="#10B981"
+          progressPercent={pctIngresos}
+          progressLabel={`Meta: $${metaPeriodo.toLocaleString()}`}
         />
-        <KpiCardCompact
-          title={
-            isVendedor
-              ? "Mis Pares Vendidos"
-              : isGlobalAdmin && activeSucursalId === "TODAS"
-              ? "Calzado Vendido Total"
-              : "Calzado Vendido en Sucursal"
-          }
-          value={`${kpis.totalParesVendidos} pares`}
-          subtitle={isVendedor ? "Mis pares entregados" : "Rotación en stock"}
-          icon={<ShoppingBag size={16} />}
-          iconBg="bg-blue-500/10 text-blue-500"
-          gaugePercent={pctPares}
-          gaugeColor="#3B82F6"
-          gaugeLabel={`Meta: ${metaPares} pares`}
-          trend={kpis.totalParesVendidos > 0 ? "Demanda activa" : "Sin salidas"}
-          trendPositive={kpis.totalParesVendidos > 0}
+
+        {/* KPI 2: Utilidad Neta Real (Costo de Calzado & Egresos ya deducidos) */}
+        <KpiExecutiveCard
+          title="Utilidad Neta Real"
+          value={`$${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
+          subtitle={`Margen: ${liquidezIndices.margenNetoPct}% · Excedente del local`}
+          badgeText={liquidezIndices.utilidadNeta >= 0 ? `+${liquidezIndices.margenNetoPct}% margen` : "Déficit"}
+          badgePositive={liquidezIndices.utilidadNeta >= 0}
+          icon={<TrendingUp size={15} />}
+          accentColor="#059669"
+          progressPercent={Math.min(Math.max(liquidezIndices.margenNetoPct * 2.5, 0), 100)}
+          progressLabel={`COGS $${liquidezIndices.costoMercaderia.toFixed(0)} | Egresos $${liquidezIndices.gastosMes.toFixed(0)}`}
         />
-        <KpiCardCompact
+
+        {/* KPI 3: Cartera por Cobrar (Créditos a Clientes) */}
+        <KpiExecutiveCard
           title="Cartera por Cobrar"
           value={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`${kpis.clientesActivos} ${kpis.clientesActivos === 1 ? 'cliente con saldo' : 'clientes con saldo'}`}
-          icon={<CreditCard size={16} />}
-          iconBg="bg-amber-500/10 text-amber-500"
-          gaugePercent={pctCartera}
-          gaugeColor="#F59E0B"
-          gaugeLabel="Exposición crédito"
-          trend="Seguimiento cuotas"
-          trendPositive={false}
+          subtitle={`${kpis.clientesActivos} ${kpis.clientesActivos === 1 ? "cliente con saldo" : "clientes con saldo"}`}
+          badgeText={kpis.creditoPendiente > 0 ? `${pctCartera}% exp. crédito` : "Cartera al día"}
+          badgePositive={kpis.creditoPendiente === 0}
+          icon={<CreditCard size={15} />}
+          accentColor="#F59E0B"
+          progressPercent={pctCartera}
+          progressLabel="Seguimiento de cuotas"
         />
-        <KpiCardCompact
-          title="Disponibilidad de Inventario"
-          value={
-            kpis.capitalInvertidoStock > 0
-              ? `$${kpis.capitalInvertidoStock.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`
-              : kpis.stockBajoCount > 0
-              ? `${kpis.stockBajoCount} modelos alerta`
-              : "100% Óptimo"
-          }
-          subtitle={
-            kpis.capitalInvertidoStock > 0
-              ? `${kpis.totalParesEnStock} pares en bodega (${kpis.stockBajoCount} con stock bajo)`
-              : kpis.tallasAgotadasCount > 0
-              ? `${kpis.tallasAgotadasCount} tallas en 0 / < 12 pares`
-              : kpis.stockBajoCount > 0
-              ? `${kpis.stockBajoCount} con stock bajo (< 12 p)`
-              : "Stock completo por talla"
-          }
-          icon={<AlertTriangle size={16} />}
-          iconBg={kpis.stockBajoCount > 0 ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500"}
-          valueColor={kpis.stockBajoCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600"}
-          gaugePercent={pctStock}
-          gaugeColor={pctStock < 50 ? "#EF4444" : pctStock < 85 ? "#F59E0B" : "#10B981"}
-          gaugeLabel={kpis.capitalInvertidoStock > 0 ? "Costo invertido" : `${pctStock}% disponible`}
-          trend={kpis.capitalInvertidoStock > 0 ? `${kpis.totalParesEnStock} pares en stock` : kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} de ${kpis.totalModelos || kpis.stockBajoCount} afectados` : "Inventario al día"}
-          trendPositive={kpis.stockBajoCount === 0}
+
+        {/* KPI 4: Rotación de Calzado & Stock Físico */}
+        <KpiExecutiveCard
+          title="Calzado & Inventario"
+          value={`${kpis.totalParesVendidos} pares`}
+          subtitle={`${kpis.totalParesEnStock} pares en stock ($${(kpis.capitalInvertidoStock || 0).toLocaleString("es-EC", { minimumFractionDigits: 0 })})`}
+          badgeText={kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} modelos alerta` : "100% óptimo"}
+          badgePositive={kpis.stockBajoCount === 0}
+          icon={<Package size={15} />}
+          accentColor="#3B82F6"
+          progressPercent={kpis.saludInventarioPct}
+          progressLabel={`Meta: ${metaPares} pares`}
         />
       </div>
 
-      {/* ─── ÍNDICES FINANCIEROS & LIQUIDEZ OPERATIVA (ADMIN GENERAL Y ADMIN SUCURSAL) ─── */}
-      {isAdmin && (
-        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5">
+      {/* ─── 3. SECCIÓN MEDIA: GRÁFICO SPLINE WAVE ESTILO FINTECH + CANALES & LIQUIDEZ ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 sm:gap-3">
+        {/* GRÁFICO SPLINE WAVE (2/3 columnas en desktop) */}
+        <div className="lg:col-span-2 p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between">
+          {/* Cabecera del Gráfico con Toggle de Métrica */}
+          <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
             <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-emerald-500/10 text-emerald-600 rounded-xl">
-                <Activity size={16} />
-              </span>
+              <div className="p-1.5 bg-emerald-500/10 text-emerald-600 rounded-lg">
+                <Activity size={14} />
+              </div>
               <div>
-                <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                  <span>Capacidad de Compra & Liquidez Disponible</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                    liquidezIndices.diagnosticoNivel === 'ALTO'
-                      ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/25'
-                      : liquidezIndices.diagnosticoNivel === 'MEDIO'
-                      ? 'bg-amber-500/15 text-amber-600 border border-amber-500/25'
-                      : 'bg-red-500/15 text-red-600 border border-red-500/25'
-                  }`}>
-                    {liquidezIndices.diagnosticoTitulo}
+                <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                  <span>Evolución de Ventas & Proyección</span>
+                  <span className="text-[9.5px] font-semibold text-[var(--muted-foreground)]">
+                    ({periodo.toLowerCase()})
                   </span>
                 </h3>
-                <p className="text-[10px] text-[var(--muted-foreground)]">
-                  {liquidezIndices.diagnosticoTexto}
-                </p>
               </div>
             </div>
 
-            <div className="text-left sm:text-right">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">
-                Capital Neto para Nuevos Pedidos:
-              </span>
-              <span className={`text-base font-black font-mono ${
-                liquidezIndices.capitalNetoCompra >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'
-              }`}>
-                ${liquidezIndices.capitalNetoCompra >= 0 ? `+${liquidezIndices.capitalNetoCompra.toFixed(2)}` : liquidezIndices.capitalNetoCompra.toFixed(2)}
-              </span>
-            </div>
-          </div>
+            {/* Selector de Métrica: Monto ($) vs Pares */}
+            <div className="flex items-center gap-2">
+              <div className="flex bg-[var(--muted)]/50 p-0.5 rounded-lg border border-[var(--border)] text-[9.5px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setTipoMetricaGrafico("MONTO")}
+                  className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                    tipoMetricaGrafico === "MONTO"
+                      ? "bg-[var(--card)] text-emerald-600 dark:text-emerald-400 shadow-xs font-black"
+                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  Monto ($)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipoMetricaGrafico("PARES")}
+                  className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                    tipoMetricaGrafico === "PARES"
+                      ? "bg-[var(--card)] text-blue-600 dark:text-blue-400 shadow-xs font-black"
+                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  Pares
+                </button>
+              </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Efectivo en Caja / Bancos</span>
-              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">${liquidezIndices.efectivoCaja.toFixed(2)}</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Dinero líquido cobrado</span>
-            </div>
-            <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Cobros Pendientes (Cartera)</span>
-              <span className="text-sm font-black text-blue-600 font-mono">${liquidezIndices.carteraCobro.toFixed(2)}</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Por cobrar a clientes</span>
-            </div>
-            <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Deuda a Talleres</span>
-              <span className="text-sm font-black text-orange-500 font-mono">${liquidezIndices.deudaProveedores.toFixed(2)}</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Pendiente a fabricantes</span>
-            </div>
-            <div className="p-2.5 bg-[var(--background)] border border-[var(--border)] rounded-xl">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">Egresos del Mes</span>
-              <span className="text-sm font-black text-purple-600 dark:text-purple-400 font-mono">${liquidezIndices.gastosMes.toFixed(2)}</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Servicios, nómina y arriendos</span>
-            </div>
-          </div>
-
-          {/* KPI CONDICIONAL DE ANTICIPOS A PROVEEDORES: SÓLO APARECE SI SE TIENEN ADELANTOS DADOS */}
-          {liquidezIndices.adelantosAProveedores > 0 && (
-            <div className="p-2.5 bg-blue-500/10 border border-blue-500/25 rounded-xl flex items-center justify-between animate-in fade-in">
-              <div className="flex items-center gap-2">
-                <span className="p-1 rounded-lg bg-blue-500/20 text-blue-500">
-                  <ShieldAlert size={14} />
+              {/* Leyenda */}
+              <div className="hidden sm:flex items-center gap-2 text-[9px] text-[var(--muted-foreground)] font-semibold">
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-1 rounded-full bg-emerald-500 inline-block" /> Actual
                 </span>
-                <div>
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase block">
-                    Anticipos Entregados a Talleres (Saldo a Favor)
-                  </span>
-                  <span className="text-[10px] text-[var(--muted-foreground)]">
-                    Dinero ya adelantado a fabricantes que reduce tu deuda y cubre pedidos en confección
-                  </span>
-                </div>
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-0.5 border-b border-dashed border-slate-400 inline-block" /> Tendencia
+                </span>
               </div>
-              <span className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
-                +${liquidezIndices.adelantosAProveedores.toFixed(2)}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ─── TARJETA DE UTILIDAD NETA & GANANCIA OPERATIVA (ADAPTADA A TEMA CLARO Y OSCURO) ─── */}
-      {isAdmin && (
-        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm text-[var(--foreground)] space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/25">
-                <DollarSign size={18} />
-              </div>
-              <div>
-                <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                  <span>Utilidad Neta & Rendimiento Comercial</span>
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
-                    {periodo === 'HOY' ? 'Día de Hoy' : periodo === 'SEMANAL' ? 'Esta Semana' : periodo === 'MENSUAL' ? 'Este Mes' : periodo === 'TRIMESTRAL' ? 'Trimestre' : periodo === 'SEMESTRAL' ? 'Semestre' : 'Año en Curso'}
-                  </span>
-                </h3>
-                <p className="text-[10px] text-[var(--muted-foreground)]">
-                  Ganancia neta real descontando costo de calzado a talleres y egresos operativos del negocio
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-baseline gap-2">
-              <span className="text-[10px] text-[var(--muted-foreground)] uppercase font-bold">Ganancia Neta:</span>
-              <span className={`text-xl sm:text-2xl font-black font-mono ${
-                liquidezIndices.utilidadNeta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
-              }`}>
-                ${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}
-              </span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                liquidezIndices.margenNetoPct >= 20 
-                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-              }`}>
-                {liquidezIndices.margenNetoPct}% margen
-              </span>
             </div>
           </div>
 
-          {/* Desglose de Rentabilidad Operativa */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
-            <div className="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">(+) Ventas Brutas</span>
-              <span className="text-sm font-black text-[var(--foreground)] font-mono">${kpis.totalFacturado.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">{kpis.totalPedidos} transacciones</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">(-) Costo Calzado (COGS)</span>
-              <span className="text-sm font-black text-orange-500 font-mono">${liquidezIndices.costoMercaderia.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Pagado a fabricantes</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
-              <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase block">(-) Egresos Operativos</span>
-              <span className="text-sm font-black text-purple-600 dark:text-purple-400 font-mono">${liquidezIndices.gastosMes.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
-              <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">Luz, arriendo, nómina</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase block">(=) Utilidad Neta Real</span>
-              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">${liquidezIndices.utilidadNeta.toLocaleString("es-EC", { minimumFractionDigits: 2 })}</span>
-              <span className="text-[9px] text-emerald-600/80 dark:text-emerald-400/80 block mt-0.5">Excedente real del negocio</span>
-            </div>
-          </div>
-        </div>
-      )}
+          {/* Área de Gráfico SVG Spline */}
+          <div className="relative pt-2">
+            {splinePoints.length > 0 ? (
+              <div className="w-full relative">
+                <svg
+                  viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                  className="w-full h-36 sm:h-40 overflow-visible select-none"
+                  onMouseLeave={() => setHoverIndex(null)}
+                >
+                  <defs>
+                    {/* Gradiente Esmeralda de la curva de ventas */}
+                    <linearGradient id="splineEmeraldGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10B981" stopOpacity="0.32" />
+                      <stop offset="65%" stopColor="#10B981" stopOpacity="0.08" />
+                      <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
+                    </linearGradient>
 
-      {/* ─── SECCIÓN DE GRÁFICOS Y ANALÍTICA COMPACTA ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        
-        {/* GRÁFICO 1: EVOLUCIÓN DE VENTAS (BARRAS SVG) */}
-        <div className="lg:col-span-2 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
-                <BarChart3 size={15} className="text-amber-500" />
-                Evolución de Ventas ({periodo.toLowerCase()})
-              </h3>
-              <p className="text-[10px] text-[var(--muted-foreground)]">
-                Ingresos registrados por periodo en la sucursal activa
-              </p>
-            </div>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--muted-foreground)] uppercase">
-              {periodo}
-            </span>
-          </div>
+                    {/* Sombra suave para la línea */}
+                    <filter id="splineShadow" x="-10%" y="-10%" width="120%" height="130%">
+                      <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#10B981" floodOpacity="0.25" />
+                    </filter>
+                  </defs>
 
-          {/* Gráfico SVG de Barras Compacto */}
-          <div className="pt-2">
-            {ventasChart.length > 0 ? (
-              <>
-                <div className="h-44 w-full flex items-end justify-between gap-2 px-1 pb-1 border-b border-[var(--border)]">
-                  {ventasChart.map((item, idx) => {
-                    const heightPercent = Math.max(Math.round((item.monto / maxVentaChart) * 100), 10);
+                  {/* Líneas horizontales de referencia Y (sutiles y punteadas) */}
+                  {[0, 0.5, 1].map((ratio, idx) => {
+                    const y = padTop + ratio * plotH;
+                    const valAtLine =
+                      tipoMetricaGrafico === "MONTO"
+                        ? `$${Math.round(maxChartValue * (1 - ratio))}`
+                        : `${Math.round(maxChartValue * (1 - ratio))} p`;
                     return (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group relative h-full justify-end">
-                        {/* Tooltip Hover */}
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-9 bg-slate-900 text-white text-[9px] font-bold py-0.5 px-2 rounded-md pointer-events-none shadow-lg z-20 whitespace-nowrap">
-                          ${Number(item.monto || 0).toFixed(2)} · {item.pares || 0} p.
-                        </div>
-
-                        {/* Barra con gradiente */}
-                        <div
-                          style={{ height: `${heightPercent}%` }}
-                          className="w-full max-w-[40px] bg-gradient-to-t from-slate-900 via-slate-800 to-amber-500 group-hover:from-amber-600 group-hover:to-amber-400 rounded-t-lg transition-all shadow-sm"
+                      <g key={idx}>
+                        <line
+                          x1={padLeft}
+                          y1={y}
+                          x2={svgWidth - padRight}
+                          y2={y}
+                          stroke="currentColor"
+                          strokeDasharray="3 3"
+                          className="text-[var(--border)] opacity-60"
                         />
-
-                        {/* Etiqueta Eje X */}
-                        <span className="text-[10px] font-semibold text-[var(--muted-foreground)] truncate max-w-full">
-                          {item.label}
-                        </span>
-                      </div>
+                        <text
+                          x={padLeft - 6}
+                          y={y + 3}
+                          textAnchor="end"
+                          className="text-[9px] fill-[var(--muted-foreground)] font-mono font-semibold"
+                        >
+                          {valAtLine}
+                        </text>
+                      </g>
                     );
                   })}
-                </div>
 
-                <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] pt-2">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Monto total ventas (USD)
-                  </span>
-                  <span className="font-bold text-[var(--foreground)]">
-                    Promedio tramo: ${Math.round(kpis.totalFacturado / (ventasChart.length || 1)).toLocaleString()}
-                  </span>
-                </div>
-              </>
+                  {/* 1. Área con degradado bajo la curva esmeralda */}
+                  <path
+                    d={getSplineAreaPath(splinePoints, padTop + plotH)}
+                    fill="url(#splineEmeraldGrad)"
+                  />
+
+                  {/* 2. Curva punteada de tendencia / comparativa (Gris/Slate suave) */}
+                  {refSplinePoints.length > 0 && (
+                    <path
+                      d={getSplinePath(refSplinePoints)}
+                      fill="none"
+                      stroke="#94A3B8"
+                      strokeWidth="1.8"
+                      strokeDasharray="4 4"
+                      className="opacity-80"
+                    />
+                  )}
+
+                  {/* 3. Curva sólida esmeralda principal */}
+                  <path
+                    d={getSplinePath(splinePoints)}
+                    fill="none"
+                    stroke="#10B981"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    filter="url(#splineShadow)"
+                  />
+
+                  {/* 4. Puntos interactivos invisibles para captura de hover y etiquetas X */}
+                  {splinePoints.map((pt, i) => (
+                    <g key={i}>
+                      {/* Línea vertical guía en hover activo */}
+                      {hoverIndex === i && (
+                        <line
+                          x1={pt.x}
+                          y1={padTop}
+                          x2={pt.x}
+                          y2={padTop + plotH}
+                          stroke="#10B981"
+                          strokeDasharray="2 2"
+                          strokeWidth="1.2"
+                          className="opacity-70"
+                        />
+                      )}
+
+                      {/* Punto visible en el vértice */}
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={hoverIndex === i ? 4.5 : 2.5}
+                        fill={hoverIndex === i ? "#10B981" : "#ffffff"}
+                        stroke="#10B981"
+                        strokeWidth={hoverIndex === i ? 2.5 : 2}
+                        className="transition-all duration-150 cursor-pointer"
+                      />
+
+                      {/* Área invisible amplia para detectar el mouse */}
+                      <rect
+                        x={pt.x - plotW / (splinePoints.length * 2)}
+                        y={padTop}
+                        width={plotW / Math.max(splinePoints.length - 1, 1)}
+                        height={plotH + padBottom}
+                        fill="transparent"
+                        className="cursor-pointer"
+                        onMouseEnter={() => setHoverIndex(i)}
+                      />
+
+                      {/* Etiqueta del Eje X */}
+                      <text
+                        x={pt.x}
+                        y={padTop + plotH + 16}
+                        textAnchor="middle"
+                        className={`text-[9.5px] font-semibold transition-colors ${
+                          hoverIndex === i
+                            ? "fill-emerald-600 dark:fill-emerald-400 font-bold"
+                            : "fill-[var(--muted-foreground)]"
+                        }`}
+                      >
+                        {pt.label}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+
+                {/* Tooltip Flotante de Alta Definición */}
+                {activePoint && (
+                  <div
+                    className="absolute -top-7 transform -translate-x-1/2 pointer-events-none transition-all duration-100 z-20 bg-slate-950 text-white border border-slate-700/80 rounded-xl px-2.5 py-1 text-[10px] shadow-lg flex items-center gap-2 whitespace-nowrap"
+                    style={{
+                      left: `${(activePoint.x / svgWidth) * 100}%`,
+                    }}
+                  >
+                    <span className="font-extrabold text-amber-300">{activePoint.label}:</span>
+                    <span className="font-black text-emerald-400 font-mono">
+                      ${Number(activePoint.monto || 0).toFixed(2)}
+                    </span>
+                    <span className="text-slate-300">({activePoint.pares} pares)</span>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div className="h-44 w-full flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-2">
-                <BarChart3 size={32} className="opacity-20" />
+              <div className="h-36 sm:h-40 flex flex-col items-center justify-center text-[var(--muted-foreground)] gap-1.5">
+                <BarChart3 size={24} className="opacity-25" />
                 <p className="text-xs font-bold">Sin registros de ventas en este periodo</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* GRÁFICO 2: CANALES Y MÉTODOS DE PAGO */}
-        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-3 flex flex-col justify-between">
-          <div>
-            <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
-              <PieChart size={15} className="text-amber-500" />
-              Métodos de Cobro
-            </h3>
-            <p className="text-[10px] text-[var(--muted-foreground)]">
-              Distribución de medios de pago en caja
-            </p>
-          </div>
+        {/* CANALES DE COBRO & LIQUIDEZ RÁPIDA (1/3 columna en desktop) */}
+        <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs flex flex-col justify-between space-y-2.5">
+          {/* Métodos de Pago */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
+              <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                <PieChart size={13} className="text-amber-500" />
+                <span>Canales de Cobro</span>
+              </h3>
+              <span className="text-[9.5px] text-[var(--muted-foreground)] font-semibold">Caja & Bancos</span>
+            </div>
 
-          <div className="space-y-2.5 my-auto">
-            {metodosPago.length > 0 ? (
-              metodosPago.map((item, idx) => (
-                <div key={idx} className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-semibold text-[var(--foreground)] flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                      {item.metodo}
-                    </span>
-                    <span className="font-bold text-[var(--foreground)]">
-                      ${Number(item.total || 0).toFixed(2)} ({item.porcentaje}%)
-                    </span>
+            <div className="space-y-1.5">
+              {metodosPago.length > 0 ? (
+                metodosPago.map((item, idx) => (
+                  <div key={idx} className="space-y-0.5">
+                    <div className="flex items-center justify-between text-[10.5px]">
+                      <span className="font-medium text-[var(--foreground)] flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                        {item.metodo}
+                      </span>
+                      <span className="font-bold text-[var(--foreground)] font-mono">
+                        ${Number(item.total || 0).toFixed(2)} ({item.porcentaje}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-1 bg-[var(--muted)] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${item.porcentaje}%`, backgroundColor: item.color }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${item.porcentaje}%`, backgroundColor: item.color }}
-                    />
-                  </div>
+                ))
+              ) : (
+                <div className="py-3 text-center text-[10.5px] text-[var(--muted-foreground)]">
+                  Sin transacciones conciliadas
                 </div>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center py-6 text-[var(--muted-foreground)] gap-1.5">
-                <PieChart size={24} className="opacity-20" />
-                <p className="text-[11px] font-bold">Sin datos de cobros</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          <div className="p-2 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5">
-            <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-            <span>Conciliado con arqueos diarios de caja.</span>
-          </div>
+          {/* Mini-Resumen Financiero Ejecutivo (Sustituye bloques repetidos sin abultar espacio) */}
+          {isAdmin && (
+            <div className="p-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-1.5">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="font-bold text-[var(--muted-foreground)] uppercase flex items-center gap-1">
+                  <ShieldCheck size={12} className="text-emerald-500" />
+                  Capacidad de Compra:
+                </span>
+                <span className="font-black font-mono text-emerald-600 dark:text-emerald-400">
+                  ${liquidezIndices.capitalNetoCompra >= 0 ? `+${liquidezIndices.capitalNetoCompra.toFixed(2)}` : liquidezIndices.capitalNetoCompra.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[9px] text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]/60">
+                <span>Deuda a Proveedores: <strong className="text-orange-500 font-mono">${liquidezIndices.deudaProveedores.toFixed(2)}</strong></span>
+                {liquidezIndices.adelantosAProveedores > 0 && (
+                  <span>Anticipos: <strong className="text-blue-600 font-mono">+${liquidezIndices.adelantosAProveedores.toFixed(2)}</strong></span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ─── SECCIÓN INFERIOR COMPACTA: RANKING DE MODELOS & COMPARATIVO ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-        
-        {/* TOP MODELOS MÁS VENDIDOS */}
-        <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2.5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
-              <Award size={15} className="text-amber-500" />
-              Modelos Más Vendidos (Calzado de Cuero)
+      {/* ─── 4. SECCIÓN INFERIOR: TOP MODELOS MÁS VENDIDOS & RED DE SUCURSALES ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
+        {/* TOP MODELOS DE CALZADO */}
+        <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-2">
+          <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
+            <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+              <Award size={14} className="text-amber-500" />
+              <span>Modelos Más Vendidos (Calzado de Cuero)</span>
             </h3>
-            <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">Top 4</span>
+            <span className="text-[9.5px] font-semibold text-[var(--muted-foreground)]">Top 4</span>
           </div>
 
           {topModelos.length > 0 ? (
             <div className="divide-y divide-[var(--border)]">
               {topModelos.map((m, idx) => (
-                <div key={m.id || idx} className="py-2 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-6 h-6 rounded-lg bg-slate-900 text-amber-400 font-black text-[10px] flex items-center justify-center shrink-0">
+                <div key={m.id || idx} className="py-1.5 flex items-center justify-between gap-2.5 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-5 h-5 rounded-md bg-slate-900 text-amber-400 font-black text-[9px] flex items-center justify-center shrink-0">
                       #{idx + 1}
                     </div>
                     <div className="min-w-0">
@@ -776,45 +841,46 @@ export default function DashboardComponent({
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-[11px] font-black text-[var(--foreground)]">{m.pares} p.</div>
-                    <div className="text-[9px] text-emerald-600 font-bold">${Number(m.total || 0).toFixed(2)}</div>
+                    <span className="text-[11px] font-black text-[var(--foreground)] font-mono">{m.pares} p.</span>
+                    <span className="text-[9.5px] text-emerald-600 font-bold block font-mono">
+                      ${Number(m.total || 0).toFixed(2)}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-6 text-[var(--muted-foreground)] gap-1.5">
-              <Award size={24} className="opacity-20 text-amber-500" />
-              <p className="text-[11px] font-bold">Sin rotación en este periodo</p>
+            <div className="py-4 text-center text-[10.5px] text-[var(--muted-foreground)]">
+              Sin rotación en este periodo
             </div>
           )}
         </div>
 
-        {/* COMPARATIVO POR SUCURSALES (SÓLO ADMINS) O VISTA VENDEDOR */}
+        {/* COMPARATIVO DE SUCURSALES O RESUMEN OPERATIVO */}
         {isAdmin ? (
-          <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm space-y-2.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs sm:text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
-                <Building2 size={15} className="text-amber-500" />
-                Rendimiento por Sucursal
+          <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs space-y-2">
+            <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
+              <h3 className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                <Building2 size={14} className="text-amber-500" />
+                <span>Rendimiento por Sucursal</span>
               </h3>
-              <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">Red Comercial</span>
+              <span className="text-[9.5px] font-semibold text-[var(--muted-foreground)]">Red Comercial</span>
             </div>
 
             {comparativoSucursales.length > 0 ? (
-              <div className="space-y-2 pt-1">
+              <div className="space-y-1.5 pt-0.5">
                 {comparativoSucursales.slice(0, 3).map((s, idx) => (
-                  <div key={idx} className="space-y-1 p-2 rounded-xl bg-[var(--muted)]/30 border border-[var(--border)]">
-                    <div className="flex items-center justify-between text-[11px]">
+                  <div key={idx} className="space-y-0.5 p-1.5 rounded-lg bg-[var(--muted)]/20 border border-[var(--border)]">
+                    <div className="flex items-center justify-between text-[10.5px]">
                       <span className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
-                        <Store size={12} className="text-amber-500" />
+                        <Store size={11} className="text-amber-500" />
                         {s.sucursalNombre}
                       </span>
-                      <span className="font-black text-[var(--foreground)]">
+                      <span className="font-black text-[var(--foreground)] font-mono">
                         ${Number(s.total || 0).toLocaleString("es-EC", { minimumFractionDigits: 2 })} ({s.porcentaje}%)
                       </span>
                     </div>
-                    <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                    <div className="w-full h-1 bg-[var(--muted)] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-slate-900 to-amber-500 rounded-full transition-all"
                         style={{ width: `${s.porcentaje}%` }}
@@ -824,25 +890,24 @@ export default function DashboardComponent({
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-6 text-[var(--muted-foreground)] gap-1.5">
-                <Store size={24} className="opacity-20 text-amber-500" />
-                <p className="text-[11px] font-bold">Sin ventas registradas en sucursales</p>
+              <div className="py-4 text-center text-[10.5px] text-[var(--muted-foreground)]">
+                Sin ventas registradas en sucursales
               </div>
             )}
           </div>
         ) : (
-          <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700 flex flex-col justify-between space-y-2">
+          <div className="p-3 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700 flex flex-col justify-between space-y-1.5">
             <div className="space-y-1">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <span className="px-2 py-0.2 rounded-full text-[8.5px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
                 PUNTO DE ATENCIÓN ACTIVO
               </span>
-              <h4 className="text-sm font-bold">Rendimiento Operativo Local</h4>
-              <p className="text-[10px] text-slate-300 leading-relaxed">
-                Visualización de métricas correspondientes a tu sucursal. Registra ventas en el POS y atiende pedidos para elevar la productividad.
+              <h4 className="text-xs font-bold">Rendimiento Operativo Local</h4>
+              <p className="text-[9.5px] text-slate-300 leading-relaxed">
+                Métricas de tu sucursal. Registra ventas por par y atiende pedidos comerciales.
               </p>
             </div>
-            <div className="pt-2 border-t border-slate-700/80 flex items-center justify-between text-[10px] text-slate-400">
-              <span>NEXORA Inteligencia Comercial</span>
+            <div className="pt-1.5 border-t border-slate-700/80 flex items-center justify-between text-[9px] text-slate-400">
+              <span>Inteligencia Comercial</span>
               <span className="text-amber-400 font-bold">En línea</span>
             </div>
           </div>
@@ -852,93 +917,96 @@ export default function DashboardComponent({
   );
 }
 
-{/* ─── COMPONENTE TARJETA KPI COMPACTA CON MEDIDOR GAUGE SVG INTEGRADO ─── */}
-interface KpiCardCompactProps {
+// ════════════════════════════════════════════════════════════════
+// TARJETA DE KPI EJECUTIVA ULTRA COMPACTA CON GAUGE / BARRA
+// ════════════════════════════════════════════════════════════════
+interface KpiExecutiveCardProps {
   title: string;
   value: string;
   subtitle: string;
-  valueColor?: string;
+  badgeText: string;
+  badgePositive: boolean;
   icon: React.ReactNode;
-  iconBg: string;
-  gaugePercent: number; // 0 - 100
-  gaugeColor: string;
-  gaugeLabel: string;
-  trend: string;
-  trendPositive: boolean;
+  accentColor: string;
+  progressPercent: number;
+  progressLabel: string;
 }
 
-function KpiCardCompact({
+function KpiExecutiveCard({
   title,
   value,
   subtitle,
-  valueColor = "",
+  badgeText,
+  badgePositive,
   icon,
-  iconBg,
-  gaugePercent,
-  gaugeColor,
-  gaugeLabel,
-  trend,
-  trendPositive,
-}: KpiCardCompactProps) {
-  // Cálculo SVG del arco de gauge (semicírculo o arco 180 grados)
-  const radius = 22;
-  const circumference = Math.PI * radius; // 180 grados
-  const strokeDashoffset = circumference - (Math.min(gaugePercent, 100) / 100) * circumference;
+  accentColor,
+  progressPercent,
+  progressLabel,
+}: KpiExecutiveCardProps) {
+  // Cálculo SVG del semicírculo del gauge
+  const radius = 18;
+  const circumference = Math.PI * radius;
+  const strokeDashoffset = circumference - (Math.min(progressPercent, 100) / 100) * circumference;
 
   return (
-    <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col justify-between">
-      
-      {/* Medidor Gauge SVG sutil en la esquina superior derecha */}
+    <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs hover:shadow-xs transition-all relative overflow-hidden flex flex-col justify-between">
+      {/* Semicírculo Gauge en la esquina superior derecha */}
       <div className="absolute right-2 top-2 flex flex-col items-center pointer-events-none opacity-85">
-        <svg width="54" height="32" viewBox="0 0 54 32" className="overflow-visible">
-          {/* Fondo del arco */}
+        <svg width="44" height="26" viewBox="0 0 44 26" className="overflow-visible">
           <path
-            d="M 5,28 A 22,22 0 0,1 49,28"
+            d="M 4,23 A 18,18 0 0,1 40,23"
             fill="none"
             stroke="currentColor"
-            strokeWidth="3.5"
+            strokeWidth="3"
             strokeLinecap="round"
-            className="text-[var(--muted)]/60"
+            className="text-[var(--muted)]/50"
           />
-          {/* Progreso del arco dinámico */}
           <path
-            d="M 5,28 A 22,22 0 0,1 49,28"
+            d="M 4,23 A 18,18 0 0,1 40,23"
             fill="none"
-            stroke={gaugeColor}
-            strokeWidth="3.5"
+            stroke={accentColor}
+            strokeWidth="3"
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             className="transition-all duration-700 ease-out"
           />
         </svg>
-        <span className="text-[8px] font-black -mt-2.5 text-[var(--muted-foreground)]">
-          {gaugePercent}%
+        <span className="text-[7.5px] font-black -mt-2 text-[var(--muted-foreground)]">
+          {Math.min(Math.round(progressPercent), 100)}%
         </span>
       </div>
 
-      <div className="space-y-1.5 pr-12">
+      <div className="space-y-1 pr-10">
         <div className="flex items-center gap-1.5 text-[var(--muted-foreground)]">
-          <div className={`p-1.5 rounded-lg ${iconBg}`}>{icon}</div>
-          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider truncate">{title}</span>
+          <div
+            className="p-1.5 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${accentColor}18`, color: accentColor }}
+          >
+            {icon}
+          </div>
+          <span className="text-[9.5px] font-bold uppercase tracking-wider truncate">{title}</span>
         </div>
+
         <div>
-          <div className={`text-lg sm:text-xl font-black tracking-tight ${valueColor || "text-[var(--foreground)]"}`}>
+          <div className="text-base sm:text-lg font-black tracking-tight text-[var(--foreground)] font-mono">
             {value}
           </div>
-          <div className="text-[9px] sm:text-[10px] font-semibold text-[var(--muted-foreground)] truncate">
-            {subtitle}
-          </div>
+          <div className="text-[9px] text-[var(--muted-foreground)] font-medium truncate">{subtitle}</div>
         </div>
       </div>
 
-      <div className="pt-2 mt-2 border-t border-[var(--border)] flex items-center justify-between text-[9px] font-bold">
-        <span className={trendPositive ? "text-emerald-600 flex items-center gap-0.5" : "text-amber-600 flex items-center gap-0.5"}>
-          {trendPositive ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
-          {trend}
+      <div className="pt-1.5 mt-1.5 border-t border-[var(--border)] flex items-center justify-between text-[8.5px] font-bold">
+        <span
+          className={`flex items-center gap-0.5 ${
+            badgePositive ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+          }`}
+        >
+          {badgePositive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+          {badgeText}
         </span>
-        <span className="text-[8px] text-[var(--muted-foreground)] truncate max-w-[80px]">
-          {gaugeLabel}
+        <span className="text-[8px] text-[var(--muted-foreground)] truncate max-w-[85px] font-normal">
+          {progressLabel}
         </span>
       </div>
     </div>

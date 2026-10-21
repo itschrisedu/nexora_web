@@ -665,7 +665,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
                 Predicción de Demanda & Estacionalidad
               </h2>
               <p className="text-xs text-[var(--muted-foreground)]">
-                Inteligencia artificial y modelado de temporadas para proyectar rotación y optimizar pedidos a talleres de calzado
+                Inteligencia artificial y modelado de temporadas para proyectar rotación y optimizar pedidos a proveedores de calzado
               </p>
             </div>
           </div>
@@ -1005,7 +1005,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
               <div className="flex-1 min-w-0">
                 <span className="font-extrabold mr-1">Inicio a clases activo:</span>
                 <span className="text-[11px] opacity-90">
-                  Mostrando compras anticipadas a taller (déficit de stock). Por defecto se prioriza zapato colegial <strong>todo negro</strong> y deportivo <strong>todo blanco</strong>. Puede consultar otros colores en cualquier momento usando los botones inferiores.
+                  Mostrando compras anticipadas a proveedores (déficit de stock). Por defecto se prioriza zapato colegial <strong>todo negro</strong> y deportivo <strong>todo blanco</strong>. Puede consultar otros colores en cualquier momento usando los botones inferiores.
                 </span>
               </div>
             </div>
@@ -1742,7 +1742,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Cantidad de Pares a Solicitar al Taller / Proveedor
+                  Cantidad de Pares a Solicitar al Proveedor
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -1772,7 +1772,7 @@ export default function PrediccionDemandaComponent({ onNavigateToProveedores }: 
               <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-2 text-blue-900 dark:text-blue-300">
                 <ShoppingCart size={14} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
                 <p className="text-[11px] leading-relaxed">
-                  Este pedido se agregará a la sección de <strong>Órdenes de Compra a Proveedores</strong> en estado <strong>Borrador</strong>, acumulándose con las demás solicitudes para que puedas revisarla, editarla y despacharla al taller.
+                  Este pedido se agregará a la sección de <strong>Órdenes de Compra a Proveedores</strong> en estado <strong>Borrador</strong>, acumulándose con las demás solicitudes para que puedas revisarla, editarla y despacharla al proveedor.
                 </p>
               </div>
 
