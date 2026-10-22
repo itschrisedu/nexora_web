@@ -249,21 +249,6 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
   // Saldo real temporal ingresado en el input
   const [tempEfectivoInput, setTempEfectivoInput] = useState<string>('');
 
-  // Cargar saldo guardado de localStorage al cambiar de sucursal
-  useEffect(() => {
-    const storageKey = `nexora_saldo_caja_${activeSucursalId || 'global'}`;
-    try {
-      const guardado = localStorage.getItem(storageKey);
-      if (guardado !== null && guardado !== '') {
-        setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: guardado }));
-        setTempEfectivoInput(guardado);
-      } else {
-        setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: '' }));
-        setTempEfectivoInput('');
-      }
-    } catch (e) {}
-  }, [activeSucursalId]);
-
   // Filtros de fecha y categoría
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
@@ -360,12 +345,13 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
         }
 
         const sucParam = activeSucursalId && activeSucursalId !== 'TODAS' ? `&sucursalId=${activeSucursalId}` : '';
-        const [gastosRes, statsRes, pedidosRes, proveedoresRes, reporteRes] = await Promise.all([
+        const [gastosRes, statsRes, pedidosRes, proveedoresRes, reporteRes, saldoCajaRes] = await Promise.all([
           ApiService.get(`/gastos?${queryParams.toString()}`).catch(() => []),
           ApiService.get(`/gastos/stats?${queryParams.toString()}`).catch(() => null),
           ApiService.get(`/pedidos?limit=100`).catch(() => []),
           ApiService.get(`/proveedores`).catch(() => []),
           ApiService.get(`/reportes/resumen-ejecutivo?periodo=MENSUAL${sucParam}`).catch(() => null),
+          ApiService.get(`/financiero/saldo-caja?sucursalId=${activeSucursalId || 'TODAS'}`).catch(() => null),
         ]);
 
         const rawGastos = Array.isArray(gastosRes) ? gastosRes : [];
@@ -386,11 +372,13 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
         const stockCosto = Number(reporteRes?.kpis?.capitalInvertidoStock || 0);
         const stockParesTot = Number(reporteRes?.kpis?.totalParesEnStock || 0);
 
-        const storageKey = `nexora_saldo_caja_${activeSucursalId || 'global'}`;
+        // Saldo real guardado en base de datos (Railway)
         let saldoGuardado = '';
-        try {
-          saldoGuardado = localStorage.getItem(storageKey) || '';
-        } catch (e) {}
+        if (saldoCajaRes?.saldoPersonalizado !== undefined && saldoCajaRes?.saldoPersonalizado !== null) {
+          saldoGuardado = saldoCajaRes.saldoPersonalizado.toString();
+        } else if (reporteRes?.kpis?.saldoCajaManual !== undefined && reporteRes?.kpis?.saldoCajaManual !== null) {
+          saldoGuardado = reporteRes.kpis.saldoCajaManual.toString();
+        }
 
         setDatosLiquidez((prev) => ({
           ...prev,
@@ -402,11 +390,9 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
           totalGastos: totalGastosMes,
           stockValorCosto: stockCosto,
           stockPares: stockParesTot,
-          efectivoPersonalizado: saldoGuardado || prev.efectivoPersonalizado || '',
+          efectivoPersonalizado: saldoGuardado,
         }));
-        if (saldoGuardado) {
-          setTempEfectivoInput(saldoGuardado);
-        }
+        setTempEfectivoInput(saldoGuardado);
 
         // Procesar pedidos con envíos/fletes
         const rawPedidos = Array.isArray(pedidosRes) ? pedidosRes : (pedidosRes?.pedidos || []);
@@ -620,30 +606,44 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
     return found ? (found.isMatriz ? `🏢 Matriz: ${found.name}` : `🏪 Sucursal: ${found.name}`) : 'Sucursal Actual';
   }, [activeSucursalId, sucursales]);
 
-  // Manejador para guardar saldo real verificado en caja/bancos en localStorage
-  const handleGuardarSaldoReal = () => {
-    const storageKey = `nexora_saldo_caja_${activeSucursalId || 'global'}`;
+  // Manejador para guardar saldo real verificado en caja/bancos en base de datos (Railway)
+  const handleGuardarSaldoReal = async () => {
     const valor = tempEfectivoInput.trim();
     if (valor !== '' && !isNaN(Number(valor)) && Number(valor) >= 0) {
       try {
-        localStorage.setItem(storageKey, valor);
-      } catch (e) {}
-      setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: valor }));
-      showToast(`Saldo real en caja/bancos ($${Number(valor).toFixed(2)}) guardado para ${nombreSucursalActiva}.`, 'success');
+        setLoading(true);
+        await ApiService.post('/financiero/saldo-caja', {
+          monto: Number(valor),
+          sucursalId: activeSucursalId !== 'TODAS' ? activeSucursalId : undefined,
+        });
+        setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: valor }));
+        showToast(`Saldo real en caja/bancos ($${Number(valor).toFixed(2)}) guardado en base de datos para ${nombreSucursalActiva}.`, 'success');
+      } catch (err: any) {
+        showToast(err.message || 'Error al guardar el saldo en base de datos.', 'error');
+      } finally {
+        setLoading(false);
+      }
     } else {
       showToast('Por favor ingresa un monto numérico válido mayor o igual a 0.', 'warning');
     }
   };
 
-  // Restablecer saldo al flujo neto calculado
-  const handleRestablecerSaldo = () => {
-    const storageKey = `nexora_saldo_caja_${activeSucursalId || 'global'}`;
+  // Restablecer saldo al flujo neto calculado en base de datos
+  const handleRestablecerSaldo = async () => {
     try {
-      localStorage.removeItem(storageKey);
-    } catch (e) {}
-    setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: '' }));
-    setTempEfectivoInput('');
-    showToast(`Saldo restablecido al flujo neto calculado para ${nombreSucursalActiva}.`, 'info');
+      setLoading(true);
+      await ApiService.post('/financiero/saldo-caja', {
+        monto: null,
+        sucursalId: activeSucursalId !== 'TODAS' ? activeSucursalId : undefined,
+      });
+      setDatosLiquidez((prev) => ({ ...prev, efectivoPersonalizado: '' }));
+      setTempEfectivoInput('');
+      showToast(`Saldo restablecido al flujo neto calculado en base de datos para ${nombreSucursalActiva}.`, 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Error al restablecer el saldo.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const mesesNombres = [

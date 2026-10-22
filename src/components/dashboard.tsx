@@ -26,6 +26,7 @@ import {
   Truck,
   ArrowRight,
   BadgeCheck,
+  Wallet,
 } from "lucide-react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "@/components/ui/toast";
@@ -130,6 +131,8 @@ export default function DashboardComponent({
     utilidadNeta: number;
     margenNetoPct: number;
     costoMercaderia: number;
+    flujoNetoEstimado: number;
+    esSaldoManual: boolean;
     diagnosticoTitulo: string;
     diagnosticoTexto: string;
     diagnosticoNivel: "ALTO" | "MEDIO" | "CRITICO";
@@ -143,6 +146,8 @@ export default function DashboardComponent({
     utilidadNeta: 0,
     margenNetoPct: 0,
     costoMercaderia: 0,
+    flujoNetoEstimado: 0,
+    esSaldoManual: false,
     diagnosticoTitulo: "Capacidad Óptima de Compra",
     diagnosticoTexto: "Disponibilidad de efectivo suficiente para compra de pedidos y abastecimiento.",
     diagnosticoNivel: "ALTO",
@@ -269,7 +274,15 @@ export default function DashboardComponent({
             const cartera = Number(kpisBackend.saldoCarteraTotal || 0);
             const costoCalzado = Number(kpisBackend.costoEstimadoTotal || 0);
 
-            const activoInmediato = ingresos + cartera + adelantos;
+            // Flujo neto calculado vs Saldo real guardado en base de datos (Railway)
+            const saldoManual =
+              kpisBackend.saldoCajaManual !== null && kpisBackend.saldoCajaManual !== undefined
+                ? Number(kpisBackend.saldoCajaManual)
+                : null;
+            const flujoNetoEstimado = Math.max(0, ingresos - costoCalzado - gMes);
+            const efectivoCajaReal = saldoManual !== null ? saldoManual : flujoNetoEstimado;
+
+            const activoInmediato = efectivoCajaReal + cartera + adelantos;
             const capNeto = activoInmediato - pasivoInmediato;
 
             // Utilidad Neta Real = Ganancia Bruta - Egresos Operativos
@@ -292,7 +305,7 @@ export default function DashboardComponent({
             }
 
             setLiquidezIndices({
-              efectivoCaja: ingresos,
+              efectivoCaja: efectivoCajaReal,
               carteraCobro: cartera,
               capitalNetoCompra: capNeto,
               deudaProveedores: dProveedores,
@@ -301,6 +314,8 @@ export default function DashboardComponent({
               utilidadNeta: utilNeta,
               margenNetoPct: margenNeto,
               costoMercaderia: costoCalzado,
+              flujoNetoEstimado,
+              esSaldoManual: saldoManual !== null,
               diagnosticoTitulo: diagTitulo,
               diagnosticoTexto: diagTexto,
               diagnosticoNivel: diagNivel,
@@ -499,8 +514,8 @@ export default function DashboardComponent({
         </div>
       </div>
 
-      {/* ─── 2. FILA DE 5 KPIS EJECUTIVOS (CLARA SEPARACIÓN DE DINERO VS PARES) ─── */}
-      <div className={`grid grid-cols-2 ${isAdmin ? "lg:grid-cols-5" : "lg:grid-cols-4"} gap-2`}>
+      {/* ─── 2. FILA DE KPIS EJECUTIVOS (CLARA SEPARACIÓN DE DINERO VS PARES) ─── */}
+      <div className={`grid grid-cols-2 ${isAdmin ? "sm:grid-cols-3 lg:grid-cols-6" : "lg:grid-cols-4"} gap-2`}>
         {/* KPI 1: Ventas / Ingresos [DINERO] */}
         <KpiExecutiveCard
           title={isVendedor ? "Mis Ventas" : isGlobalAdmin && activeSucursalId === "TODAS" ? "Ventas Totales" : "Ventas de Sucursal"}
@@ -553,7 +568,22 @@ export default function DashboardComponent({
           progressLabel="Cobranzas activas"
         />
 
-        {/* KPI 5: Utilidad Neta Real [DINERO & MARGEN - SÓLO ADMINS] */}
+        {/* KPI 5: Caja / Bancos [DINERO REAL EN BD O FLUJO NETO - SÓLO ADMINS] */}
+        {isAdmin && (
+          <KpiExecutiveCard
+            title="Caja / Bancos"
+            value={`$${liquidezIndices.efectivoCaja.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
+            subtitle={liquidezIndices.esSaldoManual ? "Saldo real en BD" : `Flujo neto: $${liquidezIndices.flujoNetoEstimado.toFixed(0)}`}
+            badgeText={liquidezIndices.esSaldoManual ? "Saldo en BD" : "Flujo Calculado"}
+            badgePositive={liquidezIndices.efectivoCaja >= 0}
+            icon={<Wallet size={14} />}
+            accentColor="#10B981"
+            progressPercent={Math.min(Math.round((liquidezIndices.efectivoCaja / (metaPeriodo * 0.4 || 1)) * 100), 100)}
+            progressLabel={liquidezIndices.esSaldoManual ? "Verificado en nube" : "Cobros - Egresos"}
+          />
+        )}
+
+        {/* KPI 6: Utilidad Neta Real [DINERO & MARGEN - SÓLO ADMINS] */}
         {isAdmin && (
           <KpiExecutiveCard
             title="Utilidad Neta Real"
@@ -594,8 +624,18 @@ export default function DashboardComponent({
             </span>
           </div>
 
-          {/* Estado de Proveedores & Capacidad de Compra */}
-          <div className="flex items-center gap-2 font-mono text-[10px]">
+          {/* Estado de Proveedores, Caja & Capacidad de Compra */}
+          <div className="flex items-center gap-2 font-mono text-[10px] flex-wrap">
+            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+              Caja/Bancos: ${liquidezIndices.efectivoCaja.toFixed(2)}
+              <span className={`px-1 py-0.2 rounded text-[7.5px] uppercase font-black ${
+                liquidezIndices.esSaldoManual
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                  : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25"
+              }`}>
+                {liquidezIndices.esSaldoManual ? "En BD" : "Calculado"}
+              </span>
+            </span>
             <span className="text-orange-500 font-bold">
               Deuda Proveedores: ${liquidezIndices.deudaProveedores.toFixed(2)}
             </span>
