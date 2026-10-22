@@ -76,6 +76,7 @@ import {
 import { generarUrlPublicaAbono, generarUrlPublicaHistorial } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
 import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from '@/utils/text-formatters';
+import { descargarReporteDeudoresPdf } from '../services/pdf-deudores.service';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 import { getCurvaDocena } from '../utils/curvas';
 
@@ -932,10 +933,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         (sum, c) => sum + Number(c.montoOriginal ?? c.montoTotal ?? 0),
         0,
       );
-      const saldoTotalPendiente = listaCobros.reduce(
-        (sum, c) => sum + Number(c.saldoPendiente || 0),
-        0,
-      );
+      const saldoTotalPendiente = listaCobros.reduce((sum, c) => {
+        if (c.estado === 'SALDADO' || c.tipo === 'CONTADO') return sum;
+        return sum + Number(c.saldoPendiente || 0);
+      }, 0);
       const totalAbonado = listaCobros.reduce(
         (sum, c) => sum + (c.abonos || []).reduce((s, a) => s + Number(a.monto || 0), 0),
         0,
@@ -2553,7 +2554,60 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     }
   };
 
-  const saldoTotalGeneral = cobrosFiltradosPorSucursal.reduce((acc, c) => acc + Number(c.saldoPendiente), 0);
+  const saldoTotalGeneral = cobrosFiltradosPorSucursal.reduce((acc, c) => {
+    if (c.estado === 'SALDADO' || c.tipo === 'CONTADO') return acc;
+    return acc + Number(c.saldoPendiente || 0);
+  }, 0);
+
+  const handleDescargarReporteDeudores = () => {
+    const deudores = clientesCartera
+      .filter((c) => c.saldoTotalPendiente > 0.01)
+      .map((c) => ({
+        clientId: c.clientId,
+        clienteNombre: c.clienteNombre,
+        clienteApellido: c.clienteApellido,
+        clienteNombreSolo: c.clienteNombreSolo,
+        clienteCedula: c.clienteCedula,
+        clienteTelefono: c.clienteTelefono,
+        clienteNivel: c.clienteNivel,
+        sucursalNombre: c.sucursalNombre,
+        totalCompras: c.montoTotalFacturado,
+        saldoTotalPendiente: c.saldoTotalPendiente,
+        totalComprasPendientes: c.totalComprasPendientes,
+        proximoVencimiento: c.proximoVencimiento,
+      }));
+
+    if (deudores.length === 0) {
+      showToast('No existen clientes con saldo deudor pendiente para exportar.', 'info');
+      return;
+    }
+
+    const tenantUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
+    const emisorNombre = businessConfig?.nombre || tenantUser?.tenantName || 'Comercializadora de Calzado';
+    const emisorRuc = businessConfig?.ruc || '1804884664001';
+    const emisorDireccion = businessConfig?.direccion || 'Cevallos, Tungurahua, Ecuador';
+    const emisorTelefono = businessConfig?.telefono || (businessConfig as any)?.whatsappContacto || '';
+
+    const hoy = new Date();
+    const fechaEmision = `${hoy.toLocaleDateString('es-EC')} ${hoy.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}`;
+
+    descargarReporteDeudoresPdf({
+      emisor: {
+        nombre: emisorNombre,
+        ruc: emisorRuc,
+        direccion: emisorDireccion,
+        telefono: emisorTelefono,
+      },
+      fechaEmision,
+      totalDeudaCartera: saldoTotalGeneral,
+      deudores,
+      filtroSucursal: activeSucursalId !== 'TODAS'
+        ? (listaSucursalesDisponibles.find((s) => s.id === selectedSucursalCobroId)?.name || 'Sucursal Seleccionada')
+        : 'Todas las Sucursales',
+    });
+
+    showToast(`Reporte PDF generado exitosamente con ${deudores.length} clientes deudores.`, 'success');
+  };
 
   // Filtrado de Cartera Consolidada
   const clientesFiltrados = clientesCartera.filter((c) => {
@@ -2648,6 +2702,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               <span className="font-extrabold text-base text-red-500 leading-tight">${saldoTotalGeneral.toFixed(2)}</span>
             </div>
           </div>
+
+          {/* Botón Descargar Reporte PDF de Clientes Deudores */}
+          <button
+            type="button"
+            onClick={handleDescargarReporteDeudores}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+            title="Descargar reporte oficial en PDF con la lista de personas que deben (Apellidos, Nombres y Saldo)"
+          >
+            <Download size={15} />
+            <span>Descargar Lista Deudores (PDF)</span>
+          </button>
         </div>
       </div>
 
