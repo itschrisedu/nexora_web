@@ -2949,7 +2949,7 @@ export default function ComercialComponent({
                       subFiltroPrep === 'EN_PREPARACION' ? 'bg-blue-600 text-white font-bold shadow-2xs' : 'text-blue-700/80 hover:bg-blue-500/10'
                     }`}
                   >
-                    En Taller / Alistamiento ({countPrepDirecta})
+                    Alistamiento en Bodega ({countPrepDirecta})
                   </button>
                   <button
                     type="button"
@@ -8631,7 +8631,7 @@ export default function ComercialComponent({
                   >
                     <div className="font-extrabold text-xs">🔄 Reposición de Pares</div>
                     <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
-                      Devolver los mismos pares físicos cuando llegue nueva mercadería del taller o proveedor.
+                      Devolver los mismos pares físicos cuando llegue nueva mercadería del proveedor.
                     </div>
                   </button>
                   <button
