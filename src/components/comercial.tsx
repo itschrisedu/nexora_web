@@ -622,22 +622,39 @@ export default function ComercialComponent({
   const [productoSeleccionadoObj, setProductoSeleccionadoObj] = useState<any | null>(null);
   const [serieFiltroBuscador, setSerieFiltroBuscador] = useState<string>('TODAS');
 
-  // Búsqueda en Cascada de Modelo y Color (Fase 6)
+  // Búsqueda Dual Omnicanal: Modelo + Color (Fase 6)
   const [filtroModeloCascada, setFiltroModeloCascada] = useState<string>('');
   const [filtroColorCascada, setFiltroColorCascada] = useState<string>('');
   const [showDropdownColoresCascada, setShowDropdownColoresCascada] = useState(false);
   const [showDropdownModelosCascada, setShowDropdownModelosCascada] = useState(false);
   const [inputBusquedaModeloCascada, setInputBusquedaModeloCascada] = useState('');
-  const [modoBusquedaPedido, setModoBusquedaPedido] = useState<'CASCADA' | 'RAPIDA'>('CASCADA');
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  const modeloInputRef = useRef<HTMLInputElement>(null);
 
-  // Modelos únicos para la Búsqueda en Cascada (Fase 6)
+  // Paleta de tonos visuales para píldoras táctiles móviles
+  const getColorSwatchBg = useCallback((colName: string) => {
+    const c = (colName || '').toLowerCase().trim();
+    if (c.includes('negro')) return '#1e293b';
+    if (c.includes('café') || c.includes('cafe') || c.includes('marrón') || c.includes('marron')) return '#78350f';
+    if (c.includes('miel') || c.includes('canela') || c.includes('camel') || c.includes('mostaza')) return '#d97706';
+    if (c.includes('blanco')) return '#f8fafc';
+    if (c.includes('azul')) return '#1d4ed8';
+    if (c.includes('vino') || c.includes('borgoña') || c.includes('guinda')) return '#831843';
+    if (c.includes('beige') || c.includes('hueso') || c.includes('crema')) return '#fde68a';
+    if (c.includes('rojo')) return '#dc2626';
+    if (c.includes('verde')) return '#15803d';
+    if (c.includes('gris') || c.includes('plomo')) return '#64748b';
+    return '#94a3b8';
+  }, []);
+
+  // Modelos únicos para el Campo 1 (Modelo)
   const modelosUnicosCascada = useMemo(() => {
     const map = new Map<string, { modelName: string; modelId?: string; variantes: any[]; colores: string[]; totalStock: number; imageUrl?: string; serieNombre?: string }>();
     catalogoProductos.forEach((p) => {
       if (serieFiltroBuscador !== 'TODAS') {
         if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return;
       }
-      if (filtroColorCascada.trim()) {
+      if (filtroColorCascada.trim() && !filtroModeloCascada.trim()) {
         const qCol = filtroColorCascada.toLowerCase().trim();
         if (!(p.color || '').toLowerCase().includes(qCol)) return;
       }
@@ -663,16 +680,45 @@ export default function ComercialComponent({
       existing.totalStock += paresP;
       if (!existing.imageUrl && p.imageUrl) existing.imageUrl = p.imageUrl;
     });
+
     let list = Array.from(map.values());
     if (inputBusquedaModeloCascada.trim()) {
       const q = inputBusquedaModeloCascada.toLowerCase().trim();
       list = list.filter((m) => m.modelName.toLowerCase().includes(q));
     }
-    return list.sort((a, b) => a.modelName.localeCompare(b.modelName, 'es', { sensitivity: 'base' }));
-  }, [catalogoProductos, serieFiltroBuscador, filtroColorCascada, inputBusquedaModeloCascada]);
+    // Ordenar: mayor stock primero, luego alfabético
+    return list.sort((a, b) => {
+      if (b.totalStock !== a.totalStock) return b.totalStock - a.totalStock;
+      return a.modelName.localeCompare(b.modelName, 'es', { sensitivity: 'base' });
+    });
+  }, [catalogoProductos, serieFiltroBuscador, filtroColorCascada, filtroModeloCascada, inputBusquedaModeloCascada]);
 
-  // Colores disponibles para el selector en cascada (Fase 6)
+  // Variantes directas cuando el usuario escribe modelo + color juntos en Campo 1
+  const variantesDirectasOmnicanal = useMemo(() => {
+    const q = inputBusquedaModeloCascada.toLowerCase().trim();
+    if (!q || q.length < 2 || filtroModeloCascada) return [];
+    return catalogoProductos
+      .filter((p) => {
+        if (serieFiltroBuscador !== 'TODAS') {
+          if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return false;
+        }
+        const full = `${p.modelName || ''} ${p.color || ''} ${p.code || ''}`.toLowerCase();
+        return full.includes(q);
+      })
+      .slice(0, 4);
+  }, [catalogoProductos, serieFiltroBuscador, inputBusquedaModeloCascada, filtroModeloCascada]);
+
+  // Colores disponibles para el Campo 2 (Color)
   const coloresDisponiblesCascada = useMemo(() => {
+    let list: Array<{
+      color: string;
+      variante?: any;
+      stock: number;
+      imageUrl?: string;
+      serieNombre?: string;
+      countModelos: number;
+    }> = [];
+
     if (filtroModeloCascada.trim()) {
       const variantesModelo = catalogoProductos.filter((p) => {
         if (serieFiltroBuscador !== 'TODAS') {
@@ -680,7 +726,7 @@ export default function ComercialComponent({
         }
         return (p.modelName || '').toLowerCase().trim() === filtroModeloCascada.toLowerCase().trim();
       });
-      return variantesModelo.map((v) => {
+      list = variantesModelo.map((v) => {
         const pares = (v.tallas || []).reduce((sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0), 0);
         return {
           color: v.color || 'Estándar',
@@ -691,33 +737,47 @@ export default function ComercialComponent({
           countModelos: 1,
         };
       });
+    } else {
+      const map = new Map<string, { color: string; countModelos: number; stock: number; variante: any; imageUrl?: string; serieNombre?: string }>();
+      catalogoProductos.forEach((p) => {
+        if (serieFiltroBuscador !== 'TODAS') {
+          if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return;
+        }
+        const col = p.color?.trim() || 'Estándar';
+        let existing = map.get(col);
+        if (!existing) {
+          existing = {
+            color: col,
+            countModelos: 0,
+            stock: 0,
+            variante: p,
+            imageUrl: p.imageUrl,
+            serieNombre: p.serieNombre,
+          };
+          map.set(col, existing);
+        }
+        existing.countModelos += 1;
+        const paresP = (p.tallas || []).reduce((sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0), 0);
+        existing.stock += paresP;
+        if (!existing.imageUrl && p.imageUrl) existing.imageUrl = p.imageUrl;
+      });
+      list = Array.from(map.values());
     }
 
-    const map = new Map<string, { color: string; countModelos: number; stock: number; variante: any; imageUrl?: string; serieNombre?: string }>();
-    catalogoProductos.forEach((p) => {
-      if (serieFiltroBuscador !== 'TODAS') {
-        if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return;
+    // Filtrar si el usuario escribe en el campo de color
+    if (filtroColorCascada.trim()) {
+      const q = filtroColorCascada.toLowerCase().trim();
+      list = list.filter((c) => c.color.toLowerCase().includes(q));
+    }
+
+    // Ordenar: colores con stock > 0 primero, luego por nombre
+    return list.sort((a, b) => {
+      if (b.stock !== a.stock) {
+        return b.stock - a.stock;
       }
-      const col = p.color?.trim() || 'Estándar';
-      let existing = map.get(col);
-      if (!existing) {
-        existing = {
-          color: col,
-          countModelos: 0,
-          stock: 0,
-          variante: p,
-          imageUrl: p.imageUrl,
-          serieNombre: p.serieNombre,
-        };
-        map.set(col, existing);
-      }
-      existing.countModelos += 1;
-      const paresP = (p.tallas || []).reduce((sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0), 0);
-      existing.stock += paresP;
-      if (!existing.imageUrl && p.imageUrl) existing.imageUrl = p.imageUrl;
+      return a.color.localeCompare(b.color, 'es', { sensitivity: 'base' });
     });
-    return Array.from(map.values()).sort((a, b) => a.color.localeCompare(b.color, 'es', { sensitivity: 'base' }));
-  }, [catalogoProductos, serieFiltroBuscador, filtroModeloCascada]);
+  }, [catalogoProductos, serieFiltroBuscador, filtroModeloCascada, filtroColorCascada]);
 
   const selectedModelThumb = useMemo(() => {
     if (!filtroModeloCascada) return undefined;
