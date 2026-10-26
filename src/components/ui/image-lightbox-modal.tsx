@@ -10,6 +10,7 @@ interface ImageLightboxModalProps {
   title?: string;
   subtitle?: string;
   badge?: string;
+  zIndexClass?: string;
 }
 
 export default function ImageLightboxModal({
@@ -19,6 +20,7 @@ export default function ImageLightboxModal({
   title,
   subtitle,
   badge,
+  zIndexClass = "z-[90]",
 }: ImageLightboxModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -40,7 +42,7 @@ export default function ImageLightboxModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+      className={`fixed inset-0 ${zIndexClass || 'z-[90]'} flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200`}
       onClick={onClose}
     >
       <div

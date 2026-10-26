@@ -143,6 +143,11 @@ export default function ReportesComponent({
   const [filtroRotacionVista, setFiltroRotacionVista] = useState<'tabla' | 'tarjetas'>('tabla');
   const [productoExpandidoId, setProductoExpandidoId] = useState<string | null>(null);
 
+  // FASE 8: Estados para Reporte de Ventas por Modelo y Margen FIFO Real
+  const [loadingModelosMargen, setLoadingModelosMargen] = useState(false);
+  const [modelosMargenData, setModelosMargenData] = useState<any>(null);
+  const [filtroCategoriaModelo, setFiltroCategoriaModelo] = useState('TODAS');
+
   // Estado de Reporte de Cobranzas (Clientes Deudores)
   const [loadingCobranzas, setLoadingCobranzas] = useState(false);
   const [cobranzasData, setCobranzasData] = useState<any>(null);
@@ -218,6 +223,8 @@ export default function ReportesComponent({
       cargarReportePos();
     } else if (tabActiva === 'sucursales') {
       cargarReporteSucursales();
+    } else if (tabActiva === 'modelos') {
+      cargarReporteModelosMargen();
     } else if (tabActiva === 'cobranzas') {
       cargarCobranzas();
     } else if (tabActiva === 'campanas') {
@@ -225,13 +232,15 @@ export default function ReportesComponent({
     } else if (tabActiva === 'proveedores') {
       cargarReporteProveedores();
     }
-  }, [periodo, sucursalSeleccionada, vendedorSeleccionado, canalSeleccionado]);
+  }, [periodo, sucursalSeleccionada, vendedorSeleccionado, canalSeleccionado, filtroCategoriaModelo]);
 
   useEffect(() => {
     if (tabActiva === 'pos') {
       if (!posData) cargarReportePos();
     } else if (tabActiva === 'sucursales') {
       if (!sucursalesReporteData) cargarReporteSucursales();
+    } else if (tabActiva === 'modelos') {
+      if (!modelosMargenData) cargarReporteModelosMargen();
     } else if (tabActiva === 'cobranzas') {
       if (!cobranzasData) cargarCobranzas();
     } else if (tabActiva === 'campanas') {
@@ -452,6 +461,32 @@ export default function ReportesComponent({
       showToast('Error al obtener reporte de abastecimiento de proveedores.', 'warning');
     } finally {
       setLoadingProveedores(false);
+    }
+  };
+
+  const cargarReporteModelosMargen = async () => {
+    setLoadingModelosMargen(true);
+    try {
+      const params = new URLSearchParams();
+      if (periodo) params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (filtroCategoriaModelo && filtroCategoriaModelo !== 'TODAS') {
+        params.append('categoria', filtroCategoriaModelo);
+      }
+      const data = await ApiService.get(`/reportes/ventas-modelos-margen?${params.toString()}`);
+      if (data) {
+        setModelosMargenData(data);
+      }
+    } catch (err: any) {
+      console.warn('Error al cargar ventas por modelo y margen:', err);
+    } finally {
+      setLoadingModelosMargen(false);
     }
   };
 
@@ -2325,6 +2360,175 @@ export default function ReportesComponent({
                   </div>
                 </div>
 
+                {/* 1.1 FASE 8: Resumen Financiero y Margen FIFO Real */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                      Pares Vendidos
+                    </span>
+                    <div className="text-xl font-black text-blue-600">
+                      {modelosMargenData?.metricas?.totalPares ?? rotResumen.totalConVentas} pares
+                    </div>
+                    <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                      En {modelosMargenData?.metricas?.totalModelosVendidos ?? rotResumen.totalConVentas} variantes
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                      Facturación Total
+                    </span>
+                    <div className="text-xl font-black text-[var(--foreground)]">
+                      ${(modelosMargenData?.metricas?.totalIngresos ?? 0).toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-emerald-600 font-bold mt-1 block">
+                      Ingreso bruto cobrado
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                      Costo Real FIFO
+                    </span>
+                    <div className="text-xl font-black text-amber-600">
+                      ${(modelosMargenData?.metricas?.totalCostoFifo ?? 0).toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
+                      Costo por lote consumido
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-[var(--card)] border border-emerald-500/30 rounded-2xl shadow-xs bg-emerald-500/5">
+                    <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block mb-1">
+                      Ganancia Neta Real
+                    </span>
+                    <div className="text-xl font-black text-emerald-600">
+                      ${(modelosMargenData?.metricas?.gananciaTotal ?? 0).toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-emerald-700/80 font-bold mt-1 block">
+                      Utilidad neta generada
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] tracking-wider block mb-1">
+                      Margen Promedio
+                    </span>
+                    <div className="text-xl font-black text-indigo-600">
+                      {modelosMargenData?.metricas?.margenPromedio ?? 0}%
+                    </div>
+                    <span className="text-[10px] text-indigo-600/80 font-bold mt-1 block">
+                      Rentabilidad sobre venta
+                    </span>
+                  </div>
+                </div>
+
+                {/* 1.2 FASE 8: Gráficas Comparativas (Barras Combinadas + Participación %) */}
+                {modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Gráfica de Barras Combinada: Volumen vs Margen % */}
+                    <div className="lg:col-span-2 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                            <BarChart3 size={16} className="text-blue-500" />
+                            Modelos con Mayor Demanda y Margen de Ganancia Real
+                          </h4>
+                          <p className="text-[11px] text-[var(--muted-foreground)]">
+                            Comparativa de pares despachados y porcentaje de utilidad FIFO
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600">
+                          Top Modelos
+                        </span>
+                      </div>
+
+                      <div className="space-y-3 pt-1">
+                        {modelosMargenData.topModelosGrafica.map((m: any, idx: number) => {
+                          const maxPares = Math.max(...modelosMargenData.topModelosGrafica.map((x: any) => x.paresVendidos), 1);
+                          const pctBar = Math.min(100, Math.max(10, (m.paresVendidos / maxPares) * 100));
+
+                          return (
+                            <div key={idx} className="space-y-1">
+                              <div className="flex items-center justify-between text-xs font-bold">
+                                <span className="truncate max-w-[220px] text-[var(--foreground)]">
+                                  {m.nombre}
+                                </span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-slate-500 text-[11px] font-bold">
+                                    {m.paresVendidos} pares
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                    m.margenPorcentual >= 40
+                                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                      : m.margenPorcentual >= 25
+                                      ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                      : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                  }`}>
+                                    {m.margenPorcentual}% margen
+                                  </span>
+                                  <span className="text-emerald-600 text-[11px] font-black min-w-[55px] text-right">
+                                    +${m.gananciaNeta.toFixed(0)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="w-full bg-[var(--muted)]/50 h-3 rounded-full overflow-hidden flex">
+                                <div
+                                  style={{ width: `${pctBar}%` }}
+                                  className="h-full bg-gradient-to-r from-blue-600 to-emerald-500 rounded-full transition-all duration-500"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Gráfica Circular / Participación Porcentual */}
+                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs flex flex-col justify-between">
+                      <div>
+                        <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
+                          <Percent size={16} className="text-emerald-500" />
+                          Participación por Modelo
+                        </h4>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          Distribución porcentual del volumen de pares comercializados
+                        </p>
+                      </div>
+
+                      <div className="space-y-2.5 my-auto py-2">
+                        {modelosMargenData.topModelosGrafica.slice(0, 5).map((m: any, idx: number) => {
+                          const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-indigo-500', 'bg-amber-500', 'bg-purple-500'];
+                          const color = colors[idx % colors.length];
+
+                          return (
+                            <div key={idx} className="p-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`w-3 h-3 rounded-full ${color} shrink-0`} />
+                                <span className="font-bold text-[var(--foreground)] truncate max-w-[150px]">
+                                  {m.nombre}
+                                </span>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="font-black text-xs text-[var(--foreground)] block">
+                                  {m.porcentajeParticipacion}%
+                                </span>
+                                <span className="text-[10px] text-[var(--muted-foreground)]">
+                                  {m.paresVendidos} pares
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="pt-2 border-t border-[var(--border)] text-center text-[11px] text-[var(--muted-foreground)]">
+                        Consolidado sobre un total de <strong className="text-[var(--foreground)]">{modelosMargenData.metricas.totalPares} pares</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* 2. Cuadrícula de Métricas y KPIs de Rotación */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Tarjeta 1: Total Artículos Analizados */}
@@ -2461,6 +2665,26 @@ export default function ReportesComponent({
                       </select>
                     </div>
 
+                    {/* Filtro por Categoría / Material (FASE 8) */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
+                        <Tag size={14} />
+                        Categoría:
+                      </span>
+                      <select
+                        value={filtroCategoriaModelo}
+                        onChange={(e) => setFiltroCategoriaModelo(e.target.value)}
+                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="TODAS">Todas las Categorías</option>
+                        {(modelosMargenData?.categorias || []).map((cat: string) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     {/* Filtro por Estado / Nivel de Rotación */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
@@ -2546,19 +2770,20 @@ export default function ReportesComponent({
                           <tr className="bg-[var(--muted)]/40 border-b border-[var(--border)] text-[var(--muted-foreground)] font-black uppercase text-[10px] tracking-wider">
                             <th className="py-3 px-4">Calzado / Modelo</th>
                             <th className="py-3 px-3">Serie</th>
+                            <th className="py-3 px-3 text-center">Pares Vendidos</th>
+                            <th className="py-3 px-3 text-right">Precio Prom.</th>
+                            <th className="py-3 px-3 text-right">Costo FIFO</th>
+                            <th className="py-3 px-3 text-right">Ganancia Neta</th>
+                            <th className="py-3 px-3 text-center">Margen %</th>
                             <th className="py-3 px-3 text-center">Stock Bodega</th>
                             <th className="py-3 px-3">Curva de Tallas</th>
-                            <th className="py-3 px-3 text-center">Pares Vendidos</th>
-                            <th className="py-3 px-3 text-center">Nivel Rotación</th>
-                            <th className="py-3 px-4 text-right">Facturación</th>
-                            <th className="py-3 px-4 text-right">Capital Retenido</th>
                             <th className="py-3 px-3 text-center">Detalle</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
                           {catalogoFiltrado.length === 0 ? (
                             <tr>
-                              <td colSpan={9} className="py-12 text-center text-slate-400">
+                              <td colSpan={10} className="py-12 text-center text-slate-400">
                                 <Package size={36} className="mx-auto mb-2 opacity-40" />
                                 <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
                                 <p className="text-xs text-[var(--muted-foreground)] mt-1">
@@ -2607,6 +2832,53 @@ export default function ReportesComponent({
                                       </span>
                                     </td>
 
+                                    {/* Pares Vendidos */}
+                                    <td className="py-3 px-3 text-center">
+                                      {p.paresVendidos > 0 ? (
+                                        <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                                          {p.paresVendidos} pares
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-rose-500 bg-rose-500/5 border border-rose-500/10">
+                                          0 ventas
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    {/* Precio Promedio */}
+                                    <td className="py-3 px-3 text-right font-bold text-xs text-[var(--foreground)]">
+                                      ${(p.paresVendidos > 0 ? (p.ingresos / p.paresVendidos) : p.precioVenta).toFixed(2)}
+                                    </td>
+
+                                    {/* Costo FIFO */}
+                                    <td className="py-3 px-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400">
+                                      ${(p.paresVendidos > 0 ? (p.costo / p.paresVendidos) : p.precioCosto).toFixed(2)}
+                                    </td>
+
+                                    {/* Ganancia Neta */}
+                                    <td className="py-3 px-3 text-right font-black text-xs text-emerald-600">
+                                      ${((p.ingresos || 0) - (p.costo || 0)).toFixed(2)}
+                                    </td>
+
+                                    {/* Margen % */}
+                                    <td className="py-3 px-3 text-center">
+                                      {(() => {
+                                        const net = (p.ingresos || 0) - (p.costo || 0);
+                                        const mPct = p.ingresos > 0 ? Math.round((net / p.ingresos) * 100) : p.margen;
+                                        return (
+                                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                            mPct >= 40
+                                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                              : mPct >= 25
+                                              ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                              : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                          }`}>
+                                            {mPct}%
+                                          </span>
+                                        );
+                                      })()}
+                                    </td>
+
                                     {/* Stock Físico */}
                                     <td className="py-3 px-3 text-center">
                                       {p.stockTotal <= 0 ? (
@@ -2650,74 +2922,6 @@ export default function ReportesComponent({
                                       </div>
                                     </td>
 
-                                    {/* Pares Vendidos */}
-                                    <td className="py-3 px-3 text-center">
-                                      {p.paresVendidos > 0 ? (
-                                        <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">
-                                          {p.paresVendidos} pares
-                                        </span>
-                                      ) : (
-                                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-rose-500 bg-rose-500/5 border border-rose-500/10">
-                                          0 ventas
-                                        </span>
-                                      )}
-                                    </td>
-
-                                    {/* Nivel Rotación */}
-                                    <td className="py-3 px-3 text-center">
-                                      {p.rotacion === 'ALTA' && (
-                                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 inline-flex items-center gap-1">
-                                          <Flame size={12} /> ALTA
-                                        </span>
-                                      )}
-                                      {p.rotacion === 'MEDIA' && (
-                                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-blue-500/15 text-blue-600 border border-blue-500/30">
-                                          MEDIA
-                                        </span>
-                                      )}
-                                      {p.rotacion === 'BAJA' && (
-                                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-500/15 text-amber-600 border border-amber-500/30">
-                                          BAJA
-                                        </span>
-                                      )}
-                                      {p.rotacion === 'SIN_MOVIMIENTO' && (
-                                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-500/15 text-rose-600 border border-rose-500/30 inline-flex items-center gap-1">
-                                          <AlertTriangle size={11} /> SIN SALIDA
-                                        </span>
-                                      )}
-                                    </td>
-
-                                    {/* Facturación */}
-                                    <td className="py-3 px-4 text-right">
-                                      {p.ingresos > 0 ? (
-                                        <span className="font-black text-xs text-emerald-600">
-                                          ${p.ingresos.toFixed(2)}
-                                        </span>
-                                      ) : (
-                                        <span className="text-[11px] text-slate-400 font-medium">$0.00</span>
-                                      )}
-                                    </td>
-
-                                    {/* Capital Retenido */}
-                                    <td className="py-3 px-4 text-right">
-                                      {p.stockTotal > 0 ? (
-                                        <div>
-                                          <span
-                                            className={`font-black text-xs ${
-                                              p.rotacion === 'SIN_MOVIMIENTO' ? 'text-rose-600' : 'text-[var(--foreground)]'
-                                            }`}
-                                          >
-                                            ${p.capitalRetenido.toFixed(2)}
-                                          </span>
-                                          <span className="block text-[9px] text-slate-400">
-                                            ${p.precioCosto.toFixed(2)} c/u
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        <span className="text-[11px] text-slate-400">$0.00</span>
-                                      )}
-                                    </td>
-
                                     {/* Detalle Toggle */}
                                     <td className="py-3 px-3 text-center">
                                       <button
@@ -2737,7 +2941,7 @@ export default function ReportesComponent({
                                   {/* Fila expandida con desglose de tallas y diagnóstico */}
                                   {expandido && (
                                     <tr className="bg-[var(--muted)]/30 border-b border-[var(--border)]">
-                                      <td colSpan={9} className="p-4">
+                                      <td colSpan={10} className="p-4">
                                         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
                                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2">
                                             <div>

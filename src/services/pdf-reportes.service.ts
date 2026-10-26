@@ -916,9 +916,9 @@ export function generarReporteModelosRotacionPdf(data: ReporteModelosData): jsPD
   y += 4.5;
 
   if (usarCatalogoCompleto) {
-    // Columnas: #, Modelo de Calzado, Color / Serie, Stock Bodega, Pares Vendidos, Nivel Rotación, Facturación Total
-    const colW = [7, 52, 35, 22, 22, 24, 24];
-    const headers = ['#', 'Modelo de Calzado', 'Color / Serie', 'Stock Físico', 'Pares Vend.', 'Rotación', 'Facturación'];
+    // Columnas: #, Modelo de Calzado, Color / Serie, Pares, P. Promedio, Costo FIFO, Utilidad Neta, Margen %
+    const colW = [7, 45, 30, 18, 21, 21, 22, 22];
+    const headers = ['#', 'Modelo de Calzado', 'Color / Serie', 'Pares Vend.', 'P. Promedio', 'Costo FIFO', 'Utilidad Neta', 'Margen %'];
 
     doc.setFillColor(15, 23, 42);
     doc.rect(marginLeft, y, contentWidth, 6, 'F');
@@ -967,26 +967,16 @@ export function generarReporteModelosRotacionPdf(data: ReporteModelosData): jsPD
 
       // 2. Modelo
       doc.setFont('helvetica', 'bold');
-      const nombreModelo = p.modelName.length > 28 ? p.modelName.substring(0, 26) + '..' : p.modelName;
+      const nombreModelo = p.modelName.length > 24 ? p.modelName.substring(0, 22) + '..' : p.modelName;
       doc.text(nombreModelo, x, y + 4.3); x += colW[1];
 
       // 3. Color / Serie
       doc.setFont('helvetica', 'normal');
       const infoSerie = `${p.color} • ${formatearNombreSerie(p.serieNombre)}`;
-      const infoSerieCorta = infoSerie.length > 22 ? infoSerie.substring(0, 20) + '..' : infoSerie;
+      const infoSerieCorta = infoSerie.length > 20 ? infoSerie.substring(0, 18) + '..' : infoSerie;
       doc.text(infoSerieCorta, x, y + 4.3); x += colW[2];
 
-      // 4. Stock Físico
-      if (p.stockTotal <= 0) {
-        doc.setTextColor(148, 163, 184);
-        doc.text('0 (Agotado)', x, y + 4.3);
-      } else {
-        doc.setTextColor(15, 23, 42);
-        doc.text(`${p.stockTotal} pares`, x, y + 4.3);
-      }
-      x += colW[3];
-
-      // 5. Pares Vendidos
+      // 4. Pares Vendidos
       if (p.paresVendidos > 0) {
         doc.setTextColor(37, 99, 235);
         doc.setFont('helvetica', 'bold');
@@ -994,37 +984,50 @@ export function generarReporteModelosRotacionPdf(data: ReporteModelosData): jsPD
       } else {
         doc.setTextColor(225, 29, 72);
         doc.setFont('helvetica', 'normal');
-        doc.text('0 vendidos', x, y + 4.3);
+        doc.text('0 ventas', x, y + 4.3);
       }
+      x += colW[3];
+
+      // 5. Precio Promedio
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'normal');
+      const pVenta = p.paresVendidos > 0 ? (p.ingresos / p.paresVendidos) : p.precioVenta;
+      doc.text(`$${pVenta.toFixed(2)}`, x, y + 4.3);
       x += colW[4];
 
-      // 6. Rotación Badge
-      doc.setFont('helvetica', 'bold');
-      if (p.rotacion === 'ALTA') {
-        doc.setTextColor(16, 185, 129);
-        doc.text('ALTA', x, y + 4.3);
-      } else if (p.rotacion === 'MEDIA') {
-        doc.setTextColor(37, 99, 235);
-        doc.text('MEDIA', x, y + 4.3);
-      } else if (p.rotacion === 'BAJA') {
-        doc.setTextColor(217, 119, 6);
-        doc.text('BAJA', x, y + 4.3);
-      } else {
-        doc.setTextColor(225, 29, 72);
-        doc.text(p.stockTotal > 0 ? 'SIN SALIDA' : 'INACTIVO', x, y + 4.3);
-      }
+      // 6. Costo FIFO
+      doc.setTextColor(100, 116, 139);
+      const cFifo = p.paresVendidos > 0 ? (p.costo / p.paresVendidos) : p.precioCosto;
+      doc.text(`$${cFifo.toFixed(2)}`, x, y + 4.3);
       x += colW[5];
 
-      // 7. Facturación
+      // 7. Utilidad Neta
+      const ganancia = (p.ingresos || 0) - (p.costo || 0);
       doc.setFont('helvetica', 'bold');
-      if (p.ingresos > 0) {
+      if (ganancia > 0) {
         doc.setTextColor(16, 185, 129);
-        doc.text(`$${p.ingresos.toFixed(2)}`, x, y + 4.3);
+        doc.text(`+$${ganancia.toFixed(2)}`, x, y + 4.3);
+      } else if (ganancia < 0) {
+        doc.setTextColor(225, 29, 72);
+        doc.text(`-$${Math.abs(ganancia).toFixed(2)}`, x, y + 4.3);
       } else {
         doc.setTextColor(148, 163, 184);
         doc.setFont('helvetica', 'normal');
         doc.text('$0.00', x, y + 4.3);
       }
+      x += colW[6];
+
+      // 8. Margen %
+      const margenPct = p.ingresos > 0 ? Math.round((ganancia / p.ingresos) * 100) : p.margen;
+      doc.setFont('helvetica', 'bold');
+      if (margenPct >= 35) {
+        doc.setTextColor(16, 185, 129);
+      } else if (margenPct >= 20) {
+        doc.setTextColor(37, 99, 235);
+      } else {
+        doc.setTextColor(217, 119, 6);
+      }
+      doc.text(`${margenPct}%`, x, y + 4.3);
 
       y += 6.2;
     });

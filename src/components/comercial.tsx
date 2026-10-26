@@ -261,6 +261,20 @@ export default function ComercialComponent({
   const [errorMsg, setErrorMsg] = useState('');
   const [savingOffline, setSavingOffline] = useState(false);
 
+  // Estrategia Comercial (Fase 9: Estándar vs Dinámico)
+  const [estrategia, setEstrategia] = useState<any>(null);
+
+  const cargarEstrategia = useCallback(async () => {
+    try {
+      const res = await ApiService.get('/configuracion/estrategia-comercial');
+      if (res) setEstrategia(res);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    cargarEstrategia();
+  }, [cargarEstrategia]);
+
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editingOrderNumero, setEditingOrderNumero] = useState<string>('');
@@ -462,7 +476,7 @@ export default function ComercialComponent({
   const [confirmandoDevolucionPaso, setConfirmandoDevolucionPaso] = useState(false);
 
   // Visor Lightbox de Foto de Calzado
-  const [lightboxImage, setLightboxImage] = useState<{ url: string; title?: string } | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; title?: string; subtitle?: string; badge?: string } | null>(null);
 
   // Cupones Promocionales (Fase E2)
   const [codigoCuponInput, setCodigoCuponInput] = useState('');
@@ -509,6 +523,15 @@ export default function ComercialComponent({
     setMetodoAdelanto('EFECTIVO');
     setReferenciaAdelanto('');
     setSerieFiltroBuscador('TODAS');
+    setFiltroModeloCascada('');
+    setFiltroColorCascada('');
+    setInputBusquedaModeloCascada('');
+    setShowDropdownModelosCascada(false);
+    setBusquedaModelo('');
+    setShowDropdownModelo(false);
+    setShowDropdownColoresCascada(false);
+    setProductoSeleccionadoObj(null);
+    setSelectedProductId('');
     setAlertaPedidoDuplicado(null);
     setIgnoroAlertaDuplicado(false);
   };
@@ -598,6 +621,111 @@ export default function ComercialComponent({
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
   const [productoSeleccionadoObj, setProductoSeleccionadoObj] = useState<any | null>(null);
   const [serieFiltroBuscador, setSerieFiltroBuscador] = useState<string>('TODAS');
+
+  // Búsqueda en Cascada de Modelo y Color (Fase 6)
+  const [filtroModeloCascada, setFiltroModeloCascada] = useState<string>('');
+  const [filtroColorCascada, setFiltroColorCascada] = useState<string>('');
+  const [showDropdownColoresCascada, setShowDropdownColoresCascada] = useState(false);
+  const [showDropdownModelosCascada, setShowDropdownModelosCascada] = useState(false);
+  const [inputBusquedaModeloCascada, setInputBusquedaModeloCascada] = useState('');
+  const [modoBusquedaPedido, setModoBusquedaPedido] = useState<'CASCADA' | 'RAPIDA'>('CASCADA');
+
+  // Modelos únicos para la Búsqueda en Cascada (Fase 6)
+  const modelosUnicosCascada = useMemo(() => {
+    const map = new Map<string, { modelName: string; modelId?: string; variantes: any[]; colores: string[]; totalStock: number; imageUrl?: string; serieNombre?: string }>();
+    catalogoProductos.forEach((p) => {
+      if (serieFiltroBuscador !== 'TODAS') {
+        if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return;
+      }
+      if (filtroColorCascada.trim()) {
+        const qCol = filtroColorCascada.toLowerCase().trim();
+        if (!(p.color || '').toLowerCase().includes(qCol)) return;
+      }
+      const mName = p.modelName || 'Sin Nombre';
+      let existing = map.get(mName);
+      if (!existing) {
+        existing = {
+          modelName: mName,
+          modelId: p.modelId,
+          variantes: [] as any[],
+          colores: [] as string[],
+          totalStock: 0,
+          imageUrl: p.imageUrl,
+          serieNombre: p.serieNombre,
+        };
+        map.set(mName, existing);
+      }
+      existing.variantes.push(p);
+      if (p.color && !existing.colores.includes(p.color)) {
+        existing.colores.push(p.color);
+      }
+      const paresP = (p.tallas || []).reduce((sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0), 0);
+      existing.totalStock += paresP;
+      if (!existing.imageUrl && p.imageUrl) existing.imageUrl = p.imageUrl;
+    });
+    let list = Array.from(map.values());
+    if (inputBusquedaModeloCascada.trim()) {
+      const q = inputBusquedaModeloCascada.toLowerCase().trim();
+      list = list.filter((m) => m.modelName.toLowerCase().includes(q));
+    }
+    return list.sort((a, b) => a.modelName.localeCompare(b.modelName, 'es', { sensitivity: 'base' }));
+  }, [catalogoProductos, serieFiltroBuscador, filtroColorCascada, inputBusquedaModeloCascada]);
+
+  // Colores disponibles para el selector en cascada (Fase 6)
+  const coloresDisponiblesCascada = useMemo(() => {
+    if (filtroModeloCascada.trim()) {
+      const variantesModelo = catalogoProductos.filter((p) => {
+        if (serieFiltroBuscador !== 'TODAS') {
+          if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return false;
+        }
+        return (p.modelName || '').toLowerCase().trim() === filtroModeloCascada.toLowerCase().trim();
+      });
+      return variantesModelo.map((v) => {
+        const pares = (v.tallas || []).reduce((sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0), 0);
+        return {
+          color: v.color || 'Estándar',
+          variante: v,
+          stock: pares,
+          imageUrl: v.imageUrl,
+          serieNombre: v.serieNombre,
+          countModelos: 1,
+        };
+      });
+    }
+
+    const map = new Map<string, { color: string; countModelos: number; stock: number; variante: any; imageUrl?: string; serieNombre?: string }>();
+    catalogoProductos.forEach((p) => {
+      if (serieFiltroBuscador !== 'TODAS') {
+        if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return;
+      }
+      const col = p.color?.trim() || 'Estándar';
+      let existing = map.get(col);
+      if (!existing) {
+        existing = {
+          color: col,
+          countModelos: 0,
+          stock: 0,
+          variante: p,
+          imageUrl: p.imageUrl,
+          serieNombre: p.serieNombre,
+        };
+        map.set(col, existing);
+      }
+      existing.countModelos += 1;
+      const paresP = (p.tallas || []).reduce((sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0), 0);
+      existing.stock += paresP;
+      if (!existing.imageUrl && p.imageUrl) existing.imageUrl = p.imageUrl;
+    });
+    return Array.from(map.values()).sort((a, b) => a.color.localeCompare(b.color, 'es', { sensitivity: 'base' }));
+  }, [catalogoProductos, serieFiltroBuscador, filtroModeloCascada]);
+
+  const selectedModelThumb = useMemo(() => {
+    if (!filtroModeloCascada) return undefined;
+    const match = catalogoProductos.find(
+      (p) => (p.modelName || '').toLowerCase().trim() === filtroModeloCascada.toLowerCase().trim() && p.imageUrl
+    );
+    return match?.imageUrl;
+  }, [catalogoProductos, filtroModeloCascada]);
 
   // Mapa de cantidad total de pares vendidos por variante para ordenar de más vendidas a menos vendidas
   const ventasPorVarianteMap = useMemo(() => {
@@ -924,7 +1052,12 @@ export default function ComercialComponent({
     setSupplierOrderCost(String(item.costPrice || (Number(item.precioUnitario) * 0.6).toFixed(2) || '15.00'));
     setSupplierOrderObservaciones('');
 
-    if (listaProveedores.length > 0 && !selectedSupplierId) {
+    // Sincronización automática de proveedor al seleccionar modelo
+    const matchedProd = catalogoProductos.find((p) => p.id === item.productId || (p.modelName === item.modelName && p.color === item.color));
+    const autoSupplierId = item.supplierId || item.proveedorId || matchedProd?.supplierId || matchedProd?.proveedorId || matchedProd?.suppliers?.[0]?.supplierId || matchedProd?.suppliers?.[0]?.id;
+    if (autoSupplierId && listaProveedores.some(p => p.id === autoSupplierId)) {
+      setSelectedSupplierId(autoSupplierId);
+    } else if (listaProveedores.length > 0 && !selectedSupplierId) {
       setSelectedSupplierId(listaProveedores[0].id);
     }
     setShowSupplierOrderModal(true);
@@ -1639,6 +1772,11 @@ export default function ComercialComponent({
       setProductoSeleccionadoObj(pObjSorted);
       setShowDropdownModelo(false);
       setBusquedaModelo('');
+      setFiltroModeloCascada('');
+      setFiltroColorCascada('');
+      setInputBusquedaModeloCascada('');
+      setShowDropdownModelosCascada(false);
+      setShowDropdownColoresCascada(false);
       // Usar salePrice del catálogo como precio base siempre
       const precioCatalogo = Number(pObj.salePrice) || Number(pObj.costPrice) || 0;
       setPrecioItem(precioCatalogo);
@@ -2750,9 +2888,24 @@ export default function ComercialComponent({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-extrabold text-xl tracking-tight text-[var(--foreground)]">
-            Gestión de Pedidos
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-extrabold text-xl tracking-tight text-[var(--foreground)]">
+              Gestión de Pedidos
+            </h2>
+            {estrategia && (
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                  estrategia.estrategiaComercialTipo === 'DINAMICO'
+                    ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30'
+                    : 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/30'
+                }`}
+              >
+                {estrategia.estrategiaComercialTipo === 'DINAMICO'
+                  ? `Dinámico (${estrategia.temporadaEfectiva})`
+                  : 'Estándar'}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-[var(--muted-foreground)] font-medium">
             Control de flujo operativo, estados de preparación y entrega
           </p>
@@ -3749,9 +3902,24 @@ export default function ComercialComponent({
                   <ShoppingBag size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white">
-                    {editingOrderId ? `Editar Pedido #${editingOrderNumero || editingOrderId.slice(0, 6).toUpperCase()}` : 'Registrar Nuevo Pedido'}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-base text-white">
+                      {editingOrderId ? `Editar Pedido #${editingOrderNumero || editingOrderId.slice(0, 6).toUpperCase()}` : 'Registrar Nuevo Pedido'}
+                    </h3>
+                    {estrategia && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          estrategia.estrategiaComercialTipo === 'DINAMICO'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                            : 'bg-white/10 text-slate-300 border border-white/15'
+                        }`}
+                      >
+                        {estrategia.estrategiaComercialTipo === 'DINAMICO'
+                          ? `Modo Dinámico (${estrategia.temporadaEfectiva})`
+                          : 'Modo Estándar'}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-300 mt-0.5">
                     {editingOrderId ? 'Modifica los datos del pedido y líneas de calzado' : 'Selecciona el cliente y agrega las series o tallas'}
                   </p>
@@ -3771,6 +3939,18 @@ export default function ComercialComponent({
               {!online && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs rounded-xl flex items-center gap-2">
                   <span>📡 Modo Offline: El pedido se guardará localmente y se sincronizará cuando vuelva la conexión.</span>
+                </div>
+              )}
+
+              {/* Alerta de Estrategia Comercial Activa (Fase 9) */}
+              {estrategia?.reglas?.validarMargenMinimo && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">Protección Dinámica:</span>
+                    <span className="text-[var(--muted-foreground)] text-[11px]">
+                      Margen mínimo configurado en {estrategia.margenMinimoDinamico}% sobre costo unitario ({estrategia.motivoTemporada}).
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -4431,7 +4611,22 @@ export default function ComercialComponent({
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl gap-3">
                         <div className="flex items-center gap-3">
                           {productoSeleccionadoObj.imageUrl ? (
-                            <img src={productoSeleccionadoObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setLightboxImage({
+                                  url: productoSeleccionadoObj.imageUrl,
+                                  title: productoSeleccionadoObj.modelName,
+                                  subtitle: `Color: ${productoSeleccionadoObj.color}`,
+                                  badge: `Serie: ${formatearNombreSerie(productoSeleccionadoObj.serieNombre)}`,
+                                })
+                              }
+                              className="relative group cursor-zoom-in shrink-0"
+                              title="Tocar para ampliar foto"
+                            >
+                              <img src={productoSeleccionadoObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform" />
+                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">🔍</span>
+                            </button>
                           ) : (
                             <div className="w-12 h-12 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">👟</div>
                           )}
@@ -4499,152 +4694,506 @@ export default function ComercialComponent({
                         })()}
                       </div>
                     ) : (
-                      <div className="relative">
-                        <div className="relative flex items-center">
-                          <Search size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            placeholder={
-                              serieFiltroBuscador !== 'TODAS'
-                                ? `Serie ${serieFiltroBuscador} activa: escribe modelo o color...`
-                                : "Buscar calzado por modelo, color o código (ej. Mocasín, Botín, Negro)..."
-                            }
-                            value={busquedaModelo}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setBusquedaModelo(val);
-                              setShowDropdownModelo(val.trim().length > 0);
-                            }}
-                            onFocus={() => {
-                              if (busquedaModelo.trim().length > 0) {
-                                setShowDropdownModelo(true);
-                              }
-                            }}
-                            className="w-full pl-10 pr-9 py-2.5 bg-[var(--card)] border-2 border-[var(--border)] hover:border-[#0F172A] focus:border-[#0F172A] rounded-xl text-xs font-semibold focus:outline-none shadow-xs transition-all"
-                          />
-                          {busquedaModelo.trim().length > 0 && (
+                      <div className="space-y-3">
+                        {/* Selector de Modo: Cascada vs Rápido */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1 p-0.5 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)] text-xs">
                             <button
                               type="button"
                               onClick={() => {
+                                setModoBusquedaPedido('CASCADA');
                                 setBusquedaModelo('');
                                 setShowDropdownModelo(false);
                               }}
-                              className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-black cursor-pointer p-0.5 rounded-full hover:bg-[var(--muted)]"
-                              title="Limpiar búsqueda"
+                              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                modoBusquedaPedido === 'CASCADA'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                              }`}
                             >
-                              ✕
+                              <Layers size={13} />
+                              <span>Búsqueda en Cascada (Modelo y Color)</span>
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModoBusquedaPedido('RAPIDA');
+                                setFiltroModeloCascada('');
+                                setFiltroColorCascada('');
+                                setShowDropdownModelosCascada(false);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                modoBusquedaPedido === 'RAPIDA'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                              }`}
+                            >
+                              <Search size={13} />
+                              <span>Búsqueda Rápida / Omnicanal</span>
+                            </button>
+                          </div>
+
+                          {modoBusquedaPedido === 'CASCADA' && filtroModeloCascada && (
+                            <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                              Paso 2: Elige el color deseado
+                            </span>
                           )}
                         </div>
 
-                        {serieFiltroBuscador !== 'TODAS' && busquedaModelo.trim().length === 0 && (
-                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 font-semibold">
-                            <span>💡</span>
-                            <span>Serie <strong>{serieFiltroBuscador}</strong> lista. Ingresa letras o el nombre en el buscador para ver los modelos.</span>
-                          </p>
-                        )}
-
-                        {showDropdownModelo && busquedaModelo.trim().length > 0 && (() => {
-                          const q = busquedaModelo.toLowerCase().trim();
-                          const listaModelosFiltradosYOrdenados = catalogoProductos
-                            .filter((p) => {
-                              // Filtro por Serie Seleccionada (si no es TODAS)
-                              if (serieFiltroBuscador !== 'TODAS') {
-                                const coincideSerie = (p.serieNombre || '').toLowerCase().trim() === serieFiltroBuscador.toLowerCase().trim();
-                                if (!coincideSerie) return false;
-                              }
-                              // Filtro por coincidencia de texto (letra, letras o palabra)
-                              if (!q) return false;
-                              return (
-                                (p.modelName || '').toLowerCase().includes(q) ||
-                                (p.color && p.color.toLowerCase().includes(q)) ||
-                                (p.serieNombre && p.serieNombre.toLowerCase().includes(q)) ||
-                                (p.code && p.code.toLowerCase().includes(q))
-                              );
-                            })
-                            .sort((a, b) => {
-                              // 1. Primero: orden alfabético por nombre del modelo
-                              const cmpModelo = (a.modelName || '').localeCompare(b.modelName || '', 'es', { sensitivity: 'base' });
-                              if (cmpModelo !== 0) return cmpModelo;
-
-                              // 2. Si son variantes del mismo modelo, ordenar de más vendidas a menos vendidas
-                              const ventasA = ventasPorVarianteMap.get(a.id) || 0;
-                              const ventasB = ventasPorVarianteMap.get(b.id) || 0;
-
-                              if (ventasB !== ventasA) {
-                                return ventasB - ventasA; // Más vendidas primero
-                              }
-
-                              // Desempate: orden alfabético por color
-                              return (a.color || '').localeCompare(b.color || '', 'es', { sensitivity: 'base' });
-                            });
-
-                          return (
-                            <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
-                              {listaModelosFiltradosYOrdenados.length > 0 ? (
-                                listaModelosFiltradosYOrdenados.map((p) => {
-                                  const totalPares = (p.tallas || []).reduce(
-                                    (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
-                                    0
-                                  );
-                                  const docenas = Math.floor(totalPares / 12);
-                                  const mediasDocenas = Math.floor(totalPares / 6);
-                                  const ventasTotal = ventasPorVarianteMap.get(p.id) || 0;
-
-                                  return (
+                        {/* MODO 1: BÚSQUEDA EN CASCADA */}
+                        {modoBusquedaPedido === 'CASCADA' && (
+                          <div className="space-y-3">
+                            {/* PASO 1: MODELO */}
+                            {filtroModeloCascada ? (
+                              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {selectedModelThumb ? (
                                     <button
-                                      key={p.id}
                                       type="button"
-                                      onClick={() => handleSeleccionarProducto(p)}
-                                      className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)] cursor-pointer"
+                                      onClick={() =>
+                                        setLightboxImage({
+                                          url: selectedModelThumb!,
+                                          title: filtroModeloCascada,
+                                          badge: serieFiltroBuscador !== 'TODAS' ? `Serie: ${serieFiltroBuscador}` : undefined,
+                                        })
+                                      }
+                                      className="relative group cursor-zoom-in shrink-0"
+                                      title="Tocar para ampliar foto"
                                     >
-                                      <div className="flex items-center gap-3 min-w-0">
-                                        {p.imageUrl ? (
-                                          <img src={p.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
-                                        ) : (
-                                          <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">👟</div>
-                                        )}
-                                        <div className="min-w-0">
-                                          <span className="block font-bold text-[var(--foreground)] truncate">{p.modelName}</span>
-                                          <div className="flex items-center gap-2 text-[10px] mt-0.5 flex-wrap">
-                                            <span className="text-[var(--muted-foreground)] font-medium">
-                                              Color: <strong className="text-[var(--foreground)]">{p.color}</strong>
+                                      <img
+                                        src={selectedModelThumb}
+                                        alt=""
+                                        className="w-11 h-11 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
+                                      />
+                                      <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">
+                                        🔍
+                                      </span>
+                                    </button>
+                                  ) : (
+                                    <div className="w-11 h-11 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-base shrink-0">
+                                      👟
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">
+                                      1. Modelo Seleccionado
+                                    </span>
+                                    <strong className="text-sm font-black text-[var(--foreground)] truncate block">
+                                      {filtroModeloCascada}
+                                    </strong>
+                                    <span className="text-[11px] text-[var(--muted-foreground)]">
+                                      {coloresDisponiblesCascada.length} {coloresDisponiblesCascada.length === 1 ? 'color disponible' : 'colores disponibles'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFiltroModeloCascada('');
+                                    setInputBusquedaModeloCascada('');
+                                  }}
+                                  className="text-xs font-bold text-red-500 hover:underline shrink-0"
+                                >
+                                  Cambiar modelo
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="relative">
+                                <div className="relative flex items-center">
+                                  <Search size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                                  <input
+                                    type="text"
+                                    placeholder="1. Escriba o seleccione un Modelo (ej. Mocasín, Oxford, Botín)..."
+                                    value={inputBusquedaModeloCascada}
+                                    onChange={(e) => {
+                                      setInputBusquedaModeloCascada(e.target.value);
+                                      setShowDropdownModelosCascada(true);
+                                    }}
+                                    onFocus={() => setShowDropdownModelosCascada(true)}
+                                    className="w-full pl-10 pr-9 py-2.5 bg-[var(--card)] border-2 border-[var(--border)] hover:border-emerald-600 focus:border-emerald-600 rounded-xl text-xs font-semibold focus:outline-none shadow-xs transition-all"
+                                  />
+                                  {inputBusquedaModeloCascada.trim().length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setInputBusquedaModeloCascada('');
+                                      }}
+                                      className="absolute right-3 text-slate-400 hover:text-slate-600 text-xs font-black cursor-pointer p-0.5 rounded-full hover:bg-[var(--muted)]"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Filtro rápido por color si aún no ha seleccionado modelo */}
+                                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
+                                    Filtro opcional por color:
+                                  </span>
+                                  {['Negro', 'Café', 'Miel', 'Blanco', 'Azul', 'Vino'].map((c) => {
+                                    const activo = filtroColorCascada.toLowerCase() === c.toLowerCase();
+                                    return (
+                                      <button
+                                        key={c}
+                                        type="button"
+                                        onClick={() => setFiltroColorCascada(activo ? '' : c)}
+                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                          activo
+                                            ? 'bg-emerald-600 text-white shadow-xs'
+                                            : 'bg-[var(--muted)]/60 text-[var(--foreground)] hover:bg-[var(--muted)]'
+                                        }`}
+                                      >
+                                        {c}
+                                      </button>
+                                    );
+                                  })}
+                                  {filtroColorCascada && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setFiltroColorCascada('')}
+                                      className="text-[10px] text-red-500 hover:underline font-bold ml-1 cursor-pointer"
+                                    >
+                                      Quitar color ({filtroColorCascada})
+                                    </button>
+                                  )}
+                                </div>
+
+                                {showDropdownModelosCascada && (
+                                  <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto">
+                                    {modelosUnicosCascada.length > 0 ? (
+                                      modelosUnicosCascada.map((m) => {
+                                        return (
+                                          <div
+                                            key={m.modelName}
+                                            onClick={() => {
+                                              setFiltroModeloCascada(m.modelName);
+                                              setInputBusquedaModeloCascada('');
+                                              setShowDropdownModelosCascada(false);
+                                            }}
+                                            className="w-full text-left px-3 py-2.5 text-xs hover:bg-emerald-500/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)] cursor-pointer"
+                                          >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                              {m.imageUrl ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setLightboxImage({
+                                                      url: m.imageUrl!,
+                                                      title: m.modelName,
+                                                      subtitle: `Colores: ${m.colores.join(', ')}`,
+                                                    });
+                                                  }}
+                                                  className="relative group cursor-zoom-in shrink-0"
+                                                  title="Tocar para ampliar foto"
+                                                >
+                                                  <img
+                                                    src={m.imageUrl}
+                                                    alt=""
+                                                    className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
+                                                  />
+                                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[9px] transition-opacity">
+                                                    🔍
+                                                  </span>
+                                                </button>
+                                              ) : (
+                                                <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
+                                                  👟
+                                                </div>
+                                              )}
+                                              <div className="min-w-0">
+                                                <span className="block font-bold text-[var(--foreground)] truncate">
+                                                  {m.modelName}
+                                                </span>
+                                                <div className="flex items-center gap-1.5 text-[10px] mt-0.5 flex-wrap">
+                                                  <span className="text-[var(--muted-foreground)]">
+                                                    {m.colores.length} {m.colores.length === 1 ? 'color:' : 'colores:'}
+                                                  </span>
+                                                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                                    {m.colores.join(', ')}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="text-right shrink-0">
+                                              {m.totalStock > 0 ? (
+                                                <span className="text-xs font-black text-emerald-600 block">
+                                                  {m.totalStock} pares
+                                                </span>
+                                              ) : (
+                                                <span className="text-[10px] font-bold text-slate-400 block">
+                                                  Bajo pedido
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
+                                        No se encontraron modelos disponibles con los filtros actuales.
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* PASO 2: COLORES DEL MODELO SELECCIONADO */}
+                            {filtroModeloCascada && (
+                              <div className="pt-1">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-2">
+                                  2. Seleccionar Color para "{filtroModeloCascada}":
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                                  {coloresDisponiblesCascada.map((col) => {
+                                    const totalPares = col.stock;
+                                    const docenas = Math.floor(totalPares / 12);
+                                    const medias = Math.floor(totalPares / 6);
+
+                                    return (
+                                      <div
+                                        key={col.variante?.id || col.color}
+                                        onClick={() => {
+                                          if (col.variante) {
+                                            handleSeleccionarProducto(col.variante);
+                                          }
+                                        }}
+                                        className="p-2.5 rounded-xl border-2 border-[var(--border)] hover:border-emerald-600 bg-[var(--card)] hover:bg-emerald-500/5 transition-all flex items-center justify-between gap-2.5 cursor-pointer group shadow-xs"
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          {col.imageUrl ? (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setLightboxImage({
+                                                  url: col.imageUrl!,
+                                                  title: `${filtroModeloCascada} — ${col.color}`,
+                                                  badge: `Serie: ${formatearNombreSerie(col.serieNombre)}`,
+                                                });
+                                              }}
+                                              className="relative group cursor-zoom-in shrink-0"
+                                              title="Tocar para ampliar foto"
+                                            >
+                                              <img
+                                                src={col.imageUrl}
+                                                alt=""
+                                                className="w-11 h-11 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
+                                              />
+                                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[9px] transition-opacity">
+                                                🔍
+                                              </span>
+                                            </button>
+                                          ) : (
+                                            <div className="w-11 h-11 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
+                                              🎨
+                                            </div>
+                                          )}
+                                          <div className="min-w-0">
+                                            <span className="font-bold text-xs text-[var(--foreground)] truncate block group-hover:text-emerald-700 dark:group-hover:text-emerald-400">
+                                              {col.color}
                                             </span>
-                                            <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                              Serie: {formatearNombreSerie(p.serieNombre)}
+                                            <span className="text-[10px] font-semibold text-emerald-600 block">
+                                              Serie: {formatearNombreSerie(col.serieNombre)}
                                             </span>
-                                            {ventasTotal > 0 && (
-                                              <span className="text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                                                🔥 {ventasTotal} {ventasTotal === 1 ? 'par vendido' : 'pares vendidos'}
+                                            {totalPares > 0 ? (
+                                              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 block">
+                                                {totalPares}p ({docenas}d / {medias}½d)
+                                              </span>
+                                            ) : (
+                                              <span className="text-[10px] font-semibold text-rose-500 block">
+                                                Sin stock físico
                                               </span>
                                             )}
                                           </div>
                                         </div>
-                                      </div>
 
-                                      <div className="text-right shrink-0">
-                                        {totalPares > 0 ? (
-                                          <>
-                                            <span className="text-xs font-black text-emerald-600 block">{totalPares} pares</span>
-                                            <span className="text-[9px] text-[var(--muted-foreground)] block">
-                                              ({docenas} doc. / {mediasDocenas} ½ doc.)
-                                            </span>
-                                          </>
-                                        ) : (
-                                          <span className="text-[10px] font-bold text-rose-500">0 pares</span>
-                                        )}
+                                        <button
+                                          type="button"
+                                          className="px-2 py-1 bg-emerald-600 group-hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shrink-0 transition-colors"
+                                        >
+                                          Elegir
+                                        </button>
                                       </div>
-                                    </button>
-                                  );
-                                })
-                              ) : (
-                                <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
-                                  No se encontraron modelos {serieFiltroBuscador !== 'TODAS' ? `en serie "${serieFiltroBuscador}"` : ''} que coincidan con "{busquedaModelo}".
+                                    );
+                                  })}
                                 </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* MODO 2: BÚSQUEDA RÁPIDA / OMNICANAL */}
+                        {modoBusquedaPedido === 'RAPIDA' && (
+                          <div className="relative">
+                            <div className="relative flex items-center">
+                              <Search size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                              <input
+                                type="text"
+                                placeholder={
+                                  serieFiltroBuscador !== 'TODAS'
+                                    ? `Serie ${serieFiltroBuscador} activa: escribe modelo o color...`
+                                    : "Buscar calzado por modelo, color o código (ej. Mocasín, Botín, Negro)..."
+                                }
+                                value={busquedaModelo}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setBusquedaModelo(val);
+                                  setShowDropdownModelo(val.trim().length > 0);
+                                }}
+                                onFocus={() => {
+                                  if (busquedaModelo.trim().length > 0) {
+                                    setShowDropdownModelo(true);
+                                  }
+                                }}
+                                className="w-full pl-10 pr-9 py-2.5 bg-[var(--card)] border-2 border-[var(--border)] hover:border-[#0F172A] focus:border-[#0F172A] rounded-xl text-xs font-semibold focus:outline-none shadow-xs transition-all"
+                              />
+                              {busquedaModelo.trim().length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setBusquedaModelo('');
+                                    setShowDropdownModelo(false);
+                                  }}
+                                  className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-black cursor-pointer p-0.5 rounded-full hover:bg-[var(--muted)]"
+                                  title="Limpiar búsqueda"
+                                >
+                                  ✕
+                                </button>
                               )}
                             </div>
-                          );
-                        })()}
+
+                            {serieFiltroBuscador !== 'TODAS' && busquedaModelo.trim().length === 0 && (
+                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 font-semibold">
+                                <span>💡</span>
+                                <span>Serie <strong>{serieFiltroBuscador}</strong> lista. Ingresa letras o el nombre en el buscador para ver los modelos.</span>
+                              </p>
+                            )}
+
+                            {showDropdownModelo && busquedaModelo.trim().length > 0 && (() => {
+                              const q = busquedaModelo.toLowerCase().trim();
+                              const listaModelosFiltradosYOrdenados = catalogoProductos
+                                .filter((p) => {
+                                  if (serieFiltroBuscador !== 'TODAS') {
+                                    const coincideSerie = (p.serieNombre || '').toLowerCase().trim() === serieFiltroBuscador.toLowerCase().trim();
+                                    if (!coincideSerie) return false;
+                                  }
+                                  if (!q) return false;
+                                  return (
+                                    (p.modelName || '').toLowerCase().includes(q) ||
+                                    (p.color && p.color.toLowerCase().includes(q)) ||
+                                    (p.serieNombre && p.serieNombre.toLowerCase().includes(q)) ||
+                                    (p.code && p.code.toLowerCase().includes(q))
+                                  );
+                                })
+                                .sort((a, b) => {
+                                  const cmpModelo = (a.modelName || '').localeCompare(b.modelName || '', 'es', { sensitivity: 'base' });
+                                  if (cmpModelo !== 0) return cmpModelo;
+
+                                  const ventasA = ventasPorVarianteMap.get(a.id) || 0;
+                                  const ventasB = ventasPorVarianteMap.get(b.id) || 0;
+
+                                  if (ventasB !== ventasA) {
+                                    return ventasB - ventasA;
+                                  }
+
+                                  return (a.color || '').localeCompare(b.color || '', 'es', { sensitivity: 'base' });
+                                });
+
+                              return (
+                                <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
+                                  {listaModelosFiltradosYOrdenados.length > 0 ? (
+                                    listaModelosFiltradosYOrdenados.map((p) => {
+                                      const totalPares = (p.tallas || []).reduce(
+                                        (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
+                                        0
+                                      );
+                                      const docenas = Math.floor(totalPares / 12);
+                                      const mediasDocenas = Math.floor(totalPares / 6);
+                                      const ventasTotal = ventasPorVarianteMap.get(p.id) || 0;
+
+                                      return (
+                                        <div
+                                          key={p.id}
+                                          onClick={() => handleSeleccionarProducto(p)}
+                                          className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)] cursor-pointer"
+                                        >
+                                          <div className="flex items-center gap-3 min-w-0">
+                                            {p.imageUrl ? (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setLightboxImage({
+                                                    url: p.imageUrl!,
+                                                    title: p.modelName,
+                                                    subtitle: `Color: ${p.color}`,
+                                                    badge: `Serie: ${formatearNombreSerie(p.serieNombre)}`,
+                                                  });
+                                                }}
+                                                className="relative group cursor-zoom-in shrink-0"
+                                                title="Tocar para ampliar foto"
+                                              >
+                                                <img
+                                                  src={p.imageUrl}
+                                                  alt=""
+                                                  className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
+                                                />
+                                                <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[9px] transition-opacity">
+                                                  🔍
+                                                </span>
+                                              </button>
+                                            ) : (
+                                              <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
+                                                👟
+                                              </div>
+                                            )}
+                                            <div className="min-w-0">
+                                              <span className="block font-bold text-[var(--foreground)] truncate">{p.modelName}</span>
+                                              <div className="flex items-center gap-2 text-[10px] mt-0.5 flex-wrap">
+                                                <span className="text-[var(--muted-foreground)] font-medium">
+                                                  Color: <strong className="text-[var(--foreground)]">{p.color}</strong>
+                                                </span>
+                                                <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                                  Serie: {formatearNombreSerie(p.serieNombre)}
+                                                </span>
+                                                {ventasTotal > 0 && (
+                                                  <span className="text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                                    🔥 {ventasTotal} {ventasTotal === 1 ? 'par vendido' : 'pares vendidos'}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="text-right shrink-0">
+                                            {totalPares > 0 ? (
+                                              <>
+                                                <span className="text-xs font-black text-emerald-600 block">{totalPares} pares</span>
+                                                <span className="text-[9px] text-[var(--muted-foreground)] block">
+                                                  ({docenas} doc. / {mediasDocenas} ½ doc.)
+                                                </span>
+                                              </>
+                                            ) : (
+                                              <span className="text-[10px] font-bold text-rose-500">0 pares</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
+                                      No se encontraron modelos {serieFiltroBuscador !== 'TODAS' ? `en serie "${serieFiltroBuscador}"` : ''} que coincidan con "{busquedaModelo}".
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -4800,7 +5349,22 @@ export default function ComercialComponent({
                             {/* Lado Izquierdo: Miniatura, Datos del Modelo y Curva de Tallas */}
                             <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                               {prodObj.imageUrl ? (
-                                <img src={prodObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] shrink-0" />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setLightboxImage({
+                                      url: prodObj.imageUrl,
+                                      title: prodObj.modelName,
+                                      subtitle: `Color: ${prodObj.color}`,
+                                      badge: `Serie: ${serieNombreDisplay}`,
+                                    })
+                                  }
+                                  className="relative group cursor-zoom-in shrink-0"
+                                  title="Tocar para ampliar foto en alta resolución"
+                                >
+                                  <img src={prodObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform" />
+                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">🔍</span>
+                                </button>
                               ) : (
                                 <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
                                   👟
@@ -5276,7 +5840,22 @@ export default function ComercialComponent({
                           <div key={key} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
                               {primerItem.imageUrl ? (
-                                <img src={primerItem.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] shrink-0" />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setLightboxImage({
+                                      url: primerItem.imageUrl!,
+                                      title: primerItem.modelName,
+                                      subtitle: `Color: ${primerItem.color}`,
+                                      badge: `Serie: ${formatearNombreSerie(primerItem.serieNombre)}`,
+                                    })
+                                  }
+                                  className="relative group cursor-zoom-in shrink-0"
+                                  title="Tocar para ampliar foto"
+                                >
+                                  <img src={primerItem.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform" />
+                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">🔍</span>
+                                </button>
                               ) : (
                                 <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">👟</div>
                               )}
@@ -8978,6 +9557,9 @@ export default function ComercialComponent({
         isOpen={Boolean(lightboxImage)}
         imageUrl={lightboxImage?.url || ''}
         title={lightboxImage?.title}
+        subtitle={lightboxImage?.subtitle}
+        badge={lightboxImage?.badge}
+        zIndexClass="z-[90]"
         onClose={() => setLightboxImage(null)}
       />
 

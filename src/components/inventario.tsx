@@ -62,6 +62,7 @@ interface ModeloAgrupadoInventario {
   sucursalNombre?: string;
   products: Producto[];
   totalMovimientos?: number;
+  createdAt?: string;
 }
 
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
@@ -115,6 +116,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   const [products, setProducts] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<'movimiento' | 'az' | 'za' | 'recientes' | 'antiguos' | 'menor_stock'>('movimiento');
   const [success, setSuccess] = useState("");
 
   // Estado de acordeones expandidos por modelo y color activo seleccionado
@@ -483,26 +485,53 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
           sucursalNombre: p.sucursalNombre,
           products: [],
           totalMovimientos: 0,
+          createdAt: (p as any).createdAt,
         });
       }
       const m = map.get(key)!;
       if (!m.fotoUrl && p.fotoUrl) {
         m.fotoUrl = p.fotoUrl;
       }
+      if (!m.createdAt && (p as any).createdAt) {
+        m.createdAt = (p as any).createdAt;
+      }
       m.products.push(p);
       m.totalMovimientos = (m.totalMovimientos || 0) + (Number((p as any).totalMovimientos) || 0);
     });
 
-    // Ordenar primero el modelo que más movimiento tiene y al final los que no tienen mucho movimiento
-    return Array.from(map.values()).sort((a, b) => {
-      const movA = a.totalMovimientos || 0;
-      const movB = b.totalMovimientos || 0;
-      if (movB !== movA) {
-        return movB - movA;
-      }
+    const list = Array.from(map.values());
+
+    return list.sort((a, b) => {
       const stockA = a.products.reduce((acc, p) => acc + (p.tallas || []).reduce((s, t) => s + (t.cantidad || 0), 0), 0);
       const stockB = b.products.reduce((acc, p) => acc + (p.tallas || []).reduce((s, t) => s + (t.cantidad || 0), 0), 0);
-      return stockB - stockA;
+
+      switch (sortBy) {
+        case 'az':
+          return (a.name || '').localeCompare(b.name || '');
+        case 'za':
+          return (b.name || '').localeCompare(a.name || '');
+        case 'recientes': {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        }
+        case 'antiguos': {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateA - dateB;
+        }
+        case 'menor_stock':
+          return stockA - stockB;
+        case 'movimiento':
+        default: {
+          const movA = a.totalMovimientos || 0;
+          const movB = b.totalMovimientos || 0;
+          if (movB !== movA) {
+            return movB - movA;
+          }
+          return stockB - stockA;
+        }
+      }
     });
   })();
 
@@ -540,10 +569,25 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
           </div>
           <p className="text-xs text-[var(--muted-foreground)] font-medium mt-0.5">Control físico de existencias por modelo, serie y talla en tiempo real</p>
         </div>
-        <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto">
-          <button onClick={loadProducts} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors shrink-0 cursor-pointer">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
+          <button onClick={loadProducts} className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors shrink-0 cursor-pointer" title="Actualizar inventario">
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--foreground)] focus:outline-none focus:border-[#0F172A] cursor-pointer"
+              title="Criterio de ordenamiento"
+            >
+              <option value="movimiento">🔥 Top Más Vendidos</option>
+              <option value="az">🔤 Nombre: A - Z</option>
+              <option value="za">🔤 Nombre: Z - A</option>
+              <option value="recientes">✨ Modelos Nuevos</option>
+              <option value="antiguos">⏳ Modelos Antiguos</option>
+              <option value="menor_stock">⚠️ Menor Stock</option>
+            </select>
+          </div>
           <div className="relative flex-1 sm:flex-none sm:w-64">
             <Search size={16} className="absolute left-3 top-3 text-[var(--muted-foreground)]" />
             <input type="text" placeholder="Buscar modelo, código o serie..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]" />

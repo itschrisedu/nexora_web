@@ -85,9 +85,14 @@ interface BusinessConfig {
   precioPlanBasico?: number;
   precioPlanComercial?: number;
   precioPlanMayorista?: number;
+  estrategiaComercialTipo?: string;
+  margenMinimoDinamico?: number;
+  temporadaComercial?: string;
+  descuentoTemporadaBaja?: number;
+  diasRotacionTemporadaBaja?: number;
 }
 
-type TabType = "general" | "credito" | "operaciones" | "fiscal" | "catalogo" | "seguridad";
+type TabType = "general" | "estrategia" | "credito" | "operaciones" | "fiscal" | "catalogo" | "seguridad";
 
 export default function PersonalizacionComponent({ online }: PersonalizacionProps) {
   const user = useMemo(() => {
@@ -379,6 +384,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     precioPlanBasico: 15,
     precioPlanComercial: 29,
     precioPlanMayorista: 49,
+    estrategiaComercialTipo: "ESTANDAR",
+    margenMinimoDinamico: 25,
+    temporadaComercial: "AUTO",
+    descuentoTemporadaBaja: 10,
+    diasRotacionTemporadaBaja: 30,
   });
 
   const [nivelesCredito, setNivelesCredito] = useState<CreditLevelConfigItem[]>([
@@ -734,6 +744,11 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         precioPlanBasico: Number(config.precioPlanBasico) || undefined,
         precioPlanComercial: Number(config.precioPlanComercial) || undefined,
         precioPlanMayorista: Number(config.precioPlanMayorista) || undefined,
+        estrategiaComercialTipo: config.estrategiaComercialTipo || "ESTANDAR",
+        margenMinimoDinamico: Number(config.margenMinimoDinamico ?? 25),
+        temporadaComercial: config.temporadaComercial || "AUTO",
+        descuentoTemporadaBaja: Number(config.descuentoTemporadaBaja ?? 10),
+        diasRotacionTemporadaBaja: Number(config.diasRotacionTemporadaBaja ?? 30),
       };
 
       await Promise.all([
@@ -849,6 +864,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
       ]
     : [
         { id: "general", label: "Identidad & Negocio", icon: <Building2 size={16} /> },
+        { id: "estrategia", label: "Estrategia Comercial", icon: <Sliders size={16} /> },
         { id: "credito", label: "Scoring & Crédito", icon: <DollarSign size={16} /> },
         { id: "operaciones", label: "Operaciones & Logística", icon: <Truck size={16} /> },
         { id: "fiscal", label: "Parámetros Fiscales", icon: <Shield size={16} /> },
@@ -1148,6 +1164,249 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
               >
                 {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
                 <span>{saving ? "Guardando..." : "Guardar Identidad & Negocio"}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ PESTAÑA: ESTRATEGIA COMERCIAL (FASE 9) ══════════════ */}
+        {activeTab === "estrategia" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {/* SELECTOR DE MODALIDAD PRINCIPAL */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <Sliders className="text-amber-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Modalidad de Comercialización y Precios</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Define la política comercial para la fijación de precios, control de rentabilidad y promociones en ventas.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Opción A: Modelo Estándar */}
+                <div
+                  onClick={() => setConfig((prev) => ({ ...prev, estrategiaComercialTipo: "ESTANDAR" }))}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${
+                    config.estrategiaComercialTipo === "ESTANDAR"
+                      ? "border-amber-500 bg-amber-500/5 shadow-sm"
+                      : "border-[var(--border)] bg-[var(--muted)]/20 hover:border-slate-400"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                        config.estrategiaComercialTipo === "ESTANDAR"
+                          ? "bg-amber-500 text-slate-950"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                      }`}>
+                        EST
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-[var(--foreground)] uppercase">Modelo Estándar</h4>
+                        <span className="text-[10px] text-[var(--muted-foreground)]">Precios fijos de catálogo</span>
+                      </div>
+                    </div>
+                    {config.estrategiaComercialTipo === "ESTANDAR" && (
+                      <span className="px-2 py-0.5 bg-amber-500 text-slate-950 text-[10px] font-bold rounded-lg uppercase">
+                        Activo
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                    Opera con los precios de venta fijos establecidos en el catálogo de productos. El vendedor aplica los precios registrados sin bloqueos automáticos de margen ni promociones forzadas por temporada.
+                  </p>
+                </div>
+
+                {/* Opción B: Modelo Dinámico */}
+                <div
+                  onClick={() => setConfig((prev) => ({ ...prev, estrategiaComercialTipo: "DINAMICO" }))}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${
+                    config.estrategiaComercialTipo === "DINAMICO"
+                      ? "border-emerald-500 bg-emerald-500/5 shadow-sm"
+                      : "border-[var(--border)] bg-[var(--muted)]/20 hover:border-slate-400"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                        config.estrategiaComercialTipo === "DINAMICO"
+                          ? "bg-emerald-500 text-white"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                      }`}>
+                        DIN
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-[var(--foreground)] uppercase">Modelo Dinámico</h4>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Protección FIFO & Temporadas</span>
+                      </div>
+                    </div>
+                    {config.estrategiaComercialTipo === "DINAMICO" && (
+                      <span className="px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg uppercase">
+                        Activo
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                    Evalúa el costo real FIFO de cada lote. En temporadas alta y regular protege el margen mínimo de ganancia impidiendo ventas por debajo del umbral. En temporada baja sugiere promociones para rotar mercadería estancada.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* PARÁMETROS DEL MODELO DINÁMICO */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <Sparkles className="text-amber-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Parámetros Operativos del Modelo Dinámico</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    {config.estrategiaComercialTipo === "DINAMICO"
+                      ? "Estos parámetros se encuentran rigiendo activamente las validaciones en el punto de venta y pedidos."
+                      : "Parámetros preparados para cuando se active el Modelo Dinámico."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Margen Mínimo */}
+                <div className="p-3.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-2">
+                  <label className="block text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                    Margen Mínimo (%)
+                  </label>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Rentabilidad mínima obligatoria sobre el costo FIFO en temporada regular/alta.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="5"
+                      max="100"
+                      step="1"
+                      value={config.margenMinimoDinamico ?? 25}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, margenMinimoDinamico: parseFloat(e.target.value) || 25 }))}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-center focus:outline-none focus:border-amber-500 font-mono"
+                    />
+                    <span className="text-xs font-bold text-slate-400">%</span>
+                  </div>
+                </div>
+
+                {/* 2. Temporada Comercial */}
+                <div className="p-3.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-2">
+                  <label className="block text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                    Temporada Comercial
+                  </label>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Régimen comercial que determina la política activa en ventas.
+                  </p>
+                  <select
+                    value={config.temporadaComercial || "AUTO"}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, temporadaComercial: e.target.value }))}
+                    className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="AUTO">Automático (Calendario y Campañas)</option>
+                    <option value="ALTA">Temporada Alta (Inicio a Clases / Diciembre)</option>
+                    <option value="REGULAR">Temporada Regular (Flujo Comercial Habitual)</option>
+                    <option value="BAJA">Temporada Baja (Promociones & Liquidación)</option>
+                  </select>
+                </div>
+
+                {/* 3. Descuento Temporada Baja */}
+                <div className="p-3.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-2">
+                  <label className="block text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                    Promoción Temporada Baja (%)
+                  </label>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Descuento sugerido en punto de venta para rotar mercadería estancada.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      step="1"
+                      value={config.descuentoTemporadaBaja ?? 10}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, descuentoTemporadaBaja: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-center focus:outline-none focus:border-amber-500 font-mono"
+                    />
+                    <span className="text-xs font-bold text-slate-400">%</span>
+                  </div>
+                </div>
+
+                {/* 4. Días Umbral Rotación */}
+                <div className="p-3.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-2">
+                  <label className="block text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                    Umbral Estancamiento (Días)
+                  </label>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Días sin registrar ventas para catalogar un modelo en liquidación.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="7"
+                      max="180"
+                      step="5"
+                      value={config.diasRotacionTemporadaBaja ?? 30}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, diasRotacionTemporadaBaja: parseInt(e.target.value) || 30 }))}
+                      className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-center focus:outline-none focus:border-amber-500 font-mono"
+                    />
+                    <span className="text-xs font-bold text-slate-400">días</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Banner Informativo de Diagnóstico */}
+              <div className="p-3.5 bg-slate-900 border border-slate-800 text-slate-200 rounded-xl text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-400 uppercase text-[11px] tracking-wider">
+                    Diagnóstico de Aplicación Comercial
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                    config.estrategiaComercialTipo === "DINAMICO"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "bg-slate-800 text-slate-300 border border-slate-700"
+                  }`}>
+                    {config.estrategiaComercialTipo === "DINAMICO" ? "Modo Dinámico Activo" : "Modo Estándar Activo"}
+                  </span>
+                </div>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  {config.estrategiaComercialTipo === "DINAMICO"
+                    ? `El sistema valida en cada transacción de venta o pedido que el precio no descienda de costo FIFO + ${config.margenMinimoDinamico ?? 25}% de margen en temporadas alta/regular, y habilitará el descuento del ${config.descuentoTemporadaBaja ?? 10}% para modelos con más de ${config.diasRotacionTemporadaBaja ?? 30} días en temporada baja.`
+                    : "El sistema opera con precios fijos definidos en catálogo sin restricciones automáticas de margen. Se puede alternar a dinámico en cualquier momento sin alterar datos históricos ni registros previos."}
+                </p>
+              </div>
+            </div>
+
+            {/* BOTÓN DE GUARDADO */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm">
+              <div className="text-xs text-[var(--muted-foreground)]">
+                {hasChanges ? (
+                  <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse inline-block" />
+                    Hay cambios pendientes en la estrategia comercial
+                  </span>
+                ) : (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                    <CheckCircle size={14} />
+                    Estrategia comercial al día
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSave(undefined, "Estrategia Comercial")}
+                disabled={!hasChanges || saving}
+                title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
+                  hasChanges && !saving
+                    ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
+                }`}
+              >
+                {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                <span>{saving ? "Guardando..." : "Guardar Estrategia Comercial"}</span>
               </button>
             </div>
           </div>

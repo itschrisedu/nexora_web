@@ -71,6 +71,7 @@ interface ProductoBusqueda {
   baseCode: string;
   modelName: string;
   color: string;
+  costPrice?: number;
   salePrice: number;
   serieNombre: string;
   serieId: string;
@@ -89,6 +90,21 @@ interface ItemVenta {
   imageUrl?: string;
   cantidad: number;
   precioUnitario: number;
+  costPrice?: number;
+}
+
+interface EstrategiaComercialVigente {
+  estrategiaComercialTipo: "ESTANDAR" | "DINAMICO";
+  temporadaConfigurada: string;
+  temporadaEfectiva: "ALTA" | "REGULAR" | "BAJA";
+  motivoTemporada: string;
+  margenMinimoDinamico: number;
+  descuentoTemporadaBaja: number;
+  diasRotacionTemporadaBaja: number;
+  reglas: {
+    validarMargenMinimo: boolean;
+    habilitarPromocionesBaja: boolean;
+  };
 }
 
 interface GrupoModeloPos {
@@ -202,6 +218,7 @@ export default function PosComponent() {
   const [metodoPago, setMetodoPago] = useState<"EFECTIVO" | "TARJETA" | "TRANSFERENCIA">("EFECTIVO");
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [ventaExitosa, setVentaExitosa] = useState(false);
+  const [estrategia, setEstrategia] = useState<EstrategiaComercialVigente | null>(null);
 
   // Proteger venta en curso si el usuario intenta salir
   useUnsavedChanges(
@@ -347,6 +364,7 @@ export default function PosComponent() {
         cargarProductos(),
         cargarNegocioInfo(),
         cargarVendedores(),
+        cargarEstrategiaComercial(),
       ]);
       setLoadingInicial(false);
     };
@@ -375,6 +393,17 @@ export default function PosComponent() {
       }
     } catch (err) {
       console.error("Error al cargar vendedores POS:", err);
+    }
+  };
+
+  const cargarEstrategiaComercial = async () => {
+    try {
+      const res = await ApiService.get("/configuracion/estrategia-comercial");
+      if (res) {
+        setEstrategia(res);
+      }
+    } catch (err) {
+      console.warn("No se pudo cargar la estrategia comercial:", err);
     }
   };
 
@@ -495,6 +524,7 @@ export default function PosComponent() {
           imageUrl: prod.imageUrl,
           cantidad: 1,
           precioUnitario: prod.salePrice,
+          costPrice: prod.costPrice,
         },
       ]);
     }
@@ -620,8 +650,26 @@ export default function PosComponent() {
     }
 
     try {
-      setProcesandoVenta(true);
       const factorDescuento = subtotalVenta > 0 ? totalVenta / subtotalVenta : 1;
+
+      // Validación de Margen Mínimo en Modelo Dinámico (Fase 9)
+      if (estrategia?.reglas?.validarMargenMinimo) {
+        const margenMinimo = estrategia.margenMinimoDinamico || 25;
+        for (const item of itemsVenta) {
+          const precioEfectivo = item.precioUnitario * factorDescuento;
+          if (item.costPrice && item.costPrice > 0) {
+            const precioMinimoRequerido = item.costPrice * (1 + margenMinimo / 100);
+            if (precioEfectivo < precioMinimoRequerido - 0.05) {
+              showToast(
+                `Estrategia Dinámica: El calzado "${item.nombre}" tiene un costo de $${item.costPrice.toFixed(2)}. El precio mínimo con margen del ${margenMinimo}% es $${precioMinimoRequerido.toFixed(2)}. Precio unitario tras rebaja: $${precioEfectivo.toFixed(2)}.`,
+                "error"
+              );
+              setProcesandoVenta(false);
+              return;
+            }
+          }
+        }
+      }
 
       const detallePagoPayload =
         metodoPago === "TRANSFERENCIA"
@@ -971,6 +1019,21 @@ export default function PosComponent() {
                   <span className={`w-2 h-2 rounded-full ${caja.abierta ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
                   {caja.abierta ? "Caja Abierta" : "Caja Cerrada"}
                 </span>
+
+                {estrategia && (
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                      estrategia.estrategiaComercialTipo === "DINAMICO"
+                        ? "bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30"
+                        : "bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/30"
+                    }`}
+                  >
+                    <SlidersHorizontal size={11} />
+                    {estrategia.estrategiaComercialTipo === "DINAMICO"
+                      ? `Dinámico (${estrategia.temporadaEfectiva})`
+                      : "Estándar"}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
                 Venta directa en mostrador, arqueo de turno y auditoría analítica de transacciones comerciales.
@@ -1132,6 +1195,45 @@ export default function PosComponent() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Panel Izquierdo: Catálogo de Productos con Imagen */}
                 <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-3xl p-5 space-y-4">
+                  {/* Banners Estrategia Comercial (Fase 9) */}
+                  {estrategia?.reglas?.habilitarPromocionesBaja && (
+                    <div className="bg-amber-500/10 border border-amber-500/25 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <Sparkles className="text-amber-500 shrink-0" size={18} />
+                        <div>
+                          <span className="font-bold text-amber-700 dark:text-amber-400 text-xs block">
+                            Campaña de Temporada Baja Activa
+                          </span>
+                          <span className="text-[11px] text-[var(--muted-foreground)]">
+                            Se sugiere rebaja del {estrategia.descuentoTemporadaBaja}% para rotar pares con más de {estrategia.diasRotacionTemporadaBaja} días de inventario.
+                          </span>
+                        </div>
+                      </div>
+                      {itemsVenta.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const desc = (subtotalVenta * (estrategia.descuentoTemporadaBaja / 100)).toFixed(2);
+                            setDescuentoVenta(desc);
+                            showToast(`Descuento de Temporada Baja aplicado: $${desc} (${estrategia.descuentoTemporadaBaja}%)`, "success");
+                          }}
+                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition-all shrink-0 cursor-pointer text-center"
+                        >
+                          Aplicar {estrategia.descuentoTemporadaBaja}% Rebaja
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {estrategia?.reglas?.validarMargenMinimo && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2 rounded-xl flex items-center gap-2">
+                      <TrendingUp className="text-emerald-600 dark:text-emerald-400 shrink-0" size={14} />
+                      <span className="text-[11px] text-[var(--muted-foreground)]">
+                        <strong className="text-emerald-700 dark:text-emerald-400">Control de Rentabilidad Dinámica:</strong> Margen mínimo obligatorio del {estrategia.margenMinimoDinamico}% sobre costo FIFO activo ({estrategia.motivoTemporada}).
+                      </span>
+                    </div>
+                  )}
+
                   <div className="relative">
                     <Search className="absolute left-3.5 top-3 text-[var(--muted-foreground)]" size={16} />
                     <input
