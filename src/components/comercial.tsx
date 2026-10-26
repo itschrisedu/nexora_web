@@ -112,7 +112,10 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
     const model = l.modelName || l.nombre || 'Calzado de Cuero';
     const color = l.color || '';
     const serieName = l.serieNombre || l.serie || '';
-    const key = `${model.toLowerCase()}_${color.toLowerCase()}_${l.productId || ''}_${serieName.toLowerCase()}`;
+    const precioUnit = Number(l.precioUnitario) || 0;
+    const precioKey = precioUnit.toFixed(2);
+    const tipoVentaKey = l.tipoVenta || 'GENERAL';
+    const key = `${model.toLowerCase()}_${color.toLowerCase()}_${l.productId || ''}_${serieName.toLowerCase()}_${tipoVentaKey.toLowerCase()}_${precioKey}`;
 
     if (!map.has(key)) {
       map.set(key, {
@@ -123,7 +126,7 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
         serieNombre: serieName,
         totalPares: 0,
         totalEntregados: 0,
-        precioUnitario: Number(l.precioUnitario) || 0,
+        precioUnitario: precioUnit,
         subtotal: 0,
         tipoVenta: l.tipoVenta,
         etiquetaVolumen: '',
@@ -138,7 +141,7 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
 
     g.totalPares += cant;
     g.totalEntregados += cantEntregada;
-    g.subtotal += Number(l.subtotal ?? (cant * g.precioUnitario));
+    g.subtotal += Number(l.subtotal ?? (cant * precioUnit));
 
     const existingTalla = g.tallas.find((t) => String(t.numero) === String(numTalla));
     if (existingTalla) {
@@ -322,6 +325,7 @@ export default function ComercialComponent({
   const [lineasPedido, setLineasPedido] = useState<
     {
       productId: string;
+      serieId?: string;
       modelName: string;
       color: string;
       serieNombre?: string;
@@ -1023,7 +1027,9 @@ export default function ComercialComponent({
     if (p.lines && p.lines.length > 0) {
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
-        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+        const serieKey = (l.serieNombre || l.serie || '').toLowerCase().trim();
+        const precioKey = Number(l.precioUnitario || 0).toFixed(2);
+        const key = `${l.productId || l.modelName}_${l.color || ''}_${serieKey}_${l.tipoVenta || 'GENERAL'}_${precioKey}`;
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(l);
       });
@@ -1108,7 +1114,9 @@ export default function ComercialComponent({
     if (p.lines && p.lines.length > 0) {
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
-        const key = `${l.productId}_${l.tipoVenta || 'GENERAL'}`;
+        const serieKey = (l.serieNombre || l.serie || '').toLowerCase().trim();
+        const precioKey = Number(l.precioUnitario || 0).toFixed(2);
+        const key = `${l.productId || l.modelName}_${l.color || ''}_${serieKey}_${l.tipoVenta || 'GENERAL'}_${precioKey}`;
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(l);
       });
@@ -1192,7 +1200,9 @@ export default function ComercialComponent({
     if (p.lines && p.lines.length > 0) {
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
-        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}_${(l.serieNombre || l.serie || '').toLowerCase()}`;
+        const serieKey = (l.serieNombre || l.serie || '').toLowerCase().trim();
+        const precioKey = Number(l.precioUnitario || 0).toFixed(2);
+        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}_${serieKey}_${precioKey}`;
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(l);
       });
@@ -1380,7 +1390,9 @@ export default function ComercialComponent({
     if (p.lines && p.lines.length > 0) {
       const grupos: { [key: string]: any[] } = {};
       p.lines.forEach((l: any) => {
-        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}_${(l.serieNombre || l.serie || '').toLowerCase()}`;
+        const serieKey = (l.serieNombre || l.serie || '').toLowerCase().trim();
+        const precioKey = Number(l.precioUnitario || 0).toFixed(2);
+        const key = `${l.productId || l.varianteId || l.id}_${l.tipoVenta || 'GENERAL'}_${serieKey}_${precioKey}`;
         if (!grupos[key]) grupos[key] = [];
         grupos[key].push(l);
       });
@@ -1545,6 +1557,7 @@ export default function ComercialComponent({
               modelId: modelo.id,
               modelName: modelo.name,
               baseCode: modelo.baseCode,
+              serieId: v.serieId || v.serie?.id || '',
               serieNombre: v.serieNombre,
               tallas: (v.tallas || []).slice().sort((a: any, b: any) => (Number(a.numero ?? a.nombre) || 0) - (Number(b.numero ?? b.nombre) || 0)),
             });
@@ -1717,6 +1730,7 @@ export default function ComercialComponent({
           productId: prodObj.id,
           modelName: prodObj.modelName,
           color: prodObj.color,
+          serieId: tipoVentaItem === 'SERIE_ESPECIAL' ? serieEspecialId : (prodObj.serieId || ''),
           serieNombre: tipoVentaItem === 'SERIE_ESPECIAL'
             ? `${listaSeriesDisponibles.find((s) => s.id === serieEspecialId)?.nombre?.replace(/_/g, ' ') || 'Serie Especial'} [Bajo Pedido]`
             : (prodObj.serieNombre || 'ADULTO'),
@@ -1816,6 +1830,7 @@ export default function ComercialComponent({
           productId: l.productId,
           modelName: l.modelName || 'Modelo',
           color: l.color || '',
+          serieId: l.serieId || '',
           serieNombre: l.serieNombre || 'Serie',
           imageUrl: l.imageUrl || '',
           tallaId: l.tallaId,
@@ -1824,6 +1839,7 @@ export default function ComercialComponent({
           precioUnitario: Number(l.precioUnitario),
           tipoVenta: l.tipoVenta || 'SERIE_COMPLETA',
           subtipoSerie: l.subtipoSerie || 'MEDIA_DOCENA',
+          observacionModelo: l.observacionModelo || l.observacion || undefined,
         }))
       );
     } else {
@@ -1949,6 +1965,7 @@ export default function ComercialComponent({
           cantidad: l.cantidad,
           tipoVenta: l.tipoVenta,
           precioUnitario: Number(l.precioUnitario),
+          serieId: l.serieId || undefined,
           observacion: l.observacionModelo || undefined,
         })),
         notas: notasFinales || undefined,
@@ -5199,12 +5216,14 @@ export default function ComercialComponent({
                   </div>
 
                   <div className="space-y-2">
-                    {/* Render de ítems agrupados compactos */}
+                    {/* Render de ítems agrupados compactos por Serie y Precio */}
                     {(() => {
-                      // Agrupar por productId y tipoVenta
+                      // Agrupar por productId, color, serieNombre, tipoVenta y precioUnitario
                       const grupos: { [key: string]: typeof lineasPedido } = {};
                       lineasPedido.forEach((l) => {
-                        const key = `${l.productId}_${l.tipoVenta}`;
+                        const serieKey = (l.serieNombre || l.serieId || '').toLowerCase().trim();
+                        const precioKey = Number(l.precioUnitario || 0).toFixed(2);
+                        const key = `${l.productId}_${l.color || ''}_${serieKey}_${l.tipoVenta}_${precioKey}`;
                         if (!grupos[key]) grupos[key] = [];
                         grupos[key].push(l);
                       });
@@ -5214,6 +5233,14 @@ export default function ComercialComponent({
                         const totalPares = lineas.reduce((acc, l) => acc + l.cantidad, 0);
                         const subtotalGrupo = lineas.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
                         const sortedLineas = [...lineas].sort((a, b) => (a.numeroTalla || 0) - (b.numeroTalla || 0));
+
+                        // Predicado para identificar con precisión quirúrgica las líneas de este grupo específico
+                        const matchThisGroup = (item: any) =>
+                          item.productId === primerItem.productId &&
+                          (item.color || '') === (primerItem.color || '') &&
+                          (item.serieNombre || item.serieId || '').toLowerCase().trim() === (primerItem.serieNombre || primerItem.serieId || '').toLowerCase().trim() &&
+                          item.tipoVenta === primerItem.tipoVenta &&
+                          Number(item.precioUnitario || 0).toFixed(2) === Number(primerItem.precioUnitario || 0).toFixed(2);
 
                         return (
                           <div key={key} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -5232,7 +5259,7 @@ export default function ComercialComponent({
                                   {primerItem.color} · <span className="font-semibold text-emerald-600">Serie: {formatearNombreSerie(primerItem.serieNombre)}</span>
                                 </div>
 
-                                {/* Chips de Tallas Interactivos y Editables con diseño estandarizado (Photo 1) */}
+                                {/* Chips de Tallas Interactivos y Editables con diseño estandarizado */}
                                 <div className="mt-2.5 space-y-2">
                                   <div className="flex flex-wrap items-center gap-2">
                                     {sortedLineas.map((l, i) => (
@@ -5247,7 +5274,7 @@ export default function ComercialComponent({
                                             onClick={() => {
                                               const nuevasLineas = [...lineasPedido];
                                               const idx = nuevasLineas.findIndex(
-                                                (item) => item.productId === l.productId && item.tallaId === l.tallaId
+                                                (item) => matchThisGroup(item) && item.tallaId === l.tallaId
                                               );
                                               if (idx !== -1) {
                                                 if (nuevasLineas[idx].cantidad > 1) {
@@ -5271,7 +5298,7 @@ export default function ComercialComponent({
                                             onClick={() => {
                                               const nuevasLineas = [...lineasPedido];
                                               const idx = nuevasLineas.findIndex(
-                                                (item) => item.productId === l.productId && item.tallaId === l.tallaId
+                                                (item) => matchThisGroup(item) && item.tallaId === l.tallaId
                                               );
                                               if (idx !== -1) {
                                                 nuevasLineas[idx].cantidad += 1;
@@ -5295,7 +5322,7 @@ export default function ComercialComponent({
                                         const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_A');
                                         const hasCurva = Object.keys(curva).length > 0;
                                         const nuevasLineas = lineasPedido.map(item => {
-                                          if (item.productId === primerItem.productId) {
+                                          if (matchThisGroup(item)) {
                                             const num = Number(item.numeroTalla);
                                             const qty = hasCurva ? (curva[num] ?? 0) : 1;
                                             return { ...item, cantidad: item.cantidad + qty };
@@ -5314,7 +5341,7 @@ export default function ComercialComponent({
                                         const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_B');
                                         const hasCurva = Object.keys(curva).length > 0;
                                         const nuevasLineas = lineasPedido.map(item => {
-                                          if (item.productId === primerItem.productId) {
+                                          if (matchThisGroup(item)) {
                                             const num = Number(item.numeroTalla);
                                             const qty = hasCurva ? (curva[num] ?? 0) : 1;
                                             return { ...item, cantidad: item.cantidad + qty };
@@ -5334,7 +5361,7 @@ export default function ComercialComponent({
                                         const hasCurva = Object.keys(curva).length > 0;
                                         const nuevasLineas = lineasPedido
                                           .map(item => {
-                                            if (item.productId === primerItem.productId) {
+                                            if (matchThisGroup(item)) {
                                               const num = Number(item.numeroTalla);
                                               const qty = hasCurva ? (curva[num] ?? 0) : 1;
                                               return { ...item, cantidad: Math.max(0, item.cantidad - qty) };
@@ -5355,7 +5382,7 @@ export default function ComercialComponent({
                                         const hasCurva = Object.keys(curva).length > 0;
                                         const nuevasLineas = lineasPedido
                                           .map(item => {
-                                            if (item.productId === primerItem.productId) {
+                                            if (matchThisGroup(item)) {
                                               const num = Number(item.numeroTalla);
                                               const qty = hasCurva ? (curva[num] ?? 0) : 1;
                                               return { ...item, cantidad: Math.max(0, item.cantidad - qty) };
@@ -5385,7 +5412,7 @@ export default function ComercialComponent({
                                         type="button"
                                         onClick={() => {
                                           const nuevasLineas = lineasPedido.map(item => {
-                                            if (item.productId === primerItem.productId) {
+                                            if (matchThisGroup(item)) {
                                               return { ...item, observacionModelo: undefined };
                                             }
                                             return item;
@@ -5398,7 +5425,7 @@ export default function ComercialComponent({
                                         ✕
                                       </button>
                                     </div>
-                                  ) : editingObservacionProductId === primerItem.productId ? (
+                                  ) : editingObservacionProductId === key ? (
                                     <div className="flex items-center gap-1.5 mt-1.5">
                                       <input
                                         type="text"
@@ -5410,7 +5437,7 @@ export default function ComercialComponent({
                                         onKeyDown={(e) => {
                                           if (e.key === 'Enter') {
                                             const nuevasLineas = lineasPedido.map(item => {
-                                              if (item.productId === primerItem.productId) {
+                                              if (matchThisGroup(item)) {
                                                 return { ...item, observacionModelo: tempObservacionText.trim() || undefined };
                                               }
                                               return item;
@@ -5428,7 +5455,7 @@ export default function ComercialComponent({
                                         type="button"
                                         onClick={() => {
                                           const nuevasLineas = lineasPedido.map(item => {
-                                            if (item.productId === primerItem.productId) {
+                                            if (matchThisGroup(item)) {
                                               return { ...item, observacionModelo: tempObservacionText.trim() || undefined };
                                             }
                                             return item;
@@ -5457,7 +5484,7 @@ export default function ComercialComponent({
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          setEditingObservacionProductId(primerItem.productId);
+                                          setEditingObservacionProductId(key);
                                           setTempObservacionText('');
                                         }}
                                         className="text-[10px] font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
@@ -5476,9 +5503,35 @@ export default function ComercialComponent({
                                 <div className="text-xs font-bold text-[var(--foreground)]">
                                   {totalPares} pares ({primerItem.tipoVenta === 'SERIE_COMPLETA' ? (primerItem.subtipoSerie === 'MEDIA_DOCENA' ? '½ Docena' : '1 Docena') : 'Numeración'})
                                 </div>
-                                <div className="text-[11px] text-[var(--muted-foreground)]">
-                                  ${primerItem.precioUnitario.toFixed(2)} / par
-                                </div>
+                                {puedeCambiarPrecio ? (
+                                  <div className="flex items-center justify-end gap-1 my-0.5" title="Precio unitario para esta serie de calzado">
+                                    <span className="text-xs font-bold text-[var(--muted-foreground)]">$</span>
+                                    <input
+                                      type="number"
+                                      step="0.25"
+                                      min="0.5"
+                                      value={primerItem.precioUnitario}
+                                      onChange={(e) => {
+                                        const nuevoPrecio = parseFloat(e.target.value);
+                                        if (!isNaN(nuevoPrecio) && nuevoPrecio >= 0) {
+                                          const nuevasLineas = lineasPedido.map((item) => {
+                                            if (matchThisGroup(item)) {
+                                              return { ...item, precioUnitario: nuevoPrecio };
+                                            }
+                                            return item;
+                                          });
+                                          setLineasPedido(nuevasLineas);
+                                        }
+                                      }}
+                                      className="w-16 px-1.5 py-0.5 text-right text-xs font-mono font-bold bg-[var(--background)] border border-[var(--border)] rounded focus:outline-none focus:border-emerald-600 text-[var(--foreground)]"
+                                    />
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">/ par</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-[var(--muted-foreground)]">
+                                    ${primerItem.precioUnitario.toFixed(2)} / par
+                                  </div>
+                                )}
                                 <div className="text-sm font-extrabold text-emerald-600">
                                   ${subtotalGrupo.toFixed(2)}
                                 </div>
@@ -5487,11 +5540,11 @@ export default function ComercialComponent({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  // Eliminar todas las líneas de este modelo
-                                  setLineasPedido(lineasPedido.filter((l) => l.productId !== primerItem.productId));
+                                  // Eliminar exclusivamente las líneas de esta serie y grupo
+                                  setLineasPedido(lineasPedido.filter((l) => !matchThisGroup(l)));
                                 }}
                                 className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                                title="Eliminar este modelo del pedido"
+                                title="Eliminar esta serie del pedido"
                               >
                                 <XCircle size={18} />
                               </button>
@@ -6815,7 +6868,8 @@ export default function ComercialComponent({
                   }>();
 
                   (pedidoEntregaSeleccionado.lines || []).forEach((l: any) => {
-                    const key = `${l.productId || l.modelName}_${l.color || ''}_${l.serieNombre || ''}_${l.tipoVenta || 'GENERAL'}`;
+                    const precioKey = Number(l.precioUnitario || 0).toFixed(2);
+                    const key = `${l.productId || l.modelName}_${l.color || ''}_${l.serieNombre || ''}_${l.tipoVenta || 'GENERAL'}_${precioKey}`;
                     if (!gruposMap.has(key)) {
                       gruposMap.set(key, {
                         key,
@@ -7395,7 +7449,8 @@ export default function ComercialComponent({
 
                   const gruposMap = new Map<string, { key: string; productId: string; modelName: string; color: string; serieNombre: string; imageUrl?: string; precioUnitario: number; tipoVenta?: string; observacionModelo?: string; lineas: any[]; }>();
                   lineasEntregadas.forEach((l: any) => {
-                    const key = [l.productId || l.modelName, l.color || '', l.serieNombre || '', l.tipoVenta || 'GENERAL'].join('_');
+                    const precioKey = Number(l.precioUnitario || 0).toFixed(2);
+                    const key = [l.productId || l.modelName, l.color || '', l.serieNombre || '', l.tipoVenta || 'GENERAL', precioKey].join('_');
                     if (!gruposMap.has(key)) {
                       gruposMap.set(key, {
                         key,
