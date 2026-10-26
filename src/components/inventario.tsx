@@ -258,7 +258,11 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
       const delta = curva[t.id] ?? 0;
       const actual = newLote[t.id] || 0;
       if (operacion === 'sumar') {
-        newLote[t.id] = actual + delta;
+        if (movType === "salida") {
+          newLote[t.id] = Math.min(t.stock || 0, actual + delta);
+        } else {
+          newLote[t.id] = actual + delta;
+        }
       } else {
         newLote[t.id] = Math.max(0, actual - delta);
       }
@@ -270,7 +274,12 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
     setSubtipoCurvaMov(tipo);
     if (!movProd || !movProd.tallas || movProd.tallas.length === 0) return;
     const curva = calcularCurvaParaTallas(movProd.serie?.nombre || '', movProd.tallas, tipo);
-    setLoteCantidades(curva);
+    const newLote: Record<string, number> = {};
+    movProd.tallas.forEach((t) => {
+      const valor = curva[t.id] ?? 0;
+      newLote[t.id] = movType === "salida" ? Math.min(t.stock || 0, valor) : valor;
+    });
+    setLoteCantidades(newLote);
   };
 
   const handleMovimiento = async (e: React.FormEvent) => {
@@ -283,19 +292,18 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
       return;
     }
 
+    const items = Object.entries(loteCantidades)
+      .map(([tallaId, cant]) => ({ tallaId, cantidad: Number(cant) || 0 }))
+      .filter((i) => i.cantidad > 0);
+
+    if (items.length === 0) {
+      setMovError(`Ingresa al menos 1 par en alguna talla para registrar la ${movType}.`);
+      return;
+    }
+
     setMovSaving(true);
     try {
       if (movType === "entrada") {
-        const items = Object.entries(loteCantidades)
-          .map(([tallaId, cant]) => ({ tallaId, cantidad: Number(cant) || 0 }))
-          .filter((i) => i.cantidad > 0);
-
-        if (items.length === 0) {
-          setMovError("Ingresa al menos 1 par en alguna talla.");
-          setMovSaving(false);
-          return;
-        }
-
         await ApiService.post(`/inventario/productos/${movProd.id}/entrada-lote`, {
           items,
           motivo: movMotivo.trim(),
@@ -305,17 +313,24 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
         const totalPares = items.reduce((s, i) => s + i.cantidad, 0);
         setSuccess(`Entrada de mercancía (${totalPares} pares) registrada correctamente.`);
       } else {
-        if (!movTallaId || !movCantidad || parseInt(movCantidad) <= 0) {
-          setMovError("Selecciona una talla y una cantidad mayor a cero.");
-          setMovSaving(false);
-          return;
+        // Validar que ninguna talla supere el stock físico actual
+        for (const it of items) {
+          const tallaObj = movProd.tallas?.find((t) => t.id === it.tallaId);
+          const maxStock = tallaObj?.stock || 0;
+          if (it.cantidad > maxStock) {
+            setMovError(`La talla T${tallaObj?.nombre || tallaObj?.numero} solo dispone de ${maxStock} pares en stock.`);
+            setMovSaving(false);
+            return;
+          }
         }
-        await ApiService.post(`/inventario/productos/${movProd.id}/salida`, {
-          tallaId: movTallaId,
-          cantidad: parseInt(movCantidad),
+
+        await ApiService.post(`/inventario/productos/${movProd.id}/salida-lote`, {
+          items,
           motivo: movMotivo.trim(),
         });
-        setSuccess(`Salida de stock registrada correctamente.`);
+
+        const totalPares = items.reduce((s, i) => s + i.cantidad, 0);
+        setSuccess(`Salida de stock (${totalPares} pares) registrada correctamente.`);
       }
 
       setShowMovModal(false);
@@ -842,290 +857,318 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
             </div>
             <form onSubmit={handleMovimiento} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
-                {movType === "entrada" && (
-                  <div className="space-y-4">
-                    {/* Selector de modo: Pares Sueltos vs Serie Completa */}
-                    <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setIngresoFormato("suelto")}
-                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                          ingresoFormato === "suelto"
-                            ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]"
-                            : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                        }`}
-                      >
-                        👟 Pares Sueltos
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIngresoFormato("serie");
-                          if (totalParesLote === 0) {
-                            aplicarPresetSerie('MEDIA_A');
-                          }
-                        }}
-                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                          ingresoFormato === "serie"
+                <div className="space-y-4">
+                  {/* Selector de modo: Pares Sueltos vs Serie Completa */}
+                  <div className="p-1 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setIngresoFormato("suelto")}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        ingresoFormato === "suelto"
+                          ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm border border-[var(--border)]"
+                          : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      }`}
+                    >
+                      👟 Pares Sueltos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIngresoFormato("serie");
+                        if (totalParesLote === 0) {
+                          aplicarPresetSerie('MEDIA_A');
+                        }
+                      }}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        ingresoFormato === "serie"
+                          ? movType === "entrada"
                             ? "bg-emerald-600 text-white shadow-sm"
-                            : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                        }`}
-                      >
-                        📦 Serie Completa
-                      </button>
-                    </div>
+                            : "bg-rose-600 text-white shadow-sm"
+                          : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                      }`}
+                    >
+                      📦 Serie Completa
+                    </button>
+                  </div>
 
-                    {/* Componente Interactivo Idéntico */}
-                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-3.5">
-                      {/* Cabecera del Producto */}
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-1 border-b border-[var(--border)]/50">
-                        <div>
-                          <h4 className="font-extrabold text-base text-[var(--foreground)] uppercase tracking-wide">
-                            {movProd.modelo || movProd.nombre}
-                          </h4>
-                          <p className="text-xs text-[var(--muted-foreground)]">
-                            <span className="font-semibold">{movProd.marca}</span>
-                            {movProd.nombre && movProd.modelo && <span> · {movProd.nombre}</span>}
-                            {movProd.serie?.nombre && (
-                              <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {formatearNombreSerie(movProd.serie.nombre)}</span></span>
-                            )}
-                            {movProd.codigo && <span className="ml-1 opacity-70">({movProd.codigo})</span>}
-                          </p>
-                        </div>
-
-                        {/* Resumen Derecho de Pares, Docenas y Costo */}
-                        <div className="text-left sm:text-right shrink-0">
-                          <div className="font-extrabold text-xs text-[var(--foreground)]">
-                            {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} {totalParesLote > 0 ? `(${getDocenaLabel(totalParesLote)})` : ''}
-                          </div>
-                          {isAdmin && (
-                            <>
-                              <div className="text-[11px] text-[var(--muted-foreground)]">
-                                ${(parseFloat(movPrecioCosto) || Number(movProd.precioCosto)).toFixed(2)} / par
-                              </div>
-                              <div className="font-black text-sm text-emerald-600">
-                                ${(totalParesLote * (parseFloat(movPrecioCosto) || Number(movProd.precioCosto))).toFixed(2)}
-                              </div>
-                            </>
+                  {/* Componente Interactivo Idéntico a la Captura */}
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-3.5">
+                    {/* Cabecera del Producto */}
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-1 border-b border-[var(--border)]/50">
+                      <div>
+                        <h4 className="font-extrabold text-base text-[var(--foreground)] uppercase tracking-wide">
+                          {movProd.modelo || movProd.nombre}
+                        </h4>
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                          <span className="font-semibold">{movProd.marca}</span>
+                          {movProd.nombre && movProd.modelo && <span> · {movProd.nombre}</span>}
+                          {movProd.serie?.nombre && (
+                            <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {formatearNombreSerie(movProd.serie.nombre)}</span></span>
                           )}
-                        </div>
+                          {movProd.codigo && <span className="ml-1 opacity-70">({movProd.codigo})</span>}
+                        </p>
                       </div>
 
-                      {/* Fila Principal: Foto | Pastillas de Tallas y Botones */}
-                      <div className="flex items-start gap-3.5">
-                        <div
-                          onClick={() => {
-                            if (movProd.fotoUrl) {
-                              setLightboxImage({ url: movProd.fotoUrl, title: `${movProd.modelo || movProd.nombre} (${movProd.codigo})` });
-                            }
-                          }}
-                          className={`w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs ${movProd.fotoUrl ? 'cursor-zoom-in hover:opacity-90' : ''}`}
-                          title={movProd.fotoUrl ? "Ver foto ampliada del calzado" : ""}
-                        >
-                          {movProd.fotoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={movProd.fotoUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <Package size={20} className="text-[var(--muted-foreground)]" />
-                          )}
+                      {/* Resumen Derecho de Pares, Docenas y Costo */}
+                      <div className="text-left sm:text-right shrink-0">
+                        <div className="font-extrabold text-xs text-[var(--foreground)]">
+                          {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} {totalParesLote > 0 ? `(${getDocenaLabel(totalParesLote)})` : ''}
+                        </div>
+                        {isAdmin && (
+                          <>
+                            <div className="text-[11px] text-[var(--muted-foreground)]">
+                              ${(parseFloat(movPrecioCosto) || Number(movProd.precioCosto || 10)).toFixed(2)} / par
+                            </div>
+                            <div className={`font-black text-sm ${movType === "entrada" ? "text-emerald-600" : "text-rose-600"}`}>
+                              ${(totalParesLote * (parseFloat(movPrecioCosto) || Number(movProd.precioCosto || 10))).toFixed(2)}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fila Principal: Foto | Pastillas de Tallas y Botones */}
+                    <div className="flex items-start gap-3.5">
+                      <div
+                        onClick={() => {
+                          if (movProd.fotoUrl) {
+                            setLightboxImage({ url: movProd.fotoUrl, title: `${movProd.modelo || movProd.nombre} (${movProd.codigo})` });
+                          }
+                        }}
+                        className={`w-14 h-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs ${movProd.fotoUrl ? 'cursor-zoom-in hover:opacity-90' : ''}`}
+                        title={movProd.fotoUrl ? "Ver foto ampliada del calzado" : ""}
+                      >
+                        {movProd.fotoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={movProd.fotoUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Package size={20} className="text-[var(--muted-foreground)]" />
+                        )}
+                      </div>
+
+                      <div className="space-y-2.5 flex-1 min-w-0">
+                        {/* Pastillas Interactivas por Talla */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {movProd.tallas?.map((t) => {
+                            const qty = loteCantidades[t.id] ?? 0;
+                            const maxStock = movType === "salida" ? (t.stock || 0) : 9999;
+                            const isAtMax = movType === "salida" && qty >= maxStock;
+                            const hasNoStock = movType === "salida" && (t.stock || 0) <= 0;
+
+                            return (
+                              <div
+                                key={t.id}
+                                className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
+                                  qty > 0
+                                    ? movType === "entrada"
+                                      ? 'bg-emerald-500/10 border-emerald-500/40 text-[var(--foreground)]'
+                                      : 'bg-rose-500/10 border-rose-500/40 text-[var(--foreground)]'
+                                    : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
+                                } ${hasNoStock ? 'opacity-50' : ''}`}
+                              >
+                                <span className="font-extrabold text-xs font-mono mr-0.5">
+                                  T{t.nombre || t.numero}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, qty - 1)})}
+                                  className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
+                                  title={`Restar 1 par T${t.nombre || t.numero}`}
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={movType === "salida" ? t.stock : undefined}
+                                  value={qty}
+                                  onChange={(e) => {
+                                    const rawVal = Math.max(0, parseInt(e.target.value) || 0);
+                                    const finalVal = movType === "salida" ? Math.min(t.stock || 0, rawVal) : rawVal;
+                                    setLoteCantidades({...loteCantidades, [t.id]: finalVal});
+                                  }}
+                                  className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={isAtMax}
+                                  onClick={() => {
+                                    if (isAtMax) return;
+                                    setLoteCantidades({...loteCantidades, [t.id]: Math.min(maxStock, qty + 1)});
+                                  }}
+                                  className={`w-5 h-5 flex items-center justify-center rounded-md text-xs font-black transition-colors ${
+                                    isAtMax
+                                      ? 'bg-slate-500/10 text-slate-400 cursor-not-allowed opacity-50'
+                                      : 'bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 cursor-pointer'
+                                  }`}
+                                  title={isAtMax ? `Stock máximo alcanzado (${t.stock} pares)` : `Sumar 1 par T${t.nombre || t.numero}`}
+                                >
+                                  +
+                                </button>
+                                <span
+                                  className={`text-[10px] font-mono ml-0.5 ${
+                                    hasNoStock ? 'text-red-500 font-bold' : 'text-[var(--muted-foreground)]'
+                                  }`}
+                                  title={`Stock actual: ${t.stock}`}
+                                >
+                                  stk:{t.stock}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
 
-                        <div className="space-y-2.5 flex-1 min-w-0">
-                          {/* Pastillas Interactivas por Talla */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            {movProd.tallas?.map((t) => {
-                              const qty = loteCantidades[t.id] ?? 0;
+                        {/* Presets en modo Serie */}
+                        {ingresoFormato === "serie" && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1">Fijar Curva:</span>
+                            {(['MEDIA_A', 'MEDIA_B', 'DOCENA'] as TipoCurva[]).map((curv) => {
+                              const lbl = curv === 'MEDIA_A' ? '½ Media A' : curv === 'MEDIA_B' ? '½ Media B' : '1 Docena';
                               return (
-                                <div
-                                  key={t.id}
-                                  className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs ${
-                                    qty > 0
-                                      ? 'bg-emerald-500/10 border-emerald-500/40 text-[var(--foreground)]'
-                                      : 'bg-[var(--muted)]/20 border-[var(--border)]/70 text-[var(--muted-foreground)]'
+                                <button
+                                  key={curv}
+                                  type="button"
+                                  onClick={() => aplicarPresetSerie(curv)}
+                                  className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer shadow-2xs ${
+                                    subtipoCurvaMov === curv
+                                      ? movType === "entrada"
+                                        ? "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 font-black"
+                                        : "bg-rose-500/15 border-rose-500 text-rose-700 dark:text-rose-300 font-black"
+                                      : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
                                   }`}
                                 >
-                                  <span className="font-extrabold text-xs font-mono mr-0.5">
-                                    T{t.nombre || t.numero}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, qty - 1)})}
-                                    className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
-                                    title={`Restar 1 par T${t.nombre || t.numero}`}
-                                  >
-                                    −
-                                  </button>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={qty}
-                                    onChange={(e) => setLoteCantidades({...loteCantidades, [t.id]: Math.max(0, parseInt(e.target.value) || 0)})}
-                                    className="w-7 text-center text-xs font-black font-mono bg-transparent border-none focus:outline-none p-0"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setLoteCantidades({...loteCantidades, [t.id]: qty + 1})}
-                                    className="w-5 h-5 flex items-center justify-center bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-md text-xs font-black transition-colors cursor-pointer"
-                                    title={`Sumar 1 par T${t.nombre || t.numero}`}
-                                  >
-                                    +
-                                  </button>
-                                  <span className="text-[10px] text-[var(--muted-foreground)] font-mono ml-0.5" title={`Stock actual: ${t.stock}`}>
-                                    stk:{t.stock}
-                                  </span>
-                                </div>
+                                  📦 {lbl}
+                                </button>
                               );
                             })}
                           </div>
+                        )}
 
-                          {/* Presets en modo Serie */}
-                          {ingresoFormato === "serie" && (
-                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                              <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1">Fijar Curva:</span>
-                              {(['MEDIA_A', 'MEDIA_B', 'DOCENA'] as TipoCurva[]).map((curv) => {
-                                const lbl = curv === 'MEDIA_A' ? '½ Media A' : curv === 'MEDIA_B' ? '½ Media B' : '1 Docena';
-                                return (
-                                  <button
-                                    key={curv}
-                                    type="button"
-                                    onClick={() => aplicarPresetSerie(curv)}
-                                    className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer shadow-2xs ${
-                                      subtipoCurvaMov === curv
-                                        ? "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 font-black"
-                                        : "border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
-                                    }`}
-                                  >
-                                    📦 {lbl}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {/* Acciones Rápidas Masivas: Media A / Media B / Docena */}
-                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => aplicarCurvaRelativaMov('MEDIA_A', 'sumar')}
-                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                              title="Sumar curva Media A (38:1, 39:2, 40:1, 41:1, 42:1)"
-                            >
-                              + Media A
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => aplicarCurvaRelativaMov('MEDIA_B', 'sumar')}
-                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                              title="Sumar curva Media B (38:1, 39:1, 40:2, 41:1, 42:1)"
-                            >
-                              + Media B
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => aplicarCurvaRelativaMov('DOCENA', 'sumar')}
-                              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                              title="Sumar 1 Docena completa (12 pares)"
-                            >
-                              + 1 Docena
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => aplicarCurvaRelativaMov('MEDIA_A', 'restar')}
-                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                              title="Restar curva Media A"
-                            >
-                              − Media A
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => aplicarCurvaRelativaMov('MEDIA_B', 'restar')}
-                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                              title="Restar curva Media B"
-                            >
-                              − Media B
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => aplicarCurvaRelativaMov('DOCENA', 'restar')}
-                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                              title="Restar 1 Docena completa"
-                            >
-                              − 1 Docena
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newLote: Record<string, number> = {};
-                                movProd.tallas?.forEach((t) => { newLote[t.id] = 0; });
-                                setLoteCantidades(newLote);
-                              }}
-                              className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                            >
-                              ↺ Poner en 0
-                            </button>
-                            <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
-                              = {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} total
-                            </span>
-                          </div>
+                        {/* Acciones Rápidas Masivas: Media A / Media B / Docena */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => aplicarCurvaRelativaMov('MEDIA_A', 'sumar')}
+                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title="Sumar curva Media A (topada a stock en salida)"
+                          >
+                            + Media A
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarCurvaRelativaMov('MEDIA_B', 'sumar')}
+                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title="Sumar curva Media B (topada a stock en salida)"
+                          >
+                            + Media B
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarCurvaRelativaMov('DOCENA', 'sumar')}
+                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title="Sumar 1 Docena completa (topada a stock en salida)"
+                          >
+                            + 1 Docena
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarCurvaRelativaMov('MEDIA_A', 'restar')}
+                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title="Restar curva Media A"
+                          >
+                            − Media A
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarCurvaRelativaMov('MEDIA_B', 'restar')}
+                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title="Restar curva Media B"
+                          >
+                            − Media B
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarCurvaRelativaMov('DOCENA', 'restar')}
+                            className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title="Restar 1 Docena completa"
+                          >
+                            − 1 Docena
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newLote: Record<string, number> = {};
+                              movProd.tallas?.forEach((t) => { newLote[t.id] = 0; });
+                              setLoteCantidades(newLote);
+                            }}
+                            className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          >
+                            ↺ Poner en 0
+                          </button>
+                          <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
+                            = {totalParesLote} {totalParesLote === 1 ? 'par' : 'pares'} total
+                          </span>
                         </div>
                       </div>
+                    </div>
 
-                      {/* Costo FIFO por Lote para Ingreso */}
-                      {isAdmin && (
-                        <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl p-3 space-y-2 mt-2">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div>
-                              <span className="font-bold text-xs text-[var(--foreground)] flex items-center gap-1.5">
-                                💲 Costo Unitario del Lote de Entrada ($)
-                              </span>
-                              <p className="text-[11px] text-[var(--muted-foreground)]">
-                                Sugerido del último lote registrado. Modifícalo si este nuevo ingreso tuvo un costo distinto.
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="relative w-28 sm:w-32">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  value={movPrecioCosto}
-                                  onChange={(e) => setMovPrecioCosto(e.target.value)}
-                                  className="w-full pl-7 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-right font-mono focus:ring-2 focus:ring-emerald-500 text-[var(--foreground)]"
-                                  placeholder="0.00"
-                                />
-                              </div>
-                            </div>
+                    {/* Costo FIFO por Lote para Ingreso */}
+                    {movType === "entrada" && isAdmin && (
+                      <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl p-3 space-y-2 mt-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <span className="font-bold text-xs text-[var(--foreground)] flex items-center gap-1.5">
+                              💲 Costo Unitario del Lote de Entrada ($)
+                            </span>
+                            <p className="text-[11px] text-[var(--muted-foreground)]">
+                              Sugerido del último lote registrado. Modifícalo si este nuevo ingreso tuvo un costo distinto.
+                            </p>
                           </div>
-                          <div className="pt-2 border-t border-[var(--border)]/40 flex justify-between items-center text-[11px]">
-                            <span className="text-[var(--muted-foreground)]">
-                              Inversión Total del Lote ({totalParesLote} pares):
-                            </span>
-                            <span className="font-black text-xs text-emerald-600 font-mono">
-                              ${(totalParesLote * (parseFloat(movPrecioCosto) || 0)).toFixed(2)}
-                            </span>
+                          <div className="flex items-center gap-2">
+                            <div className="relative w-28 sm:w-32">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={movPrecioCosto}
+                                onChange={(e) => setMovPrecioCosto(e.target.value)}
+                                className="w-full pl-7 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-right font-mono focus:ring-2 focus:ring-emerald-500 text-[var(--foreground)]"
+                                placeholder="0.00"
+                              />
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                        <div className="pt-2 border-t border-[var(--border)]/40 flex justify-between items-center text-[11px]">
+                          <span className="text-[var(--muted-foreground)]">
+                            Inversión Total del Lote ({totalParesLote} pares):
+                          </span>
+                          <span className="font-black text-xs text-emerald-600 font-mono">
+                            ${(totalParesLote * (parseFloat(movPrecioCosto) || 0)).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
-                {movType === "salida" && (
-                  <>
-                    <div>
-                      <Lbl t="Talla Seleccionada" req />
-                      <select value={movTallaId} onChange={(e) => setMovTallaId(e.target.value)} className={INPUT}>
-                        <option value="">Seleccionar talla...</option>
-                        {movProd.tallas?.map((t) => <option key={t.id} value={t.id}>Talla {t.nombre || t.numero} (stock: {t.stock})</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <Lbl t="Cantidad de Pares a Descargar" req />
-                      <input type="number" min="1" value={movCantidad} onChange={(e) => setMovCantidad(e.target.value)} className={INPUT} />
-                    </div>
-                  </>
-                )}
+                    {/* Resumen de Valorización para Salida */}
+                    {movType === "salida" && (
+                      <div className="bg-rose-500/5 border border-rose-500/20 rounded-xl p-3 space-y-1.5 mt-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                            <TrendingDown size={14} className="text-rose-500" />
+                            Descarga Total de Mercadería ({totalParesLote} pares)
+                          </span>
+                          <span className="font-black text-xs text-rose-600 font-mono">
+                            ${(totalParesLote * Number(movProd.precioCosto || 10)).toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[var(--muted-foreground)]">
+                          Se descontará el stock físico y se actualizará el inventario FIFO consumiendo los lotes más antiguos.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <div>
                   <Lbl t="Motivo / Documento" req />
                   <input type="text" value={movMotivo} onChange={(e) => setMovMotivo(e.target.value)} placeholder={movType === "entrada" ? "Ej. Comprobante de recepción / Guía N° 001" : "Ej. Ajuste de inventario"} className={INPUT} />
