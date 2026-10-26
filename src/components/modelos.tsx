@@ -1739,6 +1739,85 @@ export default function ModelosComponent({
 
     setEditProductTallas(tallasData);
     setNewTallaNumeroInput("");
+
+    // Inicializar datos de series y precios del proveedor para el componente interactivo
+    const targetModel = modelos.find((mod: ModeloAgrupado) => mod.id === actualModelId);
+    if (targetModel) {
+      setSupplierSeriesTargetModel(targetModel);
+      const supId = p.supplierId || (p.supplier as any)?.id || targetModel.supplierId || null;
+      setSupplierSeriesTargetSupplierId(supId);
+
+      const supObj = listaProveedores.find(s => s.id === supId);
+      const supName = p.supplier?.razonSocial || supObj?.razonSocial || targetModel.supplier?.razonSocial || "Proveedor";
+      setSupplierSeriesTargetSupplierName(supName);
+
+      const prodsSup = (targetModel.products || []).filter((prod: any) => {
+        const prodSupId = prod.supplierId || prod.supplier?.id;
+        if (supId) {
+          return prodSupId === supId || (!prodSupId && supId === targetModel.supplierId);
+        } else {
+          return !prodSupId || prodSupId === targetModel.supplierId;
+        }
+      });
+
+      let activeSids = Array.from(
+        new Set(
+          prodsSup
+            .filter((prod: any) => prod.activo !== false)
+            .map((prod: any) => (prod.serie as any)?.id || (prod as any).serieId)
+            .filter(Boolean)
+        )
+      ) as string[];
+
+      if (sid && !activeSids.includes(sid)) {
+        activeSids.push(sid);
+      }
+
+      const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+      const initialTallas: Record<string, string[]> = {};
+
+      series.forEach(s => {
+        const prodConPrecio = prodsSup.find((prod: any) => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
+        if (prodConPrecio) {
+          initialPrices[s.id] = {
+            costPrice: String(prodConPrecio.precioCosto || ""),
+            salePrice: String(prodConPrecio.precioVenta || ""),
+          };
+        } else {
+          const cacheKey = `${s.id}_${supId || 'default'}`;
+          if (knownSeriesCosts[cacheKey]) {
+            initialPrices[s.id] = { ...knownSeriesCosts[cacheKey] };
+          } else if (knownSeriesCosts[s.id]) {
+            initialPrices[s.id] = { ...knownSeriesCosts[s.id] };
+          } else {
+            initialPrices[s.id] = { costPrice: "", salePrice: "" };
+          }
+        }
+
+        if (s.tallas) {
+          const curva = getCurvaDocena(s.nombre, 'DOCENA');
+          if (Object.keys(curva).length > 0) {
+            initialTallas[s.id] = buildTallaIdsFromCurva(s, curva);
+          } else {
+            const defaultIds: string[] = [];
+            s.tallas.forEach(t => { defaultIds.push(t.id); defaultIds.push(t.id); });
+            initialTallas[s.id] = defaultIds;
+          }
+        }
+      });
+
+      if (sid && !initialPrices[sid]?.costPrice && p.precioCosto) {
+        initialPrices[sid] = {
+          costPrice: String(p.precioCosto),
+          salePrice: String(p.precioVenta),
+        };
+      }
+
+      setSupplierSeriesActiveIds(activeSids);
+      setSupplierSeriesPrices(initialPrices);
+      setSupplierSeriesCustomTallas(initialTallas);
+    }
+
     setError("");
     setShowEditProduct(true);
   };
@@ -2077,6 +2156,26 @@ export default function ModelosComponent({
         }));
       }
 
+      // Sincronizar series y precios de este proveedor en todos los colores de este modelo
+      if (supplierSeriesTargetModel && supplierSeriesActiveIds.length > 0) {
+        const seriesPricesNumeric: Record<string, { costPrice: number; salePrice: number }> = {};
+        for (const sid of supplierSeriesActiveIds) {
+          const sp = supplierSeriesPrices[sid];
+          if (sp) {
+            seriesPricesNumeric[sid] = {
+              costPrice: parseFloat(sp.costPrice) || costo,
+              salePrice: parseFloat(sp.salePrice) || venta,
+            };
+          }
+        }
+        await ApiService.put(`/inventario/modelos/${supplierSeriesTargetModel.id}/proveedor-series`, {
+          supplierId: supplierSeriesTargetSupplierId || editProductSupplierId || null,
+          serieIds: supplierSeriesActiveIds,
+          seriesPrices: seriesPricesNumeric,
+          customTallas: supplierSeriesCustomTallas,
+        });
+      }
+
       // Actualizar selección visual del color del modelo si cambió el nombre
       const targetModelId = editProduct.modelId;
       if (targetModelId) {
@@ -2088,7 +2187,7 @@ export default function ModelosComponent({
         lastActiveModelIdRef.current = targetModelId;
       }
 
-      setSuccess("Variante actualizada exitosamente.");
+      setSuccess("Variante y series del proveedor actualizadas exitosamente.");
       setShowEditProduct(false);
       setEditProduct(null);
       loadData(true);
@@ -2964,8 +3063,8 @@ export default function ModelosComponent({
                                   )}
                                   <button
                                     type="button"
-                                    onClick={() => openEditSupplierSeries(p, m)}
-                                    title="Editar series, costos y precios de este proveedor en todos los colores"
+                                    onClick={() => openEditProduct(p, m.id)}
+                                    title="Editar variante: imagen, color, series, numeración, stock y precios"
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs cursor-pointer"
                                   >
                                     <Edit2 size={12} />
@@ -2973,11 +3072,11 @@ export default function ModelosComponent({
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => openEditProduct(p, m.id)}
-                                    title="Editar imagen o stock puntual de esta variante"
-                                    className="p-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/50 transition-colors cursor-pointer"
+                                    onClick={() => openEditSupplierSeries(p, m)}
+                                    title="Gestionar series y precios de este proveedor en todos los colores"
+                                    className="p-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:text-blue-600 hover:bg-blue-500/10 transition-colors cursor-pointer"
                                   >
-                                    <ImageIcon size={13} />
+                                    <Boxes size={13} />
                                   </button>
                                   {online && isAdmin && (
                                     <button
@@ -4658,21 +4757,222 @@ export default function ModelosComponent({
                   className={INPUT} required placeholder="Ej: Negro, Café, Miel..." />
               </div>
 
-              {/* Serie Asociada (Modificar Serie / Numeración) */}
-              <div>
-                <Lbl t="Serie de Numeración" req />
-                <select
-                  value={editProductSerieId}
-                  onChange={(e) => handleChangeEditSerie(e.target.value)}
-                  className={INPUT}
-                >
-                  <option value="">-- Seleccionar Serie --</option>
-                  {series.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {getNombreSerie(s.nombre)} {s.tallas && s.tallas.length > 0 ? `(${s.tallas[0].numero}-${s.tallas[s.tallas.length - 1].numero})` : ''}
-                    </option>
-                  ))}
-                </select>
+              {/* Serie Asociada a esta Variante y Componente 3. SERIES Y PRECIOS */}
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <Lbl t="Serie Asignada a esta Variante" req />
+                    <span className="text-[10px] text-[var(--muted-foreground)]">Serie de numeración base</span>
+                  </div>
+                  <select
+                    value={editProductSerieId}
+                    onChange={(e) => handleChangeEditSerie(e.target.value)}
+                    className={INPUT}
+                  >
+                    <option value="">-- Seleccionar Serie --</option>
+                    {series.map((s) => {
+                      const isAct = supplierSeriesActiveIds.includes(s.id);
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {getNombreSerie(s, series)} {s.tallas && s.tallas.length > 0 ? `(${s.tallas[0].numero}-${s.tallas[s.tallas.length - 1].numero})` : ''} {isAct ? '✓ (Activa)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Sección 3: Series y Precios (Idéntica a la Imagen de Referencia) */}
+                <div className="space-y-3 bg-[var(--muted)]/15 border border-[var(--border)] rounded-2xl p-4">
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                    <div>
+                      <h5 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
+                        3. Series y Precios del Proveedor
+                      </h5>
+                      <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                        Activa las series que deseas generar, personaliza sus tallas y define precios. Si activas o desactivas una serie, se sincronizará automáticamente para todos los colores de este modelo pertenecientes a este proveedor.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewSerieNombre("");
+                        setNewSerieTallasDesde("38");
+                        setNewSerieTallasHasta("43");
+                        setError("");
+                        setShowCreateSeriesModal(true);
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline shrink-0 cursor-pointer"
+                    >
+                      <Plus size={13} /> <span>Crear Nueva Serie</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {series.map(s => {
+                      const isActive = supplierSeriesActiveIds.includes(s.id);
+                      const prices = supplierSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
+
+                      return (
+                        <div
+                          key={s.id}
+                          className={`rounded-xl border transition-all overflow-hidden ${
+                            isActive
+                              ? "border-[#0F172A] bg-[#0F172A]/5 dark:border-white/20 dark:bg-white/5 shadow-xs"
+                              : "border-[var(--border)] bg-[var(--card)] opacity-60 hover:opacity-100"
+                          }`}
+                        >
+                          {/* Toggle Header idéntico a la Foto */}
+                          <div className="w-full flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--border)]/30">
+                            <div
+                              className="flex items-center gap-3 cursor-pointer select-none"
+                              onClick={() => {
+                                toggleSupplierSerie(s.id);
+                                if (!isActive && !editProductSerieId) {
+                                  handleChangeEditSerie(s.id);
+                                }
+                              }}
+                            >
+                              <div
+                                className={`w-9 h-5 rounded-full relative transition-colors ${
+                                  isActive ? "bg-[#0F172A] dark:bg-blue-600" : "bg-[var(--border)]"
+                                }`}
+                              >
+                                <div
+                                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                    isActive ? "translate-x-4" : "translate-x-0.5"
+                                  }`}
+                                />
+                              </div>
+                              <span
+                                className={`text-xs font-bold ${
+                                  isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+                                }`}
+                              >
+                                {getNombreSerie(s, series)}
+                              </span>
+                              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                ({s.nombre})
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEditSeriesModal(s)}
+                                className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+                                title="Editar rango o nombre de esta serie"
+                              >
+                                <Edit2 size={12} />
+                                <span>Editar</span>
+                              </button>
+                              {isActive && (
+                                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                                  ACTIVA
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Inputs de Precios cuando la serie está activa */}
+                          {isActive && (() => {
+                            const costVal = parseFloat(prices.costPrice);
+                            const saleVal = parseFloat(prices.salePrice);
+                            const hasCost = !isNaN(costVal) && costVal > 0;
+                            const hasSale = !isNaN(saleVal) && saleVal > 0;
+                            const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+                            const isLoss = hasCost && hasSale && saleVal < costVal;
+                            const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+                            const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+
+                            return (
+                              <div className="p-3 space-y-2.5">
+                                <div className="grid grid-cols-2 gap-2.5">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-[var(--foreground)] flex items-center justify-between">
+                                      <span>Precio Compra ($)</span>
+                                      {hasCost && suggestedSale && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSupplierSeriesPrices(prev => ({
+                                              ...prev,
+                                              [s.id]: { ...prev[s.id], salePrice: suggestedSale },
+                                            }));
+                                            if (editProductSerieId === s.id) {
+                                              setEditProductVenta(suggestedSale);
+                                            }
+                                          }}
+                                          className="text-[9px] text-blue-600 hover:underline"
+                                        >
+                                          Sugerir: ${suggestedSale}
+                                        </button>
+                                      )}
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0.01"
+                                      step="0.01"
+                                      value={prices.costPrice}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setSupplierSeriesPrices(prev => ({
+                                          ...prev,
+                                          [s.id]: { ...prev[s.id], costPrice: val },
+                                        }));
+                                        if (editProductSerieId === s.id) {
+                                          setEditProductCosto(val);
+                                        }
+                                      }}
+                                      placeholder="0.00"
+                                      className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-600"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[10px] font-bold text-[var(--foreground)]">
+                                      Precio Venta ($)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0.01"
+                                      step="0.01"
+                                      value={prices.salePrice}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setSupplierSeriesPrices(prev => ({
+                                          ...prev,
+                                          [s.id]: { ...prev[s.id], salePrice: val },
+                                        }));
+                                        if (editProductSerieId === s.id) {
+                                          setEditProductVenta(val);
+                                        }
+                                      }}
+                                      placeholder="0.00"
+                                      className={`w-full px-2.5 py-1.5 bg-[var(--card)] border rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-600 ${
+                                        isLoss ? "border-red-500 bg-red-500/5" : "border-[var(--border)]"
+                                      }`}
+                                    />
+                                  </div>
+                                </div>
+
+                                {hasCost && hasSale && (
+                                  <div className="flex items-center justify-between text-[10px] font-mono px-1">
+                                    <span className={isLoss ? "text-red-500 font-bold" : "text-emerald-600 font-bold"}>
+                                      Margen: {marginPercent}%
+                                    </span>
+                                    <span className="text-[var(--muted-foreground)]">
+                                      Ganancia: ${profitAmount.toFixed(2)} / par
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Stock por Tallas / Numeración */}
