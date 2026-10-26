@@ -6,6 +6,7 @@ import UnsavedChangesModal from './ui/unsaved-changes-modal';
 import {
   DollarSign,
   CheckCircle,
+  CheckCircle2,
   Clock,
   AlertTriangle,
   Loader2,
@@ -200,6 +201,9 @@ interface ClienteCartera {
   estadoGlobal: EstadoCobro;
   proximoVencimiento?: string;
   saldoAFavorCliente: number;
+  haCobradoHoy: boolean;
+  totalAbonadoHoy: number;
+  ultimoAbonoHoyFecha?: string;
   cobros: Cobro[];
 }
 
@@ -505,12 +509,25 @@ function getCobroConfig(estado?: string) {
   return COBRO_ESTADO[estado || 'PENDIENTE'] || { label: estado || 'Pendiente', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' };
 }
 
+function esMismoDia(fechaStr?: string | Date | null): boolean {
+  if (!fechaStr) return false;
+  const f = new Date(fechaStr);
+  if (isNaN(f.getTime())) return false;
+  const hoy = new Date();
+  return (
+    f.getFullYear() === hoy.getFullYear() &&
+    f.getMonth() === hoy.getMonth() &&
+    f.getDate() === hoy.getDate()
+  );
+}
+
 export default function FinancieroComponent({ online, activeSucursalId, sucursales, onNavigateToPedido }: FinancieroProps) {
   const { showToast } = useToast();
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [loading, setLoading] = useState(false);
   const [vista, setVista] = useState<'CLIENTES' | 'FACTURAS'>('CLIENTES');
   const [filtro, setFiltro] = useState<EstadoCobro | 'TODOS'>('TODOS');
+  const [filtroCobroHoy, setFiltroCobroHoy] = useState<'TODOS' | 'FALTA_COBRAR_HOY' | 'COBRADOS_HOY'>('TODOS');
   // ── Identificador del local propio del usuario ─────────
   const miLocalId = useMemo(() => {
     if (activeSucursalId && activeSucursalId !== 'TODAS') return activeSucursalId;
@@ -944,6 +961,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       const comprasPendientes = listaCobros.filter((c) => Number(c.saldoPendiente) > 0);
 
+      // Abonos del día de hoy para este cliente
+      const todosAbonosCliente = listaCobros.flatMap((c) => c.abonos || []);
+      const abonosHoy = todosAbonosCliente.filter((a) => esMismoDia(a.createdAt));
+      const totalAbonadoHoy = abonosHoy.reduce((sum, a) => sum + Number(a.monto || 0), 0);
+      const haCobradoHoy = abonosHoy.length > 0;
+      const abonosHoyOrdenados = [...abonosHoy].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      const ultimoAbonoHoyFecha = abonosHoyOrdenados[0]?.createdAt;
+
       // Estado global del cliente
       let estadoGlobal: EstadoCobro = 'SALDADO';
       const tieneVencido = listaCobros.some(
@@ -991,6 +1018,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         estadoGlobal,
         proximoVencimiento: fechasPendientes[0],
         saldoAFavorCliente: clienteDb?.saldoAFavor ? Number(clienteDb.saldoAFavor) : 0,
+        haCobradoHoy,
+        totalAbonadoHoy,
+        ultimoAbonoHoyFecha,
         cobros: listaCobros.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
       });
     });
@@ -2609,6 +2639,32 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     showToast(`Reporte PDF generado exitosamente con ${deudores.length} clientes deudores.`, 'success');
   };
 
+  // Resumen operativo de Cobranza del Día de Hoy
+  const resumenCobranzaHoy = useMemo(() => {
+    let cobradosHoyCount = 0;
+    let montoCobradoHoy = 0;
+    let faltaCobrarHoyCount = 0;
+    let montoFaltaCobrarHoy = 0;
+
+    clientesCartera.forEach((c) => {
+      if (c.haCobradoHoy) {
+        cobradosHoyCount++;
+        montoCobradoHoy += c.totalAbonadoHoy;
+      }
+      if (c.saldoTotalPendiente > 0 && !c.haCobradoHoy) {
+        faltaCobrarHoyCount++;
+        montoFaltaCobrarHoy += c.saldoTotalPendiente;
+      }
+    });
+
+    return {
+      cobradosHoyCount,
+      montoCobradoHoy,
+      faltaCobrarHoyCount,
+      montoFaltaCobrarHoy,
+    };
+  }, [clientesCartera]);
+
   // Filtrado de Cartera Consolidada
   const clientesFiltrados = clientesCartera.filter((c) => {
     const cumpleEstado =
@@ -2618,14 +2674,21 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         ? c.saldoTotalPendiente > 0 && c.estadoGlobal !== 'VENCIDO'
         : c.estadoGlobal === filtro;
 
+    const cumpleFiltroCobroHoy =
+      filtroCobroHoy === 'TODOS'
+        ? true
+        : filtroCobroHoy === 'FALTA_COBRAR_HOY'
+        ? c.saldoTotalPendiente > 0 && !c.haCobradoHoy
+        : c.haCobradoHoy;
+
     const q = normalizarParaBusqueda(busqueda);
-    if (!q) return cumpleEstado;
+    if (!q) return cumpleEstado && cumpleFiltroCobroHoy;
 
     const nombreNorm = normalizarParaBusqueda(c.clienteNombre);
     const cedula = (c.clienteCedula || '').toLowerCase();
     const cumpleBusqueda = nombreNorm.includes(q) || cedula.includes(q);
 
-    return cumpleEstado && cumpleBusqueda;
+    return cumpleEstado && cumpleFiltroCobroHoy && cumpleBusqueda;
   });
 
   // Filtrado de Cobros Individuales
@@ -2828,6 +2891,76 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             );
           })}
         </div>
+
+        {/* Fila 3: Filtro Operativo de Cobranza de Hoy (Falta cobrar vs Cobrados hoy) */}
+        {vista === 'CLIENTES' && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2 sm:p-2.5 bg-gradient-to-r from-emerald-500/10 via-[var(--muted)]/40 to-amber-500/10 border border-[var(--border)] rounded-2xl w-full">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--muted-foreground)] px-1 flex items-center gap-1">
+                <Calendar size={12} className="text-emerald-600 dark:text-emerald-400" />
+                <span>Cobranza del Día:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setFiltroCobroHoy('TODOS')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                  filtroCobroHoy === 'TODOS'
+                    ? 'bg-[#0F172A] text-white border-transparent shadow-xs'
+                    : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                Todos ({clientesCartera.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroCobroHoy('FALTA_COBRAR_HOY')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                  filtroCobroHoy === 'FALTA_COBRAR_HOY'
+                    ? 'bg-amber-600 text-white border-transparent shadow-xs font-black ring-2 ring-amber-400/50'
+                    : 'bg-[var(--card)] border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10'
+                }`}
+                title="Mostrar únicamente clientes con deuda pendiente que aún NO han realizado pagos hoy"
+              >
+                <Clock size={12} className="shrink-0" />
+                <span>⏳ Falta Cobrar Hoy</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black font-mono ${
+                  filtroCobroHoy === 'FALTA_COBRAR_HOY' ? 'bg-white/20 text-white' : 'bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                }`}>
+                  {resumenCobranzaHoy.faltaCobrarHoyCount}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroCobroHoy('COBRADOS_HOY')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                  filtroCobroHoy === 'COBRADOS_HOY'
+                    ? 'bg-emerald-600 text-white border-transparent shadow-xs font-black ring-2 ring-emerald-400/50'
+                    : 'bg-[var(--card)] border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10'
+                }`}
+                title="Mostrar clientes que ya realizaron abonos el día de hoy"
+              >
+                <CheckCircle2 size={12} className="shrink-0" />
+                <span>✓ Cobrados Hoy</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black font-mono ${
+                  filtroCobroHoy === 'COBRADOS_HOY' ? 'bg-white/20 text-white' : 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300'
+                }`}>
+                  {resumenCobranzaHoy.cobradosHoyCount}
+                </span>
+              </button>
+            </div>
+
+            {/* Resumen monetario del día */}
+            <div className="flex items-center gap-2.5 px-2 text-xs flex-wrap sm:flex-nowrap">
+              <span className="inline-flex items-center gap-1 text-[11px] text-[var(--muted-foreground)]">
+                Recaudado hoy: <strong className="font-mono text-emerald-600 dark:text-emerald-400 font-extrabold">${resumenCobranzaHoy.montoCobradoHoy.toFixed(2)}</strong>
+              </span>
+              <span className="text-[var(--border)] hidden sm:inline">|</span>
+              <span className="inline-flex items-center gap-1 text-[11px] text-[var(--muted-foreground)]">
+                Pendiente por cobrar: <strong className="font-mono text-amber-600 dark:text-amber-400 font-extrabold">${resumenCobranzaHoy.montoFaltaCobrarHoy.toFixed(2)}</strong>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Grid Principal: Tabla completa */}
@@ -2884,7 +3017,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                               }`}
                             >
                               <td className="px-5 py-4">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2.5">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -2896,15 +3029,57 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                   >
                                     {isExpanded ? <ChevronUp size={16} className="text-[#0F172A]" /> : <ChevronDown size={16} />}
                                   </button>
-                                  <div>
-                                    <div className="font-extrabold text-xs text-[var(--foreground)] capitalize">
-                                      {capitalizarNombreCompleto(cliente.clienteNombre)}
+
+                                  {/* Visto / Estado de Cobranza Hoy en el lado izquierdo */}
+                                  {cliente.haCobradoHoy ? (
+                                    <div
+                                      className="w-7 h-7 rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400 shadow-2xs"
+                                      title={`✓ Cobrado hoy: $${cliente.totalAbonadoHoy.toFixed(2)}${cliente.ultimoAbonoHoyFecha ? ` a las ${new Date(cliente.ultimoAbonoHoyFecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
+                                    >
+                                      <CheckCircle2 size={16} className="stroke-[2.5]" />
                                     </div>
-                                    <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] mt-0.5">
+                                  ) : cliente.saldoTotalPendiente > 0 ? (
+                                    <div
+                                      className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400"
+                                      title="Falta cobrar hoy (cliente con deuda pendiente sin abonos hoy)"
+                                    >
+                                      <Clock size={14} className="stroke-[2.2]" />
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="w-7 h-7 rounded-full bg-slate-500/10 border border-slate-500/20 flex items-center justify-center shrink-0 text-slate-400"
+                                      title="Cliente al día (sin saldo pendiente)"
+                                    >
+                                      <Check size={14} />
+                                    </div>
+                                  )}
+
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-extrabold text-xs text-[var(--foreground)] capitalize">
+                                        {capitalizarNombreCompleto(cliente.clienteNombre)}
+                                      </span>
+                                      {cliente.haCobradoHoy && (
+                                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-mono">
+                                          ✓ Cobrado hoy: ${cliente.totalAbonadoHoy.toFixed(2)}
+                                        </span>
+                                      )}
+                                      {!cliente.haCobradoHoy && cliente.saldoTotalPendiente > 0 && (
+                                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25">
+                                          ⏳ Falta cobrar
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] mt-0.5 flex-wrap">
                                       <span>C.I: {cliente.clienteCedula}</span>
                                       {cliente.clienteNivel && (
                                         <span className="px-1.5 py-0.2 bg-[#0F172A]/10 text-[#0F172A] rounded font-bold">
                                           {cliente.clienteNivel}
+                                        </span>
+                                      )}
+                                      {cliente.haCobradoHoy && cliente.ultimoAbonoHoyFecha && (
+                                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                                          · Abono {new Date(cliente.ultimoAbonoHoyFecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                       )}
                                     </div>
@@ -2998,6 +3173,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                     <div className="space-y-2">
                                       {cliente.cobros.map((cobroItem) => {
                                         const cCfg = getCobroConfig(cobroItem.estado);
+                                        const abonosHoyCobro = (cobroItem.abonos || []).filter((a) => esMismoDia(a.createdAt));
+                                        const totalAbonadoHoyCobro = abonosHoyCobro.reduce((sum, a) => sum + Number(a.monto || 0), 0);
                                         const numNota = cobroItem.saleNote?.numero
                                           ? `NOTA #${String(cobroItem.saleNote.numero).padStart(4, '0')}`
                                           : cobroItem.numeroCobro || `#${cobroItem.id.slice(0, 8).toUpperCase()}`;
@@ -3076,6 +3253,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                                   <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${cCfg.color}`}>
                                                     {cCfg.label}
                                                   </span>
+                                                  {abonosHoyCobro.length > 0 && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-mono">
+                                                      <CheckCircle2 size={11} className="text-emerald-600 dark:text-emerald-400" />
+                                                      <span>Abonado hoy: ${totalAbonadoHoyCobro.toFixed(2)}</span>
+                                                    </span>
+                                                  )}
                                                 </div>
                                                 <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-3 mt-1 flex-wrap">
                                                   <span>Fecha: {new Date(cobroItem.createdAt).toLocaleDateString('es-EC')}</span>
