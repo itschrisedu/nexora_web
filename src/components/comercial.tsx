@@ -2354,12 +2354,14 @@ export default function ComercialComponent({
     setPedidoACorregir(orderToUse);
     const mapPrecios: Record<string, string> = {};
     (orderToUse.lines || []).forEach((l: any) => {
-      const modelKey = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
+      const modelBase = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
+      const serieKey = (l.serieNombre || l.serie || l.product?.serie?.nombre || '').toLowerCase().trim();
+      const groupKey = `${modelBase}__${serieKey || 'general'}`;
       const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
         ? Number(l.precioUnitario)
         : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
-      if (mapPrecios[modelKey] === undefined && pUnit > 0) {
-        mapPrecios[modelKey] = String(pUnit);
+      if (mapPrecios[groupKey] === undefined && pUnit > 0) {
+        mapPrecios[groupKey] = String(pUnit);
       }
     });
     setPreciosCorregirMap(mapPrecios);
@@ -2369,13 +2371,15 @@ export default function ComercialComponent({
   const handleGuardarTodasCorreccionesPrecio = async (modelosList: Array<{
     modelKey: string;
     productIds: string[];
+    lineIds?: string[];
     modelName: string;
+    serieNombre?: string;
     totalPares: number;
     precioActual: number;
   }>) => {
     if (!pedidoACorregir) return;
 
-    const itemsAEnviar: Array<{ productIds: string[]; nuevoPrecioUnitario: number }> = [];
+    const itemsAEnviar: Array<{ lineIds?: string[]; productIds: string[]; nuevoPrecioUnitario: number }> = [];
 
     for (const m of modelosList) {
       const valorStr = preciosCorregirMap[m.modelKey] !== undefined
@@ -2383,10 +2387,12 @@ export default function ComercialComponent({
         : (m.precioActual > 0 ? String(m.precioActual) : '');
       const precioNum = parseFloat(valorStr);
       if (isNaN(precioNum) || precioNum <= 0) {
-        showToast(`Ingresa un precio válido mayor a 0 para el modelo "${m.modelName}"`, 'warning');
+        const desc = m.serieNombre ? `"${m.modelName} (${m.serieNombre})"` : `"${m.modelName}"`;
+        showToast(`Ingresa un precio válido mayor a 0 para el modelo ${desc}`, 'warning');
         return;
       }
       itemsAEnviar.push({
+        lineIds: m.lineIds,
         productIds: m.productIds,
         nuevoPrecioUnitario: precioNum,
       });
@@ -8267,7 +8273,7 @@ export default function ComercialComponent({
             {/* Cuerpo del Modal */}
             <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-200">
-                💡 Si hubo un error en el precio pactado con el cliente, modifícalo aquí por modelo. Se aplicará a todos los colores de ese modelo y se reajustarán notas de entrega, total del pedido y saldos de cartera automáticamente.
+                💡 Si hubo un error en el precio pactado con el cliente, modifícalo aquí por modelo y serie. Se aplicará a todos los colores de esa serie y se reajustarán notas de entrega, total del pedido y saldos de cartera automáticamente.
               </div>
 
               {(() => {
@@ -8278,12 +8284,15 @@ export default function ComercialComponent({
                   serieNombre: string;
                   imageUrl?: string;
                   productIds: Set<string>;
+                  lineIds: Set<string>;
                   totalPares: number;
                   precioActual: number;
                 }>();
 
                 (pedidoACorregir.lines || []).forEach((l: any) => {
-                  const modelKey = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
+                  const modelBase = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
+                  const serieKey = (l.serieNombre || l.serie || l.product?.serie?.nombre || '').toLowerCase().trim();
+                  const modelKey = `${modelBase}__${serieKey || 'general'}`;
                   const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
                     ? Number(l.precioUnitario)
                     : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
@@ -8296,6 +8305,7 @@ export default function ComercialComponent({
                       serieNombre: l.serieNombre || l.product?.serie?.nombre || 'Estándar',
                       imageUrl: l.imageUrl || l.product?.imageUrl,
                       productIds: new Set<string>(),
+                      lineIds: new Set<string>(),
                       totalPares: 0,
                       precioActual: pUnit,
                     });
@@ -8305,6 +8315,7 @@ export default function ComercialComponent({
                   if (l.color) m.colores.add(l.color.trim());
                   if (l.product?.color) m.colores.add(l.product.color.trim());
                   if (l.productId) m.productIds.add(l.productId);
+                  if (l.id) m.lineIds.add(l.id);
                   if (!m.imageUrl && (l.imageUrl || l.product?.imageUrl)) {
                     m.imageUrl = l.imageUrl || l.product?.imageUrl;
                   }
@@ -8317,6 +8328,7 @@ export default function ComercialComponent({
                 const list = Array.from(modelosMap.values()).map((m) => ({
                   ...m,
                   productIds: Array.from(m.productIds),
+                  lineIds: Array.from(m.lineIds),
                   coloresList: Array.from(m.colores).filter(Boolean),
                 }));
 
@@ -8503,13 +8515,17 @@ export default function ComercialComponent({
                   const modelosMap = new Map<string, {
                     modelKey: string;
                     productIds: Set<string>;
+                    lineIds: Set<string>;
                     modelName: string;
+                    serieNombre: string;
                     totalPares: number;
                     precioActual: number;
                   }>();
 
                   (pedidoACorregir.lines || []).forEach((l: any) => {
-                    const modelKey = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
+                    const modelBase = (l.modelId ? String(l.modelId) : '') || (l.modelName ? l.modelName.trim().toUpperCase() : '') || String(l.productId || l.id);
+                    const serieKey = (l.serieNombre || l.serie || l.product?.serie?.nombre || '').toLowerCase().trim();
+                    const modelKey = `${modelBase}__${serieKey || 'general'}`;
                     const pUnit = l.precioUnitario !== undefined && l.precioUnitario !== null
                       ? Number(l.precioUnitario)
                       : (l.precio !== undefined ? Number(l.precio) : Number(l.product?.precioVenta || l.product?.salePrice || 0));
@@ -8518,13 +8534,16 @@ export default function ComercialComponent({
                       modelosMap.set(modelKey, {
                         modelKey,
                         productIds: new Set<string>(),
+                        lineIds: new Set<string>(),
                         modelName: l.modelName || l.product?.name || 'Calzado',
+                        serieNombre: l.serieNombre || l.product?.serie?.nombre || 'Estándar',
                         totalPares: 0,
                         precioActual: pUnit,
                       });
                     }
                     const m = modelosMap.get(modelKey)!;
                     if (l.productId) m.productIds.add(l.productId);
+                    if (l.id) m.lineIds.add(l.id);
                     m.totalPares += (l.cantidad || 0);
                     if (m.precioActual <= 0 && pUnit > 0) m.precioActual = pUnit;
                   });
@@ -8532,6 +8551,7 @@ export default function ComercialComponent({
                   const list = Array.from(modelosMap.values()).map((m) => ({
                     ...m,
                     productIds: Array.from(m.productIds),
+                    lineIds: Array.from(m.lineIds),
                   }));
 
                   handleGuardarTodasCorreccionesPrecio(list);
