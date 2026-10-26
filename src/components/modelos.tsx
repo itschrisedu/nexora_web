@@ -480,6 +480,7 @@ export default function ModelosComponent({
 
   // ── Estado para Proveedor Alternos en Creación ──
   const [createAlternateIds, setCreateAlternateIds] = useState<string[]>([]);
+  const [syncingModelId, setSyncingModelId] = useState<string | null>(null);
 
   // ── Estado para mini-formulario de agregar proveedor rápido ──
   const [showQuickSupplier, setShowQuickSupplier] = useState(false);
@@ -2129,6 +2130,20 @@ export default function ModelosComponent({
     }
   };
 
+  const handleSincronizarSeriesModelo = async (m: ModeloAgrupado) => {
+    setSyncingModelId(m.id);
+    try {
+      const res = await ApiService.post(`/inventario/modelos/${m.id}/sincronizar-series`, {});
+      setSuccess(res?.message || "Series sincronizadas exitosamente en todos los colores.");
+      await loadData(true);
+      setTimeout(() => setSuccess(""), 4500);
+    } catch (err: any) {
+      setError(err?.message || "Error al sincronizar series del modelo.");
+    } finally {
+      setSyncingModelId(null);
+    }
+  };
+
   const handleDeleteModel = (id: string, modelName: string) => {
     setConfirmModal({
       isOpen: true,
@@ -2564,6 +2579,16 @@ export default function ModelosComponent({
                                   >
                                     <Edit2 size={13} />
                                     <span>Editar</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSincronizarSeriesModelo(m)}
+                                    disabled={syncingModelId === m.id}
+                                    title="Sincronizar automáticamente todas las series en el 100% de los colores de este modelo"
+                                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  >
+                                    <RefreshCw size={13} className={syncingModelId === m.id ? "animate-spin" : ""} />
+                                    <span>Sincronizar Series</span>
                                   </button>
                                   <button
                                     type="button"
