@@ -3146,15 +3146,7 @@ export default function ModelosComponent({
                                     <Edit2 size={12} />
                                     <span>Editar</span>
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditSupplierSeries(p, m)}
-                                    title="Gestionar series y precios de este proveedor en todos los colores"
-                                    className="p-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:text-blue-600 hover:bg-blue-500/10 transition-colors cursor-pointer"
-                                  >
-                                    <Boxes size={13} />
-                                  </button>
-                                  {online && isAdmin && (
+                                                                    {online && isAdmin && (
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteProduct(p.id, m.name, p.color, p.serie?.nombre, m.id)}
