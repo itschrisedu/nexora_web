@@ -4755,263 +4755,333 @@ export default function ComercialComponent({
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {/* Selector de Modo: Cascada vs Rápido */}
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-1 p-0.5 bg-[var(--muted)]/50 rounded-xl border border-[var(--border)] text-xs">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setModoBusquedaPedido('CASCADA');
-                                setBusquedaModelo('');
-                                setShowDropdownModelo(false);
-                              }}
-                              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                modoBusquedaPedido === 'CASCADA'
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                              }`}
-                            >
-                              <Layers size={13} />
-                              <span>Búsqueda en Cascada (Modelo y Color)</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setModoBusquedaPedido('RAPIDA');
-                                setFiltroModeloCascada('');
-                                setFiltroColorCascada('');
-                                setShowDropdownModelosCascada(false);
-                              }}
-                              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                modoBusquedaPedido === 'RAPIDA'
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                              }`}
-                            >
-                              <Search size={13} />
-                              <span>Búsqueda Rápida / Omnicanal</span>
-                            </button>
-                          </div>
-
-                          {modoBusquedaPedido === 'CASCADA' && filtroModeloCascada && (
-                            <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                              Paso 2: Elige el color deseado
-                            </span>
-                          )}
-                        </div>
-
-                        {/* MODO 1: BÚSQUEDA EN CASCADA */}
-                        {modoBusquedaPedido === 'CASCADA' && (
-                          <div className="space-y-3">
-                            {/* PASO 1: MODELO */}
-                            {filtroModeloCascada ? (
-                              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  {selectedModelThumb ? (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setLightboxImage({
-                                          url: selectedModelThumb!,
-                                          title: filtroModeloCascada,
-                                          badge: serieFiltroBuscador !== 'TODAS' ? `Serie: ${serieFiltroBuscador}` : undefined,
-                                        })
-                                      }
-                                      className="relative group cursor-zoom-in shrink-0"
-                                      title="Tocar para ampliar foto"
-                                    >
-                                      <img
-                                        src={selectedModelThumb}
-                                        alt=""
-                                        className="w-11 h-11 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
-                                      />
-                                      <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">
-                                        🔍
-                                      </span>
-                                    </button>
-                                  ) : (
-                                    <div className="w-11 h-11 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-base shrink-0">
-                                      👟
-                                    </div>
-                                  )}
-                                  <div className="min-w-0">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">
-                                      1. Modelo Seleccionado
-                                    </span>
-                                    <strong className="text-sm font-black text-[var(--foreground)] truncate block">
-                                      {filtroModeloCascada}
-                                    </strong>
-                                    <span className="text-[11px] text-[var(--muted-foreground)]">
-                                      {coloresDisponiblesCascada.length} {coloresDisponiblesCascada.length === 1 ? 'color disponible' : 'colores disponibles'}
-                                    </span>
-                                  </div>
-                                </div>
-
+                        {/* BARRA DUAL: 1. MODELO + 2. COLOR (DISEÑO INTEGRADO Y FLUIDO) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+                          {/* ─── CAMPO 1: MODELO ─── */}
+                          <div className="relative">
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground)] flex items-center gap-1.5">
+                                <span>👟 1. Modelo de Calzado</span>
+                                {filtroModeloCascada && (
+                                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                                    ✓ Seleccionado
+                                  </span>
+                                )}
+                              </label>
+                              {filtroModeloCascada && (
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setFiltroModeloCascada('');
                                     setInputBusquedaModeloCascada('');
+                                    setFiltroColorCascada('');
+                                    setShowDropdownColoresCascada(false);
+                                    modeloInputRef.current?.focus();
                                   }}
-                                  className="text-xs font-bold text-red-500 hover:underline shrink-0"
+                                  className="text-[10px] text-red-500 hover:underline font-bold cursor-pointer"
                                 >
-                                  Cambiar modelo
+                                  ✕ Cambiar modelo
                                 </button>
-                              </div>
-                            ) : (
-                              <div className="relative">
-                                <div className="relative flex items-center">
-                                  <Search size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
-                                  <input
-                                    type="text"
-                                    placeholder="1. Escriba o seleccione un Modelo (ej. Mocasín, Oxford, Botín)..."
-                                    value={inputBusquedaModeloCascada}
-                                    onChange={(e) => {
-                                      setInputBusquedaModeloCascada(e.target.value);
-                                      setShowDropdownModelosCascada(true);
-                                    }}
-                                    onFocus={() => setShowDropdownModelosCascada(true)}
-                                    className="w-full pl-10 pr-9 py-2.5 bg-[var(--card)] border-2 border-[var(--border)] hover:border-emerald-600 focus:border-emerald-600 rounded-xl text-xs font-semibold focus:outline-none shadow-xs transition-all"
-                                  />
-                                  {inputBusquedaModeloCascada.trim().length > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setInputBusquedaModeloCascada('');
-                                      }}
-                                      className="absolute right-3 text-slate-400 hover:text-slate-600 text-xs font-black cursor-pointer p-0.5 rounded-full hover:bg-[var(--muted)]"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </div>
+                              )}
+                            </div>
 
-                                {/* Filtro rápido por color si aún no ha seleccionado modelo */}
-                                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                                    Filtro opcional por color:
-                                  </span>
-                                  {['Negro', 'Café', 'Miel', 'Blanco', 'Azul', 'Vino'].map((c) => {
-                                    const activo = filtroColorCascada.toLowerCase() === c.toLowerCase();
-                                    return (
-                                      <button
-                                        key={c}
-                                        type="button"
-                                        onClick={() => setFiltroColorCascada(activo ? '' : c)}
-                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                                          activo
-                                            ? 'bg-emerald-600 text-white shadow-xs'
-                                            : 'bg-[var(--muted)]/60 text-[var(--foreground)] hover:bg-[var(--muted)]'
-                                        }`}
+                            <div className="relative flex items-center">
+                              <Search size={16} className="absolute left-3 text-slate-400 pointer-events-none" />
+                              <input
+                                ref={modeloInputRef}
+                                type="text"
+                                placeholder={
+                                  filtroModeloCascada
+                                    ? filtroModeloCascada
+                                    : "Buscar modelo (ej. Botín, Oxford, Mocasín)..."
+                                }
+                                value={filtroModeloCascada ? filtroModeloCascada : inputBusquedaModeloCascada}
+                                onChange={(e) => {
+                                  if (filtroModeloCascada) {
+                                    setFiltroModeloCascada('');
+                                    setFiltroColorCascada('');
+                                  }
+                                  setInputBusquedaModeloCascada(e.target.value);
+                                  setShowDropdownModelosCascada(true);
+                                  setShowDropdownColoresCascada(false);
+                                }}
+                                onFocus={() => {
+                                  setShowDropdownModelosCascada(true);
+                                  setShowDropdownColoresCascada(false);
+                                }}
+                                className={`w-full pl-9 pr-9 py-2.5 bg-[var(--card)] border-2 rounded-xl text-xs font-semibold focus:outline-none transition-all ${
+                                  filtroModeloCascada
+                                    ? 'border-emerald-600 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300 font-bold'
+                                    : 'border-[var(--border)] hover:border-emerald-600 focus:border-emerald-600 text-[var(--foreground)]'
+                                }`}
+                              />
+                              {(inputBusquedaModeloCascada || filtroModeloCascada) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setInputBusquedaModeloCascada('');
+                                    setFiltroModeloCascada('');
+                                    setFiltroColorCascada('');
+                                    setShowDropdownModelosCascada(false);
+                                    setShowDropdownColoresCascada(false);
+                                  }}
+                                  className="absolute right-2.5 text-slate-400 hover:text-slate-600 text-xs font-black p-1 rounded-full hover:bg-[var(--muted)] cursor-pointer"
+                                  title="Limpiar modelo"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+
+                            {/* DROPDOWN DE MODELOS (ESTILO OMNICANAL FLUIDO) */}
+                            {showDropdownModelosCascada && (
+                              <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto">
+                                {/* Opcional: Variantes directas cuando escribe modelo + color juntos */}
+                                {variantesDirectasOmnicanal.length > 0 && (
+                                  <div className="p-1.5 bg-emerald-500/5 border-b border-[var(--border)]">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 px-2 py-0.5 block">
+                                      ⚡ Coincidencia directa (1 solo clic):
+                                    </span>
+                                    {variantesDirectasOmnicanal.map((v) => (
+                                      <div
+                                        key={v.id}
+                                        onClick={() => {
+                                          handleSeleccionarProducto(v);
+                                          setShowDropdownModelosCascada(false);
+                                        }}
+                                        className="px-2.5 py-1.5 hover:bg-emerald-500/10 rounded-xl cursor-pointer flex items-center justify-between gap-2 text-xs font-bold text-[var(--foreground)]"
                                       >
-                                        {c}
-                                      </button>
-                                    );
-                                  })}
-                                  {filtroColorCascada && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setFiltroColorCascada('')}
-                                      className="text-[10px] text-red-500 hover:underline font-bold ml-1 cursor-pointer"
-                                    >
-                                      Quitar color ({filtroColorCascada})
-                                    </button>
-                                  )}
-                                </div>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {v.imageUrl ? (
+                                            <img src={v.imageUrl} alt="" className="w-8 h-8 rounded-lg object-cover border border-[var(--border)]" />
+                                          ) : (
+                                            <div className="w-8 h-8 rounded-lg bg-[var(--muted)] flex items-center justify-center text-xs">👟</div>
+                                          )}
+                                          <div className="truncate">
+                                            <span>{v.modelName}</span>
+                                            <span className="text-emerald-600 ml-1.5 font-bold">({v.color})</span>
+                                          </div>
+                                        </div>
+                                        <span className="text-[10px] text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                          Elegir
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
 
-                                {showDropdownModelosCascada && (
-                                  <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto">
-                                    {modelosUnicosCascada.length > 0 ? (
-                                      modelosUnicosCascada.map((m) => {
-                                        return (
-                                          <div
-                                            key={m.modelName}
-                                            onClick={() => {
-                                              setFiltroModeloCascada(m.modelName);
-                                              setInputBusquedaModeloCascada('');
-                                              setShowDropdownModelosCascada(false);
-                                            }}
-                                            className="w-full text-left px-3 py-2.5 text-xs hover:bg-emerald-500/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)] cursor-pointer"
-                                          >
-                                            <div className="flex items-center gap-3 min-w-0">
-                                              {m.imageUrl ? (
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setLightboxImage({
-                                                      url: m.imageUrl!,
-                                                      title: m.modelName,
-                                                      subtitle: `Colores: ${m.colores.join(', ')}`,
-                                                    });
-                                                  }}
-                                                  className="relative group cursor-zoom-in shrink-0"
-                                                  title="Tocar para ampliar foto"
-                                                >
-                                                  <img
-                                                    src={m.imageUrl}
-                                                    alt=""
-                                                    className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
-                                                  />
-                                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[9px] transition-opacity">
-                                                    🔍
-                                                  </span>
-                                                </button>
-                                              ) : (
-                                                <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
-                                                  👟
-                                                </div>
-                                              )}
-                                              <div className="min-w-0">
-                                                <span className="block font-bold text-[var(--foreground)] truncate">
-                                                  {m.modelName}
-                                                </span>
-                                                <div className="flex items-center gap-1.5 text-[10px] mt-0.5 flex-wrap">
-                                                  <span className="text-[var(--muted-foreground)]">
-                                                    {m.colores.length} {m.colores.length === 1 ? 'color:' : 'colores:'}
-                                                  </span>
-                                                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                                                    {m.colores.join(', ')}
-                                                  </span>
-                                                </div>
-                                              </div>
+                                {/* Lista de Modelos Únicos */}
+                                {modelosUnicosCascada.length > 0 ? (
+                                  modelosUnicosCascada.map((m) => {
+                                    return (
+                                      <div
+                                        key={m.modelName}
+                                        onClick={() => {
+                                          setFiltroModeloCascada(m.modelName);
+                                          setInputBusquedaModeloCascada(m.modelName);
+                                          setShowDropdownModelosCascada(false);
+                                          setFiltroColorCascada('');
+                                          setShowDropdownColoresCascada(true);
+                                          setTimeout(() => colorInputRef.current?.focus(), 80);
+                                        }}
+                                        className="w-full text-left px-3 py-2.5 text-xs hover:bg-emerald-500/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)] cursor-pointer group"
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          {m.imageUrl ? (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setLightboxImage({
+                                                  url: m.imageUrl!,
+                                                  title: m.modelName,
+                                                  subtitle: `Colores: ${m.colores.join(', ')}`,
+                                                });
+                                              }}
+                                              className="relative group/zoom cursor-zoom-in shrink-0"
+                                              title="Tocar para ampliar foto"
+                                            >
+                                              <img
+                                                src={m.imageUrl}
+                                                alt=""
+                                                className="w-10 h-10 object-cover rounded-xl border border-[var(--border)] group-hover/zoom:scale-105 transition-transform"
+                                              />
+                                              <span className="absolute inset-0 bg-black/30 opacity-0 group-hover/zoom:opacity-100 rounded-xl flex items-center justify-center text-white text-[9px] transition-opacity">
+                                                🔍
+                                              </span>
+                                            </button>
+                                          ) : (
+                                            <div className="w-10 h-10 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
+                                              👟
                                             </div>
+                                          )}
 
-                                            <div className="text-right shrink-0">
-                                              {m.totalStock > 0 ? (
-                                                <span className="text-xs font-black text-emerald-600 block">
-                                                  {m.totalStock} pares
-                                                </span>
-                                              ) : (
-                                                <span className="text-[10px] font-bold text-slate-400 block">
-                                                  Bajo pedido
-                                                </span>
-                                              )}
+                                          <div className="min-w-0">
+                                            <span className="block font-black text-xs text-[var(--foreground)] group-hover:text-emerald-700 dark:group-hover:text-emerald-300 truncate">
+                                              {m.modelName}
+                                            </span>
+                                            <div className="flex items-center gap-1.5 text-[10px] mt-0.5 flex-wrap">
+                                              <span className="text-[var(--muted-foreground)]">
+                                                {m.colores.length} {m.colores.length === 1 ? 'color:' : 'colores:'}
+                                              </span>
+                                              <span className="font-semibold text-emerald-700 dark:text-emerald-400 truncate max-w-[170px]">
+                                                {m.colores.join(', ')}
+                                              </span>
                                             </div>
                                           </div>
-                                        );
-                                      })
-                                    ) : (
-                                      <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
-                                        No se encontraron modelos disponibles con los filtros actuales.
+                                        </div>
+
+                                        <div className="text-right shrink-0">
+                                          {m.totalStock > 0 ? (
+                                            <span className="text-xs font-black text-emerald-600 block">
+                                              {m.totalStock} pares
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-slate-400 block">
+                                              Bajo pedido
+                                            </span>
+                                          )}
+                                          <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                                            Elegir color →
+                                          </span>
+                                        </div>
                                       </div>
-                                    )}
+                                    );
+                                  })
+                                ) : (
+                                  <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
+                                    No se encontraron modelos con los filtros actuales.
                                   </div>
                                 )}
                               </div>
                             )}
+                          </div>
 
-                            {/* PASO 2: COLORES DEL MODELO SELECCIONADO */}
-                            {filtroModeloCascada && (
-                              <div className="pt-1">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-2">
-                                  2. Seleccionar Color para "{filtroModeloCascada}":
-                                </label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                                  {coloresDisponiblesCascada.map((col) => {
+                          {/* ─── CAMPO 2: COLOR (FILTRABLE CON PÍLDORAS RÁPIDAS Y STOCK) ─── */}
+                          <div className="relative">
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--foreground)] flex items-center gap-1.5">
+                                <span>🎨 2. Color del Calzado</span>
+                                {filtroModeloCascada ? (
+                                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded border border-blue-500/20">
+                                    De: {filtroModeloCascada}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-[var(--muted-foreground)]">
+                                    (Opcional para filtrar)
+                                  </span>
+                                )}
+                              </label>
+
+                              {filtroColorCascada && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFiltroColorCascada('');
+                                    setShowDropdownColoresCascada(true);
+                                  }}
+                                  className="text-[10px] text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+                                >
+                                  ✕ Limpiar
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="relative flex items-center">
+                              <span className="absolute left-3 text-slate-400 pointer-events-none text-xs">
+                                🎨
+                              </span>
+                              <input
+                                ref={colorInputRef}
+                                type="text"
+                                placeholder={
+                                  filtroModeloCascada
+                                    ? `Escriba o elija color para "${filtroModeloCascada}"...`
+                                    : "Filtrar por color (ej. Miel, Negro, Café)..."
+                                }
+                                value={filtroColorCascada}
+                                onChange={(e) => {
+                                  setFiltroColorCascada(e.target.value);
+                                  setShowDropdownColoresCascada(true);
+                                  setShowDropdownModelosCascada(false);
+                                }}
+                                onFocus={() => {
+                                  setShowDropdownColoresCascada(true);
+                                  setShowDropdownModelosCascada(false);
+                                }}
+                                className="w-full pl-9 pr-9 py-2.5 bg-[var(--card)] border-2 border-[var(--border)] hover:border-emerald-600 focus:border-emerald-600 rounded-xl text-xs font-semibold focus:outline-none transition-all shadow-xs"
+                              />
+                              {filtroColorCascada && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFiltroColorCascada('');
+                                    setShowDropdownColoresCascada(true);
+                                  }}
+                                  className="absolute right-2.5 text-slate-400 hover:text-slate-600 text-xs font-black p-1 rounded-full hover:bg-[var(--muted)] cursor-pointer"
+                                  title="Limpiar color"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+
+                            {/* DROPDOWN DE COLORES CON PÍLDORAS RÁPIDAS Y DETALLE OMNICANAL */}
+                            {showDropdownColoresCascada && (
+                              <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto">
+                                {/* CABECERA DE PÍLDORAS TÁCTILES RÁPIDAS (1-TAP EN PANTALLA) */}
+                                {coloresDisponiblesCascada.length > 0 && (
+                                  <div className="p-2 bg-[var(--muted)]/40 border-b border-[var(--border)]">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-foreground)]">
+                                        Selección Rápida de Color:
+                                      </span>
+                                      <span className="text-[10px] text-emerald-600 font-bold">
+                                        {coloresDisponiblesCascada.length} disponibles
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar flex-wrap">
+                                      {coloresDisponiblesCascada.map((c) => {
+                                        const dotColor = getColorSwatchBg(c.color);
+                                        return (
+                                          <button
+                                            key={`pill-${c.color}`}
+                                            type="button"
+                                            onClick={() => {
+                                              if (c.variante) {
+                                                handleSeleccionarProducto(c.variante);
+                                              } else {
+                                                setFiltroColorCascada(c.color);
+                                                setShowDropdownColoresCascada(false);
+                                                setShowDropdownModelosCascada(true);
+                                              }
+                                            }}
+                                            className="px-2.5 py-1 rounded-full text-[11px] font-bold border border-[var(--border)] hover:border-emerald-600 bg-[var(--card)] hover:bg-emerald-500/10 text-[var(--foreground)] transition-all flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer group"
+                                          >
+                                            <span
+                                              className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/20"
+                                              style={{ backgroundColor: dotColor }}
+                                            />
+                                            <span>{c.color}</span>
+                                            {c.stock > 0 && (
+                                              <span className="text-[9px] font-black text-emerald-600">
+                                                ({c.stock}p)
+                                              </span>
+                                            )}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* LISTA DETALLADA CON FOTO, SERIE Y PARES */}
+                                {coloresDisponiblesCascada.length > 0 ? (
+                                  coloresDisponiblesCascada.map((col) => {
                                     const totalPares = col.stock;
                                     const docenas = Math.floor(totalPares / 12);
                                     const medias = Math.floor(totalPares / 6);
+                                    const dotColor = getColorSwatchBg(col.color);
 
                                     return (
                                       <div
@@ -5019,9 +5089,14 @@ export default function ComercialComponent({
                                         onClick={() => {
                                           if (col.variante) {
                                             handleSeleccionarProducto(col.variante);
+                                            setShowDropdownColoresCascada(false);
+                                          } else {
+                                            setFiltroColorCascada(col.color);
+                                            setShowDropdownColoresCascada(false);
+                                            setShowDropdownModelosCascada(true);
                                           }
                                         }}
-                                        className="p-2.5 rounded-xl border-2 border-[var(--border)] hover:border-emerald-600 bg-[var(--card)] hover:bg-emerald-500/5 transition-all flex items-center justify-between gap-2.5 cursor-pointer group shadow-xs"
+                                        className="w-full text-left px-3 py-2.5 text-xs hover:bg-emerald-500/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)] cursor-pointer group"
                                       >
                                         <div className="flex items-center gap-2.5 min-w-0">
                                           {col.imageUrl ? (
@@ -5031,229 +5106,78 @@ export default function ComercialComponent({
                                                 e.stopPropagation();
                                                 setLightboxImage({
                                                   url: col.imageUrl!,
-                                                  title: `${filtroModeloCascada} — ${col.color}`,
+                                                  title: `${filtroModeloCascada || 'Calzado'} — ${col.color}`,
                                                   badge: `Serie: ${formatearNombreSerie(col.serieNombre)}`,
                                                 });
                                               }}
-                                              className="relative group cursor-zoom-in shrink-0"
+                                              className="relative group/zoom cursor-zoom-in shrink-0"
                                               title="Tocar para ampliar foto"
                                             >
                                               <img
                                                 src={col.imageUrl}
                                                 alt=""
-                                                className="w-11 h-11 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
+                                                className="w-10 h-10 object-cover rounded-xl border border-[var(--border)] group-hover/zoom:scale-105 transition-transform"
                                               />
-                                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[9px] transition-opacity">
+                                              <span className="absolute inset-0 bg-black/30 opacity-0 group-hover/zoom:opacity-100 rounded-xl flex items-center justify-center text-white text-[9px] transition-opacity">
                                                 🔍
                                               </span>
                                             </button>
                                           ) : (
-                                            <div className="w-11 h-11 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
-                                              🎨
+                                            <div
+                                              className="w-10 h-10 rounded-xl border border-black/10 flex items-center justify-center text-sm shrink-0"
+                                              style={{ backgroundColor: `${dotColor}22` }}
+                                            >
+                                              <span
+                                                className="w-4 h-4 rounded-full border border-black/30 shadow-xs"
+                                                style={{ backgroundColor: dotColor }}
+                                              />
                                             </div>
                                           )}
+
                                           <div className="min-w-0">
-                                            <span className="font-bold text-xs text-[var(--foreground)] truncate block group-hover:text-emerald-700 dark:group-hover:text-emerald-400">
-                                              {col.color}
-                                            </span>
-                                            <span className="text-[10px] font-semibold text-emerald-600 block">
+                                            <div className="flex items-center gap-1.5">
+                                              <span
+                                                className="w-2 h-2 rounded-full shrink-0 border border-black/20"
+                                                style={{ backgroundColor: dotColor }}
+                                              />
+                                              <span className="font-black text-xs text-[var(--foreground)] group-hover:text-emerald-700 dark:group-hover:text-emerald-300 truncate">
+                                                {col.color}
+                                              </span>
+                                            </div>
+                                            <span className="text-[10px] text-emerald-600 block mt-0.5">
                                               Serie: {formatearNombreSerie(col.serieNombre)}
                                             </span>
-                                            {totalPares > 0 ? (
-                                              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 block">
-                                                {totalPares}p ({docenas}d / {medias}½d)
-                                              </span>
-                                            ) : (
-                                              <span className="text-[10px] font-semibold text-rose-500 block">
-                                                Sin stock físico
-                                              </span>
-                                            )}
                                           </div>
                                         </div>
 
-                                        <button
-                                          type="button"
-                                          className="px-2 py-1 bg-emerald-600 group-hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shrink-0 transition-colors"
-                                        >
-                                          Elegir
-                                        </button>
+                                        <div className="text-right shrink-0">
+                                          {totalPares > 0 ? (
+                                            <>
+                                              <span className="text-xs font-black text-emerald-600 block">
+                                                {totalPares} pares
+                                              </span>
+                                              <span className="text-[9px] text-[var(--muted-foreground)] block">
+                                                ({docenas} doc. / {medias} ½doc.)
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <span className="text-[10px] font-semibold text-slate-400 block">
+                                              Bajo pedido
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
                                     );
-                                  })}
-                                </div>
+                                  })
+                                ) : (
+                                  <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
+                                    No se encontraron variantes en color "{filtroColorCascada}".
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
-                        )}
-
-                        {/* MODO 2: BÚSQUEDA RÁPIDA / OMNICANAL */}
-                        {modoBusquedaPedido === 'RAPIDA' && (
-                          <div className="relative">
-                            <div className="relative flex items-center">
-                              <Search size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
-                              <input
-                                type="text"
-                                placeholder={
-                                  serieFiltroBuscador !== 'TODAS'
-                                    ? `Serie ${serieFiltroBuscador} activa: escribe modelo o color...`
-                                    : "Buscar calzado por modelo, color o código (ej. Mocasín, Botín, Negro)..."
-                                }
-                                value={busquedaModelo}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setBusquedaModelo(val);
-                                  setShowDropdownModelo(val.trim().length > 0);
-                                }}
-                                onFocus={() => {
-                                  if (busquedaModelo.trim().length > 0) {
-                                    setShowDropdownModelo(true);
-                                  }
-                                }}
-                                className="w-full pl-10 pr-9 py-2.5 bg-[var(--card)] border-2 border-[var(--border)] hover:border-[#0F172A] focus:border-[#0F172A] rounded-xl text-xs font-semibold focus:outline-none shadow-xs transition-all"
-                              />
-                              {busquedaModelo.trim().length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setBusquedaModelo('');
-                                    setShowDropdownModelo(false);
-                                  }}
-                                  className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-black cursor-pointer p-0.5 rounded-full hover:bg-[var(--muted)]"
-                                  title="Limpiar búsqueda"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-
-                            {serieFiltroBuscador !== 'TODAS' && busquedaModelo.trim().length === 0 && (
-                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 font-semibold">
-                                <span>💡</span>
-                                <span>Serie <strong>{serieFiltroBuscador}</strong> lista. Ingresa letras o el nombre en el buscador para ver los modelos.</span>
-                              </p>
-                            )}
-
-                            {showDropdownModelo && busquedaModelo.trim().length > 0 && (() => {
-                              const q = busquedaModelo.toLowerCase().trim();
-                              const listaModelosFiltradosYOrdenados = catalogoProductos
-                                .filter((p) => {
-                                  if (serieFiltroBuscador !== 'TODAS') {
-                                    const coincideSerie = (p.serieNombre || '').toLowerCase().trim() === serieFiltroBuscador.toLowerCase().trim();
-                                    if (!coincideSerie) return false;
-                                  }
-                                  if (!q) return false;
-                                  return (
-                                    (p.modelName || '').toLowerCase().includes(q) ||
-                                    (p.color && p.color.toLowerCase().includes(q)) ||
-                                    (p.serieNombre && p.serieNombre.toLowerCase().includes(q)) ||
-                                    (p.code && p.code.toLowerCase().includes(q))
-                                  );
-                                })
-                                .sort((a, b) => {
-                                  const cmpModelo = (a.modelName || '').localeCompare(b.modelName || '', 'es', { sensitivity: 'base' });
-                                  if (cmpModelo !== 0) return cmpModelo;
-
-                                  const ventasA = ventasPorVarianteMap.get(a.id) || 0;
-                                  const ventasB = ventasPorVarianteMap.get(b.id) || 0;
-
-                                  if (ventasB !== ventasA) {
-                                    return ventasB - ventasA;
-                                  }
-
-                                  return (a.color || '').localeCompare(b.color || '', 'es', { sensitivity: 'base' });
-                                });
-
-                              return (
-                                <div className="absolute left-0 right-0 top-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto">
-                                  {listaModelosFiltradosYOrdenados.length > 0 ? (
-                                    listaModelosFiltradosYOrdenados.map((p) => {
-                                      const totalPares = (p.tallas || []).reduce(
-                                        (sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0),
-                                        0
-                                      );
-                                      const docenas = Math.floor(totalPares / 12);
-                                      const mediasDocenas = Math.floor(totalPares / 6);
-                                      const ventasTotal = ventasPorVarianteMap.get(p.id) || 0;
-
-                                      return (
-                                        <div
-                                          key={p.id}
-                                          onClick={() => handleSeleccionarProducto(p)}
-                                          className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#0F172A]/10 transition-colors border-b border-[var(--border)] last:border-none flex items-center justify-between gap-3 font-bold text-[var(--foreground)] cursor-pointer"
-                                        >
-                                          <div className="flex items-center gap-3 min-w-0">
-                                            {p.imageUrl ? (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setLightboxImage({
-                                                    url: p.imageUrl!,
-                                                    title: p.modelName,
-                                                    subtitle: `Color: ${p.color}`,
-                                                    badge: `Serie: ${formatearNombreSerie(p.serieNombre)}`,
-                                                  });
-                                                }}
-                                                className="relative group cursor-zoom-in shrink-0"
-                                                title="Tocar para ampliar foto"
-                                              >
-                                                <img
-                                                  src={p.imageUrl}
-                                                  alt=""
-                                                  className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform"
-                                                />
-                                                <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[9px] transition-opacity">
-                                                  🔍
-                                                </span>
-                                              </button>
-                                            ) : (
-                                              <div className="w-10 h-10 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
-                                                👟
-                                              </div>
-                                            )}
-                                            <div className="min-w-0">
-                                              <span className="block font-bold text-[var(--foreground)] truncate">{p.modelName}</span>
-                                              <div className="flex items-center gap-2 text-[10px] mt-0.5 flex-wrap">
-                                                <span className="text-[var(--muted-foreground)] font-medium">
-                                                  Color: <strong className="text-[var(--foreground)]">{p.color}</strong>
-                                                </span>
-                                                <span className="text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                                  Serie: {formatearNombreSerie(p.serieNombre)}
-                                                </span>
-                                                {ventasTotal > 0 && (
-                                                  <span className="text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                                                    🔥 {ventasTotal} {ventasTotal === 1 ? 'par vendido' : 'pares vendidos'}
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </div>
-
-                                          <div className="text-right shrink-0">
-                                            {totalPares > 0 ? (
-                                              <>
-                                                <span className="text-xs font-black text-emerald-600 block">{totalPares} pares</span>
-                                                <span className="text-[9px] text-[var(--muted-foreground)] block">
-                                                  ({docenas} doc. / {mediasDocenas} ½ doc.)
-                                                </span>
-                                              </>
-                                            ) : (
-                                              <span className="text-[10px] font-bold text-rose-500">0 pares</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      );
-                                    })
-                                  ) : (
-                                    <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
-                                      No se encontraron modelos {serieFiltroBuscador !== 'TODAS' ? `en serie "${serieFiltroBuscador}"` : ''} que coincidan con "{busquedaModelo}".
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )}
+                        </div>
                       </div>
                     )}
                   </div>
