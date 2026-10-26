@@ -455,6 +455,15 @@ export default function ModelosComponent({
   const [newTallaNumeroInput, setNewTallaNumeroInput] = useState("");
   const [tallaInputError, setTallaInputError] = useState("");
 
+  // ── Estado para modal de Edición de Series y Precios del Proveedor para el Modelo ──
+  const [showSupplierSeriesModal, setShowSupplierSeriesModal] = useState(false);
+  const [supplierSeriesTargetModel, setSupplierSeriesTargetModel] = useState<ModeloAgrupado | null>(null);
+  const [supplierSeriesTargetSupplierId, setSupplierSeriesTargetSupplierId] = useState<string | null>(null);
+  const [supplierSeriesTargetSupplierName, setSupplierSeriesTargetSupplierName] = useState<string>("");
+  const [supplierSeriesActiveIds, setSupplierSeriesActiveIds] = useState<string[]>([]);
+  const [supplierSeriesPrices, setSupplierSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
+  const [supplierSeriesCustomTallas, setSupplierSeriesCustomTallas] = useState<Record<string, string[]>>({});
+
   // ── Estado para modal de Edición del Modelo Base y sus Series ──
   const [showEditModel, setShowEditModel] = useState(false);
   const [editModel, setEditModel] = useState<ModeloAgrupado | null>(null);
@@ -1734,6 +1743,202 @@ export default function ModelosComponent({
     setShowEditProduct(true);
   };
 
+  // ── Abrir modal de Edición de Series y Precios del Proveedor para el Modelo ──
+  const openEditSupplierSeries = (p: Producto, m: ModeloAgrupado) => {
+    lastActiveModelIdRef.current = m.id;
+    setSupplierSeriesTargetModel(m);
+
+    const supId = p.supplierId || (p.supplier as any)?.id || m.supplierId || null;
+    setSupplierSeriesTargetSupplierId(supId);
+
+    const supObj = listaProveedores.find(s => s.id === supId);
+    const supName = p.supplier?.razonSocial || supObj?.razonSocial || m.supplier?.razonSocial || "Proveedor";
+    setSupplierSeriesTargetSupplierName(supName);
+
+    // Identificar variantes de este modelo que pertenecen a este proveedor
+    const prodsSup = (m.products || []).filter(prod => {
+      const prodSupId = prod.supplierId || (prod as any).supplier?.id;
+      if (supId) {
+        return prodSupId === supId || (!prodSupId && supId === m.supplierId);
+      } else {
+        return !prodSupId || prodSupId === m.supplierId;
+      }
+    });
+
+    // Series activas para este proveedor en este modelo (aquellas con al menos un producto activo)
+    const activeSids = Array.from(
+      new Set(
+        prodsSup
+          .filter(prod => prod.activo !== false)
+          .map(prod => (prod.serie as any)?.id || (prod as any).serieId)
+          .filter(Boolean)
+      )
+    ) as string[];
+
+    // Precios de cada serie para este proveedor
+    const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
+    const initialTallas: Record<string, string[]> = {};
+
+    series.forEach(s => {
+      const prodConPrecio = prodsSup.find(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
+      if (prodConPrecio) {
+        initialPrices[s.id] = {
+          costPrice: String(prodConPrecio.precioCosto || ""),
+          salePrice: String(prodConPrecio.precioVenta || ""),
+        };
+      } else {
+        const cacheKey = `${s.id}_${supId || 'default'}`;
+        if (knownSeriesCosts[cacheKey]) {
+          initialPrices[s.id] = { ...knownSeriesCosts[cacheKey] };
+        } else if (knownSeriesCosts[s.id]) {
+          initialPrices[s.id] = { ...knownSeriesCosts[s.id] };
+        } else {
+          initialPrices[s.id] = { costPrice: "", salePrice: "" };
+        }
+      }
+
+      if (s.tallas) {
+        const curva = getCurvaDocena(s.nombre, 'DOCENA');
+        if (Object.keys(curva).length > 0) {
+          initialTallas[s.id] = buildTallaIdsFromCurva(s, curva);
+        } else {
+          const defaultIds: string[] = [];
+          s.tallas.forEach(t => { defaultIds.push(t.id); defaultIds.push(t.id); });
+          initialTallas[s.id] = defaultIds;
+        }
+      }
+    });
+
+    setSupplierSeriesActiveIds(activeSids);
+    setSupplierSeriesPrices(initialPrices);
+    setSupplierSeriesCustomTallas(initialTallas);
+    setError("");
+    setShowSupplierSeriesModal(true);
+  };
+
+  const toggleSupplierSerie = (id: string) => {
+    setSupplierSeriesActiveIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(x => x !== id);
+      } else {
+        const sObj = series.find(s => s.id === id);
+        if (sObj && sObj.tallas && !supplierSeriesCustomTallas[id]) {
+          const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
+          if (Object.keys(curva).length > 0) {
+            const ids = buildTallaIdsFromCurva(sObj, curva);
+            setSupplierSeriesCustomTallas(ct => ({ ...ct, [id]: ids }));
+          } else {
+            const ids: string[] = [];
+            sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
+            setSupplierSeriesCustomTallas(ct => ({ ...ct, [id]: ids }));
+          }
+        }
+        if (!supplierSeriesPrices[id]) {
+          setSupplierSeriesPrices(sp => ({
+            ...sp,
+            [id]: { costPrice: "", salePrice: "" },
+          }));
+        }
+        return [...prev, id];
+      }
+    });
+  };
+
+  const addTallaRepeatInSupplierSeries = (serieId: string, tallaId: string) => {
+    setSupplierSeriesCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      return { ...prev, [serieId]: [...current, tallaId] };
+    });
+  };
+
+  const removeOneTallaInSupplierSeries = (serieId: string, tallaId: string) => {
+    setSupplierSeriesCustomTallas(prev => {
+      const current = prev[serieId] || [];
+      const idx = current.indexOf(tallaId);
+      if (idx > -1) {
+        const copy = [...current];
+        copy.splice(idx, 1);
+        return { ...prev, [serieId]: copy };
+      }
+      return prev;
+    });
+  };
+
+  const restablecerDocenaEstandarEnSupplierSeries = (serieId: string) => {
+    const sObj = series.find(s => s.id === serieId);
+    if (!sObj || !sObj.tallas) return;
+    const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
+    if (Object.keys(curva).length > 0) {
+      const ids = buildTallaIdsFromCurva(sObj, curva);
+      setSupplierSeriesCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    } else {
+      const ids: string[] = [];
+      sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
+      setSupplierSeriesCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    }
+  };
+
+  const handleSaveSupplierSeries = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supplierSeriesTargetModel) return;
+    setError("");
+
+    for (const sid of supplierSeriesActiveIds) {
+      const sp = supplierSeriesPrices[sid];
+      const cost = parseFloat(sp?.costPrice || "0");
+      const sale = parseFloat(sp?.salePrice || "0");
+      if (isNaN(cost) || cost <= 0 || isNaN(sale) || sale <= 0) {
+        const sName = series.find(s => s.id === sid)?.nombre || "seleccionada";
+        setError(`Debes ingresar un precio de compra y venta válidos (mayores a 0) para la serie activa "${sName}".`);
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const seriesPricesNumeric: Record<string, { costPrice: number; salePrice: number }> = {};
+      for (const sid of supplierSeriesActiveIds) {
+        const sp = supplierSeriesPrices[sid];
+        if (sp) {
+          seriesPricesNumeric[sid] = {
+            costPrice: parseFloat(sp.costPrice) || 0,
+            salePrice: parseFloat(sp.salePrice) || 0,
+          };
+        }
+      }
+
+      const res = await ApiService.put(`/inventario/modelos/${supplierSeriesTargetModel.id}/proveedor-series`, {
+        supplierId: supplierSeriesTargetSupplierId,
+        serieIds: supplierSeriesActiveIds,
+        seriesPrices: seriesPricesNumeric,
+        customTallas: supplierSeriesCustomTallas,
+      });
+
+      setKnownSeriesCosts(prev => {
+        const next = { ...prev };
+        for (const sid of supplierSeriesActiveIds) {
+          const sp = supplierSeriesPrices[sid];
+          if (sp) {
+            next[`${sid}_${supplierSeriesTargetSupplierId || 'default'}`] = { ...sp };
+            next[sid] = { ...sp };
+          }
+        }
+        return next;
+      });
+
+      lastActiveModelIdRef.current = supplierSeriesTargetModel.id;
+      setSuccess(res?.message || `Series y precios del proveedor sincronizados exitosamente en todos los colores.`);
+      setShowSupplierSeriesModal(false);
+      setSupplierSeriesTargetModel(null);
+      await loadData(true);
+      setTimeout(() => setSuccess(""), 4000);
+    } catch (err: any) {
+      setError(err.message || "Error al actualizar las series del proveedor.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleChangeEditSerie = (newSerieId: string) => {
     setEditProductSerieId(newSerieId);
     const selectedSerie = series.find(s => s.id === newSerieId);
@@ -2758,11 +2963,21 @@ export default function ModelosComponent({
                                     </button>
                                   )}
                                   <button
-                                    onClick={() => openEditProduct(p, m.id)}
+                                    type="button"
+                                    onClick={() => openEditSupplierSeries(p, m)}
+                                    title="Editar series, costos y precios de este proveedor en todos los colores"
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs cursor-pointer"
                                   >
                                     <Edit2 size={12} />
                                     <span>Editar</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditProduct(p, m.id)}
+                                    title="Editar imagen o stock puntual de esta variante"
+                                    className="p-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/50 transition-colors cursor-pointer"
+                                  >
+                                    <ImageIcon size={13} />
                                   </button>
                                   {online && isAdmin && (
                                     <button
@@ -5079,6 +5294,309 @@ export default function ModelosComponent({
                 >
                   {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
                   <span>Guardar Cambios</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════ */}
+      {/* MODAL: SERIES Y PRECIOS POR PROVEEDOR EN EL MODELO       */}
+      {/* ═════════════════════════════════════════════════════════ */}
+      {showSupplierSeriesModal && supplierSeriesTargetModel && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowSupplierSeriesModal(false); }}
+        >
+          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Encabezado */}
+            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-emerald-400 font-bold shrink-0">
+                  <Boxes size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-extrabold text-base text-white">{supplierSeriesTargetModel.name}</h3>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <Truck size={10} />
+                      {supplierSeriesTargetSupplierName}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Activa o desactiva series para este proveedor. Los cambios se aplicarán a todos los colores del modelo.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSupplierSeriesModal(false)}
+                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSupplierSeries} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                {error && (
+                  <div className="flex items-start justify-between gap-2.5 p-3.5 bg-red-500/10 border border-red-500/30 text-red-500 text-xs rounded-2xl font-bold animate-in fade-in duration-150">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                      <span>{error}</span>
+                    </div>
+                    <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-red-600 p-0.5 rounded cursor-pointer">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Sección 3: Series y Precios (Coincide idéntico con la imagen de referencia) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+                    <h5 className="text-xs font-bold text-[#0F172A] uppercase tracking-widest">3. Series y Precios</h5>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewSerieNombre("");
+                        setNewSerieTallasDesde("38");
+                        setNewSerieTallasHasta("43");
+                        setError("");
+                        setShowCreateSeriesModal(true);
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] hover:underline cursor-pointer"
+                    >
+                      <Plus size={13} /> <span>Crear Nueva Serie</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
+                    Activa las series que deseas generar, personaliza sus tallas y define precios.
+                  </p>
+
+                  <div className="space-y-3">
+                    {series.map(s => {
+                      const isActive = supplierSeriesActiveIds.includes(s.id);
+                      const prices = supplierSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
+                      const selectedTallaIds = supplierSeriesCustomTallas[s.id] || [];
+
+                      return (
+                        <div
+                          key={s.id}
+                          className={`rounded-xl border transition-all overflow-hidden ${
+                            isActive
+                              ? "border-[#0F172A] bg-[#0F172A]/5 shadow-sm"
+                              : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
+                          }`}
+                        >
+                          {/* Toggle Header */}
+                          <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+                            <div
+                              className="flex items-center gap-3 cursor-pointer select-none"
+                              onClick={() => toggleSupplierSerie(s.id)}
+                            >
+                              <div
+                                className={`w-10 h-5 rounded-full relative transition-colors ${
+                                  isActive ? "bg-[#0F172A]" : "bg-[var(--border)]"
+                                }`}
+                              >
+                                <div
+                                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                    isActive ? "translate-x-5" : "translate-x-0.5"
+                                  }`}
+                                />
+                              </div>
+                              <span
+                                className={`text-sm font-bold ${
+                                  isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+                                }`}
+                              >
+                                {getNombreSerie(s, series)}
+                              </span>
+                              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                ({s.nombre})
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEditSeriesModal(s)}
+                                className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+                                title="Editar rango o nombre de esta serie"
+                              >
+                                <Edit2 size={13} />
+                                <span>Editar</span>
+                              </button>
+                              {isActive && (
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">
+                                  ACTIVA
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Detalle si la serie está activa */}
+                          {isActive && (() => {
+                            const costVal = parseFloat(prices.costPrice);
+                            const saleVal = parseFloat(prices.salePrice);
+                            const hasCost = !isNaN(costVal) && costVal > 0;
+                            const hasSale = !isNaN(saleVal) && saleVal > 0;
+                            const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+                            const isLoss = hasCost && hasSale && saleVal < costVal;
+                            const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+                            const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+                            const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
+
+                            return (
+                              <div className="px-4 pb-4 pt-3 space-y-3">
+                                {/* Inputs de Precio */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Lbl t="Precio de Compra ($)" req />
+                                    <input
+                                      type="number"
+                                      min="0.01"
+                                      step="0.01"
+                                      value={prices.costPrice}
+                                      onChange={e =>
+                                        setSupplierSeriesPrices(prev => ({
+                                          ...prev,
+                                          [s.id]: { ...prev[s.id], costPrice: e.target.value },
+                                        }))
+                                      }
+                                      placeholder="0.00"
+                                      className={INPUT}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Lbl t="Precio de Venta ($)" req />
+                                    <input
+                                      type="number"
+                                      min="0.01"
+                                      step="0.01"
+                                      value={prices.salePrice}
+                                      onChange={e =>
+                                        setSupplierSeriesPrices(prev => ({
+                                          ...prev,
+                                          [s.id]: { ...prev[s.id], salePrice: e.target.value },
+                                        }))
+                                      }
+                                      placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
+                                      className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Indicador de Margen */}
+                                {hasCost && (
+                                  <div className="text-[11px] font-semibold">
+                                    {hasSale ? (
+                                      isLoss ? (
+                                        <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+                                          <AlertCircle size={14} className="shrink-0 animate-bounce" />
+                                          <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                        </div>
+                                      ) : (
+                                        <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+                                          <CheckCircle size={14} />
+                                          <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+                                        </div>
+                                      )
+                                    ) : (
+                                      <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+                                        <DollarSign size={14} className="shrink-0" />
+                                        <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Curva de Tallas con Steppers */}
+                                <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                                      Serie: {getNombreSerie(s, series).toUpperCase()}
+                                    </span>
+                                    <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+                                      = {selectedTallaIds.length} pares total
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2">
+                                    {s.tallas?.sort((a, b) => a.numero - b.numero).map(t => {
+                                      const count = selectedTallaIds.filter(id => id === t.id).length;
+                                      return (
+                                        <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+                                          <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => removeOneTallaInSupplierSeries(s.id, t.id)}
+                                            className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
+                                          >−</button>
+                                          <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => addTallaRepeatInSupplierSeries(s.id, t.id)}
+                                            className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
+                                          >+</button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
+                                        = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => restablecerDocenaEstandarEnSupplierSeries(s.id)}
+                                      className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <RefreshCw size={11} />
+                                      <span>Restablecer estándar</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer con acciones */}
+              <div className="p-4 sm:p-5 border-t border-[var(--border)] bg-[var(--muted)]/20 flex items-center justify-between gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowSupplierSeriesModal(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-xl border border-[var(--border)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Sincronizando series...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} />
+                      <span>Guardar y Aplicar a Todos los Colores</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

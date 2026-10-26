@@ -41,6 +41,7 @@ interface Producto {
   color?: string;
   fotoUrl?: string;
   precioCosto: number;
+  ultimoCostoLote?: number;
   precioVenta: number;
   serie?: { id?: string; nombre: string };
   supplierId?: string | null;
@@ -127,6 +128,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
   const [movTallaId, setMovTallaId] = useState("");
   const [movCantidad, setMovCantidad] = useState("1");
   const [movMotivo, setMovMotivo] = useState("");
+  const [movPrecioCosto, setMovPrecioCosto] = useState<string>("");
   const [movError, setMovError] = useState("");
   const [movSaving, setMovSaving] = useState(false);
 
@@ -233,6 +235,11 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
     setMovError("");
     setSerieMultiplicador(1);
 
+    const initialCost = p.ultimoCostoLote !== undefined && p.ultimoCostoLote > 0
+      ? p.ultimoCostoLote
+      : (p.precioCosto || 10);
+    setMovPrecioCosto(String(initialCost));
+
     const initialLote: Record<string, number> = {};
     if (p.tallas && p.tallas.length > 0) {
       p.tallas.forEach((t) => {
@@ -292,6 +299,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
         await ApiService.post(`/inventario/productos/${movProd.id}/entrada-lote`, {
           items,
           motivo: movMotivo.trim(),
+          precioCosto: parseFloat(movPrecioCosto) || undefined,
         });
 
         const totalPares = items.reduce((s, i) => s + i.cantidad, 0);
@@ -893,10 +901,10 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                           {isAdmin && (
                             <>
                               <div className="text-[11px] text-[var(--muted-foreground)]">
-                                ${Number(movProd.precioCosto).toFixed(2)} / par
+                                ${(parseFloat(movPrecioCosto) || Number(movProd.precioCosto)).toFixed(2)} / par
                               </div>
                               <div className="font-black text-sm text-emerald-600">
-                                ${(totalParesLote * Number(movProd.precioCosto)).toFixed(2)}
+                                ${(totalParesLote * (parseFloat(movPrecioCosto) || Number(movProd.precioCosto))).toFixed(2)}
                               </div>
                             </>
                           )}
@@ -1061,6 +1069,44 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                           </div>
                         </div>
                       </div>
+
+                      {/* Costo FIFO por Lote para Ingreso */}
+                      {isAdmin && (
+                        <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl p-3 space-y-2 mt-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <span className="font-bold text-xs text-[var(--foreground)] flex items-center gap-1.5">
+                                💲 Costo Unitario del Lote de Entrada ($)
+                              </span>
+                              <p className="text-[11px] text-[var(--muted-foreground)]">
+                                Sugerido del último lote registrado. Modifícalo si este nuevo ingreso tuvo un costo distinto.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="relative w-28 sm:w-32">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0.01"
+                                  value={movPrecioCosto}
+                                  onChange={(e) => setMovPrecioCosto(e.target.value)}
+                                  className="w-full pl-7 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-right font-mono focus:ring-2 focus:ring-emerald-500 text-[var(--foreground)]"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="pt-2 border-t border-[var(--border)]/40 flex justify-between items-center text-[11px]">
+                            <span className="text-[var(--muted-foreground)]">
+                              Inversión Total del Lote ({totalParesLote} pares):
+                            </span>
+                            <span className="font-black text-xs text-emerald-600 font-mono">
+                              ${(totalParesLote * (parseFloat(movPrecioCosto) || 0)).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
