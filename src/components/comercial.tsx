@@ -2065,9 +2065,13 @@ export default function ComercialComponent({
     }
   };
 
-  const loadPedidos = async () => {
+  const lastActivePedidoIdRef = useRef<string | null>(null);
+
+  const loadPedidos = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent && pedidos.length === 0) {
+        setLoading(true);
+      }
       if (online) {
         const data = await ApiService.get('/pedidos?incluirOtrasSucursales=true');
         setPedidos(data || []);
@@ -2089,16 +2093,36 @@ export default function ComercialComponent({
       console.error('Error al cargar pedidos:', err);
     } finally {
       setLoading(false);
+      const targetId = lastActivePedidoIdRef.current;
+      if (targetId) {
+        const scrollToElement = (attempt = 0) => {
+          const el = document.getElementById(`pedido-row-${targetId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('bg-blue-500/10', 'transition-all');
+            setTimeout(() => {
+              el?.classList.remove('bg-blue-500/10');
+            }, 2000);
+            lastActivePedidoIdRef.current = null;
+          } else if (attempt < 8) {
+            setTimeout(() => scrollToElement(attempt + 1), 80);
+          } else {
+            lastActivePedidoIdRef.current = null;
+          }
+        };
+        setTimeout(() => scrollToElement(), 60);
+      }
     }
   };
 
   const handleCambiarEstado = async (id: string, nuevoEstado: EstadoPedido) => {
     setUpdatingId(id);
+    lastActivePedidoIdRef.current = id;
     try {
       if (online) {
         await ApiService.put(`/pedidos/${id}/estado`, { estado: nuevoEstado });
         showToast(`Pedido actualizado a ${ESTADO_CONFIG[nuevoEstado]?.label || nuevoEstado}`, 'success');
-        await loadPedidos();
+        await loadPedidos(true);
       } else {
         showToast('Debes estar online para actualizar el estado del pedido.', 'warning');
       }
@@ -3133,7 +3157,7 @@ export default function ComercialComponent({
       })()}
 
       {/* Tabla de Pedidos */}
-      {loading ? (
+      {loading && pedidos.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 text-[var(--muted-foreground)]">
           <Loader2 className="animate-spin text-[#0F172A] mb-2" size={32} />
           <span className="text-sm">Cargando pedidos...</span>

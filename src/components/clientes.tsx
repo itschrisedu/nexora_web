@@ -288,8 +288,12 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     }
   };
 
-  const loadClientes = async () => {
-    setLoading(true);
+  const lastActiveClienteIdRef = useRef<string | null>(null);
+
+  const loadClientes = async (isSilent = false) => {
+    if (!isSilent && clientes.length === 0) {
+      setLoading(true);
+    }
     try {
       if (online) {
         const data = await ApiService.get("/clientes");
@@ -322,6 +326,25 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       console.error("Error cargando clientes:", e);
     } finally {
       setLoading(false);
+      const targetId = lastActiveClienteIdRef.current;
+      if (targetId) {
+        const scrollToElement = (attempt = 0) => {
+          const el = document.getElementById(`cliente-dir-row-${targetId}`) || document.getElementById(`cliente-card-${targetId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('bg-blue-500/10', 'transition-all');
+            setTimeout(() => {
+              el?.classList.remove('bg-blue-500/10');
+            }, 2000);
+            lastActiveClienteIdRef.current = null;
+          } else if (attempt < 8) {
+            setTimeout(() => scrollToElement(attempt + 1), 80);
+          } else {
+            lastActiveClienteIdRef.current = null;
+          }
+        };
+        setTimeout(() => scrollToElement(), 60);
+      }
     }
   };
 
@@ -499,7 +522,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         });
         setSuccess("Cliente registrado localmente (offline).");
       }
-      setShowCreate(false); resetForm(); loadClientes();
+      setShowCreate(false); resetForm(); loadClientes(true);
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       let msg = err.message || "Error al registrar el cliente.";
@@ -553,7 +576,10 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         setSuccess("Cliente actualizado correctamente.");
       }
 
-      setShowEdit(false); setSelected(null); resetForm(); loadClientes();
+      if (selected?.id) {
+        lastActiveClienteIdRef.current = selected.id;
+      }
+      setShowEdit(false); setSelected(null); resetForm(); loadClientes(true);
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       let msg = err.message || "Error al actualizar el cliente.";
@@ -938,7 +964,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
               <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
-                  onClick={loadClientes}
+                  onClick={() => loadClientes()}
                   className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors shrink-0 cursor-pointer"
                   title="Actualizar listado"
                 >
@@ -966,7 +992,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
             </div>
 
             {/* Tabla Directorio */}
-            {loading ? (
+            {loading && clientes.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
                 <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
                 <span className="text-sm">Cargando clientes...</span>
@@ -990,6 +1016,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
                 return (
                   <div
+                    id={`cliente-card-${c.id}`}
                     key={c.id}
                     onClick={() => { setSelected(c); setShowMobileDetailModal(true); }}
                     className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-xs space-y-3 transition-all cursor-pointer hover:border-[#0F172A]/40 active:scale-[0.99] ${
@@ -1116,6 +1143,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
                       return (
                         <tr
+                          id={`cliente-dir-row-${c.id}`}
                           key={c.id}
                           onClick={() => {
                             setSelected(c);

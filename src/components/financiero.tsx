@@ -818,8 +818,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     }
   };
 
-  const loadCobros = async () => {
-    setLoading(true);
+  // Referencias para retener foco y scroll en el cliente o factura activa
+  const lastActiveClienteIdRef = useRef<string | null>(null);
+  const lastActiveCobroIdRef = useRef<string | null>(null);
+
+  const loadCobros = async (isSilent = false) => {
+    if (!isSilent && cobros.length === 0) {
+      setLoading(true);
+    }
     try {
       if (online) {
         const [dataCobros, dataClientes, dataCatalogo] = await Promise.all([
@@ -854,6 +860,35 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       console.error('Error al cargar cobros:', err);
     } finally {
       setLoading(false);
+      // Restaurar foco visual y scroll sin perder la posición del cliente o documento
+      const targetClienteId = lastActiveClienteIdRef.current;
+      const targetCobroId = lastActiveCobroIdRef.current;
+      if (targetClienteId || targetCobroId) {
+        const scrollToElement = (attempt = 0) => {
+          let el: HTMLElement | null = null;
+          if (targetClienteId) {
+            el = document.getElementById(`cliente-row-${targetClienteId}`);
+          }
+          if (!el && targetCobroId) {
+            el = document.getElementById(`cobro-row-${targetCobroId}`);
+          }
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('bg-blue-500/10', 'transition-all');
+            setTimeout(() => {
+              el?.classList.remove('bg-blue-500/10');
+            }, 2000);
+            lastActiveClienteIdRef.current = null;
+            lastActiveCobroIdRef.current = null;
+          } else if (attempt < 8) {
+            setTimeout(() => scrollToElement(attempt + 1), 80);
+          } else {
+            lastActiveClienteIdRef.current = null;
+            lastActiveCobroIdRef.current = null;
+          }
+        };
+        setTimeout(() => scrollToElement(), 60);
+      }
     }
   };
 
@@ -1541,11 +1576,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         });
       }
 
+      if (clienteSeleccionadoId) {
+        lastActiveClienteIdRef.current = clienteSeleccionadoId;
+      }
       setMontoAbono('');
       setNotasAbono('');
       setShowCuentaModal(false);
       setCobroSeleccionadoId(null);
-      await loadCobros();
+      await loadCobros(true);
     } catch (err: any) {
       showToast(err.message || 'Error al registrar abono.', 'error');
     } finally {
@@ -2304,12 +2342,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         );
       }
 
+      if (carteraSeleccionada?.clientId) {
+        lastActiveClienteIdRef.current = carteraSeleccionada.clientId;
+      }
       setShowDevolucionModal(false);
       setLineasDevolucion([]);
       setMotivoDevolucion('');
       setDevolucionProductoId('');
       setDevolucionPrecioUnitario(0);
-      await loadCobros();
+      await loadCobros(true);
     } catch (err: any) {
       showToast(err.message || 'Error al registrar devolucion.', 'error');
     } finally {
@@ -2573,10 +2614,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         notas: cambioTipoNotas,
       });
 
+      if (cobroParaCambiarTipo?.clientId) {
+        lastActiveClienteIdRef.current = cobroParaCambiarTipo.clientId;
+      }
       showToast(res.message || 'Tipo de venta modificado exitosamente.', 'success');
       setShowCambiarTipoModal(false);
       setCobroParaCambiarTipo(null);
-      await loadCobros();
+      await loadCobros(true);
     } catch (err: any) {
       showToast(err.message || 'Error al cambiar tipo de venta.', 'error');
     } finally {
@@ -2967,7 +3011,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       <div className="space-y-4">
         {/* Tabla de Clientes o Facturas */}
         <div className="space-y-4">
-          {loading ? (
+          {loading && cobros.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
               <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
               <span className="text-xs font-bold">Cargando cartera consolidada de clientes...</span>
@@ -3011,6 +3055,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         return (
                           <Fragment key={cliente.clientId}>
                             <tr
+                              id={`cliente-row-${cliente.clientId}`}
                               onClick={() => handleSeleccionarCliente(cliente)}
                               className={`hover:bg-[var(--muted)]/30 cursor-pointer transition-colors ${
                                 isSelected ? 'bg-[#0F172A]/5 border-l-4 border-l-[#0F172A]' : ''
@@ -3393,6 +3438,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                         return (
                           <tr
+                            id={`cobro-row-${cobro.id}`}
                             key={cobro.id}
                             onClick={() => {
                               if (orderId && onNavigateToPedido) {

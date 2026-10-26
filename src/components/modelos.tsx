@@ -371,6 +371,10 @@ export default function ModelosComponent({
   // Acordeones abiertos
   const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
 
+  // Referencias para mantener el foco y scroll en el modelo que se está configurando/editando
+  const lastActiveModelIdRef = useRef<string | null>(null);
+  const lastActiveModelCodeRef = useRef<string | null>(null);
+
   // Modal de confirmación UI (reemplaza window.confirm sin 'localhost:3000 dice')
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -667,8 +671,10 @@ export default function ModelosComponent({
     return () => window.removeEventListener("nexora:margin-changed", handleMarginUpdate);
   }, [online, activeSucursalId]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent && modelos.length === 0) {
+      setLoading(true);
+    }
     try {
       const sucParam = activeSucursalId ? `?sucursalId=${activeSucursalId}` : '';
       const [mdls, redRes] = await Promise.all([
@@ -731,6 +737,35 @@ export default function ModelosComponent({
       console.error("Error cargando modelos:", e);
     } finally {
       setLoading(false);
+      // Restaurar foco visual y scroll sin perder la posición del modelo que se estaba configurando
+      const targetId = lastActiveModelIdRef.current;
+      const targetCode = lastActiveModelCodeRef.current;
+      if (targetId || targetCode) {
+        const scrollToElement = (attempt = 0) => {
+          let el: HTMLElement | null = null;
+          if (targetId) {
+            el = document.getElementById(`modelo-card-${targetId}`) || document.getElementById(`modelo-red-${targetId}`);
+          }
+          if (!el && targetCode) {
+            el = document.querySelector(`[data-basecode="${targetCode}"]`);
+          }
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'transition-all');
+            setTimeout(() => {
+              el?.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2');
+            }, 2000);
+            lastActiveModelIdRef.current = null;
+            lastActiveModelCodeRef.current = null;
+          } else if (attempt < 8) {
+            setTimeout(() => scrollToElement(attempt + 1), 80);
+          } else {
+            lastActiveModelIdRef.current = null;
+            lastActiveModelCodeRef.current = null;
+          }
+        };
+        setTimeout(() => scrollToElement(), 60);
+      }
     }
   };
 
@@ -1090,6 +1125,8 @@ export default function ModelosComponent({
   };
 
   const openAddColorModal = (m: ModeloAgrupado) => {
+    lastActiveModelIdRef.current = m.id;
+    setExpandedModels(prev => ({ ...prev, [m.id]: true }));
     setSelectedModelForColor(m);
     setNewColorName("");
     setNewColorFoto(null);
@@ -1471,8 +1508,9 @@ export default function ModelosComponent({
       // Auto-seleccionar el nuevo color y expandir variante
       setSelectedColorForModel(prev => ({ ...prev, [modelId]: addedColor }));
       setExpandedModels(prev => ({ ...prev, [modelId]: true }));
+      lastActiveModelIdRef.current = modelId;
 
-      loadData();
+      loadData(true);
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al añadir el nuevo color.");
@@ -1581,10 +1619,12 @@ export default function ModelosComponent({
         alternateSupplierIds: createAlternateIds.filter(Boolean),
       });
 
+      const createdBaseCode = baseCode;
       setSuccess("Modelo y sus variantes creados exitosamente.");
       setShowCreate(false);
       resetForm();
-      loadData();
+      lastActiveModelCodeRef.current = createdBaseCode;
+      loadData(true);
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al crear el modelo.");
@@ -1593,7 +1633,12 @@ export default function ModelosComponent({
     }
   };
 
-  const openPrice = (p: Producto) => {
+  const openPrice = (p: Producto, modelId?: string) => {
+    const actualModelId = modelId || p.modelId;
+    if (actualModelId) {
+      lastActiveModelIdRef.current = actualModelId;
+      setExpandedModels(prev => ({ ...prev, [actualModelId]: true }));
+    }
     setPriceProd(p);
     setNewCosto(String(p.precioCosto));
     setNewVenta(String(p.precioVenta));
@@ -1607,6 +1652,10 @@ export default function ModelosComponent({
     if (!priceProd || !newCosto || !newVenta) { setError("Ingresa ambos precios."); return; }
     setSaving(true);
     try {
+      if (priceProd.modelId) {
+        lastActiveModelIdRef.current = priceProd.modelId;
+        setExpandedModels(prev => ({ ...prev, [priceProd.modelId!]: true }));
+      }
       await ApiService.patch(`/inventario/productos/${priceProd.id}/precio`, {
         nuevoPrecioCosto: parseFloat(newCosto),
         nuevoPrecioVenta: parseFloat(newVenta),
@@ -1615,7 +1664,7 @@ export default function ModelosComponent({
       setSuccess("Precios actualizados.");
       setShowPrice(false);
       setPriceProd(null);
-      loadData();
+      loadData(true);
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al actualizar precios.");
@@ -1626,7 +1675,12 @@ export default function ModelosComponent({
 
   // ── Abrir modal de edición integral de variante ──
   const openEditProduct = (p: Producto, modelId?: string) => {
-    setEditProduct({ ...p, modelId: modelId || p.modelId });
+    const actualModelId = modelId || p.modelId;
+    if (actualModelId) {
+      lastActiveModelIdRef.current = actualModelId;
+      setExpandedModels(prev => ({ ...prev, [actualModelId]: true }));
+    }
+    setEditProduct({ ...p, modelId: actualModelId });
     setEditProductColor(p.color);
     setEditProductImage(p.fotoUrl || null);
     setEditProductImageChanged(false);
@@ -1824,12 +1878,14 @@ export default function ModelosComponent({
           ...prev,
           [targetModelId]: editProductColor.trim(),
         }));
+        setExpandedModels(prev => ({ ...prev, [targetModelId]: true }));
+        lastActiveModelIdRef.current = targetModelId;
       }
 
       setSuccess("Variante actualizada exitosamente.");
       setShowEditProduct(false);
       setEditProduct(null);
-      loadData();
+      loadData(true);
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al actualizar la variante.");
@@ -1840,6 +1896,7 @@ export default function ModelosComponent({
 
   // ── Abrir modal de edición del modelo base y sus series ──
   const openEditModel = (m: ModeloAgrupado) => {
+    lastActiveModelIdRef.current = m.id;
     setEditModel(m);
     setEditModelName(m.name);
     setEditModelBrand(m.brand);
@@ -2000,10 +2057,11 @@ export default function ModelosComponent({
         }
       }
 
+      lastActiveModelIdRef.current = editModel.id;
       setSuccess("Modelo y series actualizados exitosamente.");
       setShowEditModel(false);
       setEditModel(null);
-      loadData();
+      loadData(true);
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
       setError(err.message || "Error al actualizar el modelo.");
@@ -2013,6 +2071,7 @@ export default function ModelosComponent({
   };
 
   const handleToggleModel = (id: string, modelName: string, currentActive: boolean) => {
+    lastActiveModelIdRef.current = id;
     if (currentActive) {
       setConfirmModal({
         isOpen: true,
@@ -2024,9 +2083,10 @@ export default function ModelosComponent({
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
           setSaving(true);
           try {
+            lastActiveModelIdRef.current = id;
             await ApiService.patch(`/inventario/modelos/${id}/toggle`, {});
             setSuccess(`Modelo deshabilitado correctamente.`);
-            loadData();
+            loadData(true);
             setTimeout(() => setSuccess(""), 4000);
           } catch (err: any) {
             setError(err.message || "Error al cambiar estado del modelo.");
@@ -2040,9 +2100,10 @@ export default function ModelosComponent({
       (async () => {
         setSaving(true);
         try {
+          lastActiveModelIdRef.current = id;
           await ApiService.patch(`/inventario/modelos/${id}/toggle`, {});
           setSuccess(`Modelo habilitado correctamente.`);
-          loadData();
+          loadData(true);
           setTimeout(() => setSuccess(""), 4000);
         } catch (err: any) {
           setError(err.message || "Error al cambiar estado del modelo.");
@@ -2056,6 +2117,7 @@ export default function ModelosComponent({
   const handleImportarModeloDirecto = async (model: ModeloRed, variantIds?: string[]) => {
     if (!isAdmin) return;
     setImportingModelId(model.id);
+    lastActiveModelIdRef.current = model.id;
     setError("");
     setSuccess("");
     try {
@@ -2065,7 +2127,7 @@ export default function ModelosComponent({
       });
       setSuccess(res.message || `Modelo "${model.name}" importado exitosamente con sus variantes y proveedores vinculados.`);
       setImportModalData({ isOpen: false, model: null, selectedVariantIds: [] });
-      await loadData();
+      await loadData(true);
       setTimeout(() => setSuccess(""), 5000);
     } catch (err: any) {
       setError(err.message || "Error al importar el modelo.");
@@ -2087,7 +2149,7 @@ export default function ModelosComponent({
         try {
           await ApiService.delete(`/inventario/modelos/${id}`);
           setSuccess(`Modelo "${modelName}" retirado exitosamente de este local.`);
-          await loadData();
+          await loadData(true);
           setTimeout(() => setSuccess(""), 4000);
         } catch (err: any) {
           setError(err.message || "Error al retirar el modelo.");
@@ -2098,7 +2160,7 @@ export default function ModelosComponent({
     });
   };
 
-  const handleDeleteProduct = (productId: string, productName: string, color: string, serieNombre?: string) => {
+  const handleDeleteProduct = (productId: string, productName: string, color: string, serieNombre?: string, modelId?: string) => {
     setConfirmModal({
       isOpen: true,
       title: "Excluir Variante de esta Sucursal",
@@ -2109,9 +2171,13 @@ export default function ModelosComponent({
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
         setSaving(true);
         try {
+          if (modelId) {
+            lastActiveModelIdRef.current = modelId;
+            setExpandedModels(prev => ({ ...prev, [modelId]: true }));
+          }
           await ApiService.delete(`/inventario/productos/${productId}`);
           setSuccess(`Variante "${color}" retirada exitosamente de este local comercial.`);
-          await loadData();
+          await loadData(true);
           setTimeout(() => setSuccess(""), 4000);
         } catch (err: any) {
           setError(err.message || "Error al retirar la variante.");
@@ -2122,7 +2188,11 @@ export default function ModelosComponent({
     });
   };
 
-  const handleToggleProduct = (id: string, code: string, currentActive: boolean) => {
+  const handleToggleProduct = (id: string, code: string, currentActive: boolean, modelId?: string) => {
+    if (modelId) {
+      lastActiveModelIdRef.current = modelId;
+      setExpandedModels(prev => ({ ...prev, [modelId]: true }));
+    }
     if (currentActive) {
       setConfirmModal({
         isOpen: true,
@@ -2134,9 +2204,10 @@ export default function ModelosComponent({
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
           setSaving(true);
           try {
+            if (modelId) lastActiveModelIdRef.current = modelId;
             await ApiService.patch(`/inventario/productos/${id}/toggle`, {});
             setSuccess(`Variante deshabilitada correctamente.`);
-            loadData();
+            loadData(true);
             setTimeout(() => setSuccess(""), 4000);
           } catch (err: any) {
             setError(err.message || "Error al cambiar estado de la variante.");
@@ -2149,9 +2220,10 @@ export default function ModelosComponent({
       (async () => {
         setSaving(true);
         try {
+          if (modelId) lastActiveModelIdRef.current = modelId;
           await ApiService.patch(`/inventario/productos/${id}/toggle`, {});
           setSuccess(`Variante habilitada correctamente.`);
-          loadData();
+          loadData(true);
           setTimeout(() => setSuccess(""), 4000);
         } catch (err: any) {
           setError(err.message || "Error al cambiar estado de la variante.");
@@ -2233,7 +2305,7 @@ export default function ModelosComponent({
 
         <div className="flex items-center gap-3">
           <button
-            onClick={loadData}
+            onClick={() => loadData()}
             title="Refrescar catálogo y sincronización con la red"
             className="p-2.5 border border-[var(--border)] rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer"
           >
@@ -2387,7 +2459,7 @@ export default function ModelosComponent({
             />
           </div>
 
-          {loading ? (
+          {loading && modelos.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
               <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
               <span className="text-sm">Cargando catálogo local...</span>
@@ -2420,9 +2492,14 @@ export default function ModelosComponent({
                 const isExpanded = expandedModels[m.id];
 
                 return (
-                  <div key={m.id} className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all ${
-                    !m.active ? "opacity-60 bg-[var(--muted)]/20" : ""
-                  }`}>
+                  <div
+                    id={`modelo-card-${m.id}`}
+                    data-basecode={m.baseCode}
+                    key={m.id}
+                    className={`bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all ${
+                      !m.active ? "opacity-60 bg-[var(--muted)]/20" : ""
+                    }`}
+                  >
                     {/* Resumen del Modelo */}
                     <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex items-start sm:items-center gap-4">
@@ -2662,7 +2739,7 @@ export default function ModelosComponent({
                                   {online && isAdmin && (
                                     <button
                                       type="button"
-                                      onClick={() => handleToggleProduct(p.id, p.codigo, p.activo)}
+                                      onClick={() => handleToggleProduct(p.id, p.codigo, p.activo, m.id)}
                                       className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
                                         p.activo
                                           ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
@@ -2682,7 +2759,7 @@ export default function ModelosComponent({
                                   {online && isAdmin && (
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteProduct(p.id, m.name, p.color, p.serie?.nombre)}
+                                      onClick={() => handleDeleteProduct(p.id, m.name, p.color, p.serie?.nombre, m.id)}
                                       title="Retirar variante de este local sin afectar a otros locales"
                                       className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all cursor-pointer"
                                     >
@@ -2739,7 +2816,7 @@ export default function ModelosComponent({
             )}
           </div>
 
-          {loading ? (
+          {loading && modelosRed.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
               <Loader2 className="animate-spin text-[#0F172A] mb-3" size={36} />
               <span className="text-sm">Explorando modelos en la red comercial...</span>
@@ -2764,6 +2841,7 @@ export default function ModelosComponent({
 
                 return (
                   <div
+                    id={`modelo-red-${m.id}`}
                     key={m.id}
                     className={`bg-[var(--card)] border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all space-y-4 ${
                       isParcial ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-[var(--border)]"
