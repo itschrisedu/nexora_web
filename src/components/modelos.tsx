@@ -2025,40 +2025,33 @@ export default function ModelosComponent({
       // El proveedor principal nunca debe duplicarse en los alternos
       const cleanAlternates = editModelAlternateIds.filter(id => id && id !== editModelSupplierId);
 
-      await ApiService.put(`/inventario/modelos/${editModel.id}`, {
+      // Convertir mapa de precios de series a numérico para el backend
+      const seriesPricesNumeric: Record<string, { costPrice: number; salePrice: number }> = {};
+      for (const sid of editModelSerieIds) {
+        const sp = editModelSeriesPrices[sid];
+        if (sp) {
+          seriesPricesNumeric[sid] = {
+            costPrice: parseFloat(sp.costPrice) || 0,
+            salePrice: parseFloat(sp.salePrice) || 0,
+          };
+        }
+      }
+
+      // Propagar series, proveedor y curvas de tallas en una sola llamada atómica a TODOS los colores
+      const res = await ApiService.put(`/inventario/modelos/${editModel.id}`, {
         name: editModelName.trim(),
         brand: editModelBrand.trim(),
         baseCode: editModelBaseCode.trim(),
         material: editModelMaterial.trim() || undefined,
         supplierId: editModelSupplierId || null,
         alternateSupplierIds: cleanAlternates,
+        serieIds: editModelSerieIds,
+        seriesPrices: seriesPricesNumeric,
+        customTallas: editModelCustomTallas,
       });
 
-      // Actualizar precios y serie SOLO en las variantes que corresponden al proveedor principal o sin proveedor específico
-      // NUNCA sobreescribir el costo/precio de variantes que tienen proveedores alternos con sus propios costos distintos
-      for (const p of editModel.products || []) {
-        const sid = (p.serie as any)?.id || (p as any).serieId;
-        if (sid && editModelSerieIds.includes(sid)) {
-          const pSupId = p.supplierId || (p.supplier as any)?.id;
-          const isPrimaryOrUnassigned = !pSupId || pSupId === editModel.supplierId || pSupId === editModelSupplierId;
-
-          if (isPrimaryOrUnassigned) {
-            const prices = editModelSeriesPrices[sid];
-            const costVal = parseFloat(prices?.costPrice || String(p.precioCosto));
-            const saleVal = parseFloat(prices?.salePrice || String(p.precioVenta));
-
-            await ApiService.put(`/inventario/productos/${p.id}`, {
-              serieId: sid,
-              costPrice: isNaN(costVal) ? Number(p.precioCosto) : costVal,
-              salePrice: isNaN(saleVal) ? Number(p.precioVenta) : saleVal,
-              supplierId: editModelSupplierId || null,
-            });
-          }
-        }
-      }
-
       lastActiveModelIdRef.current = editModel.id;
-      setSuccess("Modelo y series actualizados exitosamente.");
+      setSuccess(res?.message || "Modelo y series sincronizados exitosamente en todos los colores.");
       setShowEditModel(false);
       setEditModel(null);
       loadData(true);
