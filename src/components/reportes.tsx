@@ -39,6 +39,11 @@ import {
   UserCheck,
   X,
   RotateCcw,
+  Layers,
+  Grid,
+  List,
+  Flame,
+  TrendingDown,
 } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 import { useToast } from '@/components/ui/toast';
@@ -129,6 +134,14 @@ export default function ReportesComponent({
   const [filtroTrabajadorRol, setFiltroTrabajadorRol] = useState('TODOS');
   const [filtroTrabajadorOrden, setFiltroTrabajadorOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PEDIDOS_DESC' | 'VENTAS_ASC'>('VENTAS_DESC');
   const [filtroAbonosFinanzasTexto, setFiltroAbonosFinanzasTexto] = useState('');
+
+  // Filtros específicos para Rotación de Calzado & Modelos (Catálogo Completo)
+  const [filtroRotacionTexto, setFiltroRotacionTexto] = useState('');
+  const [filtroRotacionSerie, setFiltroRotacionSerie] = useState('TODAS');
+  const [filtroRotacionEstado, setFiltroRotacionEstado] = useState<'TODOS' | 'ALTA' | 'MEDIA' | 'BAJA' | 'SIN_MOVIMIENTO' | 'CON_STOCK' | 'SIN_STOCK'>('TODOS');
+  const [filtroRotacionOrden, setFiltroRotacionOrden] = useState<'VENTAS_DESC' | 'VENTAS_ASC' | 'STOCK_DESC' | 'STOCK_ASC' | 'INGRESOS_DESC' | 'MARGEN_DESC'>('VENTAS_DESC');
+  const [filtroRotacionVista, setFiltroRotacionVista] = useState<'tabla' | 'tarjetas'>('tabla');
+  const [productoExpandidoId, setProductoExpandidoId] = useState<string | null>(null);
 
   // Estado de Reporte de Cobranzas (Clientes Deudores)
   const [loadingCobranzas, setLoadingCobranzas] = useState(false);
@@ -553,8 +566,12 @@ export default function ReportesComponent({
       fechaGeneracion: new Date().toLocaleString('es-EC'),
       topModelos: (reporteData?.topModelos as ModeloReporte[]) || [],
       bajaRotacion: reporteData?.bajaRotacion || [],
+      catalogoCompleto: reporteData?.catalogoProductosCompleto || [],
+      rotacionResumen: reporteData?.rotacionResumen || {},
       totalParesVendidos: kpis.totalParesVendidos || 0,
       totalIngresosModelos: kpis.totalIngresos || 0,
+      filtroSerie: filtroRotacionSerie,
+      filtroEstado: filtroRotacionEstado,
     };
 
     const doc = generarReporteModelosRotacionPdf(payload);
@@ -2170,150 +2187,770 @@ export default function ReportesComponent({
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* TAB 2: ROTACIÓN DE CALZADO & MODELOS                           */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {tabActiva === 'modelos' && (
-            <div className="space-y-6">
-              {/* Encabezado y Acciones de PDF para Modelos */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
-                    <ShoppingBag size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Reporte de Rotación de Calzado & Catálogo de Modelos
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Análisis de modelos estrella más demandados y alertas de calzado con baja rotación en bodega
-                    </p>
-                  </div>
-                </div>
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 2: ROTACIÓN DE CALZADO & MODELOS                           */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {tabActiva === 'modelos' && (() => {
+            const catalogoOriginal = (reporteData?.catalogoProductosCompleto as any[]) || [];
+            const rotResumen = reporteData?.rotacionResumen || {
+              totalProductos: catalogoOriginal.length,
+              totalConVentas: catalogoOriginal.filter((p: any) => p.paresVendidos > 0).length,
+              totalSinVentas: catalogoOriginal.filter((p: any) => p.paresVendidos === 0).length,
+              totalConStock: catalogoOriginal.filter((p: any) => p.stockTotal > 0).length,
+              totalSinStock: catalogoOriginal.filter((p: any) => p.stockTotal <= 0).length,
+              totalRotacionAlta: catalogoOriginal.filter((p: any) => p.rotacion === 'ALTA').length,
+              totalRotacionMedia: catalogoOriginal.filter((p: any) => p.rotacion === 'MEDIA').length,
+              totalRotacionBaja: catalogoOriginal.filter((p: any) => p.rotacion === 'BAJA').length,
+              totalSinMovimiento: catalogoOriginal.filter((p: any) => p.rotacion === 'SIN_MOVIMIENTO').length,
+              capitalEnRiesgo: catalogoOriginal
+                .filter((p: any) => p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0)
+                .reduce((acc: number, p: any) => acc + (p.capitalRetenido || 0), 0),
+            };
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => handleReporteModelosPdf('preview')}
-                    disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Eye size={14} />
-                    <span>Previsualizar PDF</span>
-                  </button>
+            const seriesDisponibles = (reporteData?.seriesDisponibles as { id: string; nombre: string }[]) || [];
 
-                  <button
-                    type="button"
-                    onClick={() => handleReporteModelosPdf('download')}
-                    disabled={loading || !reporteData}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <Download size={14} />
-                    <span>Descargar PDF</span>
-                  </button>
-                </div>
-              </div>
-              {/* Top 10 Modelos Estrella */}
-              <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
-                      <Award className="text-amber-500" size={18} />
-                      <span>Top 10 Modelos de Calzado Más Vendidos</span>
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Artículos con mayor demanda y rotación en el periodo analizado
-                    </p>
+            // Filtrado dinámico
+            const catalogoFiltrado = catalogoOriginal.filter((p: any) => {
+              if (filtroRotacionTexto.trim()) {
+                const query = normalizarParaBusqueda(filtroRotacionTexto);
+                const mName = normalizarParaBusqueda(p.modelName || '');
+                const mColor = normalizarParaBusqueda(p.color || '');
+                const mSerie = normalizarParaBusqueda(p.serieNombre || '');
+                if (!mName.includes(query) && !mColor.includes(query) && !mSerie.includes(query)) {
+                  return false;
+                }
+              }
+
+              if (filtroRotacionSerie !== 'TODAS') {
+                if (p.serieId !== filtroRotacionSerie) return false;
+              }
+
+              if (filtroRotacionEstado !== 'TODOS') {
+                if (filtroRotacionEstado === 'CON_STOCK') {
+                  if (p.stockTotal <= 0) return false;
+                } else if (filtroRotacionEstado === 'SIN_STOCK') {
+                  if (p.stockTotal > 0) return false;
+                } else {
+                  if (p.rotacion !== filtroRotacionEstado) return false;
+                }
+              }
+
+              return true;
+            }).sort((a: any, b: any) => {
+              if (filtroRotacionOrden === 'VENTAS_DESC') return b.paresVendidos - a.paresVendidos;
+              if (filtroRotacionOrden === 'VENTAS_ASC') return a.paresVendidos - b.paresVendidos;
+              if (filtroRotacionOrden === 'STOCK_DESC') return b.stockTotal - a.stockTotal;
+              if (filtroRotacionOrden === 'STOCK_ASC') return a.stockTotal - b.stockTotal;
+              if (filtroRotacionOrden === 'INGRESOS_DESC') return b.ingresos - a.ingresos;
+              if (filtroRotacionOrden === 'MARGEN_DESC') return b.margen - a.margen;
+              return 0;
+            });
+
+            const hayFiltrosActivos =
+              filtroRotacionTexto.trim() !== '' ||
+              filtroRotacionSerie !== 'TODAS' ||
+              filtroRotacionEstado !== 'TODOS' ||
+              filtroRotacionOrden !== 'VENTAS_DESC';
+
+            return (
+              <div className="space-y-6">
+                {/* 1. Encabezado Ejecutivo y Botones de Descarga / Vista */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+                      <ShoppingBag size={24} />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-[var(--foreground)]">
+                        Reporte Profesional de Rotación de Calzado & Modelos
+                      </h3>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        Auditoría completa de catálogo: artículos estrella, rotación regular y calzado inmóvil con capital estancado
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-xl border border-emerald-500/20">
-                    {reporteData?.topModelos?.length || 0} modelos estrella
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {reporteData?.topModelos?.map((m: any, idx: number) => (
-                    <div
-                      key={m.productId ? `top-${m.productId}` : `top-${idx}`}
-                      className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl flex items-center gap-3 relative overflow-hidden"
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Switch de modo vista */}
+                    <div className="flex items-center bg-[var(--muted)]/50 p-1 rounded-2xl border border-[var(--border)]">
+                      <button
+                        type="button"
+                        onClick={() => setFiltroRotacionVista('tabla')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          filtroRotacionVista === 'tabla'
+                            ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                        }`}
+                        title="Vista en tabla analítica"
+                      >
+                        <List size={14} />
+                        <span>Tabla</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFiltroRotacionVista('tarjetas')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          filtroRotacionVista === 'tarjetas'
+                            ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
+                            : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                        }`}
+                        title="Vista en tarjetas con curva de tallas"
+                      >
+                        <Grid size={14} />
+                        <span>Tarjetas</span>
+                      </button>
+                    </div>
+
+                    {/* Botón Preview PDF */}
+                    <button
+                      type="button"
+                      onClick={() => handleReporteModelosPdf('preview')}
+                      disabled={loading || !reporteData}
+                      className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
                     >
-                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-[#0F172A] text-white rounded-md text-[10px] font-black">
-                        #{idx + 1}
-                      </div>
+                      <Eye size={14} />
+                      <span>Previsualizar PDF</span>
+                    </button>
 
-                      {m.imageUrl ? (
-                        <img src={m.imageUrl} alt="" className="w-14 h-14 object-cover rounded-xl border border-[var(--border)] shrink-0" />
-                      ) : (
-                        <div className="w-14 h-14 rounded-xl bg-[var(--muted)] flex items-center justify-center text-xl shrink-0">
-                          👞
-                        </div>
+                    {/* Botón Descargar PDF */}
+                    <button
+                      type="button"
+                      onClick={() => handleReporteModelosPdf('download')}
+                      disabled={loading || !reporteData}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      <Download size={14} />
+                      <span>Descargar PDF</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Cuadrícula de Métricas y KPIs de Rotación */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Tarjeta 1: Total Artículos Analizados */}
+                  <div
+                    onClick={() => setFiltroRotacionEstado('TODOS')}
+                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-blue-500/50 ${
+                      filtroRotacionEstado === 'TODOS' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-[var(--border)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider">Catálogo Total</span>
+                      <Package size={16} className="text-blue-500" />
+                    </div>
+                    <div className="text-2xl font-black text-[var(--foreground)]">
+                      {rotResumen.totalProductos}
+                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">modelos</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--muted-foreground)]">
+                      <span className="text-emerald-600 font-bold">{rotResumen.totalConStock} con stock</span>
+                      <span>•</span>
+                      <span className="text-slate-400">{rotResumen.totalSinStock} agotados</span>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta 2: Con Ventas Activas */}
+                  <div
+                    onClick={() => setFiltroRotacionEstado('ALTA')}
+                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-emerald-500/50 ${
+                      filtroRotacionEstado === 'ALTA' ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-[var(--border)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Con Salida Comercial</span>
+                      <Flame size={16} className="text-emerald-500" />
+                    </div>
+                    <div className="text-2xl font-black text-emerald-600">
+                      {rotResumen.totalConVentas}
+                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">
+                        ({rotResumen.totalProductos > 0 ? Math.round((rotResumen.totalConVentas / rotResumen.totalProductos) * 100) : 0}%)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--muted-foreground)]">
+                      <span className="text-emerald-600 font-bold">{rotResumen.totalRotacionAlta} Alta</span>
+                      <span>•</span>
+                      <span className="text-blue-600 font-bold">{rotResumen.totalRotacionMedia} Media</span>
+                      <span>•</span>
+                      <span className="text-amber-600 font-bold">{rotResumen.totalRotacionBaja} Baja</span>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta 3: Sin Movimiento (0 ventas) */}
+                  <div
+                    onClick={() => setFiltroRotacionEstado('SIN_MOVIMIENTO')}
+                    className={`p-4 bg-[var(--card)] border rounded-2xl transition-all cursor-pointer shadow-xs hover:border-rose-500/50 ${
+                      filtroRotacionEstado === 'SIN_MOVIMIENTO' ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/5' : 'border-[var(--border)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-rose-600">Sin Salida (0 Ventas)</span>
+                      <TrendingDown size={16} className="text-rose-500" />
+                    </div>
+                    <div className="text-2xl font-black text-rose-600">
+                      {rotResumen.totalSinMovimiento}
+                      <span className="text-xs font-medium text-[var(--muted-foreground)] ml-1.5">modelos</span>
+                    </div>
+                    <div className="text-[11px] text-rose-500/80 mt-2 font-medium">
+                      Calzado sin salida comercial en el periodo
+                    </div>
+                  </div>
+
+                  {/* Tarjeta 4: Capital Estancado en Bodega */}
+                  <div
+                    onClick={() => {
+                      setFiltroRotacionEstado('SIN_MOVIMIENTO');
+                      setFiltroRotacionOrden('STOCK_DESC');
+                    }}
+                    className="p-4 bg-[var(--card)] border border-rose-500/30 rounded-2xl transition-all cursor-pointer shadow-xs hover:border-rose-500"
+                    title="Click para ver artículos estancados ordenados por stock"
+                  >
+                    <div className="flex items-center justify-between text-[var(--muted-foreground)] mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-rose-600">Capital en Riesgo</span>
+                      <AlertTriangle size={16} className="text-rose-500" />
+                    </div>
+                    <div className="text-2xl font-black text-rose-600">
+                      ${rotResumen.capitalEnRiesgo.toFixed(2)}
+                    </div>
+                    <div className="text-[11px] text-[var(--muted-foreground)] mt-2">
+                      Costo retenido en {rotResumen.totalSinMovimiento} modelos sin rotación
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Barra de Filtros, Series y Búsqueda */}
+                <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3 shadow-xs">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    {/* Búsqueda */}
+                    <div className="relative flex-1 min-w-[240px]">
+                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                      <input
+                        type="text"
+                        value={filtroRotacionTexto}
+                        onChange={(e) => setFiltroRotacionTexto(e.target.value)}
+                        placeholder="Buscar por modelo, color o serie..."
+                        className="w-full pl-10 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-hidden focus:border-blue-500 transition-colors"
+                      />
+                      {filtroRotacionTexto && (
+                        <button
+                          type="button"
+                          onClick={() => setFiltroRotacionTexto('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X size={14} />
+                        </button>
                       )}
-
-                      <div className="min-w-0 flex-1 pr-6">
-                        <span className="font-black text-xs text-[var(--foreground)] block truncate">{m.modelName}</span>
-                        <div className="text-[10px] text-[var(--muted-foreground)] truncate">
-                          Color: <strong className="text-[var(--foreground)]">{m.color}</strong> • {formatearNombreSerie(m.serieNombre)}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-black text-emerald-600">
-                            {m.pares} pares
-                          </span>
-                          <span className="text-[10px] text-[var(--muted-foreground)]">
-                            (${m.ingresos.toFixed(2)})
-                          </span>
-                        </div>
-                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Alerta de Baja Rotación / Stock Estancado */}
-              <div className="p-6 bg-[var(--card)] border border-rose-500/30 rounded-3xl space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
-                      <AlertTriangle className="text-rose-500" size={18} />
-                      <span>Alerta de Calzado con Baja Rotación (Stock Estancado)</span>
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Modelos con stock físico en bodega pero con 0 o pocas ventas en el periodo (Candidatos a descuento de liquidación)
-                    </p>
+                    {/* Filtro por Serie */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
+                        <Layers size={14} />
+                        Serie:
+                      </span>
+                      <select
+                        value={filtroRotacionSerie}
+                        onChange={(e) => setFiltroRotacionSerie(e.target.value)}
+                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="TODAS">Todas las Series ({seriesDisponibles.length})</option>
+                        {seriesDisponibles.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {formatearNombreSerie(s.nombre)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filtro por Estado / Nivel de Rotación */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
+                        <Filter size={14} />
+                        Rotación:
+                      </span>
+                      <select
+                        value={filtroRotacionEstado}
+                        onChange={(e) => setFiltroRotacionEstado(e.target.value as any)}
+                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="TODOS">Todos los Estados</option>
+                        <option value="ALTA">Alta Rotación (Estrella)</option>
+                        <option value="MEDIA">Rotación Media</option>
+                        <option value="BAJA">Baja Rotación</option>
+                        <option value="SIN_MOVIMIENTO">Sin Movimiento (0 Ventas)</option>
+                        <option value="CON_STOCK">Solo con Stock Físico</option>
+                        <option value="SIN_STOCK">Solo Agotados</option>
+                      </select>
+                    </div>
+
+                    {/* Ordenación */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap">
+                        Ordenar:
+                      </span>
+                      <select
+                        value={filtroRotacionOrden}
+                        onChange={(e) => setFiltroRotacionOrden(e.target.value as any)}
+                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="VENTAS_DESC">Mayor Demanda (Más vendidos)</option>
+                        <option value="VENTAS_ASC">Menor Demanda (Menos vendidos)</option>
+                        <option value="STOCK_DESC">Mayor Stock en Bodega</option>
+                        <option value="STOCK_ASC">Menor Stock en Bodega</option>
+                        <option value="INGRESOS_DESC">Mayor Facturación</option>
+                        <option value="MARGEN_DESC">Mayor Margen Estimado</option>
+                      </select>
+                    </div>
+
+                    {/* Botón Reset */}
+                    {hayFiltrosActivos && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFiltroRotacionTexto('');
+                          setFiltroRotacionSerie('TODAS');
+                          setFiltroRotacionEstado('TODOS');
+                          setFiltroRotacionOrden('VENTAS_DESC');
+                        }}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 rounded-xl transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                        title="Restaurar todos los filtros"
+                      >
+                        <RotateCcw size={13} />
+                        <span>Limpiar</span>
+                      </button>
+                    )}
                   </div>
-                  <span className="text-xs font-bold text-rose-500 bg-rose-500/10 px-3 py-1 rounded-xl border border-rose-500/20">
-                    {reporteData?.bajaRotacion?.length || 0} modelos inmóviles
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {reporteData?.bajaRotacion?.map((m: any, idx: number) => (
-                    <div
-                      key={m.productId ? `baja-${m.productId}` : `baja-${idx}`}
-                      className="p-3.5 bg-rose-500/5 border border-rose-500/20 rounded-2xl space-y-2"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        {m.imageUrl ? (
-                          <img src={m.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center text-sm shrink-0">
-                            📦
-                          </div>
+                  {/* Contador de resultados */}
+                  <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-2 border-t border-[var(--border)]">
+                    <span>
+                      Mostrando <strong className="text-[var(--foreground)]">{catalogoFiltrado.length}</strong> de{' '}
+                      <strong>{catalogoOriginal.length}</strong> artículos del catálogo
+                    </span>
+                    {filtroRotacionSerie !== 'TODAS' && (
+                      <span className="text-blue-600 font-bold bg-blue-500/10 px-2 py-0.5 rounded-md">
+                        Serie:{' '}
+                        {formatearNombreSerie(
+                          seriesDisponibles.find((s) => s.id === filtroRotacionSerie)?.nombre || filtroRotacionSerie
                         )}
-                        <div className="min-w-0 flex-1">
-                          <span className="font-bold text-xs text-[var(--foreground)] block truncate">{m.modelName}</span>
-                          <span className="text-[10px] text-[var(--muted-foreground)] block truncate">Color: {m.color}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center text-xs pt-1 border-t border-rose-500/20">
-                        <span className="text-slate-500 text-[11px]">Stock Parado:</span>
-                        <strong className="text-rose-600 font-black">{m.stockActual} pares</strong>
-                      </div>
-                      <div className="text-[10px] text-[var(--muted-foreground)]">
-                        Salidas en el periodo: <strong className="text-[var(--foreground)]">{m.paresVendidosEnPeriodo} pares</strong>
-                      </div>
-                    </div>
-                  ))}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* 4. Lista de Productos: VISTA TABLA */}
+                {filtroRotacionVista === 'tabla' && (
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-[var(--muted)]/40 border-b border-[var(--border)] text-[var(--muted-foreground)] font-black uppercase text-[10px] tracking-wider">
+                            <th className="py-3 px-4">Calzado / Modelo</th>
+                            <th className="py-3 px-3">Serie</th>
+                            <th className="py-3 px-3 text-center">Stock Bodega</th>
+                            <th className="py-3 px-3">Curva de Tallas</th>
+                            <th className="py-3 px-3 text-center">Pares Vendidos</th>
+                            <th className="py-3 px-3 text-center">Nivel Rotación</th>
+                            <th className="py-3 px-4 text-right">Facturación</th>
+                            <th className="py-3 px-4 text-right">Capital Retenido</th>
+                            <th className="py-3 px-3 text-center">Detalle</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {catalogoFiltrado.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="py-12 text-center text-slate-400">
+                                <Package size={36} className="mx-auto mb-2 opacity-40" />
+                                <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
+                                <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                                  Prueba cambiando los criterios de serie, rotación o el texto de búsqueda.
+                                </p>
+                              </td>
+                            </tr>
+                          ) : (
+                            catalogoFiltrado.map((p: any) => {
+                              const expandido = productoExpandidoId === p.productId;
+                              return (
+                                <React.Fragment key={p.productId}>
+                                  <tr className="hover:bg-[var(--muted)]/20 transition-colors">
+                                    {/* Calzado / Modelo con miniatura */}
+                                    <td className="py-3 px-4">
+                                      <div className="flex items-center gap-3">
+                                        {p.imageUrl ? (
+                                          <img
+                                            src={p.imageUrl}
+                                            alt={p.modelName}
+                                            className="w-11 h-11 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-11 h-11 rounded-xl bg-[var(--muted)] flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
+                                            👞
+                                          </div>
+                                        )}
+                                        <div className="min-w-0">
+                                          <span className="font-black text-xs text-[var(--foreground)] block truncate uppercase">
+                                            {p.modelName}
+                                          </span>
+                                          <span className="text-[11px] text-[var(--muted-foreground)] block truncate">
+                                            Color: <strong className="text-[var(--foreground)]">{p.color}</strong>
+                                          </span>
+                                          <span className="text-[10px] text-slate-400">
+                                            PVP: ${p.precioVenta.toFixed(2)} / par
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* Serie */}
+                                    <td className="py-3 px-3">
+                                      <span className="text-xs font-bold text-emerald-600 block">
+                                        {formatearNombreSerie(p.serieNombre)}
+                                      </span>
+                                    </td>
+
+                                    {/* Stock Físico */}
+                                    <td className="py-3 px-3 text-center">
+                                      {p.stockTotal <= 0 ? (
+                                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                          Agotado (0)
+                                        </span>
+                                      ) : (
+                                        <div>
+                                          <span className="font-black text-xs text-[var(--foreground)]">
+                                            {p.stockTotal} pares
+                                          </span>
+                                          {p.stockDisponible < p.stockTotal && (
+                                            <span className="block text-[10px] text-amber-600 font-medium">
+                                              ({p.stockDisponible} disp.)
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </td>
+
+                                    {/* Curva de Tallas Resumida */}
+                                    <td className="py-3 px-3 max-w-[260px]">
+                                      <div className="flex flex-wrap gap-1">
+                                        {p.tallasDetalle && p.tallasDetalle.length > 0 ? (
+                                          p.tallasDetalle.map((t: any) => (
+                                            <span
+                                              key={t.talla}
+                                              className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold border ${
+                                                t.disponible > 0
+                                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                                                  : 'bg-rose-500/10 text-rose-500 border-rose-500/20 opacity-60'
+                                              }`}
+                                              title={`Talla ${t.talla}: ${t.disponible} disponibles`}
+                                            >
+                                              T{t.talla}:{t.disponible}
+                                            </span>
+                                          ))
+                                        ) : (
+                                          <span className="text-[10px] text-slate-400">Sin desglose</span>
+                                        )}
+                                      </div>
+                                    </td>
+
+                                    {/* Pares Vendidos */}
+                                    <td className="py-3 px-3 text-center">
+                                      {p.paresVendidos > 0 ? (
+                                        <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                                          {p.paresVendidos} pares
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-rose-500 bg-rose-500/5 border border-rose-500/10">
+                                          0 ventas
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    {/* Nivel Rotación */}
+                                    <td className="py-3 px-3 text-center">
+                                      {p.rotacion === 'ALTA' && (
+                                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 inline-flex items-center gap-1">
+                                          <Flame size={12} /> ALTA
+                                        </span>
+                                      )}
+                                      {p.rotacion === 'MEDIA' && (
+                                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-blue-500/15 text-blue-600 border border-blue-500/30">
+                                          MEDIA
+                                        </span>
+                                      )}
+                                      {p.rotacion === 'BAJA' && (
+                                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-500/15 text-amber-600 border border-amber-500/30">
+                                          BAJA
+                                        </span>
+                                      )}
+                                      {p.rotacion === 'SIN_MOVIMIENTO' && (
+                                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-500/15 text-rose-600 border border-rose-500/30 inline-flex items-center gap-1">
+                                          <AlertTriangle size={11} /> SIN SALIDA
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    {/* Facturación */}
+                                    <td className="py-3 px-4 text-right">
+                                      {p.ingresos > 0 ? (
+                                        <span className="font-black text-xs text-emerald-600">
+                                          ${p.ingresos.toFixed(2)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[11px] text-slate-400 font-medium">$0.00</span>
+                                      )}
+                                    </td>
+
+                                    {/* Capital Retenido */}
+                                    <td className="py-3 px-4 text-right">
+                                      {p.stockTotal > 0 ? (
+                                        <div>
+                                          <span
+                                            className={`font-black text-xs ${
+                                              p.rotacion === 'SIN_MOVIMIENTO' ? 'text-rose-600' : 'text-[var(--foreground)]'
+                                            }`}
+                                          >
+                                            ${p.capitalRetenido.toFixed(2)}
+                                          </span>
+                                          <span className="block text-[9px] text-slate-400">
+                                            ${p.precioCosto.toFixed(2)} c/u
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[11px] text-slate-400">$0.00</span>
+                                      )}
+                                    </td>
+
+                                    {/* Detalle Toggle */}
+                                    <td className="py-3 px-3 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => setProductoExpandidoId(expandido ? null : p.productId)}
+                                        className="p-1.5 hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg transition-colors cursor-pointer"
+                                        title={expandido ? 'Ocultar desglose' : 'Ver curva detallada'}
+                                      >
+                                        <ChevronDown
+                                          size={16}
+                                          className={`transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`}
+                                        />
+                                      </button>
+                                    </td>
+                                  </tr>
+
+                                  {/* Fila expandida con desglose de tallas y diagnóstico */}
+                                  {expandido && (
+                                    <tr className="bg-[var(--muted)]/30 border-b border-[var(--border)]">
+                                      <td colSpan={9} className="p-4">
+                                        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
+                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-2">
+                                            <div>
+                                              <span className="font-black text-xs uppercase text-[var(--foreground)]">
+                                                Desglose de Curva de Tallas & Stock en Bodega: {p.modelName} ({p.color})
+                                              </span>
+                                              <span className="text-[11px] text-[var(--muted-foreground)] block">
+                                                Serie: <strong className="text-emerald-600">{formatearNombreSerie(p.serieNombre)}</strong> • Margen estimado: <strong className="text-emerald-600">{p.margen}%</strong>
+                                              </span>
+                                            </div>
+
+                                            {/* Diagnóstico Operativo */}
+                                            {p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0 && (
+                                              <div className="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-600 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                                <AlertTriangle size={14} />
+                                                <span>Candidato a promoción de liquidación / combo</span>
+                                              </div>
+                                            )}
+                                            {p.rotacion === 'ALTA' && p.tallasAgotadas?.length > 0 && (
+                                              <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                                <AlertCircle size={14} />
+                                                <span>Reabastecer tallas agotadas: {p.tallasAgotadas.join(', ')}</span>
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {/* Curva de Tallas Detallada */}
+                                          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 pt-1">
+                                            {p.tallasDetalle?.map((t: any) => (
+                                              <div
+                                                key={t.talla}
+                                                className={`p-2.5 rounded-xl border text-center ${
+                                                  t.disponible > 0
+                                                    ? 'bg-[var(--muted)]/40 border-[var(--border)]'
+                                                    : 'bg-rose-500/5 border-rose-500/20 opacity-70'
+                                                }`}
+                                              >
+                                                <span className="font-black text-xs block text-[var(--foreground)]">
+                                                  Talla {t.talla}
+                                                </span>
+                                                <span
+                                                  className={`font-black text-sm block ${
+                                                    t.disponible > 0 ? 'text-emerald-600' : 'text-rose-500'
+                                                  }`}
+                                                >
+                                                  {t.disponible} pares
+                                                </span>
+                                                {t.reservado > 0 && (
+                                                  <span className="text-[9px] text-amber-600 block">
+                                                    ({t.reservado} reservado)
+                                                  </span>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Lista de Productos: VISTA TARJETAS (Cumple Estrictamente Regla 7 ModelTallaCurvaCard) */}
+                {filtroRotacionVista === 'tarjetas' && (
+                  <div className="space-y-4">
+                    {catalogoFiltrado.length === 0 ? (
+                      <div className="p-12 text-center bg-[var(--card)] border border-[var(--border)] rounded-3xl text-slate-400">
+                        <Package size={40} className="mx-auto mb-2 opacity-40" />
+                        <p className="font-bold text-sm">No se encontraron modelos con los filtros seleccionados</p>
+                        <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                          Prueba cambiando los criterios de serie, rotación o el texto de búsqueda.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {catalogoFiltrado.map((p: any) => {
+                          const docenasTotal = (p.stockTotal / 12).toFixed(1);
+                          return (
+                            <div
+                              key={p.productId}
+                              className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between gap-3 relative overflow-hidden"
+                            >
+                              {/* Header: Miniatura, Modelo en negrita mayúscula, Color y Serie (Regla 7) */}
+                              <div className="flex items-start gap-3">
+                                {p.imageUrl ? (
+                                  <img
+                                    src={p.imageUrl}
+                                    alt={p.modelName}
+                                    className="w-12 h-12 rounded-xl object-cover border border-[var(--border)] shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-xl bg-[var(--muted)] flex items-center justify-center text-xl shrink-0 border border-[var(--border)]">
+                                    👞
+                                  </div>
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <h4 className="font-black uppercase text-xs text-[var(--foreground)] truncate">
+                                      {p.modelName}
+                                    </h4>
+                                    {/* Badge Rotación */}
+                                    {p.rotacion === 'ALTA' && (
+                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shrink-0">
+                                        ALTA
+                                      </span>
+                                    )}
+                                    {p.rotacion === 'MEDIA' && (
+                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-blue-500/10 text-blue-600 border border-blue-500/20 shrink-0">
+                                        MEDIA
+                                      </span>
+                                    )}
+                                    {p.rotacion === 'BAJA' && (
+                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-500/10 text-amber-600 border border-amber-500/20 shrink-0">
+                                        BAJA
+                                      </span>
+                                    )}
+                                    {p.rotacion === 'SIN_MOVIMIENTO' && (
+                                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-rose-500/10 text-rose-600 border border-rose-500/20 shrink-0">
+                                        SIN SALIDA
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="text-[11px] text-[var(--muted-foreground)] truncate mt-0.5">
+                                    Color: <strong className="text-[var(--foreground)]">{p.color}</strong> •{' '}
+                                    <span className="text-emerald-600 font-bold">
+                                      Serie: {formatearNombreSerie(p.serieNombre)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Curva de Tallas (Regla 7): Píldoras para cada talla con cantidades */}
+                              <div className="bg-[var(--muted)]/30 p-2.5 rounded-xl border border-[var(--border)]">
+                                <div className="text-[10px] font-bold text-[var(--muted-foreground)] mb-1.5 flex items-center justify-between">
+                                  <span>Curva de Tallas & Stock Bodega:</span>
+                                  <span className="text-slate-500">
+                                    {p.tallasConStock} de {p.tallasDetalle?.length || 0} tallas activas
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {p.tallasDetalle && p.tallasDetalle.length > 0 ? (
+                                    p.tallasDetalle.map((t: any) => (
+                                      <div
+                                        key={t.talla}
+                                        className={`px-2 py-1 rounded-lg text-center border text-[10px] font-bold ${
+                                          t.disponible > 0
+                                            ? 'bg-[var(--card)] text-[var(--foreground)] border-[var(--border)]'
+                                            : 'bg-rose-500/5 text-rose-500 border-rose-500/20 opacity-50'
+                                        }`}
+                                      >
+                                        <span className="block text-[9px] text-[var(--muted-foreground)]">T{t.talla}</span>
+                                        <span>{t.disponible}</span>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400">Sin tallas registradas</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Resumen Comercial (Regla 7): Total pares, precio y subtotal */}
+                              <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-xs">
+                                <div>
+                                  <div className="font-bold text-[var(--foreground)]">
+                                    {p.stockTotal} pares en bodega
+                                    <span className="text-[10px] font-normal text-[var(--muted-foreground)] ml-1">
+                                      ({docenasTotal} Docenas)
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    Salidas en periodo:{' '}
+                                    <strong className={p.paresVendidos > 0 ? 'text-blue-600' : 'text-rose-500'}>
+                                      {p.paresVendidos} pares
+                                    </strong>
+                                  </div>
+                                </div>
+
+                                <div className="text-right">
+                                  <div className="text-[10px] text-[var(--muted-foreground)]">
+                                    ${p.precioVenta.toFixed(2)} / par
+                                  </div>
+                                  <div className="font-black text-sm text-emerald-600">
+                                    ${p.ingresos.toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Alerta de mercadería sin rotación pero con stock */}
+                              {p.rotacion === 'SIN_MOVIMIENTO' && p.stockTotal > 0 && (
+                                <div className="px-2.5 py-1.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[10px] text-rose-600 font-bold flex items-center justify-between">
+                                  <span>Mercadería Inmóvil</span>
+                                  <span>${p.capitalRetenido.toFixed(2)} en costo</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* TAB 3: PRODUCTIVIDAD POR TRABAJADOR                            */}

@@ -122,6 +122,47 @@ export interface ReporteResumenEjecutivoData {
   rankingVendedores?: VendedorReporte[];
 }
 
+export interface ProductoRotacionCompleto {
+  productId: string;
+  modelId: string;
+  modelName: string;
+  color: string;
+  serieId: string;
+  serieNombre: string;
+  imageUrl?: string;
+  active: boolean;
+  precioVenta: number;
+  precioCosto: number;
+  stockTotal: number;
+  stockDisponible: number;
+  paresVendidos: number;
+  ingresos: number;
+  costo: number;
+  margen: number;
+  pedidos: number;
+  capitalRetenido: number;
+  valorComercial: number;
+  rotacion: 'ALTA' | 'MEDIA' | 'BAJA' | 'SIN_MOVIMIENTO';
+  tallasDetalle?: { talla: string; stock: number; reservado: number; disponible: number }[];
+  tallasAgotadas?: string[];
+  tallasConStock?: number;
+}
+
+export interface RotacionResumenData {
+  totalProductos: number;
+  totalConVentas: number;
+  totalSinVentas: number;
+  totalConStock: number;
+  totalSinStock: number;
+  totalRotacionAlta: number;
+  totalRotacionMedia: number;
+  totalRotacionBaja: number;
+  totalSinMovimiento: number;
+  capitalEnRiesgo: number;
+  umbralAlta: number;
+  umbralMedia: number;
+}
+
 export interface ReporteModelosData {
   negocio: NegocioInfo;
   periodo: string;
@@ -134,8 +175,12 @@ export interface ReporteModelosData {
     stockActual: number;
     paresVendidosEnPeriodo: number;
   }[];
+  catalogoCompleto?: ProductoRotacionCompleto[];
+  rotacionResumen?: RotacionResumenData;
   totalParesVendidos: number;
   totalIngresosModelos: number;
+  filtroSerie?: string;
+  filtroEstado?: string;
 }
 
 export interface ReporteProductividadData {
@@ -759,95 +804,282 @@ export function generarReporteResumenEjecutivoPdf(data: ReporteResumenEjecutivoD
 export function generarReporteModelosRotacionPdf(data: ReporteModelosData): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const marginLeft = 14;
-  const marginRight = 14;
+  const marginLeft = 12;
+  const marginRight = 12;
   const contentWidth = pageWidth - marginLeft - marginRight;
 
   let y = dibujarEncabezado(
     doc,
     data.negocio,
-    'Reporte de Rotación de Calzado & Modelos',
+    'Reporte Profesional de Rotación de Calzado & Modelos',
     data.periodo,
     data.fechaGeneracion
   );
 
-  // KPIs
+  const res = data.rotacionResumen;
+  const catalogo = data.catalogoCompleto || [];
+
+  // Filtrado si aplica
+  let itemsAMostrar = [...catalogo];
+  if (data.filtroSerie && data.filtroSerie !== 'TODAS') {
+    itemsAMostrar = itemsAMostrar.filter((p) => p.serieId === data.filtroSerie);
+  }
+  if (data.filtroEstado && data.filtroEstado !== 'TODOS') {
+    if (data.filtroEstado === 'CON_STOCK') {
+      itemsAMostrar = itemsAMostrar.filter((p) => p.stockTotal > 0);
+    } else if (data.filtroEstado === 'SIN_STOCK') {
+      itemsAMostrar = itemsAMostrar.filter((p) => p.stockTotal <= 0);
+    } else {
+      itemsAMostrar = itemsAMostrar.filter((p) => p.rotacion === data.filtroEstado);
+    }
+  }
+
+  // Si no hay catálogo completo, usar topModelos como fallback
+  const usarCatalogoCompleto = itemsAMostrar.length > 0;
+
+  // KPIs de Rotación Ejecutiva (4 bloques profesionales)
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(marginLeft, y, contentWidth, 16, 2, 2, 'F');
+  doc.roundedRect(marginLeft, y, contentWidth, 20, 2, 2, 'F');
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(marginLeft, y, contentWidth, 16, 2, 2, 'S');
+  doc.roundedRect(marginLeft, y, contentWidth, 20, 2, 2, 'S');
 
-  const kpiW = contentWidth / 3;
+  const kpiW = contentWidth / 4;
+
+  // KPI 1: Total Artículos Analizados
   doc.setTextColor(100, 116, 139);
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
-  doc.text('TOTAL PARES VENDIDOS', marginLeft + kpiW * 0 + kpiW / 2, y + 5, { align: 'center' });
-  doc.text('INGRESOS POR CALZADO', marginLeft + kpiW * 1 + kpiW / 2, y + 5, { align: 'center' });
-  doc.text('MODELOS CON MOVIMIENTO', marginLeft + kpiW * 2 + kpiW / 2, y + 5, { align: 'center' });
-
+  doc.text('CATÁLOGO ANALIZADO', marginLeft + kpiW * 0 + kpiW / 2, y + 5, { align: 'center' });
   doc.setTextColor(15, 23, 42);
-  doc.setFontSize(10);
-  doc.text(`${data.totalParesVendidos} pares`, marginLeft + kpiW * 0 + kpiW / 2, y + 12, { align: 'center' });
+  doc.setFontSize(9.5);
+  doc.text(`${res?.totalProductos || catalogo.length || data.topModelos.length} Modelos/Colores`, marginLeft + kpiW * 0 + kpiW / 2, y + 12, { align: 'center' });
+  doc.setFontSize(5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`${res?.totalConStock || 0} con stock físico`, marginLeft + kpiW * 0 + kpiW / 2, y + 16.5, { align: 'center' });
+
+  // KPI 2: Con Ventas vs Sin Movimiento
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.text('ESTATUS COMERCIAL', marginLeft + kpiW * 1 + kpiW / 2, y + 5, { align: 'center' });
+  doc.setFontSize(9.5);
   doc.setTextColor(16, 185, 129);
-  doc.text(`$${data.totalIngresosModelos.toFixed(2)}`, marginLeft + kpiW * 1 + kpiW / 2, y + 12, { align: 'center' });
-  doc.setTextColor(59, 130, 246);
-  doc.text(`${data.topModelos.length}`, marginLeft + kpiW * 2 + kpiW / 2, y + 12, { align: 'center' });
+  doc.text(`${res?.totalConVentas || data.topModelos.length} Activos`, marginLeft + kpiW * 1 + kpiW / 2, y + 12, { align: 'center' });
+  doc.setFontSize(5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(225, 29, 72);
+  doc.text(`${res?.totalSinVentas || 0} sin ventas (inmóviles)`, marginLeft + kpiW * 1 + kpiW / 2, y + 16.5, { align: 'center' });
 
-  y += 22;
+  // KPI 3: Pares Vendidos & Facturación
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(100, 116, 139);
+  doc.text('PARES COMERCIALIZADOS', marginLeft + kpiW * 2 + kpiW / 2, y + 5, { align: 'center' });
+  doc.setFontSize(9.5);
+  doc.setTextColor(37, 99, 235);
+  doc.text(`${data.totalParesVendidos} pares`, marginLeft + kpiW * 2 + kpiW / 2, y + 12, { align: 'center' });
+  doc.setFontSize(5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`$${data.totalIngresosModelos.toFixed(2)} facturados`, marginLeft + kpiW * 2 + kpiW / 2, y + 16.5, { align: 'center' });
 
-  // Tabla Ranking
+  // KPI 4: Capital en Riesgo (Mercadería estancada)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(100, 116, 139);
+  doc.text('CAPITAL ESTANCADO (0 VENTAS)', marginLeft + kpiW * 3 + kpiW / 2, y + 5, { align: 'center' });
+  doc.setFontSize(9.5);
+  doc.setTextColor(225, 29, 72);
+  doc.text(`$${(res?.capitalEnRiesgo || 0).toFixed(2)}`, marginLeft + kpiW * 3 + kpiW / 2, y + 12, { align: 'center' });
+  doc.setFontSize(5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`${res?.totalSinMovimiento || 0} modelos sin rotación`, marginLeft + kpiW * 3 + kpiW / 2, y + 16.5, { align: 'center' });
+
+  y += 26;
+
+  // Subtítulo y Filtro Activo
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'bold');
-  doc.text('RANKING DE MODELOS CON MAYOR DEMANDA', marginLeft, y);
-  y += 5;
+  const tituloTabla = usarCatalogoCompleto
+    ? `INVENTARIO COMPLETO Y ROTACIÓN DETALLADA (${itemsAMostrar.length} ARTÍCULOS)`
+    : `RANKING DE MODELOS CON MAYOR DEMANDA (${data.topModelos.length} MODELOS)`;
+  doc.text(tituloTabla, marginLeft, y);
 
-  const colW = [8, 65, 35, 25, 35];
-  const headers = ['#', 'Modelo de Calzado', 'Color / Serie', 'Pares Vendidos', 'Monto Facturado'];
-
-  doc.setFillColor(15, 23, 42);
-  doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(6.5);
-
-  let x = marginLeft + 1.5;
-  headers.forEach((h, i) => {
-    doc.text(h, x, y + 4.5);
-    x += colW[i];
-  });
-  y += 6.5;
-
-  data.topModelos.forEach((m, idx) => {
-    if (y > 270) {
-      dibujarPie(doc);
-      doc.addPage();
-      y = 14;
-    }
-
-    const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
-    doc.setFillColor(bg[0], bg[1], bg[2]);
-    doc.rect(marginLeft, y, contentWidth, 7, 'F');
-
-    doc.setTextColor(30, 41, 59);
+  if (data.filtroSerie && data.filtroSerie !== 'TODAS') {
     doc.setFontSize(6.5);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(37, 99, 235);
+    doc.text(`[Filtro Serie: ${formatearNombreSerie(data.filtroSerie)}]`, marginLeft + 105, y);
+  }
+  y += 4.5;
 
-    x = marginLeft + 1.5;
-    doc.text(`${idx + 1}`, x, y + 5); x += colW[0];
+  if (usarCatalogoCompleto) {
+    // Columnas: #, Modelo de Calzado, Color / Serie, Stock Bodega, Pares Vendidos, Nivel Rotación, Facturación Total
+    const colW = [7, 52, 35, 22, 22, 24, 24];
+    const headers = ['#', 'Modelo de Calzado', 'Color / Serie', 'Stock Físico', 'Pares Vend.', 'Rotación', 'Facturación'];
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(marginLeft, y, contentWidth, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6);
     doc.setFont('helvetica', 'bold');
-    doc.text(m.modelName, x, y + 5); x += colW[1];
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${m.color} • ${formatearNombreSerie(m.serieNombre)}`, x, y + 5); x += colW[2];
-    doc.text(`${m.pares} pares`, x, y + 5); x += colW[3];
 
-    doc.setTextColor(16, 185, 129);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`$${(m.ingresos || 0).toFixed(2)}`, x, y + 5);
+    let x = marginLeft + 1.5;
+    headers.forEach((h, i) => {
+      doc.text(h, x, y + 4.2);
+      x += colW[i];
+    });
+    y += 6;
 
-    y += 7;
-  });
+    itemsAMostrar.forEach((p, idx) => {
+      if (y > 272) {
+        dibujarPie(doc, `Pares vendidos: ${data.totalParesVendidos} | Ingresos: $${data.totalIngresosModelos.toFixed(2)}`);
+        doc.addPage();
+        y = 14;
 
-  dibujarPie(doc, `Pares vendidos: ${data.totalParesVendidos} | Ingresos: $${data.totalIngresosModelos.toFixed(2)}`);
+        // Re-dibujar encabezados de tabla en nueva página
+        doc.setFillColor(15, 23, 42);
+        doc.rect(marginLeft, y, contentWidth, 6, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'bold');
+        let rx = marginLeft + 1.5;
+        headers.forEach((h, i) => {
+          doc.text(h, rx, y + 4.2);
+          rx += colW[i];
+        });
+        y += 6;
+      }
+
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, 6.2, 'F');
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'normal');
+
+      x = marginLeft + 1.5;
+      // 1. #
+      doc.text(`${idx + 1}`, x, y + 4.3); x += colW[0];
+
+      // 2. Modelo
+      doc.setFont('helvetica', 'bold');
+      const nombreModelo = p.modelName.length > 28 ? p.modelName.substring(0, 26) + '..' : p.modelName;
+      doc.text(nombreModelo, x, y + 4.3); x += colW[1];
+
+      // 3. Color / Serie
+      doc.setFont('helvetica', 'normal');
+      const infoSerie = `${p.color} • ${formatearNombreSerie(p.serieNombre)}`;
+      const infoSerieCorta = infoSerie.length > 22 ? infoSerie.substring(0, 20) + '..' : infoSerie;
+      doc.text(infoSerieCorta, x, y + 4.3); x += colW[2];
+
+      // 4. Stock Físico
+      if (p.stockTotal <= 0) {
+        doc.setTextColor(148, 163, 184);
+        doc.text('0 (Agotado)', x, y + 4.3);
+      } else {
+        doc.setTextColor(15, 23, 42);
+        doc.text(`${p.stockTotal} pares`, x, y + 4.3);
+      }
+      x += colW[3];
+
+      // 5. Pares Vendidos
+      if (p.paresVendidos > 0) {
+        doc.setTextColor(37, 99, 235);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${p.paresVendidos} pares`, x, y + 4.3);
+      } else {
+        doc.setTextColor(225, 29, 72);
+        doc.setFont('helvetica', 'normal');
+        doc.text('0 vendidos', x, y + 4.3);
+      }
+      x += colW[4];
+
+      // 6. Rotación Badge
+      doc.setFont('helvetica', 'bold');
+      if (p.rotacion === 'ALTA') {
+        doc.setTextColor(16, 185, 129);
+        doc.text('ALTA', x, y + 4.3);
+      } else if (p.rotacion === 'MEDIA') {
+        doc.setTextColor(37, 99, 235);
+        doc.text('MEDIA', x, y + 4.3);
+      } else if (p.rotacion === 'BAJA') {
+        doc.setTextColor(217, 119, 6);
+        doc.text('BAJA', x, y + 4.3);
+      } else {
+        doc.setTextColor(225, 29, 72);
+        doc.text(p.stockTotal > 0 ? 'SIN SALIDA' : 'INACTIVO', x, y + 4.3);
+      }
+      x += colW[5];
+
+      // 7. Facturación
+      doc.setFont('helvetica', 'bold');
+      if (p.ingresos > 0) {
+        doc.setTextColor(16, 185, 129);
+        doc.text(`$${p.ingresos.toFixed(2)}`, x, y + 4.3);
+      } else {
+        doc.setTextColor(148, 163, 184);
+        doc.setFont('helvetica', 'normal');
+        doc.text('$0.00', x, y + 4.3);
+      }
+
+      y += 6.2;
+    });
+  } else {
+    // Fallback: solo topModelos
+    const colW = [8, 65, 35, 25, 35];
+    const headers = ['#', 'Modelo de Calzado', 'Color / Serie', 'Pares Vendidos', 'Monto Facturado'];
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6.5);
+
+    let x = marginLeft + 1.5;
+    headers.forEach((h, i) => {
+      doc.text(h, x, y + 4.5);
+      x += colW[i];
+    });
+    y += 6.5;
+
+    data.topModelos.forEach((m, idx) => {
+      if (y > 270) {
+        dibujarPie(doc);
+        doc.addPage();
+        y = 14;
+      }
+
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, 7, 'F');
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'normal');
+
+      x = marginLeft + 1.5;
+      doc.text(`${idx + 1}`, x, y + 5); x += colW[0];
+      doc.setFont('helvetica', 'bold');
+      doc.text(m.modelName, x, y + 5); x += colW[1];
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${m.color} • ${formatearNombreSerie(m.serieNombre)}`, x, y + 5); x += colW[2];
+      doc.text(`${m.pares} pares`, x, y + 5); x += colW[3];
+
+      doc.setTextColor(16, 185, 129);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`$${(m.ingresos || 0).toFixed(2)}`, x, y + 5);
+
+      y += 7;
+    });
+  }
+
+  dibujarPie(
+    doc,
+    `Catálogo Total: ${res?.totalProductos || catalogo.length || data.topModelos.length} | Pares Vendidos: ${data.totalParesVendidos} | Ingresos: $${data.totalIngresosModelos.toFixed(2)}`
+  );
   return doc;
 }
 
