@@ -463,6 +463,7 @@ export default function ModelosComponent({
   const [supplierSeriesActiveIds, setSupplierSeriesActiveIds] = useState<string[]>([]);
   const [supplierSeriesPrices, setSupplierSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [supplierSeriesCustomTallas, setSupplierSeriesCustomTallas] = useState<Record<string, string[]>>({});
+  const [supplierSeriesStockOption, setSupplierSeriesStockOption] = useState<Record<string, 'DOCENA' | 'NINGUNA'>>({});
 
   // ── Estado para modal de Edición del Modelo Base y sus Series ──
   const [showEditModel, setShowEditModel] = useState(false);
@@ -1775,6 +1776,7 @@ export default function ModelosComponent({
 
       const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
       const initialTallas: Record<string, string[]> = {};
+      const initialStockOptions: Record<string, 'DOCENA' | 'NINGUNA'> = {};
 
       series.forEach(s => {
         const prodConPrecio = prodsSup.find((prod: any) => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
@@ -1795,13 +1797,30 @@ export default function ModelosComponent({
         }
 
         if (s.tallas) {
-          const curva = getCurvaDocena(s.nombre, 'DOCENA');
-          if (Object.keys(curva).length > 0) {
-            initialTallas[s.id] = buildTallaIdsFromCurva(s, curva);
+          const sTallas = s.tallas;
+          if (sid === s.id && rawTallas && rawTallas.length > 0) {
+            const currentVariantTallaIds: string[] = [];
+            rawTallas.forEach((t: any) => {
+              const qty = t.cantidad ?? t.disponible ?? 0;
+              const matchingTalla = sTallas.find(st => st.numero === t.numero || st.id === t.tallaId || st.id === t.id);
+              if (matchingTalla && qty > 0) {
+                for (let k = 0; k < qty; k++) {
+                  currentVariantTallaIds.push(matchingTalla.id);
+                }
+              }
+            });
+            initialTallas[s.id] = currentVariantTallaIds;
+            initialStockOptions[s.id] = currentVariantTallaIds.length > 0 ? 'DOCENA' : 'NINGUNA';
           } else {
-            const defaultIds: string[] = [];
-            s.tallas.forEach(t => { defaultIds.push(t.id); defaultIds.push(t.id); });
-            initialTallas[s.id] = defaultIds;
+            const curva = getCurvaDocena(s.nombre, 'DOCENA');
+            if (Object.keys(curva).length > 0) {
+              initialTallas[s.id] = buildTallaIdsFromCurva(s, curva);
+            } else {
+              const defaultIds: string[] = [];
+              s.tallas.forEach(t => { defaultIds.push(t.id); defaultIds.push(t.id); });
+              initialTallas[s.id] = defaultIds;
+            }
+            initialStockOptions[s.id] = 'DOCENA';
           }
         }
       });
@@ -1816,6 +1835,7 @@ export default function ModelosComponent({
       setSupplierSeriesActiveIds(activeSids);
       setSupplierSeriesPrices(initialPrices);
       setSupplierSeriesCustomTallas(initialTallas);
+      setSupplierSeriesStockOption(initialStockOptions);
     }
 
     setError("");
@@ -1946,15 +1966,54 @@ export default function ModelosComponent({
   const restablecerDocenaEstandarEnSupplierSeries = (serieId: string) => {
     const sObj = series.find(s => s.id === serieId);
     if (!sObj || !sObj.tallas) return;
-    const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
-    if (Object.keys(curva).length > 0) {
-      const ids = buildTallaIdsFromCurva(sObj, curva);
-      setSupplierSeriesCustomTallas(ct => ({ ...ct, [serieId]: ids }));
-    } else {
-      const ids: string[] = [];
-      sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
-      setSupplierSeriesCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    const docena = getDocenaBaseParaSerie(sObj);
+    const ids = buildTallaIdsFromCurva(sObj, docena);
+    setSupplierSeriesCustomTallas(ct => ({ ...ct, [serieId]: ids }));
+    setSupplierSeriesStockOption(prev => ({ ...prev, [serieId]: 'DOCENA' }));
+  };
+
+  const aplicarCurvaEnSupplierSeries = (serieId: string, tipo: 'DOCENA' | 'NINGUNA') => {
+    setSupplierSeriesStockOption(prev => ({ ...prev, [serieId]: tipo }));
+    const sObj = series.find(s => s.id === serieId);
+    if (!sObj || !sObj.tallas) return;
+
+    if (tipo === 'DOCENA') {
+      const docena = getDocenaBaseParaSerie(sObj);
+      const ids = buildTallaIdsFromCurva(sObj, docena);
+      setSupplierSeriesCustomTallas(prev => ({ ...prev, [serieId]: ids }));
+    } else if (tipo === 'NINGUNA') {
+      setSupplierSeriesCustomTallas(prev => ({ ...prev, [serieId]: [] }));
     }
+  };
+
+  const handleSupplierChangeInEditProduct = (newSupId: string) => {
+    setEditProductSupplierId(newSupId);
+    setSupplierSeriesTargetSupplierId(newSupId || null);
+
+    const actualModelId = (editProduct?.modelId || (editProduct as any)?.model?.id || (editProduct as any)?.modelo?.id);
+    const targetModel = supplierSeriesTargetModel || modelos.find((mod: ModeloAgrupado) => mod.id === actualModelId);
+    if (!targetModel) return;
+
+    setSupplierSeriesPrices(prev => {
+      const updated = { ...prev };
+      series.forEach(s => {
+        const cacheKey = `${s.id}_${newSupId || 'default'}`;
+        if (knownSeriesCosts[cacheKey]) {
+          updated[s.id] = { ...knownSeriesCosts[cacheKey] };
+        } else {
+          const matchingProd = targetModel.products?.find(
+            (p: any) => (p.supplierId === newSupId || (p.supplier as any)?.id === newSupId) && (((p.serie as any)?.id === s.id) || (p as any).serieId === s.id)
+          );
+          if (matchingProd && matchingProd.precioCosto > 0) {
+            updated[s.id] = {
+              costPrice: String(matchingProd.precioCosto),
+              salePrice: String(matchingProd.precioVenta),
+            };
+          }
+        }
+      });
+      return updated;
+    });
   };
 
   const handleSaveSupplierSeries = async (e: React.FormEvent) => {
@@ -2114,12 +2173,33 @@ export default function ModelosComponent({
       setError("El color es obligatorio.");
       return;
     }
-    const costo = parseFloat(editProductCosto);
-    const venta = parseFloat(editProductVenta);
-    if (isNaN(costo) || costo <= 0 || isNaN(venta) || venta <= 0) {
-      setError("Los precios deben ser mayores a 0.");
+
+    const currentSerieId = (supplierSeriesActiveIds.includes(editProductSerieId) ? editProductSerieId : supplierSeriesActiveIds[0]) || editProductSerieId;
+    if (!currentSerieId) {
+      setError("Debes activar al menos una serie para esta variante.");
       return;
     }
+
+    const currentPrices = supplierSeriesPrices[currentSerieId] || { costPrice: editProductCosto, salePrice: editProductVenta };
+    const costo = parseFloat(currentPrices.costPrice);
+    const venta = parseFloat(currentPrices.salePrice);
+    if (isNaN(costo) || costo <= 0 || isNaN(venta) || venta <= 0) {
+      setError("Debes ingresar un precio de compra y venta válidos (mayores a 0) en la serie activa.");
+      return;
+    }
+
+    const selectedTallaIds = supplierSeriesCustomTallas[currentSerieId] || [];
+    const activeSerieObj = series.find(s => s.id === currentSerieId);
+    const isSinStock = supplierSeriesStockOption[currentSerieId] === 'NINGUNA';
+
+    const tallasPayload = (activeSerieObj?.tallas || []).map(t => {
+      const count = isSinStock ? 0 : selectedTallaIds.filter(id => id === t.id).length;
+      return {
+        tallaId: t.id,
+        numero: t.numero,
+        cantidad: count,
+      };
+    });
 
     setSaving(true);
     try {
@@ -2134,25 +2214,21 @@ export default function ModelosComponent({
       await ApiService.put(`/inventario/productos/${editProduct.id}`, {
         color: editProductColor.trim(),
         imageUrl: editProductImageChanged ? (finalImageUrl || null) : undefined,
-        serieId: editProductSerieId || undefined,
+        serieId: currentSerieId,
         costPrice: costo,
         salePrice: venta,
         supplierId: editProductSupplierId || null,
         motivoCambioPrecio: editProductMotivo.trim() || undefined,
-        tallas: editProductTallas.map(t => ({
-          tallaId: t.tallaId || undefined,
-          numero: t.numero,
-          cantidad: t.cantidad,
-        })),
+        tallas: tallasPayload,
       });
 
       // Guardar en la memoria de costos de series
-      if (editProductSerieId) {
-        const key = `${editProductSerieId}_${editProductSupplierId || 'default'}`;
+      if (currentSerieId) {
+        const key = `${currentSerieId}_${editProductSupplierId || 'default'}`;
         setKnownSeriesCosts(prev => ({
           ...prev,
-          [key]: { costPrice: editProductCosto, salePrice: editProductVenta },
-          [editProductSerieId]: { costPrice: editProductCosto, salePrice: editProductVenta },
+          [key]: { costPrice: String(costo), salePrice: String(venta) },
+          [currentSerieId]: { costPrice: String(costo), salePrice: String(venta) },
         }));
       }
 
@@ -2169,7 +2245,7 @@ export default function ModelosComponent({
           }
         }
         await ApiService.put(`/inventario/modelos/${supplierSeriesTargetModel.id}/proveedor-series`, {
-          supplierId: supplierSeriesTargetSupplierId || editProductSupplierId || null,
+          supplierId: editProductSupplierId || supplierSeriesTargetSupplierId || null,
           serieIds: supplierSeriesActiveIds,
           seriesPrices: seriesPricesNumeric,
           customTallas: supplierSeriesCustomTallas,
@@ -4757,343 +4833,6 @@ export default function ModelosComponent({
                   className={INPUT} required placeholder="Ej: Negro, Café, Miel..." />
               </div>
 
-              {/* Serie Asociada a esta Variante y Componente 3. SERIES Y PRECIOS */}
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <Lbl t="Serie Asignada a esta Variante" req />
-                    <span className="text-[10px] text-[var(--muted-foreground)]">Serie de numeración base</span>
-                  </div>
-                  <select
-                    value={editProductSerieId}
-                    onChange={(e) => handleChangeEditSerie(e.target.value)}
-                    className={INPUT}
-                  >
-                    <option value="">-- Seleccionar Serie --</option>
-                    {series.map((s) => {
-                      const isAct = supplierSeriesActiveIds.includes(s.id);
-                      return (
-                        <option key={s.id} value={s.id}>
-                          {getNombreSerie(s, series)} {s.tallas && s.tallas.length > 0 ? `(${s.tallas[0].numero}-${s.tallas[s.tallas.length - 1].numero})` : ''} {isAct ? '✓ (Activa)' : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-
-                {/* Sección 3: Series y Precios (Idéntica a la Imagen de Referencia) */}
-                <div className="space-y-3 bg-[var(--muted)]/15 border border-[var(--border)] rounded-2xl p-4">
-                  <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
-                    <div>
-                      <h5 className="text-xs font-black text-[var(--foreground)] uppercase tracking-wider">
-                        3. Series y Precios del Proveedor
-                      </h5>
-                      <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
-                        Activa las series que deseas generar, personaliza sus tallas y define precios. Si activas o desactivas una serie, se sincronizará automáticamente para todos los colores de este modelo pertenecientes a este proveedor.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewSerieNombre("");
-                        setNewSerieTallasDesde("38");
-                        setNewSerieTallasHasta("43");
-                        setError("");
-                        setShowCreateSeriesModal(true);
-                      }}
-                      className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline shrink-0 cursor-pointer"
-                    >
-                      <Plus size={13} /> <span>Crear Nueva Serie</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    {series.map(s => {
-                      const isActive = supplierSeriesActiveIds.includes(s.id);
-                      const prices = supplierSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
-
-                      return (
-                        <div
-                          key={s.id}
-                          className={`rounded-xl border transition-all overflow-hidden ${
-                            isActive
-                              ? "border-[#0F172A] bg-[#0F172A]/5 dark:border-white/20 dark:bg-white/5 shadow-xs"
-                              : "border-[var(--border)] bg-[var(--card)] opacity-60 hover:opacity-100"
-                          }`}
-                        >
-                          {/* Toggle Header idéntico a la Foto */}
-                          <div className="w-full flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--border)]/30">
-                            <div
-                              className="flex items-center gap-3 cursor-pointer select-none"
-                              onClick={() => {
-                                toggleSupplierSerie(s.id);
-                                if (!isActive && !editProductSerieId) {
-                                  handleChangeEditSerie(s.id);
-                                }
-                              }}
-                            >
-                              <div
-                                className={`w-9 h-5 rounded-full relative transition-colors ${
-                                  isActive ? "bg-[#0F172A] dark:bg-blue-600" : "bg-[var(--border)]"
-                                }`}
-                              >
-                                <div
-                                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                    isActive ? "translate-x-4" : "translate-x-0.5"
-                                  }`}
-                                />
-                              </div>
-                              <span
-                                className={`text-xs font-bold ${
-                                  isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-                                }`}
-                              >
-                                {getNombreSerie(s, series)}
-                              </span>
-                              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                                ({s.nombre})
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openEditSeriesModal(s)}
-                                className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
-                                title="Editar rango o nombre de esta serie"
-                              >
-                                <Edit2 size={12} />
-                                <span>Editar</span>
-                              </button>
-                              {isActive && (
-                                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                                  ACTIVA
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Inputs de Precios cuando la serie está activa */}
-                          {isActive && (() => {
-                            const costVal = parseFloat(prices.costPrice);
-                            const saleVal = parseFloat(prices.salePrice);
-                            const hasCost = !isNaN(costVal) && costVal > 0;
-                            const hasSale = !isNaN(saleVal) && saleVal > 0;
-                            const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
-                            const isLoss = hasCost && hasSale && saleVal < costVal;
-                            const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
-                            const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
-
-                            return (
-                              <div className="p-3 space-y-2.5">
-                                <div className="grid grid-cols-2 gap-2.5">
-                                  <div>
-                                    <label className="text-[10px] font-bold text-[var(--foreground)] flex items-center justify-between">
-                                      <span>Precio Compra ($)</span>
-                                      {hasCost && suggestedSale && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setSupplierSeriesPrices(prev => ({
-                                              ...prev,
-                                              [s.id]: { ...prev[s.id], salePrice: suggestedSale },
-                                            }));
-                                            if (editProductSerieId === s.id) {
-                                              setEditProductVenta(suggestedSale);
-                                            }
-                                          }}
-                                          className="text-[9px] text-blue-600 hover:underline"
-                                        >
-                                          Sugerir: ${suggestedSale}
-                                        </button>
-                                      )}
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="0.01"
-                                      step="0.01"
-                                      value={prices.costPrice}
-                                      onChange={e => {
-                                        const val = e.target.value;
-                                        setSupplierSeriesPrices(prev => ({
-                                          ...prev,
-                                          [s.id]: { ...prev[s.id], costPrice: val },
-                                        }));
-                                        if (editProductSerieId === s.id) {
-                                          setEditProductCosto(val);
-                                        }
-                                      }}
-                                      placeholder="0.00"
-                                      className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-600"
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="text-[10px] font-bold text-[var(--foreground)]">
-                                      Precio Venta ($)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="0.01"
-                                      step="0.01"
-                                      value={prices.salePrice}
-                                      onChange={e => {
-                                        const val = e.target.value;
-                                        setSupplierSeriesPrices(prev => ({
-                                          ...prev,
-                                          [s.id]: { ...prev[s.id], salePrice: val },
-                                        }));
-                                        if (editProductSerieId === s.id) {
-                                          setEditProductVenta(val);
-                                        }
-                                      }}
-                                      placeholder="0.00"
-                                      className={`w-full px-2.5 py-1.5 bg-[var(--card)] border rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-blue-600 ${
-                                        isLoss ? "border-red-500 bg-red-500/5" : "border-[var(--border)]"
-                                      }`}
-                                    />
-                                  </div>
-                                </div>
-
-                                {hasCost && hasSale && (
-                                  <div className="flex items-center justify-between text-[10px] font-mono px-1">
-                                    <span className={isLoss ? "text-red-500 font-bold" : "text-emerald-600 font-bold"}>
-                                      Margen: {marginPercent}%
-                                    </span>
-                                    <span className="text-[var(--muted-foreground)]">
-                                      Ganancia: ${profitAmount.toFixed(2)} / par
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Stock por Tallas / Numeración */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Lbl t="Numeración y Stock (pares por número)" />
-                  <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
-                    Total: {editProductTallas.reduce((acc, t) => acc + (t.cantidad || 0), 0)} pares
-                  </span>
-                </div>
-
-                {/* Presets de Curvas para la variante en edición */}
-                {editProductSerieId && (
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
-                      = {editProductTallas.reduce((sum, t) => sum + (t.cantidad || 0), 0)} pares total
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const selectedSerie = series.find(s => s.id === editProductSerieId);
-                        if (selectedSerie?.tallas) {
-                          const docena = getDocenaBaseParaSerie(selectedSerie);
-                          setEditProductTallas(selectedSerie.tallas.map(t => ({
-                            tallaId: t.id,
-                            numero: t.numero,
-                            cantidad: docena[t.numero] || 0,
-                          })));
-                        }
-                      }}
-                      className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                      title="Restablecer curva base estándar (38 al 42 con 39 y 40 repetidos = 12 pares)"
-                    >
-                      <RefreshCw size={11} />
-                      <span>Restablecer estándar (38-42)</span>
-                    </button>
-                  </div>
-                )}
-
-                {editProductTallas.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl">
-                    {editProductTallas.sort((a, b) => a.numero - b.numero).map((t, i) => {
-                      const selectedSerie = series.find(s => s.id === editProductSerieId);
-                      const isBaseSerieTalla = selectedSerie?.tallas?.some(st => st.numero === t.numero);
-
-                      return (
-                        <div key={t.tallaId || `t-${t.numero}`} className="flex items-center gap-0 bg-[var(--card)] border border-[var(--border)] rounded-lg px-1.5 py-1 shadow-xs">
-                          <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
-                          <button type="button"
-                            onClick={() => {
-                              setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: Math.max(0, tt.cantidad - 1) } : tt));
-                            }}
-                            className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
-                          >−</button>
-                          <input
-                            type="number"
-                            min="0"
-                            value={t.cantidad}
-                            onChange={e => {
-                              const val = Math.max(0, parseInt(e.target.value) || 0);
-                              setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: val } : tt));
-                            }}
-                            className="w-8 text-center text-sm font-extrabold text-[var(--foreground)] bg-transparent border-0 focus:outline-none"
-                          />
-                          <button type="button"
-                            onClick={() => {
-                              setEditProductTallas(prev => prev.map((tt, ii) => ii === i ? { ...tt, cantidad: tt.cantidad + 1 } : tt));
-                            }}
-                            className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
-                          >+</button>
-                          {!isBaseSerieTalla && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveTallaFromEdit(t.numero)}
-                              className="ml-1 text-slate-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
-                              title="Quitar esta talla adicional de la variante"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[var(--muted-foreground)] italic p-2 border border-dashed rounded-lg text-center">
-                    No hay tallas asignadas. Selecciona una serie o añade tallas abajo.
-                  </p>
-                )}
-
-                {/* Formulario rápido para añadir talla adicional a la numeración */}
-                <div className="space-y-1 pt-1">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="10"
-                      max="60"
-                      placeholder="N° Talla (ej: 44)"
-                      value={newTallaNumeroInput}
-                      onChange={(e) => { setNewTallaNumeroInput(e.target.value); setTallaInputError(""); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomTallaToEdit(); } }}
-                      className="w-32 px-3 py-1.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-blue-600"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddCustomTallaToEdit}
-                      className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-600 hover:text-white rounded-xl text-xs font-bold border border-blue-500/30 flex items-center gap-1 transition-all cursor-pointer"
-                    >
-                      <Plus size={13} />
-                      <span>Añadir Talla</span>
-                    </button>
-                  </div>
-                  {tallaInputError && (
-                    <p className="text-[11px] font-bold text-red-500 flex items-center gap-1 animate-in fade-in duration-150">
-                      <AlertCircle size={12} className="shrink-0" />
-                      <span>{tallaInputError}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-
               {/* Proveedor Fabricante de la Variante */}
               <div className="space-y-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl p-3.5">
                 <div className="flex items-center justify-between">
@@ -5102,16 +4841,7 @@ export default function ModelosComponent({
                 </div>
                 <select
                   value={editProductSupplierId}
-                  onChange={(e) => {
-                    const newSupId = e.target.value;
-                    setEditProductSupplierId(newSupId);
-                    // Auto-propagar precio conocido para este proveedor y serie si existe
-                    const cacheKey = `${editProductSerieId}_${newSupId || 'default'}`;
-                    if (knownSeriesCosts[cacheKey]) {
-                      setEditProductCosto(knownSeriesCosts[cacheKey].costPrice);
-                      setEditProductVenta(knownSeriesCosts[cacheKey].salePrice);
-                    }
-                  }}
+                  onChange={(e) => handleSupplierChangeInEditProduct(e.target.value)}
                   className={INPUT}
                 >
                   <option value="">-- Proveedor por defecto del modelo --</option>
@@ -5137,113 +4867,285 @@ export default function ModelosComponent({
                 })()}
               </div>
 
-              {/* Precios, Detección de Variación & Margen */}
-              {(() => {
-                const costNum = parseFloat(editProductCosto) || 0;
-                const saleNum = parseFloat(editProductVenta) || 0;
-                const prevCost = Number(editProduct.precioCosto) || 0;
-                const diffCost = costNum - prevCost;
-                const suggested = costNum > 0 ? calculateSuggestedPrice(costNum, marginPct) : 0;
-                const realMargin = costNum > 0 && saleNum > 0 ? calculateRealMarginPercent(costNum, saleNum) : 0;
-                const ganancia = costNum > 0 && saleNum > 0 ? calculateProfitAmount(costNum, saleNum) : 0;
+                {/* Sección 3: Series y Precios (Idéntica a la Captura de Referencia) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+                  <h5 className="text-xs font-bold text-[#0F172A] dark:text-white uppercase tracking-widest">
+                    3. Series y Precios
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewSerieNombre("");
+                      setNewSerieTallasDesde("38");
+                      setNewSerieTallasHasta("43");
+                      setError("");
+                      setShowCreateSeriesModal(true);
+                    }}
+                    className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    <Plus size={13} /> <span>Crear Nueva Serie</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
+                  Activa las series que deseas generar, personaliza sus tallas y define precios.
+                </p>
 
-                return (
-                  <div className="space-y-3">
-                    {/* Indicador de variación en tiempo real (Alza / Rebaja) */}
-                    {Math.abs(diffCost) > 0.001 && costNum > 0 && (
-                      <div className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between animate-in fade-in duration-200 ${
-                        diffCost > 0
-                          ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
-                          : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                      }`}>
-                        <span className="flex items-center gap-1.5">
-                          {diffCost > 0 ? '🔺 Alza en Costo de Entrega:' : '🟢 Rebaja en Costo de Entrega:'}
-                          ${prevCost.toFixed(2)} ➔ ${costNum.toFixed(2)}
-                        </span>
-                        <span className="font-mono font-black">
-                          {diffCost > 0 ? `+ $${diffCost.toFixed(2)}` : `- $${Math.abs(diffCost).toFixed(2)}`}
-                        </span>
-                      </div>
-                    )}
+                <div className="space-y-3">
+                  {series.map(s => {
+                    const isActive = supplierSeriesActiveIds.includes(s.id);
+                    const prices = supplierSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
+                    const selectedTallaIds = supplierSeriesCustomTallas[s.id] || [];
 
-                    <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
-                          Ajuste de Precios & Rentabilidad
-                        </span>
-                        {suggested > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setEditProductVenta(suggested.toFixed(2))}
-                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-lg hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                    return (
+                      <div
+                        key={s.id}
+                        className={`rounded-xl border transition-all overflow-hidden ${
+                          isActive
+                            ? "border-[#0F172A] bg-[#0F172A]/5 dark:border-white/20 dark:bg-white/5 shadow-sm"
+                            : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        {/* Toggle Header */}
+                        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+                          <div
+                            className="flex items-center gap-3 cursor-pointer select-none"
+                            onClick={() => toggleSupplierSerie(s.id)}
                           >
-                            Aplicar Sugerido (${suggested.toFixed(2)})
-                          </button>
-                        )}
-                      </div>
+                            <div
+                              className={`w-10 h-5 rounded-full relative transition-colors ${
+                                isActive ? "bg-[#0F172A] dark:bg-blue-600" : "bg-[var(--border)]"
+                              }`}
+                            >
+                              <div
+                                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                  isActive ? "translate-x-5" : "translate-x-0.5"
+                                }`}
+                              />
+                            </div>
+                            <span
+                              className={`text-sm font-bold ${
+                                isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
+                              }`}
+                            >
+                              {getNombreSerie(s, series)}
+                            </span>
+                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                              ({s.nombre})
+                            </span>
+                          </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Lbl t="Precio Costo / Entrega ($)" req />
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            value={editProductCosto}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setEditProductCosto(val);
-                              const num = parseFloat(val);
-                              if (!isNaN(num) && num > 0) {
-                                const sug = calculateSuggestedPrice(num, marginPct);
-                                if (!editProductVenta || editProductVenta === "0") {
-                                  setEditProductVenta(sug.toFixed(2));
-                                }
-                              }
-                            }}
-                            className={INPUT}
-                            required
-                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditSeriesModal(s)}
+                              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+                              title="Editar rango o nombre de esta serie"
+                            >
+                              <Edit2 size={13} />
+                              <span>Editar</span>
+                            </button>
+                            {isActive && (
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">
+                                ACTIVA
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <Lbl t="Precio Venta al Público ($)" req />
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            value={editProductVenta}
-                            onChange={e => setEditProductVenta(e.target.value)}
-                            className={INPUT}
-                            required
-                          />
-                        </div>
-                      </div>
 
-                      {/* Resumen de Margen */}
-                      {costNum > 0 && saleNum > 0 && (
-                        <div className="flex items-center justify-between pt-1.5 text-[11px] text-[var(--muted-foreground)] border-t border-emerald-500/15">
-                          <span>Margen Real: <strong className="text-emerald-600">{realMargin.toFixed(1)}%</strong></span>
-                          <span>Ganancia: <strong className="text-emerald-600 font-mono">${ganancia.toFixed(2)} / par</strong></span>
-                        </div>
-                      )}
-                    </div>
+                        {/* Detalle si la serie está activa */}
+                        {isActive && (() => {
+                          const costVal = parseFloat(prices.costPrice);
+                          const saleVal = parseFloat(prices.salePrice);
+                          const hasCost = !isNaN(costVal) && costVal > 0;
+                          const hasSale = !isNaN(saleVal) && saleVal > 0;
+                          const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
+                          const isLoss = hasCost && hasSale && saleVal < costVal;
+                          const marginPercent = hasCost && hasSale ? calculateRealMarginPercent(costVal, saleVal) : 0;
+                          const profitAmount = hasCost && hasSale ? calculateProfitAmount(costVal, saleVal) : 0;
+                          const suggestedProfit = hasCost && suggestedSale ? (parseFloat(suggestedSale) - costVal).toFixed(2) : "0.00";
 
-                    {/* Motivo de cambio de precio (opcional para trazabilidad) */}
-                    {Math.abs(diffCost) > 0.001 && (
-                      <div>
-                        <Lbl t="Motivo del Ajuste de Precio (Opcional)" />
-                        <input
-                          type="text"
-                          placeholder="Ej: Cambio en tarifa de mano de obra del proveedor"
-                          value={editProductMotivo}
-                          onChange={e => setEditProductMotivo(e.target.value)}
-                          className={INPUT}
-                        />
+                          return (
+                            <div className="px-4 pb-4 pt-3 space-y-3">
+                              {/* Inputs de Precio */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Lbl t="Precio de Compra ($)" req />
+                                  <input
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={prices.costPrice}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setSupplierSeriesPrices(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...prev[s.id], costPrice: val }
+                                      }));
+                                    }}
+                                    placeholder="0.00"
+                                    className={INPUT}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="flex items-center justify-between">
+                                    <Lbl t="Precio de Venta ($)" req />
+                                    {hasCost && suggestedSale && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSupplierSeriesPrices(prev => ({
+                                            ...prev,
+                                            [s.id]: { ...prev[s.id], salePrice: suggestedSale }
+                                          }));
+                                        }}
+                                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                                        title="Auto-asignar precio sugerido con margen de ganancia"
+                                      >
+                                        Auto: ${suggestedSale}
+                                      </button>
+                                    )}
+                                  </div>
+                                  <input
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={prices.salePrice}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setSupplierSeriesPrices(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...prev[s.id], salePrice: val }
+                                      }));
+                                    }}
+                                    placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
+                                    className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Indicador de Margen Configurable */}
+                              {hasCost && (
+                                <div className="text-[11px] font-semibold">
+                                  {hasSale ? (
+                                    isLoss ? (
+                                      <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
+                                        <AlertCircle size={14} className="shrink-0 animate-bounce" />
+                                        <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                      </div>
+                                    ) : (
+                                      <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
+                                        <CheckCircle size={14} className="shrink-0" />
+                                        <span>Margen de ganancia: <strong className="font-extrabold">{marginPercent.toFixed(1)}%</strong> (+${profitAmount.toFixed(2)} de utilidad por par)</span>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 text-blue-600 rounded-lg flex items-center gap-1.5">
+                                      <DollarSign size={14} className="shrink-0" />
+                                      <span>Precio sugerido ({marginPct}% margen): <strong className="font-extrabold">${suggestedSale}</strong> (Ganancia estimada: +${suggestedProfit}/par)</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Componente de Curva de Tallas con Steppers */}
+                              <div className="pt-2 border-t border-[var(--border)]/40 space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                                    Serie: {getNombreSerie(s, series).toUpperCase()}
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+                                    = {selectedTallaIds.length} pares total
+                                  </span>
+                                </div>
+
+                                {/* Steppers por talla */}
+                                <div className="flex flex-wrap gap-2">
+                                  {s.tallas?.sort((a, b) => a.numero - b.numero).map(t => {
+                                    const count = selectedTallaIds.filter(id => id === t.id).length;
+                                    return (
+                                      <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
+                                        <span className="text-xs font-black text-[var(--foreground)] px-1.5 w-9 text-center">T{t.numero}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeOneTallaInSupplierSeries(s.id, t.id)}
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-sm font-bold transition-colors cursor-pointer"
+                                        >−</button>
+                                        <span className="w-8 text-center text-sm font-extrabold text-[var(--foreground)]">{count}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => addTallaRepeatInSupplierSeries(s.id, t.id)}
+                                          className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-sm font-bold transition-colors cursor-pointer"
+                                        >+</button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Total de pares y botón para restablecer docena estándar */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/30">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold text-[var(--foreground)] font-mono">
+                                      = {selectedTallaIds.length} pares total ({getDocenaLabelExt(selectedTallaIds.length)})
+                                    </span>
+                                    {selectedTallaIds.length !== 12 && (
+                                      <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
+                                        ⚠️ Una docena estándar suma 12 pares
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => restablecerDocenaEstandarEnSupplierSeries(s.id)}
+                                    className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                    title="Restablecer curva base estándar (38 al 42 con 39 y 40 repetidos = 12 pares)"
+                                  >
+                                    <RefreshCw size={11} />
+                                    <span>Restablecer estándar (38-42)</span>
+                                  </button>
+                                </div>
+
+                                {/* Selección de Stock Inicial para Bodega */}
+                                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
+                                    Stock Inicial en Bodega para este modelo:
+                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'DOCENA')}
+                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        (supplierSeriesStockOption[s.id] || 'DOCENA') === 'DOCENA'
+                                          ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
+                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
+                                      }`}
+                                    >
+                                      {(supplierSeriesStockOption[s.id] || 'DOCENA') === 'DOCENA' && <Check size={13} />}
+                                      1 Docena en Bodega (12 pares según serie de arriba)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'NINGUNA')}
+                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        supplierSeriesStockOption[s.id] === 'NINGUNA'
+                                          ? "border-slate-600 bg-slate-700 text-white shadow-xs"
+                                          : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
+                                      }`}
+                                    >
+                                      {supplierSeriesStockOption[s.id] === 'NINGUNA' && <Check size={13} />}
+                                      Sin Stock Inicial (0 pares, solo catálogo para pedidos)
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
+                    );
+                  })}
+                </div>
+              </div>
 
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl">
