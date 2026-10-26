@@ -2582,16 +2582,6 @@ export default function ModelosComponent({
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleSincronizarSeriesModelo(m)}
-                                    disabled={syncingModelId === m.id}
-                                    title="Sincronizar automáticamente todas las series en el 100% de los colores de este modelo"
-                                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                  >
-                                    <RefreshCw size={13} className={syncingModelId === m.id ? "animate-spin" : ""} />
-                                    <span>Sincronizar Series</span>
-                                  </button>
-                                  <button
-                                    type="button"
                                     onClick={() => openAddColorModal(m)}
                                     title="Añadir un nuevo color a este modelo"
                                     className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white transition-all flex items-center gap-1 shadow-sm cursor-pointer"
