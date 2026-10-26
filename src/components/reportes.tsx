@@ -38,6 +38,7 @@ import {
   ChevronRight,
   UserCheck,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 import { useToast } from '@/components/ui/toast';
@@ -127,6 +128,7 @@ export default function ReportesComponent({
   const [filtroTrabajadorTexto, setFiltroTrabajadorTexto] = useState('');
   const [filtroTrabajadorRol, setFiltroTrabajadorRol] = useState('TODOS');
   const [filtroTrabajadorOrden, setFiltroTrabajadorOrden] = useState<'VENTAS_DESC' | 'PARES_DESC' | 'PEDIDOS_DESC' | 'VENTAS_ASC'>('VENTAS_DESC');
+  const [filtroAbonosFinanzasTexto, setFiltroAbonosFinanzasTexto] = useState('');
 
   // Estado de Reporte de Cobranzas (Clientes Deudores)
   const [loadingCobranzas, setLoadingCobranzas] = useState(false);
@@ -203,20 +205,28 @@ export default function ReportesComponent({
       cargarReportePos();
     } else if (tabActiva === 'sucursales') {
       cargarReporteSucursales();
+    } else if (tabActiva === 'cobranzas') {
+      cargarCobranzas();
+    } else if (tabActiva === 'campanas') {
+      cargarCampanas();
+    } else if (tabActiva === 'proveedores') {
+      cargarReporteProveedores();
     }
   }, [periodo, sucursalSeleccionada, vendedorSeleccionado, canalSeleccionado]);
 
   useEffect(() => {
-    if (tabActiva === 'pos' && !posData) {
-      cargarReportePos();
-    } else if (tabActiva === 'sucursales' && !sucursalesReporteData) {
-      cargarReporteSucursales();
-    } else if (tabActiva === 'cobranzas' && !cobranzasData) {
-      cargarCobranzas();
-    } else if (tabActiva === 'campanas' && !campanasData) {
-      cargarCampanas();
-    } else if (tabActiva === 'proyeccion_ml' && !proyeccionMl) {
-      cargarProyeccionMl();
+    if (tabActiva === 'pos') {
+      if (!posData) cargarReportePos();
+    } else if (tabActiva === 'sucursales') {
+      if (!sucursalesReporteData) cargarReporteSucursales();
+    } else if (tabActiva === 'cobranzas') {
+      if (!cobranzasData) cargarCobranzas();
+    } else if (tabActiva === 'campanas') {
+      if (!campanasData) cargarCampanas();
+    } else if (tabActiva === 'proveedores') {
+      if (!proveedoresData) cargarReporteProveedores();
+    } else if (tabActiva === 'proyeccion_ml') {
+      if (!proyeccionMl) cargarProyeccionMl();
     }
   }, [tabActiva]);
 
@@ -298,6 +308,9 @@ export default function ReportesComponent({
       if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
         params.append('vendedorId', vendedorSeleccionado);
       }
+      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
+        params.append('canal', canalSeleccionado);
+      }
       if (filtroPosMetodo && filtroPosMetodo !== 'TODOS') {
         params.append('metodoPago', filtroPosMetodo);
       }
@@ -330,6 +343,12 @@ export default function ReportesComponent({
       if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
         params.append('sucursalId', sucursalSeleccionada);
       }
+      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
+        params.append('vendedorId', vendedorSeleccionado);
+      }
+      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
+        params.append('canal', canalSeleccionado);
+      }
 
       const data = await ApiService.get(`/reportes/rendimiento-sucursales?${params.toString()}`);
       setSucursalesReporteData(data);
@@ -344,7 +363,22 @@ export default function ReportesComponent({
   const cargarCobranzas = async () => {
     setLoadingCobranzas(true);
     try {
-      const data = await ApiService.get('/reportes/cobranzas');
+      const params = new URLSearchParams();
+      params.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) params.append('fechaDesde', fechaDesde);
+        if (fechaHasta) params.append('fechaHasta', fechaHasta);
+      }
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      if (vendedorSeleccionado && vendedorSeleccionado !== 'TODOS') {
+        params.append('vendedorId', vendedorSeleccionado);
+      }
+      if (canalSeleccionado && canalSeleccionado !== 'TODOS') {
+        params.append('canal', canalSeleccionado);
+      }
+      const data = await ApiService.get(`/reportes/cobranzas?${params.toString()}`);
       setCobranzasData(data);
     } catch (err: any) {
       console.error('Error al cargar reporte de cobranzas:', err);
@@ -357,13 +391,17 @@ export default function ReportesComponent({
   const cargarCampanas = async () => {
     setLoadingCampanas(true);
     try {
-      const data = await ApiService.get('/reportes/campanas');
+      const params = new URLSearchParams();
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        params.append('sucursalId', sucursalSeleccionada);
+      }
+      const data = await ApiService.get(`/reportes/campanas?${params.toString()}`);
       setCampanasData(data);
     } catch (err: any) {
       console.error('Error al cargar reporte de campañas:', err);
       showToast('Error al obtener reporte de campañas promocionales.', 'warning');
     } finally {
-      setLoadingCobranzas(false);
+      setLoadingCampanas(false);
     }
   };
 
@@ -619,6 +657,12 @@ export default function ReportesComponent({
 
   // 7. FINANZAS & MÉTODOS DE PAGO
   const handleReporteFinanzasPdf = (modo: 'preview' | 'download') => {
+    const vObj = vendedores.find((v) => v.id === vendedorSeleccionado);
+    const canalLabels: Record<string, string> = {
+      MANUAL: 'POS Mostrador / Venta Directa',
+      WHATSAPP: 'Pedidos WhatsApp / Comercial',
+      CATALOGO: 'Catálogo Digital Web',
+    };
     const payload = {
       negocio: obtenerNegocioPayload(),
       periodo,
@@ -627,6 +671,11 @@ export default function ReportesComponent({
       saldoCarteraTotal: kpis.saldoCarteraTotal || 0,
       totalIngresosVentas: kpis.totalIngresos || 0,
       distribucionMetodosAbono: reporteData?.distribucionMetodosAbono || {},
+      vendedorNombre: vObj?.nombre || (vendedorSeleccionado !== 'TODOS' ? vendedorSeleccionado : undefined),
+      canalNombre: canalSeleccionado !== 'TODOS' ? (canalLabels[canalSeleccionado] || canalSeleccionado) : undefined,
+      distribucionCanales: reporteData?.distribucionCanales || undefined,
+      distribucionFormasPago: reporteData?.distribucionFormasPago || undefined,
+      recaudacionPorVendedor: reporteData?.recaudacionPorVendedor || undefined,
     };
 
     const doc = generarReporteFinanzasMetodosPdf(payload);
@@ -3027,36 +3076,84 @@ export default function ReportesComponent({
                   </button>
                 </div>
               </div>
+
+              {/* Barra de Filtros Activos para Finanzas */}
+              <div className="flex flex-wrap items-center gap-2 p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl text-xs shadow-2xs">
+                <span className="font-bold text-[var(--muted-foreground)] flex items-center gap-1.5 mr-1">
+                  <Filter size={13} className="text-blue-600" />
+                  <span>Filtros Activos:</span>
+                </span>
+                <span className="px-2.5 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg font-bold">
+                  📅 {periodo} {periodo === 'PERSONALIZADO' && `(${fechaDesde || 'Inicio'} a ${fechaHasta || 'Fin'})`}
+                </span>
+                <span className="px-2.5 py-1 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg font-bold">
+                  🏢 {sucursalSeleccionada === 'TODAS' ? 'Todas las Sucursales' : (sucursales.find(s => s.id === sucursalSeleccionada)?.name || 'Sucursal Seleccionada')}
+                </span>
+                <span className={`px-2.5 py-1 rounded-lg font-bold border ${
+                  vendedorSeleccionado !== 'TODOS' ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
+                }`}>
+                  👤 {vendedorSeleccionado === 'TODOS' ? 'Todos los Trabajadores' : (vendedores.find(v => v.id === vendedorSeleccionado)?.nombre || 'Trabajador')}
+                </span>
+                <span className={`px-2.5 py-1 rounded-lg font-bold border ${
+                  canalSeleccionado !== 'TODOS' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
+                }`}>
+                  📡 {canalSeleccionado === 'TODOS' ? 'Todos los Canales' : canalSeleccionado === 'MANUAL' ? 'POS Mostrador' : canalSeleccionado === 'WHATSAPP' ? 'Pedidos WhatsApp' : 'Catálogo Digital'}
+                </span>
+                {(vendedorSeleccionado !== 'TODOS' || canalSeleccionado !== 'TODOS' || sucursalSeleccionada !== 'TODAS') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVendedorSeleccionado('TODOS');
+                      setCanalSeleccionado('TODOS');
+                      if (isGlobalAdmin) setSucursalSeleccionada('TODAS');
+                    }}
+                    className="ml-auto text-[11px] font-bold text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Restablecer Filtros</span>
+                  </button>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Desglose de Métodos de Pago en Cobranzas */}
                 <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                    Recaudación por Método de Pago / Abono
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
+                    <span>Recaudación por Método de Pago / Abono</span>
+                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      ${kpis.totalRecaudadoCobros.toFixed(2)} total
+                    </span>
                   </h3>
                   <div className="space-y-2 text-xs">
-                    {Object.entries(reporteData?.distribucionMetodosAbono || {}).map(([met, d]: [string, any]) => {
-                      const pct = kpis.totalRecaudadoCobros > 0 ? (d.monto / kpis.totalRecaudadoCobros) * 100 : 0;
-                      return (
-                        <div key={met} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
-                          <div className="flex justify-between items-center font-bold">
-                            <span>
-                              {met === 'EFECTIVO' && '💵 Efectivo'}
-                              {met === 'TRANSFERENCIA' && '🏦 Transferencia Bancaria'}
-                              {met === 'DEPOSITO' && '💳 Depósito'}
-                              {met === 'CHEQUE' && '📑 Cheque'}
-                              {met === 'DESCUENTO_COMERCIAL' && '🎁 Descuento / Rebaja Retención'}
-                            </span>
-                            <span>${d.monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
+                    {Object.entries(reporteData?.distribucionMetodosAbono || {}).length === 0 ? (
+                      <p className="text-xs text-[var(--muted-foreground)] p-4 text-center">
+                        No hay abonos registrados para los filtros seleccionados.
+                      </p>
+                    ) : (
+                      Object.entries(reporteData?.distribucionMetodosAbono || {}).map(([met, d]: [string, any]) => {
+                        const pct = kpis.totalRecaudadoCobros > 0 ? (d.monto / kpis.totalRecaudadoCobros) * 100 : 0;
+                        return (
+                          <div key={met} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
+                            <div className="flex justify-between items-center font-bold">
+                              <span>
+                                {met === 'EFECTIVO' && '💵 Efectivo'}
+                                {met === 'TRANSFERENCIA' && '🏦 Transferencia Bancaria'}
+                                {met === 'DEPOSITO' && '💳 Depósito'}
+                                {met === 'CHEQUE' && '📑 Cheque'}
+                                {met === 'DESCUENTO_COMERCIAL' && '🎁 Descuento / Rebaja Retención'}
+                              </span>
+                              <span>${d.monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
+                            </div>
+                            <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
+                              <div style={{ width: `${pct}%` }} className="bg-blue-600 h-full rounded-full" />
+                            </div>
+                            <div className="text-[10px] text-[var(--muted-foreground)]">
+                              {d.count} abonos recibidos
+                            </div>
                           </div>
-                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
-                            <div style={{ width: `${pct}%` }} className="bg-blue-600 h-full rounded-full" />
-                          </div>
-                          <div className="text-[10px] text-[var(--muted-foreground)]">
-                            {d.count} abonos recibidos
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
@@ -3072,7 +3169,7 @@ export default function ReportesComponent({
                       ${kpis.saldoCarteraTotal.toFixed(2)}
                     </div>
                     <p className="text-[10px] text-red-700/80">
-                      Total adeudado por clientes en notas y compras a crédito activas.
+                      Total adeudado por clientes en notas y compras a crédito activas ({kpis.clientesConDeudaCount || 0} clientes deudores).
                     </p>
                   </div>
 
@@ -3087,6 +3184,208 @@ export default function ReportesComponent({
                   </div>
                 </div>
               </div>
+
+              {/* Ventas y Recaudación por Canal de Venta & Contado vs Crédito */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Ventas por Canal de Entrada */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
+                    <span>Ventas por Canal de Entrada</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Facturación total</span>
+                  </h3>
+                  <div className="space-y-2 text-xs">
+                    {[
+                      { key: 'MANUAL', label: '🏪 POS Mostrador / Venta Directa', data: reporteData?.distribucionCanales?.MANUAL, color: 'bg-emerald-600' },
+                      { key: 'WHATSAPP', label: '💬 Pedidos WhatsApp / Comercial', data: reporteData?.distribucionCanales?.WHATSAPP, color: 'bg-blue-600' },
+                      { key: 'CATALOGO', label: '📱 Catálogo Digital Web', data: reporteData?.distribucionCanales?.CATALOGO, color: 'bg-purple-600' },
+                    ].map((c) => {
+                      const monto = c.data?.monto || 0;
+                      const pares = c.data?.pares || 0;
+                      const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
+                      return (
+                        <div key={c.key} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
+                          <div className="flex justify-between items-center font-bold">
+                            <span>{c.label}</span>
+                            <span>${monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
+                          </div>
+                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
+                            <div style={{ width: `${pct}%` }} className={`${c.color} h-full rounded-full`} />
+                          </div>
+                          <div className="text-[10px] text-[var(--muted-foreground)] flex justify-between">
+                            <span>{c.data?.count || 0} pedidos registrados</span>
+                            <span>{pares} pares vendidos</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Formas de Pago: Contado vs Crédito */}
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
+                    <span>Distribución Contado vs Crédito</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Forma comercial</span>
+                  </h3>
+                  <div className="space-y-2 text-xs">
+                    {[
+                      { key: 'CONTADO', label: '💵 Ventas de Contado', data: reporteData?.distribucionFormasPago?.CONTADO, color: 'bg-emerald-600' },
+                      { key: 'CREDITO', label: '📑 Ventas a Crédito', data: reporteData?.distribucionFormasPago?.CREDITO, color: 'bg-blue-600' },
+                    ].map((f) => {
+                      const monto = f.data?.monto || 0;
+                      const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
+                      return (
+                        <div key={f.key} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
+                          <div className="flex justify-between items-center font-bold">
+                            <span>{f.label}</span>
+                            <span>${monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
+                          </div>
+                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
+                            <div style={{ width: `${pct}%` }} className={`${f.color} h-full rounded-full`} />
+                          </div>
+                          <div className="text-[10px] text-[var(--muted-foreground)]">
+                            {f.data?.count || 0} transacciones realizadas
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cobros y Recaudación por Trabajador / Vendedor */}
+              {reporteData?.recaudacionPorVendedor && reporteData.recaudacionPorVendedor.length > 0 && (
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
+                    <span>Cobros y Recaudación por Trabajador</span>
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-normal">Abonos recaudados</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {reporteData.recaudacionPorVendedor.map((v: any) => {
+                      const pct = kpis.totalRecaudadoCobros > 0 ? (v.totalAbonos / kpis.totalRecaudadoCobros) * 100 : 0;
+                      return (
+                        <div key={v.userId} className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-xs text-[var(--foreground)] truncate">{v.nombre}</span>
+                            <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-500/10 text-blue-600">
+                              {v.rol?.replace('ROL_', '') || 'VENDEDOR'}
+                            </span>
+                          </div>
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-lg font-black text-emerald-600 font-mono">
+                              ${v.totalAbonos.toFixed(2)}
+                            </span>
+                            <span className="text-xs font-bold text-[var(--muted-foreground)]">
+                              {pct.toFixed(0)}% del total
+                            </span>
+                          </div>
+                          <div className="w-full bg-[var(--muted)] h-1.5 rounded-full overflow-hidden">
+                            <div style={{ width: `${pct}%` }} className="bg-emerald-500 h-full rounded-full" />
+                          </div>
+                          <p className="text-[10px] text-[var(--muted-foreground)]">
+                            {v.count} abonos recibidos
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Historial Detallado de Transacciones de Cobro y Abonos */}
+              {reporteData?.abonosRecientes && reporteData.abonosRecientes.length > 0 && (
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
+                        Historial de Transacciones de Cobro y Abonos
+                      </h3>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        Últimos movimientos financieros registrados en el periodo según los filtros activos
+                      </p>
+                    </div>
+
+                    <div className="relative w-full sm:w-64">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
+                      <input
+                        type="text"
+                        value={filtroAbonosFinanzasTexto}
+                        onChange={(e) => setFiltroAbonosFinanzasTexto(e.target.value)}
+                        placeholder="Buscar por cliente, cobrador..."
+                        className="w-full pl-8 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-[var(--muted)]/60 text-[var(--muted-foreground)] text-[10px] uppercase font-bold tracking-wider border-b border-[var(--border)]">
+                        <tr>
+                          <th className="py-2.5 px-3.5">Fecha</th>
+                          <th className="py-2.5 px-3.5">Cliente</th>
+                          <th className="py-2.5 px-3.5">Recaudador / Vendedor</th>
+                          <th className="py-2.5 px-3.5">Canal</th>
+                          <th className="py-2.5 px-3.5">Método</th>
+                          <th className="py-2.5 px-3.5 text-right">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)] font-medium">
+                        {reporteData.abonosRecientes
+                          .filter((ab: any) => {
+                            if (!filtroAbonosFinanzasTexto.trim()) return true;
+                            const t = filtroAbonosFinanzasTexto.toLowerCase();
+                            return (
+                              ab.clienteNombre?.toLowerCase().includes(t) ||
+                              ab.usuarioNombre?.toLowerCase().includes(t) ||
+                              ab.metodo?.toLowerCase().includes(t) ||
+                              ab.notas?.toLowerCase().includes(t)
+                            );
+                          })
+                          .map((ab: any) => (
+                            <tr key={ab.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                              <td className="py-2.5 px-3.5 text-[var(--muted-foreground)] font-mono text-[11px]">
+                                {new Date(ab.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="py-2.5 px-3.5 font-bold text-[var(--foreground)]">
+                                {ab.clienteNombre}
+                                {ab.notaNumero && (
+                                  <span className="block text-[10px] font-mono text-[var(--muted-foreground)]">
+                                    Nota #{ab.notaNumero}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-[var(--foreground)]">
+                                👤 {ab.usuarioNombre}
+                              </td>
+                              <td className="py-2.5 px-3.5">
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                  ab.canal === 'MANUAL' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' :
+                                  ab.canal === 'WHATSAPP' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' :
+                                  'bg-purple-500/10 text-purple-700 dark:text-purple-300'
+                                }`}>
+                                  {ab.canal === 'MANUAL' ? '🏪 POS' : ab.canal === 'WHATSAPP' ? '💬 WhatsApp' : '📱 Catálogo'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3.5">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-[var(--muted)] text-[var(--foreground)]">
+                                  {ab.metodo}
+                                </span>
+                                {ab.notas && (
+                                  <span className="block text-[9px] text-[var(--muted-foreground)] truncate max-w-[120px]" title={ab.notas}>
+                                    {ab.notas}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3.5 text-right font-mono font-black text-emerald-600 text-sm">
+                                +${ab.monto.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

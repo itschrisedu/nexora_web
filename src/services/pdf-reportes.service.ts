@@ -155,6 +155,11 @@ export interface ReporteFinanzasData {
   saldoCarteraTotal: number;
   totalIngresosVentas: number;
   distribucionMetodosAbono: Record<string, { monto: number; count: number }>;
+  vendedorNombre?: string;
+  canalNombre?: string;
+  distribucionCanales?: Record<string, { count: number; monto: number; pares: number }>;
+  distribucionFormasPago?: Record<string, { count: number; monto: number }>;
+  recaudacionPorVendedor?: { userId: string; nombre: string; rol: string; totalAbonos: number; count: number }[];
 }
 
 export interface ReporteMlData {
@@ -965,6 +970,15 @@ export function generarReporteFinanzasMetodosPdf(data: ReporteFinanzasData): jsP
     data.fechaGeneracion
   );
 
+  // Subtítulo con filtros aplicados si existen
+  if (data.vendedorNombre || data.canalNombre) {
+    const filtrosTxt = `Filtros: ${data.vendedorNombre ? `Trabajador: ${data.vendedorNombre}` : 'Todos los Trabajadores'} | ${data.canalNombre ? `Canal: ${data.canalNombre}` : 'Todos los Canales'}`;
+    doc.setTextColor(71, 85, 105);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.text(filtrosTxt, marginLeft, y - 2);
+  }
+
   // KPIs
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(marginLeft, y, contentWidth, 16, 2, 2, 'F');
@@ -1046,6 +1060,116 @@ export function generarReporteFinanzasMetodosPdf(data: ReporteFinanzasData): jsP
 
     y += 7;
   });
+
+  // Sección Canales de Venta si está disponible
+  if (data.distribucionCanales && Object.keys(data.distribucionCanales).length > 0) {
+    y += 6;
+    if (y > 240) {
+      doc.addPage();
+      y = 15;
+    }
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DISTRIBUCIÓN DE VENTAS POR CANAL DE ENTRADA', marginLeft, y);
+    y += 5;
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6.5);
+    const canalHeaders = ['Canal', 'Pedidos', 'Pares Vendidos', 'Monto Facturado ($)', '% Facturación'];
+    const canalColW = [50, 25, 30, 35, 28];
+    x = marginLeft + 1.5;
+    canalHeaders.forEach((h, i) => {
+      doc.text(h, x, y + 4.5);
+      x += canalColW[i];
+    });
+    y += 6.5;
+
+    const canalNames: Record<string, string> = {
+      MANUAL: 'POS Mostrador / Venta Directa',
+      WHATSAPP: 'Pedidos WhatsApp / Asesor',
+      CATALOGO: 'Catálogo Digital Web',
+    };
+
+    Object.entries(data.distribucionCanales).forEach(([cKey, cVal], idx) => {
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'normal');
+
+      const pct = data.totalIngresosVentas > 0 ? ((cVal.monto / data.totalIngresosVentas) * 100).toFixed(1) : '0';
+
+      x = marginLeft + 1.5;
+      doc.setFont('helvetica', 'bold');
+      doc.text(canalNames[cKey] || cKey, x, y + 4.5); x += canalColW[0];
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${cVal.count} pedidos`, x, y + 4.5); x += canalColW[1];
+      doc.text(`${cVal.pares} pares`, x, y + 4.5); x += canalColW[2];
+      doc.setTextColor(16, 185, 129);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`$${cVal.monto.toFixed(2)}`, x, y + 4.5); x += canalColW[3];
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${pct}%`, x, y + 4.5);
+      y += 6.5;
+    });
+  }
+
+  // Sección Recaudación por Trabajador si está disponible
+  if (data.recaudacionPorVendedor && data.recaudacionPorVendedor.length > 0) {
+    y += 6;
+    if (y > 240) {
+      doc.addPage();
+      y = 15;
+    }
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RECAUDACIÓN POR TRABAJADOR / VENDEDOR', marginLeft, y);
+    y += 5;
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6.5);
+    const vendHeaders = ['Trabajador / Vendedor', 'Rol', 'Abonos Recibidos', 'Monto Cobrado ($)', '% Recaudación'];
+    const vendColW = [60, 30, 30, 28, 20];
+    x = marginLeft + 1.5;
+    vendHeaders.forEach((h, i) => {
+      doc.text(h, x, y + 4.5);
+      x += vendColW[i];
+    });
+    y += 6.5;
+
+    data.recaudacionPorVendedor.forEach((v, idx) => {
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'normal');
+
+      const pct = data.totalRecaudadoCobros > 0 ? ((v.totalAbonos / data.totalRecaudadoCobros) * 100).toFixed(1) : '0';
+
+      x = marginLeft + 1.5;
+      doc.setFont('helvetica', 'bold');
+      doc.text(v.nombre, x, y + 4.5); x += vendColW[0];
+      doc.setFont('helvetica', 'normal');
+      doc.text(v.rol.replace('ROL_', ''), x, y + 4.5); x += vendColW[1];
+      doc.text(`${v.count} abonos`, x, y + 4.5); x += vendColW[2];
+      doc.setTextColor(16, 185, 129);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`$${v.totalAbonos.toFixed(2)}`, x, y + 4.5); x += vendColW[3];
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${pct}%`, x, y + 4.5);
+      y += 6.5;
+    });
+  }
 
   dibujarPie(doc, `Recaudación Total: $${data.totalRecaudadoCobros.toFixed(2)}`);
   return doc;
