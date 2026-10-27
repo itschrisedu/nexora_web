@@ -76,7 +76,7 @@ export default function SriComponent() {
 
   const loadConfig = async () => {
     try {
-      const data = await ApiService.get("/configuracion");
+      const data = await ApiService.get("/configuracion/negocio");
       if (data) {
         setConfig((prev) => ({
           ...prev,
@@ -86,7 +86,7 @@ export default function SriComponent() {
           sriEstablecimiento: data.sriEstablecimiento || prev.sriEstablecimiento,
           sriPuntoEmision: data.sriPuntoEmision || prev.sriPuntoEmision,
           sriAmbiente: data.sriAmbiente || prev.sriAmbiente,
-          tieneP12: !!data.sriP12Path,
+          tieneP12: !!data.tieneP12 || !!data.firmaP12Path,
           logoUrl: data.logoUrl || prev.logoUrl,
           primaryColor: (data.primaryColor && (data.primaryColor.includes("6366f1") || data.primaryColor.includes("8b5cf6"))) ? "#0F172A" : (data.primaryColor || prev.primaryColor),
         }));
@@ -105,7 +105,7 @@ export default function SriComponent() {
   const loadFacturas = async () => {
     setLoadingFacturas(true);
     try {
-      const data = await ApiService.get("/sri/comprobantes");
+      const data = await ApiService.get("/facturacion-sri/facturas");
       if (Array.isArray(data)) {
         setFacturas(data);
       }
@@ -121,10 +121,19 @@ export default function SriComponent() {
     setLoadingConfig(true);
     setMsgConfig({ type: "", text: "" });
     try {
-      await ApiService.put("/configuracion", config);
+      await ApiService.put("/configuracion/negocio", {
+        nombre: config.nombre.trim(),
+        ruc: config.ruc.trim(),
+        direccion: config.direccion.trim() || "Cevallos, Tungurahua",
+        sriEstablecimiento: config.sriEstablecimiento || "001",
+        sriPuntoEmision: config.sriPuntoEmision || "001",
+        sriAmbiente: config.sriAmbiente || "1",
+      });
       setMsgConfig({ type: "success", text: "Configuración y datos de emisor guardados con éxito." });
+      showToast("Configuración SRI guardada con éxito", "success");
     } catch (err: any) {
       setMsgConfig({ type: "error", text: err.message || "Error al guardar la configuración." });
+      showToast(err.message || "Error al guardar configuración", "error");
     } finally {
       setLoadingConfig(false);
     }
@@ -138,16 +147,18 @@ export default function SriComponent() {
 
     try {
       const formData = new FormData();
-      formData.append("file", fileP12);
+      formData.append("firma", fileP12);
       formData.append("password", passwordP12);
 
-      await ApiService.postFormData("/sri/upload-p12", formData);
+      await ApiService.postFormData("/configuracion/sri/firma-p12", formData);
       setMsgConfig({ type: "success", text: "Certificado de firma .p12 subido y encriptado con éxito." });
+      showToast("Firma electrónica cargada y validada con éxito", "success");
       setConfig((prev) => ({ ...prev, tieneP12: true }));
       setFileP12(null);
       setPasswordP12("");
     } catch (err: any) {
       setMsgConfig({ type: "error", text: err.message || "Error al procesar el archivo .p12." });
+      showToast(err.message || "Error al subir la firma .p12", "error");
     } finally {
       setUploadingFirma(false);
     }
@@ -155,7 +166,7 @@ export default function SriComponent() {
 
   const handleConsultarEstado = async (facturaId: string) => {
     try {
-      await ApiService.post(`/sri/consultar/${facturaId}`, {});
+      await ApiService.get(`/facturacion-sri/estado/${facturaId}`);
       showToast("Estado de factura actualizado", "info");
       loadFacturas();
     } catch (err: any) {
