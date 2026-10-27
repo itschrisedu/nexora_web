@@ -1761,67 +1761,44 @@ export default function ModelosComponent({
         }
       });
 
-      let activeSids = Array.from(
-        new Set(
-          prodsSup
-            .filter((prod: any) => prod.activo !== false)
-            .map((prod: any) => (prod.serie as any)?.id || (prod as any).serieId)
-            .filter(Boolean)
-        )
-      ) as string[];
-
-      if (sid && !activeSids.includes(sid)) {
-        activeSids.push(sid);
-      }
+      // Para editar una variante específica, la ÚNICA serie activa debe ser la serie de ESTA variante
+      const activeSids = sid ? [sid] : (series.length > 0 ? [series[0].id] : []);
 
       const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
       const initialTallas: Record<string, string[]> = {};
       const initialStockOptions: Record<string, 'DOCENA' | 'NINGUNA'> = {};
 
       series.forEach(s => {
-        const prodConPrecio = prodsSup.find((prod: any) => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
-        if (prodConPrecio) {
+        if (s.id === sid) {
+          // Serie correspondiente a esta variante
           initialPrices[s.id] = {
-            costPrice: String(prodConPrecio.precioCosto || ""),
-            salePrice: String(prodConPrecio.precioVenta || ""),
+            costPrice: String(p.precioCosto || ""),
+            salePrice: String(p.precioVenta || ""),
           };
-        } else {
-          const cacheKey = `${s.id}_${supId || 'default'}`;
-          if (knownSeriesCosts[cacheKey]) {
-            initialPrices[s.id] = { ...knownSeriesCosts[cacheKey] };
-          } else if (knownSeriesCosts[s.id]) {
-            initialPrices[s.id] = { ...knownSeriesCosts[s.id] };
-          } else {
-            initialPrices[s.id] = { costPrice: "", salePrice: "" };
-          }
-        }
 
-        if (s.tallas) {
-          const sTallas = s.tallas;
-          if (sid === s.id && rawTallas && rawTallas.length > 0) {
-            const currentVariantTallaIds: string[] = [];
+          const currentVariantTallaIds: string[] = [];
+          if (s.tallas && rawTallas && rawTallas.length > 0) {
             rawTallas.forEach((t: any) => {
               const qty = t.cantidad ?? t.disponible ?? 0;
-              const matchingTalla = sTallas.find(st => st.numero === t.numero || st.id === t.tallaId || st.id === t.id);
+              const matchingTalla = s.tallas!.find(st => st.numero === t.numero || st.id === t.tallaId || st.id === t.id);
               if (matchingTalla && qty > 0) {
                 for (let k = 0; k < qty; k++) {
                   currentVariantTallaIds.push(matchingTalla.id);
                 }
               }
             });
-            initialTallas[s.id] = currentVariantTallaIds;
-            initialStockOptions[s.id] = currentVariantTallaIds.length > 0 ? 'DOCENA' : 'NINGUNA';
-          } else {
-            const curva = getCurvaDocena(s.nombre, 'DOCENA');
-            if (Object.keys(curva).length > 0) {
-              initialTallas[s.id] = buildTallaIdsFromCurva(s, curva);
-            } else {
-              const defaultIds: string[] = [];
-              s.tallas.forEach(t => { defaultIds.push(t.id); defaultIds.push(t.id); });
-              initialTallas[s.id] = defaultIds;
-            }
-            initialStockOptions[s.id] = 'DOCENA';
           }
+          initialTallas[s.id] = currentVariantTallaIds;
+          initialStockOptions[s.id] = currentVariantTallaIds.length === 12 ? 'DOCENA' : 'NINGUNA';
+        } else {
+          // Para las otras series, NO inventar stock ficticio: van en 0
+          const prodConPrecio = prodsSup.find((prod: any) => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
+          initialPrices[s.id] = {
+            costPrice: String(prodConPrecio?.precioCosto || ""),
+            salePrice: String(prodConPrecio?.precioVenta || ""),
+          };
+          initialTallas[s.id] = [];
+          initialStockOptions[s.id] = 'NINGUNA';
         }
       });
 
@@ -1916,6 +1893,12 @@ export default function ModelosComponent({
   };
 
   const toggleSupplierSerie = (id: string) => {
+    // Si estamos editando una variante individual, solo puede haber 1 serie activa asignada
+    if (showEditProduct) {
+      setSupplierSeriesActiveIds([id]);
+      setEditProductSerieId(id);
+      return;
+    }
     setSupplierSeriesActiveIds(prev => {
       if (prev.includes(id)) {
         return prev.filter(x => x !== id);
@@ -1946,7 +1929,12 @@ export default function ModelosComponent({
   const addTallaRepeatInSupplierSeries = (serieId: string, tallaId: string) => {
     setSupplierSeriesCustomTallas(prev => {
       const current = prev[serieId] || [];
-      return { ...prev, [serieId]: [...current, tallaId] };
+      const updated = [...current, tallaId];
+      setSupplierSeriesStockOption(so => ({
+        ...so,
+        [serieId]: updated.length === 12 ? 'DOCENA' : 'NINGUNA'
+      }));
+      return { ...prev, [serieId]: updated };
     });
   };
 
@@ -1957,6 +1945,10 @@ export default function ModelosComponent({
       if (idx > -1) {
         const copy = [...current];
         copy.splice(idx, 1);
+        setSupplierSeriesStockOption(so => ({
+          ...so,
+          [serieId]: copy.length === 12 ? 'DOCENA' : 'NINGUNA'
+        }));
         return { ...prev, [serieId]: copy };
       }
       return prev;
@@ -2190,10 +2182,9 @@ export default function ModelosComponent({
 
     const selectedTallaIds = supplierSeriesCustomTallas[currentSerieId] || [];
     const activeSerieObj = series.find(s => s.id === currentSerieId);
-    const isSinStock = supplierSeriesStockOption[currentSerieId] === 'NINGUNA';
 
     const tallasPayload = (activeSerieObj?.tallas || []).map(t => {
-      const count = isSinStock ? 0 : selectedTallaIds.filter(id => id === t.id).length;
+      const count = selectedTallaIds.filter(id => id === t.id).length;
       return {
         tallaId: t.id,
         numero: t.numero,
@@ -2230,26 +2221,6 @@ export default function ModelosComponent({
           [key]: { costPrice: String(costo), salePrice: String(venta) },
           [currentSerieId]: { costPrice: String(costo), salePrice: String(venta) },
         }));
-      }
-
-      // Sincronizar series y precios de este proveedor en todos los colores de este modelo
-      if (supplierSeriesTargetModel && supplierSeriesActiveIds.length > 0) {
-        const seriesPricesNumeric: Record<string, { costPrice: number; salePrice: number }> = {};
-        for (const sid of supplierSeriesActiveIds) {
-          const sp = supplierSeriesPrices[sid];
-          if (sp) {
-            seriesPricesNumeric[sid] = {
-              costPrice: parseFloat(sp.costPrice) || costo,
-              salePrice: parseFloat(sp.salePrice) || venta,
-            };
-          }
-        }
-        await ApiService.put(`/inventario/modelos/${supplierSeriesTargetModel.id}/proveedor-series`, {
-          supplierId: editProductSupplierId || supplierSeriesTargetSupplierId || null,
-          serieIds: supplierSeriesActiveIds,
-          seriesPrices: seriesPricesNumeric,
-          customTallas: supplierSeriesCustomTallas,
-        });
       }
 
       // Actualizar selección visual del color del modelo si cambió el nombre
@@ -5097,35 +5068,35 @@ export default function ModelosComponent({
                                   </button>
                                 </div>
 
-                                {/* Selección de Stock Inicial para Bodega */}
+                                {/* Selección de Stock en Bodega */}
                                 <div className="space-y-1.5 pt-2 border-t border-[var(--border)]/40">
                                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-                                    Stock Inicial en Bodega para este modelo:
+                                    Stock en Bodega para esta variante:
                                   </span>
                                   <div className="flex flex-wrap gap-2">
                                     <button
                                       type="button"
                                       onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'DOCENA')}
                                       className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                        (supplierSeriesStockOption[s.id] || 'DOCENA') === 'DOCENA'
+                                        selectedTallaIds.length === 12 && supplierSeriesStockOption[s.id] === 'DOCENA'
                                           ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
                                           : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
                                       }`}
                                     >
-                                      {(supplierSeriesStockOption[s.id] || 'DOCENA') === 'DOCENA' && <Check size={13} />}
+                                      {selectedTallaIds.length === 12 && supplierSeriesStockOption[s.id] === 'DOCENA' && <Check size={13} />}
                                       1 Docena en Bodega (12 pares según serie de arriba)
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'NINGUNA')}
                                       className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                        supplierSeriesStockOption[s.id] === 'NINGUNA'
+                                        selectedTallaIds.length === 0
                                           ? "border-slate-600 bg-slate-700 text-white shadow-xs"
                                           : "border-slate-300 dark:border-slate-700 bg-[var(--card)] hover:bg-rose-500/10 text-rose-600"
                                       }`}
                                     >
-                                      {supplierSeriesStockOption[s.id] === 'NINGUNA' && <Check size={13} />}
-                                      Sin Stock Inicial (0 pares, solo catálogo para pedidos)
+                                      {selectedTallaIds.length === 0 && <Check size={13} />}
+                                      Sin Stock (0 pares, solo catálogo para pedidos)
                                     </button>
                                   </div>
                                 </div>
