@@ -1927,6 +1927,49 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     abrirWhatsAppUniversal(numLimpio, mensaje);
   };
 
+  const handleEnviarEstadoCuentaProveedorWhatsApp = (cuentaData: any) => {
+    if (!cuentaData?.supplier) {
+      showToast('No hay información disponible del proveedor.', 'warning');
+      return;
+    }
+    const sup = cuentaData.supplier;
+    const telefono = sup.contacto || sup.telefono || '';
+    let numLimpio = telefono.replace(/\D/g, '');
+    if (numLimpio.startsWith('09') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    } else if (numLimpio.startsWith('0') && numLimpio.length === 10) {
+      numLimpio = '593' + numLimpio.substring(1);
+    }
+
+    if (!numLimpio) {
+      showToast('El proveedor no tiene teléfono / WhatsApp registrado.', 'warning');
+      return;
+    }
+
+    const hoyLegible = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+    const resumen = cuentaData.resumen || {};
+    const totalFacturado = Number(resumen.totalFacturado || 0);
+    const totalPagado = Number(resumen.totalPagado || 0);
+    const cruzado = Number(resumen.cruzadoConMercaderia || Math.min(totalFacturado, totalPagado));
+    const saldoPendiente = Number(resumen.saldoPendiente || 0);
+    const saldoAFavor = Number(resumen.saldoAFavor || 0);
+    const userStored = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
+    const bName = userStored?.tenant?.name || 'Administración Central';
+
+    let estadoSaldoStr = '';
+    if (saldoPendiente > 0.01) {
+      estadoSaldoStr = `🔴 *SALDO PENDIENTE POR PAGAR: $${saldoPendiente.toFixed(2)}*`;
+    } else if (saldoAFavor > 0.01) {
+      estadoSaldoStr = `🟢 *ADELANTO DISPONIBLE A FAVOR: $${saldoAFavor.toFixed(2)}*`;
+    } else {
+      estadoSaldoStr = `✅ *CUENTA AL DÍA ($0.00)*`;
+    }
+
+    const mensaje = `📋 *ESTADO DE CUENTA — PROVEEDOR*\n\nEstimado/a *${sup.razonSocial || sup.nombre || 'Proveedor'}* (RUC: ${sup.ruc || 'N/A'}),\n\nLe compartimos el extracto de balance comercial y de pagos con corte a *${hoyLegible}*:\n\n📦 *Total Facturado:* $${totalFacturado.toFixed(2)} (${resumen.totalEntregas || 0} entregas)\n💵 *Total Pagado:* $${totalPagado.toFixed(2)} (${resumen.totalPagos || 0} pagos)\n🔄 *Cruzado con Mercadería:* $${cruzado.toFixed(2)}\n\n━━━━━━━━━━━━━━━━━━━━━\n${estadoSaldoStr}\n━━━━━━━━━━━━━━━━━━━━━\n\n_Emitido por ${bName}_`;
+
+    abrirWhatsAppUniversal(numLimpio, mensaje);
+  };
+
   const handleAbrirDevolucionProveedor = (item?: any) => {
     if (item) {
       setDevClienteDevolucionId(item.id || '');
@@ -3387,11 +3430,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       <td className="px-5 py-3 text-center">
                         <button
                           onClick={() => handleEnviarPagoWhatsApp(p)}
-                          className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-600 text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 mx-auto"
+                          className="px-2.5 py-1 bg-[#25D366]/10 hover:bg-[#25D366] hover:text-white text-[#25D366] text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1.5 mx-auto border border-[#25D366]/20 cursor-pointer shadow-2xs"
                           title="Enviar Comprobante al WhatsApp del Proveedor"
                         >
-                          <MessageCircle size={12} />
-                          <span>Notificar</span>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                          <span>WhatsApp</span>
                         </button>
                       </td>
                     </tr>
@@ -4656,6 +4699,18 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               </div>
 
+              {cuentaCorrienteData && (
+                <button
+                  type="button"
+                  onClick={() => handleEnviarEstadoCuentaProveedorWhatsApp(cuentaCorrienteData)}
+                  className="hidden sm:flex px-3.5 py-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold transition-all items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 shrink-0 mr-2"
+                  title="Compartir resumen del Estado de Cuenta al WhatsApp del Proveedor"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  <span>WhatsApp</span>
+                </button>
+              )}
+
               {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => setShowCuentaModal(false)}
@@ -5035,9 +5090,20 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 {isPago || isDevolucion ? `− ${Number(mov.monto).toFixed(2)}` : `+ ${Number(mov.monto).toFixed(2)}`}
                               </div>
                               {mov.metodo && (
-                                <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
+                                <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
                                   {mov.metodo}
                                 </span>
+                              )}
+                              {mov.comprobante && (
+                                <div className="text-[10px] font-mono text-[var(--foreground)] mt-0.5 font-bold flex items-center justify-end gap-1">
+                                  <span className="text-[var(--muted-foreground)] font-sans font-normal text-[9px]">Trans/Comp:</span>
+                                  <span className="text-emerald-700 dark:text-emerald-400">#{mov.comprobante.replace(/^#/, '')}</span>
+                                </div>
+                              )}
+                              {mov.banco && (
+                                <div className="text-[9px] text-[var(--muted-foreground)] font-medium">
+                                  {mov.banco}
+                                </div>
                               )}
                               {isDevolucion && (
                                 <span className="px-1.5 py-0.5 bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded text-[9px] font-bold border border-rose-500/20 inline-block mt-0.5">
@@ -5073,10 +5139,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       createdAt: mov.fecha,
                                       supplier: cuentaCorrienteData.supplier,
                                     })}
-                                    className="p-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer"
+                                    className="p-1 px-2 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 text-[9px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                                     title="Enviar Comprobante por WhatsApp"
                                   >
-                                    <MessageCircle size={11} />
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                                     <span>WhatsApp</span>
                                   </button>
                                 </div>
@@ -5097,10 +5163,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       createdAt: mov.fecha,
                                       supplier: cuentaCorrienteData.supplier,
                                     })}
-                                    className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer"
+                                    className="p-1 px-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-[9px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                                     title="Enviar Constancia por WhatsApp"
                                   >
-                                    <MessageCircle size={11} />
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                                     <span>WhatsApp</span>
                                   </button>
                                 </div>
@@ -5202,7 +5268,18 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           })() : null}
 
             {/* Pinned Footer */}
-            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end shrink-0">
+            <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-between shrink-0">
+              {cuentaCorrienteData ? (
+                <button
+                  type="button"
+                  onClick={() => handleEnviarEstadoCuentaProveedorWhatsApp(cuentaCorrienteData)}
+                  className="px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  title="Compartir resumen del Estado de Cuenta al WhatsApp del Proveedor"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  <span>Compartir por WhatsApp</span>
+                </button>
+              ) : <div />}
               <button
                 type="button"
                 onClick={() => setShowCuentaModal(false)}

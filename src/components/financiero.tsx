@@ -258,6 +258,11 @@ interface ClienteHistorial {
     esCobroOtraSucursal?: boolean;
     procesadoPor?: string;
     procesadoPorRol?: string;
+    reciboRef?: string | null;
+    notas?: string | null;
+    comprobante?: string;
+    referencia?: string;
+    numeroTransaccion?: string;
   }[];
 }
 
@@ -1769,9 +1774,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         abonos.push({
           fecha: m.fecha ? m.fecha.split('T')[0] : '',
           fechaRaw: m.fecha || '',
-          numeroComprobante: m.numeroCodigo || (m.titulo ? m.titulo.replace(/[^0-9]/g, '') : ''),
+          numeroComprobante: m.reciboRef || m.numeroCodigo || (m.titulo ? m.titulo.replace(/[^0-9]/g, '') : ''),
           formaPago: m.metodo || 'EFECTIVO',
-          referencia: m.numeroCodigo,
+          referencia: m.comprobante || m.referencia || m.numeroTransaccion || (m.notas ? m.notas.replace(/\[REC-[A-Z0-9]+\]/i, '').trim() : '') || m.numeroCodigo,
           monto: m.monto,
           cobradoPor: m.cobradoPor,
           saldoAnterior: m.saldoAnterior ?? (m.nuevoSaldo !== undefined ? m.nuevoSaldo + (m.monto || 0) : undefined),
@@ -3185,17 +3190,33 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                               </td>
 
                               <td className="px-5 py-4 text-center">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSeleccionarCliente(cliente);
-                                  }}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 mx-auto"
-                                >
-                                  <DollarSign size={13} />
-                                  <span>Gestionar Cobro</span>
-                                </button>
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSeleccionarCliente(cliente);
+                                    }}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <DollarSign size={13} />
+                                    <span>Gestionar Cobro</span>
+                                  </button>
+                                  {cliente.clienteTelefono && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEnviarEstadoCuentaWhatsApp(cliente);
+                                      }}
+                                      className="p-1.5 px-2 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+                                      title="Enviar Estado de Cuenta al WhatsApp del Cliente"
+                                    >
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                      <span className="text-[10px] font-bold">WhatsApp</span>
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
 
@@ -3608,10 +3629,21 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     {getCobroConfig(carteraSeleccionada.estadoGlobal).label}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400 flex justify-between mt-1.5">
+                <div className="text-[10px] text-slate-400 flex justify-between mt-1.5 items-center">
                   <span>Cédula: <strong className="text-slate-200">{carteraSeleccionada.clienteCedula}</strong></span>
                   <span>Tel: <strong className="text-slate-200">{carteraSeleccionada.clienteTelefono}</strong></span>
                 </div>
+                {carteraSeleccionada.clienteTelefono && (
+                  <button
+                    type="button"
+                    onClick={() => handleEnviarEstadoCuentaWhatsApp(carteraSeleccionada)}
+                    className="mt-2.5 w-full py-1.5 px-3 rounded-lg bg-[#25D366]/20 hover:bg-[#25D366]/30 text-[#25D366] border border-[#25D366]/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-98"
+                    title="Enviar resumen de Estado de Cuenta al WhatsApp del Cliente"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    <span>Compartir Estado de Cuenta por WhatsApp</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -3770,6 +3802,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             <span className="text-[10px] text-[var(--muted-foreground)] font-semibold px-1.5 py-0.5 bg-emerald-500/10 rounded">
                               {a.metodo}
                             </span>
+                            {(() => {
+                              const transRef = (a.notas ? a.notas.replace(/\[REC-[A-Z0-9]+\]/i, '').trim() : '');
+                              if (!transRef || transRef.toLowerCase() === 'abono unificado a cuenta') return null;
+                              return (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 font-mono text-[9px] font-bold">
+                                  Ref/Trans: #{transRef.replace(/^#/, '')}
+                                </span>
+                              );
+                            })()}
                             <span className="text-[10px] text-[var(--muted-foreground)]">
                               {new Date(a.createdAt).toLocaleDateString('es-EC')}
                             </span>
@@ -4753,10 +4794,20 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                   {isAbono || isDevolucion ? `− ${m.monto.toFixed(2)}` : `+ ${m.monto.toFixed(2)}`}
                                 </div>
                                 {m.metodo && (
-                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
+                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
                                     {m.metodo}
                                   </span>
                                 )}
+                                {(() => {
+                                  const transRef = m.comprobante || m.referencia || m.numeroTransaccion || (m.notas ? m.notas.replace(/\[REC-[A-Z0-9]+\]/i, '').trim() : '');
+                                  if (!transRef || transRef.toLowerCase() === 'abono unificado a cuenta') return null;
+                                  return (
+                                    <div className="text-[10px] font-mono text-[var(--foreground)] mt-0.5 font-bold flex items-center justify-end gap-1">
+                                      <span className="text-[var(--muted-foreground)] font-sans font-normal text-[9px]">Trans/Ref:</span>
+                                      <span className="text-emerald-700 dark:text-emerald-400">#{transRef.replace(/^#/, '')}</span>
+                                    </div>
+                                  );
+                                })()}
                                 {isDevolucion && (
                                   <span className="px-1.5 py-0.5 bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded text-[9px] font-bold border border-rose-500/20 inline-block mt-0.5">
                                     DEVOLUCIÓN
