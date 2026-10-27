@@ -630,7 +630,6 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [filtroCompartirFechaFin, setFiltroCompartirFechaFin] = useState('');
   const [compartirEmailDestino, setCompartirEmailDestino] = useState('');
   const [compartirTelefonoDestino, setCompartirTelefonoDestino] = useState('');
-  const [descargarCopiaPdfAlCompartir, setDescargarCopiaPdfAlCompartir] = useState(true);
   const [compartiendoHistorial, setCompartiendoHistorial] = useState(false);
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [loadingPreviewPdf, setLoadingPreviewPdf] = useState<boolean>(false);
@@ -1941,8 +1940,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         console.warn('Error generando URL corta de historial:', urlErr);
       }
 
-      // 2. Enviar en segundo plano al correo electrónico si fue especificado
-      const emailTarget = compartirEmailDestino?.trim();
+      // 2. Enviar en segundo plano al correo electrónico registrado del cliente
+      const emailTarget = (historialCliente?.cliente?.email || '').trim();
       if (emailTarget && emailTarget.includes('@')) {
         const pdfBase64 = await generarHistorialPdfBase64(pdfData);
         const cleanCliente = pdfData.cliente.nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -1999,8 +1998,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         });
       }
 
-      // 3. Compartir vía WhatsApp con el enlace público incluido
-      await compartirHistorialWhatsApp(pdfData, compartirTelefonoDestino, descargarCopiaPdfAlCompartir, urlPublica);
+      // 3. Compartir vía WhatsApp con el enlace público incluido (sin descarga automática)
+      await compartirHistorialWhatsApp(pdfData, compartirTelefonoDestino, false, urlPublica);
 
       showToast(
         emailTarget && emailTarget.includes('@')
@@ -3853,10 +3852,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                   formatoEnvioAbono
                                 );
                               }}
-                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                              className="p-1.5 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
                               title="Enviar Comprobante por WhatsApp y Correo Electrónico"
                             >
-                              <Send size={12} />
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                             </button>
                           )}
                         </div>
@@ -6902,36 +6901,20 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         onChange={(e) => setCompartirTelefonoDestino(e.target.value)}
                         className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
                       />
-                      <label className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)] cursor-pointer pt-1">
-                        <input
-                          type="checkbox"
-                          checked={descargarCopiaPdfAlCompartir}
-                          onChange={(e) => setDescargarCopiaPdfAlCompartir(e.target.checked)}
-                          className="rounded accent-emerald-600"
-                        />
-                        <span>Descargar copia PDF al abrir WhatsApp</span>
-                      </label>
+
                     </div>
 
-                    <div className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Mail size={15} className="text-blue-500" />
-                        <span className="text-xs font-extrabold text-[var(--foreground)]">
-                          Correo Electrónico
-                        </span>
-                      </div>
-                      <input
-                        type="email"
-                        placeholder="cliente@ejemplo.com"
-                        value={compartirEmailDestino}
-                        onChange={(e) => setCompartirEmailDestino(e.target.value)}
-                        className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-500"
-                      />
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        El extracto PDF se generará y despachará por correo.
+                  </div>
+
+                  {/* Nota informativa sobre correo automático */}
+                  {historialCliente.cliente.email && (
+                    <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-2xl flex items-center gap-2.5">
+                      <Mail size={15} className="text-blue-500 shrink-0" />
+                      <p className="text-[11px] text-[var(--muted-foreground)]">
+                        Al compartir, el extracto PDF se enviará en segundo plano al correo registrado del cliente (<strong className="text-[var(--foreground)]">{historialCliente.cliente.email}</strong>).
                       </p>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Acciones principales en el panel izquierdo */}
@@ -6993,32 +6976,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       <span className="hidden sm:inline text-[11px] font-bold">Actualizar</span>
                     </button>
 
-                    {previewPdfUrl && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const w = window.open(previewPdfUrl, '_blank');
-                            w?.focus();
-                          }}
-                          className="p-1.5 px-2.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] transition-colors cursor-pointer text-xs flex items-center gap-1 shadow-xs"
-                          title="Abrir en pestaña nueva o imprimir"
-                        >
-                          <ExternalLink size={13} />
-                          <span className="hidden sm:inline text-[11px] font-bold">Pestaña</span>
-                        </button>
 
-                        <button
-                          type="button"
-                          onClick={handleDescargarHistorialPdf}
-                          className="p-1.5 px-3 rounded-lg bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white transition-colors cursor-pointer text-xs flex items-center gap-1 font-bold shadow-xs"
-                          title="Descargar este archivo"
-                        >
-                          <Download size={13} />
-                          <span className="text-[11px]">Guardar</span>
-                        </button>
-                      </>
-                    )}
                   </div>
                 </div>
 
