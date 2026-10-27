@@ -292,22 +292,12 @@ export default function SriComponent() {
                 </select>
               </div>
 
-              {/* Personalización de Marca (Logo & Color) */}
-              <div className="border-t border-[var(--border)] pt-4 mt-4 space-y-3">
-                <h3 className="text-sm font-semibold text-[var(--card-foreground)] flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#0F172A]" />
-                  Personalización de Marca & Color de Espacio
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 rounded-xl text-xs flex items-center justify-between">
-                  <span>🎨 La personalización de Marca, Logo corporativo y Paleta de colores ahora se gestionan en el nuevo módulo <strong>Personalización & Sistema</strong>.</span>
-                </div>               </h3>
-              </div>
-
               <button
                 type="submit"
                 disabled={loadingConfig}
                 className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
               >
-                {loadingConfig ? "Guardando..." : "Guardar Configuración & Marca"}
+                {loadingConfig ? "Guardando..." : "Guardar Configuración"}
               </button>
             </form>
           </div>
@@ -385,11 +375,8 @@ export default function SriComponent() {
               </form>
             </div>
 
-            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-700 dark:text-amber-300 mt-4">
-              🛡️ <strong>Seguridad Garantizada:</strong> Los certificados .p12 se almacenan aislados por Tenant y sus claves de acceso están cifradas mediante algoritmo simétrico AES-256-GCM.
-            </div>
           </div>
-        </div>
+      </div>
       )}
 
       {/* Tab 2: Comprobantes Emitidos */}
