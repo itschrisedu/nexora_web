@@ -1528,7 +1528,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       });
 
       const nuevoSaldoStr = resAbono?.nuevoSaldo !== undefined ? `$${Number(resAbono.nuevoSaldo).toFixed(2)}` : 'actualizado';
-      showToast(`Abono unificado de $${valor.toFixed(2)} registrado exitosamente. Nuevo saldo deudor: ${nuevoSaldoStr}.`, 'success');
+      if (resAbono?.reclasificadoAContado) {
+        showToast(`⚡ ¡Cobro saldado dentro de las 24 horas! Reclasificado automáticamente a CONTADO. Nuevo saldo deudor: ${nuevoSaldoStr}.`, 'success');
+      } else {
+        showToast(`Abono unificado de $${valor.toFixed(2)} registrado exitosamente. Nuevo saldo deudor: ${nuevoSaldoStr}.`, 'success');
+      }
 
       // Nombre o número de recibo unificado asociado
       const numNotaRef = resAbono?.reciboRef
@@ -3312,9 +3316,15 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                                       <Building size={10} /> {cobroItem.sucursalNombre || 'Matriz'}
                                                     </span>
                                                   )}
-                                                  <span className="px-2 py-0.2 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px]">
-                                                    {cobroItem.tipo || 'Crédito'}
-                                                  </span>
+                                                  {(cobroItem as any).esProntoPago24h ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-yellow-400/20 text-yellow-700 dark:text-yellow-300 border border-yellow-500/30">
+                                                      ⚡ Contado (Pronto pago 24h)
+                                                    </span>
+                                                  ) : (
+                                                    <span className="px-2 py-0.2 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px]">
+                                                      {cobroItem.tipo || 'Crédito'}
+                                                    </span>
+                                                  )}
                                                   <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${cCfg.color}`}>
                                                     {cCfg.label}
                                                   </span>
@@ -4721,6 +4731,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                     </span>
                                   </div>
                                   <div className="text-[11px] text-[var(--muted-foreground)]">{m.descripcion}</div>
+                                  {(m as any).esProntoPago24h && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-yellow-400/20 text-yellow-700 dark:text-yellow-300 border border-yellow-500/30 mt-0.5">
+                                      ⚡ Contado (Pronto pago 24h)
+                                    </span>
+                                  )}
 
                                   {/* Responsables: Cobrado por / Vendedor / Entregado por / Procesado por */}
                                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
