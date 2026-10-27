@@ -3807,11 +3807,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                               {a.metodo}
                             </span>
                             {(() => {
-                              const transRef = (a.notas ? a.notas.replace(/\[REC-[A-Z0-9]+\]/i, '').trim() : '');
-                              if (!transRef || transRef.toLowerCase() === 'abono unificado a cuenta') return null;
+                              const esBanco = a.metodo === "TRANSFERENCIA" || a.metodo === "DEPOSITO";
+                              if (!esBanco) return null;
+                              const transRef = a.notas ? a.notas.replace(/\[REC-[A-Z0-9]+\]/i, '').trim() : "";
+                              if (!transRef || transRef.toLowerCase() === "abono unificado a cuenta") return null;
                               return (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 font-mono text-[9px] font-bold">
-                                  Ref/Trans: #{transRef.replace(/^#/, '')}
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 font-mono text-[9px] font-bold max-w-[120px] truncate" title={`Ref/Trans: #${transRef.replace(/^#/, "")}`}>
+                                  #{transRef.replace(/^#/, "")}
                                 </span>
                               );
                             })()}
@@ -4803,13 +4805,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                   </span>
                                 )}
                                 {(() => {
-                                  const transRef = m.comprobante || m.referencia || m.numeroTransaccion || (m.notas ? m.notas.replace(/\[REC-[A-Z0-9]+\]/i, '').trim() : '');
-                                  if (!transRef || transRef.toLowerCase() === 'abono unificado a cuenta') return null;
+                                  const esBanco = m.metodo === "TRANSFERENCIA" || m.metodo === "DEPOSITO";
+                                  if (!esBanco) return null;
+                                  const transRef = m.numeroTransaccion || m.referencia || "";
+                                  if (!transRef || transRef.toLowerCase() === "abono unificado a cuenta") return null;
                                   return (
-                                    <div className="text-[10px] font-mono text-[var(--foreground)] mt-0.5 font-bold flex items-center justify-end gap-1">
-                                      <span className="text-[var(--muted-foreground)] font-sans font-normal text-[9px]">Trans/Ref:</span>
-                                      <span className="text-emerald-700 dark:text-emerald-400">#{transRef.replace(/^#/, '')}</span>
-                                    </div>
+                                    <span className="text-[9px] font-mono text-emerald-700 dark:text-emerald-400 font-semibold max-w-[100px] truncate block" title={`Trans/Ref: ${transRef}`}>
+                                      #{transRef.replace(/^#/, "")}
+                                    </span>
                                   );
                                 })()}
                                 {isDevolucion && (

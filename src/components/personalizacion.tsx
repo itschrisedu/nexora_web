@@ -598,6 +598,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             precioPlanMayorista: Number(data.precioPlanMayorista) > 0 ? Number(data.precioPlanMayorista) : getStoredPlanPrices().mayorista,
             autoWhatsAppHabilitado: data.autoWhatsAppHabilitado ?? true,
             autoEmailHabilitado: data.autoEmailHabilitado ?? true,
+            autoDespachoHabilitado: data.autoDespachoHabilitado !== undefined ? Boolean(data.autoDespachoHabilitado) : true,
           };
 
           setConfig(loadedConfig);

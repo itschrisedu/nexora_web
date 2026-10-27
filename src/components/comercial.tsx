@@ -3797,8 +3797,13 @@ export default function ComercialComponent({
                                           : 'Sin anticipo registrado'}
                                       </span>
                                       {Number(p.adelanto || 0) > 0 && (
-                                        <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 font-extrabold text-[10px]">
-                                          {p.metodoAdelanto || 'EFECTIVO'}{p.referenciaAdelanto ? ` · Ref: ${p.referenciaAdelanto}` : ''}
+                                        <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 font-extrabold text-[10px] inline-flex items-center gap-1 max-w-[220px]">
+                                          <span>{p.metodoAdelanto || "EFECTIVO"}</span>
+                                          {(p.metodoAdelanto === "TRANSFERENCIA" || p.metodoAdelanto === "DEPOSITO") && p.referenciaAdelanto && (
+                                            <span className="font-mono font-normal opacity-90 truncate max-w-[110px]" title={`Ref: ${p.referenciaAdelanto}`}>
+                                              · Ref: #{p.referenciaAdelanto.replace(/^#/, "")}
+                                            </span>
+                                          )}
                                         </span>
                                       )}
                                     </div>
