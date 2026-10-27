@@ -641,6 +641,15 @@ function MainApp() {
         if (config.primaryColor) {
           applyBrandingColor(config.primaryColor);
         }
+        if (typeof window !== 'undefined') {
+          if (config.autoWhatsAppHabilitado !== undefined) {
+            localStorage.setItem('nexora_auto_whatsapp_abono', String(config.autoWhatsAppHabilitado));
+            localStorage.setItem('nexora_auto_whatsapp_comprobante', String(config.autoWhatsAppHabilitado));
+          }
+          if (config.autoEmailHabilitado !== undefined) {
+            localStorage.setItem('nexora_auto_email_comprobante', String(config.autoEmailHabilitado));
+          }
+        }
       }
     } catch (err) {
       console.warn('Error fetching business branding:', err);

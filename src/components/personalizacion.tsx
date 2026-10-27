@@ -54,6 +54,8 @@ interface BusinessConfig {
   horaFinOperativa?: string;
   duracionSesionHoras?: number;
   autoDespachoHabilitado?: boolean;
+  autoWhatsAppHabilitado?: boolean;
+  autoEmailHabilitado?: boolean;
   sriAmbiente?: string;
   sriEstablecimiento?: string;
   sriPuntoEmision?: string;
@@ -594,10 +596,28 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             precioPlanBasico: Number(data.precioPlanBasico) > 0 ? Number(data.precioPlanBasico) : getStoredPlanPrices().basico,
             precioPlanComercial: Number(data.precioPlanComercial) > 0 ? Number(data.precioPlanComercial) : getStoredPlanPrices().comercial,
             precioPlanMayorista: Number(data.precioPlanMayorista) > 0 ? Number(data.precioPlanMayorista) : getStoredPlanPrices().mayorista,
+            autoWhatsAppHabilitado: data.autoWhatsAppHabilitado ?? true,
+            autoEmailHabilitado: data.autoEmailHabilitado ?? true,
           };
 
           setConfig(loadedConfig);
           setInitialConfig(loadedConfig);
+
+          if (data.autoWhatsAppHabilitado !== undefined) {
+            setAutoWhatsAppAbono(Boolean(data.autoWhatsAppHabilitado));
+            setInitialAutoWhatsAppAbono(Boolean(data.autoWhatsAppHabilitado));
+            if (typeof window !== "undefined") {
+              localStorage.setItem("nexora_auto_whatsapp_abono", String(data.autoWhatsAppHabilitado));
+              localStorage.setItem("nexora_auto_whatsapp_comprobante", String(data.autoWhatsAppHabilitado));
+            }
+          }
+          if (data.autoEmailHabilitado !== undefined) {
+            setAutoEmailComprobante(Boolean(data.autoEmailHabilitado));
+            setInitialAutoEmailComprobante(Boolean(data.autoEmailHabilitado));
+            if (typeof window !== "undefined") {
+              localStorage.setItem("nexora_auto_email_comprobante", String(data.autoEmailHabilitado));
+            }
+          }
 
           if (data.primaryColor && typeof document !== "undefined") {
             document.documentElement.style.setProperty("--primary", data.primaryColor);
@@ -749,6 +769,8 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         temporadaComercial: config.temporadaComercial || "AUTO",
         descuentoTemporadaBaja: Number(config.descuentoTemporadaBaja ?? 10),
         diasRotacionTemporadaBaja: Number(config.diasRotacionTemporadaBaja ?? 30),
+        autoWhatsAppHabilitado: autoWhatsAppAbono,
+        autoEmailHabilitado: autoEmailComprobante,
       };
 
       await Promise.all([
@@ -1742,13 +1764,21 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   <input
                     type="checkbox"
                     checked={autoWhatsAppAbono}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const checked = e.target.checked;
                       setAutoWhatsAppAbono(checked);
                       if (typeof window !== "undefined") {
                         localStorage.setItem("nexora_auto_whatsapp_abono", String(checked));
                         localStorage.setItem("nexora_auto_whatsapp_comprobante", String(checked));
                         window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+                      }
+                      if (online) {
+                        try {
+                          await ApiService.put("/configuracion/negocio", { autoWhatsAppHabilitado: checked });
+                          setInitialAutoWhatsAppAbono(checked);
+                        } catch (err) {
+                          console.warn("Error guardando switch WhatsApp en servidor:", err);
+                        }
                       }
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
@@ -1879,12 +1909,20 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                   <input
                     type="checkbox"
                     checked={autoEmailComprobante}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const checked = e.target.checked;
                       setAutoEmailComprobante(checked);
                       if (typeof window !== "undefined") {
                         localStorage.setItem("nexora_auto_email_comprobante", String(checked));
                         window.dispatchEvent(new CustomEvent("nexora:config-changed"));
+                      }
+                      if (online) {
+                        try {
+                          await ApiService.put("/configuracion/negocio", { autoEmailHabilitado: checked });
+                          setInitialAutoEmailComprobante(checked);
+                        } catch (err) {
+                          console.warn("Error guardando switch Correo en servidor:", err);
+                        }
                       }
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"

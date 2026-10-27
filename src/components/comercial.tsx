@@ -3524,16 +3524,7 @@ export default function ComercialComponent({
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          {p.tipoPago === 'CONTADO' && (p.notas?.includes('Pronto Pago 24h') || p.notas?.includes('PRONTO PAGO')) ? (
-                            <span
-                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold"
-                              title="Reclasificado automáticamente a CONTADO por pago total en menos de 24 horas"
-                            >
-                              ⚡ Contado (Pronto pago 24h)
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px] font-semibold">{p.tipoPago}</span>
-                          )}
+                          <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px] font-semibold">{p.tipoPago}</span>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="font-extrabold text-emerald-600">${Number(p.montoTotal).toFixed(2)}</div>
