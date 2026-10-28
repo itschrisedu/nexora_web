@@ -804,7 +804,8 @@ export default function PosComponent() {
             if (resSri?.estadoSri === "AUTORIZADO") {
               showToast(`Factura electrónica ${resSri.numeroComprobante} AUTORIZADA por el SRI`, "success");
 
-              if (compradorEmail) {
+              const autoEmailFacturaPos = typeof window !== "undefined" ? localStorage.getItem("nexora_auto_email_comprobante") !== "false" : true;
+              if (autoEmailFacturaPos && compradorEmail) {
                 ApiService.post("/notificaciones/email-comprobante", {
                   destinatario: compradorEmail,
                   asunto: `Factura Electrónica Autorizada ${resSri.numeroComprobante} — ${nombreEmisorPos}`,

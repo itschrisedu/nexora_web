@@ -1345,8 +1345,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       showToast('El cliente no tiene número de teléfono registrado para WhatsApp.', 'info');
     }
 
-    // 2. Envío obligatorio por Correo Electrónico en segundo plano
-    if (emailDestino) {
+    // 2. Envío por Correo Electrónico en segundo plano (solo si está habilitado en configuración)
+    const autoEmailConfigurado = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
+    if (autoEmailConfigurado && emailDestino) {
       try {
         const msgTexto = await armarMensajeWhatsAppAbono(dataAbono, false);
         const urlRecibo = await generarUrlPublicaAbono(dataAbono);
@@ -2841,9 +2842,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       {/* Barra de Búsqueda, Sucursales y Filtros de Estado */}
       <div className="space-y-2.5">
-        {/* Fila 1: Búsqueda a la izquierda y Sucursales al lado derecho */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
+        {/* Fila 1: Búsqueda en su propia línea en pantallas intermedias para evitar compresión */}
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          <div className="relative w-full xl:max-w-md">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
             <input
               type="text"
