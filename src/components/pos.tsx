@@ -6,6 +6,7 @@ import { useToast } from "./ui/toast";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from "@/utils/text-formatters";
 import {
+  generarUrlPublicaFactura,
   generarUrlPublicaVentaPOS,
   armarMensajeWhatsAppVentaPOS,
   type VentaPosComprobanteData,
@@ -805,21 +806,66 @@ export default function PosComponent() {
             if (resSri?.estadoSri === "AUTORIZADO") {
               showToast(`Factura electrónica ${resSri.numeroComprobante} AUTORIZADA por el SRI`, "success");
 
-              // Facturación electrónica rompe switches: se despacha siempre al correo del cliente
+              // Facturación electrónica rompe switches: se despacha siempre al correo del cliente con enlace corto
+              const correoDestinoPos = (compradorEmail || "").trim();
+              if (correoDestinoPos && correoDestinoPos.includes('@') && correoDestinoPos !== 'facturas@cliente.com') {
+                const pdfDataEmail: any = {
+                  emisor: {
+                    nombre: nombreEmisorPos,
+                    ruc: negocioInfo?.ruc || "",
+                    direccion: negocioInfo?.direccion || "Cevallos, Tungurahua",
+                    telefono: negocioInfo?.telefono,
+                    email: negocioInfo?.email,
+                  },
+                  comprobante: {
+                    numero: resSri.numeroComprobante,
+                    fecha: new Date().toLocaleDateString("es-EC", { year: "numeric", month: "long", day: "numeric" }),
+                    claveAcceso: resSri.claveAcceso,
+                  },
+                  comprador: {
+                    nombre: compradorNombre,
+                    cedula: cedulaLimpia,
+                    direccion: compradorDireccion,
+                    telefono: compradorTelefono,
+                    email: correoDestinoPos,
+                  },
+                  detalles: (detallesSri || []).map((d: any) => ({
+                    descripcion: d.descripcion,
+                    cantidad: d.cantidad,
+                    precioUnitario: d.precioUnitario,
+                    descuento: d.descuento || 0,
+                    subtotal: d.cantidad * d.precioUnitario,
+                  })),
+                  totales: {
+                    subtotal15: 0,
+                    subtotal0: totalFacturaSri,
+                    iva15: 0,
+                    total: totalFacturaSri,
+                  },
+                };
 
-              if (compradorEmail && compradorEmail.includes('@') && compradorEmail !== 'facturas@cliente.com') {
+                let urlCorta = "";
+                try {
+                  urlCorta = await generarUrlPublicaFactura(pdfDataEmail);
+                } catch (e) {
+                  console.warn("Error generando enlace corto de factura POS:", e);
+                }
+
+                const mensajeFactura = `Estimado/a ${compradorNombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura Nº: ${resSri.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${resSri.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!`;
+
                 ApiService.post("/notificaciones/email-comprobante", {
-                  destinatario: compradorEmail,
-                  asunto: `Factura Electrónica Autorizada ${resSri.numeroComprobante} — ${nombreEmisorPos}`,
+                  destinatario: correoDestinoPos,
+                  asunto: `Factura Electrónica ${resSri.numeroComprobante} — ${nombreEmisorPos}`,
                   tipo: "FACTURA",
                   detalles: {
                     nombreEmisor: nombreEmisorPos,
                     numeroFactura: resSri.numeroComprobante,
                     claveAcceso: resSri.claveAcceso,
-                    mensaje: `Estimado(a) ${compradorNombre}, su compra en mostrador ha sido facturada electrónicamente con autorización del SRI No. ${resSri.numeroComprobante} por un total de $${totalFacturaSri.toFixed(2)}.\n\nClave de Acceso SRI:\n${resSri.claveAcceso}`,
+                    urlComprobante: urlCorta,
+                    mensaje: mensajeFactura,
                   },
                 })
-                  .then(() => showToast(`Factura electrónica enviada al correo ${compradorEmail}`, "success"))
+                  .then(() => showToast(`Factura electrónica enviada al correo ${correoDestinoPos}`, "success"))
                   .catch((e) => console.warn("Error enviando email factura POS:", e));
               }
             } else if (resSri?.estadoSri) {

@@ -7,6 +7,7 @@
 import { ComprobanteAbonoPdfData } from './pdf-abono.service';
 import { FacturaPdfData, OrdenCompraPdfData } from './pdf-factura.service';
 import { capitalizarNombreCompleto } from '@/utils/text-formatters';
+import { ApiService } from './api.service';
 
 /**
  * Obtiene la URL base del backend (API)
@@ -150,21 +151,28 @@ export function decodificarPayload(rawInput: string): any {
 async function guardarYObtenerToken(tipo: string, payload: any): Promise<string> {
   const base = obtenerUrlBase();
   try {
-    const apiUrl = obtenerApiUrl();
-    const res = await fetch(`${apiUrl}/catalogo/comprobante`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo, payload }),
-    });
-
-    if (res.ok) {
-      const result = await res.json();
-      if (result?.token) {
-        return `${base}/c?t=${result.token}`;
-      }
+    const res: any = await ApiService.post('/catalogo/comprobante', { tipo, payload });
+    if (res?.token) {
+      return `${base}/c?t=${res.token}`;
     }
   } catch (e) {
-    console.warn('Backend no disponible para comprobante, usando fallback Base64:', e);
+    console.warn('ApiService no disponible para comprobante corto, probando fetch directo:', e);
+    try {
+      const apiUrl = obtenerApiUrl();
+      const resFetch = await fetch(`${apiUrl}/catalogo/comprobante`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, payload }),
+      });
+      if (resFetch.ok) {
+        const result = await resFetch.json();
+        if (result?.token) {
+          return `${base}/c?t=${result.token}`;
+        }
+      }
+    } catch (errFetch) {
+      console.warn('Backend no disponible para comprobante, usando fallback Base64:', errFetch);
+    }
   }
 
   // Fallback offline: codificar en la URL (enlace largo)
@@ -207,13 +215,20 @@ export async function generarUrlPublicaFactura(data: FacturaPdfData): Promise<st
     t: 'FACTURA',
     num: data.comprobante.numero?.trim() || 'FAC',
     f: data.comprobante.fecha || '',
+    aut: data.comprobante.claveAcceso || '',
     c_nom: data.comprador.nombre || 'Cliente',
     c_id: data.comprador.cedula || '',
+    c_dir: data.comprador.direccion || '',
+    c_tel: data.comprador.telefono || '',
+    c_mail: data.comprador.email || '',
+    e_nom: data.emisor.nombre || 'Calzado de Cuero',
+    e_ruc: data.emisor.ruc || '',
+    e_dir: data.emisor.direccion || '',
+    e_tel: data.emisor.telefono || '',
     sub: (Number(data.totales?.subtotal15 || 0) + Number(data.totales?.subtotal0 || 0)),
     iva: Number(data.totales?.iva15 || 0),
     tot: Number(data.totales?.total || 0),
-    e_nom: data.emisor.nombre || 'NEXORA',
-    items: (data.detalles || []).slice(0, 10).map((it) => ({
+    items: (data.detalles || []).slice(0, 15).map((it) => ({
       d: it.descripcion || 'Calzado',
       c: it.cantidad || 1,
       u: it.precioUnitario || 0,

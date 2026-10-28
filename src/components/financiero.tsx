@@ -2703,7 +2703,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   claveAcceso: res.claveAcceso,
                   nombreEmisor: negocioNombre,
                   urlComprobante: urlCorta,
-                  mensaje: `Estimado/a ${facturaCliente.nombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\nFactura No: ${res.numeroComprobante}\nClave de Acceso SRI:\n${res.claveAcceso || 'Autorizada'}${urlCorta ? `\n\nDescargue su comprobante digital oficial aquí:\n${urlCorta}` : ''}\n\n¡Muchas gracias por su preferencia!`,
+                  mensaje: `Estimado/a ${facturaCliente.nombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura Nº: ${res.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${res.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!`,
                 },
               });
               showToast(`Factura enviada automáticamente al correo ${emailCliente}`, 'success');
