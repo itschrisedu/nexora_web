@@ -1,5 +1,19 @@
+/**
+ * Utilidades comerciales para la distribución proporcional de curvas de tallas.
+ * Implementa los estándares reales de comercialización de calzado de cuero del cantón Cevallos:
+ * - Docena completa (12 pares): distribución balanceada con repetición en tallas centrales de alta rotación.
+ * - Media Docena Tipo A (6 pares): curva orientada a tallas menores/medias.
+ * - Media Docena Tipo B (6 pares): curva orientada a tallas medias/mayores.
+ */
 export type TipoCurva = 'DOCENA' | 'MEDIA_A' | 'MEDIA_B';
 
+/**
+ * Retorna la plantilla de distribución de pares por número de talla según la serie y tipo de curva.
+ *
+ * @param serieName Nombre de la serie (ej: 'Caballero', 'Damas', 'Juvenil', 'Niños').
+ * @param tipo Tipo de curva a calcular ('DOCENA', 'MEDIA_A', 'MEDIA_B').
+ * @returns Mapeo de número de talla a cantidad de pares asignados.
+ */
 export const getCurvaDocena = (serieName: string, tipo: TipoCurva): Record<number, number> => {
   const name = (serieName || '').toUpperCase();
 
