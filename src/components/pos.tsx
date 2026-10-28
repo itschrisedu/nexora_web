@@ -851,7 +851,8 @@ export default function PosComponent() {
                   console.warn("Error generando enlace corto de factura POS:", e);
                 }
 
-                const mensajeFactura = `Estimado/a ${compradorNombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura Nº: ${resSri.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${resSri.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!`;
+                const urlTextoPos = urlCorta ? `\n\nDescargue su factura digital en PDF aquí:\n${urlCorta}` : '';
+                const mensajeFactura = `Estimado/a ${compradorNombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura Nº: ${resSri.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${resSri.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!${urlTextoPos}`;
 
                 ApiService.post("/notificaciones/email-comprobante", {
                   destinatario: correoDestinoPos,
