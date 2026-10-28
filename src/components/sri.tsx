@@ -174,6 +174,31 @@ export default function SriComponent() {
     }
   };
 
+  const handleDescargarXml = (factura: FacturaSRI) => {
+    if (!factura.xmlUrl) {
+      showToast("El contenido XML de este comprobante no está disponible.", "warning");
+      return;
+    }
+    if (factura.xmlUrl.startsWith("http://") || factura.xmlUrl.startsWith("https://")) {
+      window.open(factura.xmlUrl, "_blank");
+      return;
+    }
+    try {
+      const blob = new Blob([factura.xmlUrl], { type: "application/xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `factura-${factura.numeroComprobante || factura.claveAcceso || "sri"}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Archivo XML descargado exitosamente", "success");
+    } catch (e: any) {
+      showToast("Error al descargar archivo XML: " + (e?.message || ""), "error");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -461,14 +486,14 @@ export default function SriComponent() {
                           </button>
                         )}
                         {factura.xmlUrl && (
-                          <a
-                            href={factura.xmlUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-2 py-1 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] text-xs rounded-lg inline-flex items-center gap-1 border border-[var(--border)]"
+                          <button
+                            type="button"
+                            onClick={() => handleDescargarXml(factura)}
+                            className="px-2.5 py-1 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] text-xs rounded-lg inline-flex items-center gap-1 border border-[var(--border)] cursor-pointer transition-all"
+                            title="Descargar archivo XML firmado y autorizado por el SRI"
                           >
                             <Download size={12} /> XML
-                          </a>
+                          </button>
                         )}
                       </td>
                     </tr>
