@@ -705,6 +705,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     sriEstablecimiento?: string;
     sriPuntoEmision?: string;
     sriObligadoContabilidad?: boolean;
+    autoEmailHabilitado?: boolean;
+    autoWhatsAppHabilitado?: boolean;
+    sriRegimen?: string;
+    sriRazonSocial?: string;
   } | null>(null);
 
   // Control de descartes y cierre seguro de modales
