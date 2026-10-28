@@ -1137,7 +1137,7 @@ export default function ComercialComponent({
     }
     setSupplierOrderTallasMap(mapTallas);
 
-    setSupplierOrderCost(String(item.costPrice || (Number(item.precioUnitario) * 0.6).toFixed(2) || '15.00'));
+    setSupplierOrderCost(String(item.ultimoCostoLote || item.costPrice || (Number(item.precioUnitario) * 0.6).toFixed(2) || '15.00'));
     setSupplierOrderObservaciones('');
 
     // Sincronización automática de proveedor al seleccionar modelo
@@ -1779,7 +1779,8 @@ export default function ComercialComponent({
               code: v.code,
               color: v.color,
               imageUrl: v.imageUrl,
-              costPrice: Number(v.costPrice || 0),
+              costPrice: Number(v.ultimoCostoLote || v.costPrice || 0),
+              ultimoCostoLote: Number(v.ultimoCostoLote || v.costPrice || 0),
               salePrice: Number(v.salePrice || 0),
               modelId: modelo.id,
               modelName: modelo.name,
