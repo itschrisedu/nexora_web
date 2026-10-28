@@ -804,7 +804,8 @@ export default function PosComponent() {
             if (resSri?.estadoSri === "AUTORIZADO") {
               showToast(`Factura electrónica ${resSri.numeroComprobante} AUTORIZADA por el SRI`, "success");
 
-              const autoEmailFacturaPos = typeof window !== "undefined" ? localStorage.getItem("nexora_auto_email_comprobante") !== "false" : true;
+              const autoEmailLocalPos = typeof window !== "undefined" ? localStorage.getItem("nexora_auto_email_comprobante") : null;
+              const autoEmailFacturaPos = autoEmailLocalPos !== null ? autoEmailLocalPos === "true" : (businessConfig?.autoEmailHabilitado ?? false);
               if (autoEmailFacturaPos && compradorEmail) {
                 ApiService.post("/notificaciones/email-comprobante", {
                   destinatario: compradorEmail,
@@ -998,7 +999,8 @@ export default function PosComponent() {
     if (!ultimoTicket) return;
     setEnviandoComprobantePOS(true);
     try {
-      const autoEmail = typeof window !== "undefined" ? localStorage.getItem("nexora_auto_email_comprobante") !== "false" : true;
+      const autoEmailLocalPos2 = typeof window !== "undefined" ? localStorage.getItem("nexora_auto_email_comprobante") : null;
+      const autoEmail = autoEmailLocalPos2 !== null ? autoEmailLocalPos2 === "true" : (businessConfig?.autoEmailHabilitado ?? false);
       const autoWhatsApp = typeof window !== "undefined" ? (localStorage.getItem("nexora_auto_whatsapp_abono") !== "false" && localStorage.getItem("nexora_auto_whatsapp_comprobante") !== "false") : true;
 
       if (!autoEmail && !autoWhatsApp) {

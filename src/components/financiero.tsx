@@ -1346,7 +1346,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     }
 
     // 2. Envío por Correo Electrónico en segundo plano (solo si está habilitado en configuración)
-    const autoEmailConfigurado = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
+    const autoEmailLocal = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') : null;
+    const autoEmailConfigurado = autoEmailLocal !== null ? autoEmailLocal === 'true' : (businessConfig?.autoEmailHabilitado ?? false);
     if (autoEmailConfigurado && emailDestino) {
       try {
         const msgTexto = await armarMensajeWhatsAppAbono(dataAbono, false);
@@ -1572,7 +1573,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       }
 
       // Envío AUTOMÁTICO por Correo Electrónico en segundo plano (sin abrir pestañas ni recargar)
-      const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
+      const autoEmailLocal2 = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') : null;
+      const autoEmail = autoEmailLocal2 !== null ? autoEmailLocal2 === 'true' : (businessConfig?.autoEmailHabilitado ?? false);
       const emailDestino = carteraSeleccionada?.clienteEmail || (carteraSeleccionada as any)?.email;
       if (autoEmail && emailDestino) {
         const msgTexto = await armarMensajeWhatsAppAbono(dataAbono, false);

@@ -1555,8 +1555,11 @@ export default function ComercialComponent({
 
     const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📦 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares${desgloseFinancieroTexto}\n\n📥 *Descarga aquí tu comprobante oficial de pedido:*\n👉 ${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
 
-    const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
-    const autoWhatsApp = typeof window !== 'undefined' ? (localStorage.getItem('nexora_auto_whatsapp_abono') !== 'false' && localStorage.getItem('nexora_auto_whatsapp_comprobante') !== 'false') : true;
+    const autoEmailLocal = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') : null;
+    const autoEmail = autoEmailLocal !== null ? autoEmailLocal === 'true' : (businessConfig?.autoEmailHabilitado ?? false);
+
+    const autoWhatsAppLocal = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_whatsapp_comprobante') : null;
+    const autoWhatsApp = autoWhatsAppLocal !== null ? autoWhatsAppLocal === 'true' : (businessConfig?.autoWhatsAppHabilitado ?? false);
 
     if (!esManual && !autoEmail && !autoWhatsApp) {
       return;
@@ -1722,8 +1725,11 @@ export default function ComercialComponent({
 
     const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📄 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n• ' + (p.lines?.length || 1) + ' ítems'}\n\n📊 *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n📥 *Descarga aquí tu comprobante oficial de entrega en PDF:*\n👉 ${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
 
-    const autoEmail = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') !== 'false' : true;
-    const autoWhatsApp = typeof window !== 'undefined' ? (localStorage.getItem('nexora_auto_whatsapp_abono') !== 'false' && localStorage.getItem('nexora_auto_whatsapp_comprobante') !== 'false') : true;
+    const autoEmailLocal = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') : null;
+    const autoEmail = autoEmailLocal !== null ? autoEmailLocal === 'true' : (businessConfig?.autoEmailHabilitado ?? false);
+
+    const autoWhatsAppLocal = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_whatsapp_comprobante') : null;
+    const autoWhatsApp = autoWhatsAppLocal !== null ? autoWhatsAppLocal === 'true' : (businessConfig?.autoWhatsAppHabilitado ?? false);
 
     if (!esManual && !autoEmail && !autoWhatsApp) {
       return;
