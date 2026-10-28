@@ -2424,8 +2424,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             cantidad: g.cantidad,
             precioUnitario: Number(precioUnitarioGrupo.toFixed(2)),
             descuento: 0,
-            tarifaIva: 15,
-            codigoIva: '4',
+            tarifaIva: 0,
+            codigoIva: '0',
           });
         });
       } else {
@@ -2436,8 +2436,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           cantidad: 1,
           precioUnitario: monto,
           descuento: 0,
-          tarifaIva: 15,
-          codigoIva: '4',
+          tarifaIva: 0,
+          codigoIva: '0',
         });
       }
     });
@@ -5680,12 +5680,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       {/* MODAL: FACTURACIÓN ELECTRÓNICA SRI                            */}
       {/* ════════════════════════════════════════════════════════════════ */}
       {showFacturaModal && facturaCliente && carteraSeleccionada && (() => {
-        const subtotalCalc = facturaCliente.detalles.reduce(
-          (sum, d) => sum + d.cantidad * d.precioUnitario - (d.descuento || 0), 0
-        );
+        const subtotal0Calc = facturaCliente.detalles
+          .filter((d) => (d.tarifaIva ?? 0) === 0)
+          .reduce((sum, d) => sum + d.cantidad * d.precioUnitario - (d.descuento || 0), 0);
+        const subtotal15Calc = facturaCliente.detalles
+          .filter((d) => (d.tarifaIva ?? 0) > 0)
+          .reduce((sum, d) => sum + d.cantidad * d.precioUnitario - (d.descuento || 0), 0);
         const ivaCalc = facturaCliente.detalles.reduce(
-          (sum, d) => sum + ((d.cantidad * d.precioUnitario - (d.descuento || 0)) * d.tarifaIva) / 100, 0
+          (sum, d) => sum + ((d.cantidad * d.precioUnitario - (d.descuento || 0)) * (d.tarifaIva || 0)) / 100, 0
         );
+        const subtotalCalc = subtotal0Calc + subtotal15Calc;
         const totalCalc = subtotalCalc + ivaCalc;
 
         const armarDatosPdf = () => ({
@@ -5722,8 +5726,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             subtotal: d.cantidad * d.precioUnitario - (d.descuento || 0),
           })),
           totales: {
-            subtotal15: subtotalCalc,
-            subtotal0: 0,
+            subtotal15: subtotal15Calc,
+            subtotal0: subtotal0Calc,
             descuento: 0,
             iva15: ivaCalc,
             total: totalCalc,
@@ -6275,38 +6279,70 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                   {/* 4. Forma de Pago y Resumen Tributario */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    <div className="p-4 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-2">
-                      <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)]">
-                        Forma de Pago SRI *
-                      </label>
-                      <select
-                        value={facturaCliente.formaPago}
-                        onChange={(e) =>
-                          setFacturaCliente({ ...facturaCliente, formaPago: e.target.value })
-                        }
-                        className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                      >
-                        <option value="01">01 - Sin utilización del sistema financiero (Efectivo)</option>
-                        <option value="20">20 - Otros con utilización del sistema financiero (Transferencia / Depósito)</option>
-                        <option value="16">16 - Tarjeta de Débito</option>
-                        <option value="19">19 - Tarjeta de Crédito</option>
-                      </select>
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Código oficial del catálogo de formas de pago del SRI Ecuador.
-                      </p>
+                    <div className="p-4 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)] mb-1">
+                          Régimen Tributario / Tarifa IVA *
+                        </label>
+                        <select
+                          value={facturaCliente.detalles[0]?.tarifaIva === 15 ? '15' : '0'}
+                          onChange={(e) => {
+                            const nuevaTarifa = Number(e.target.value);
+                            const nuevoCodigo = nuevaTarifa === 0 ? '0' : '4';
+                            setFacturaCliente({
+                              ...facturaCliente,
+                              detalles: facturaCliente.detalles.map((d) => ({
+                                ...d,
+                                tarifaIva: nuevaTarifa,
+                                codigoIva: nuevoCodigo,
+                              })),
+                            });
+                          }}
+                          className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        >
+                          <option value="0">RIMPE - Negocio Popular (Tarifa IVA 0%)</option>
+                          <option value="15">Régimen General / Emprendedor (Tarifa IVA 15%)</option>
+                        </select>
+                        <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                          {facturaCliente.detalles[0]?.tarifaIva === 15
+                            ? 'Tarifa general de IVA 15% para Régimen General o Emprendedor.'
+                            : 'Los negocios populares facturan a tarifa 0% de IVA según normativa SRI.'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)] mb-1">
+                          Forma de Pago SRI *
+                        </label>
+                        <select
+                          value={facturaCliente.formaPago}
+                          onChange={(e) =>
+                            setFacturaCliente({ ...facturaCliente, formaPago: e.target.value })
+                          }
+                          className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        >
+                          <option value="01">01 - Sin utilización del sistema financiero (Efectivo)</option>
+                          <option value="20">20 - Otros con utilización del sistema financiero (Transferencia / Depósito)</option>
+                          <option value="16">16 - Tarjeta de Débito</option>
+                          <option value="19">19 - Tarjeta de Crédito</option>
+                        </select>
+                        <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+                          Código oficial del catálogo de formas de pago del SRI Ecuador.
+                        </p>
+                      </div>
                     </div>
 
                     <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-1.5 shadow-xs">
                       <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
                         <span>Subtotal Base 0%:</span>
-                        <span className="font-semibold">$0.00</span>
+                        <span className="font-semibold">${subtotal0Calc.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
                         <span>Subtotal Base 15%:</span>
-                        <span className="font-semibold">${subtotalCalc.toFixed(2)}</span>
+                        <span className="font-semibold">${subtotal15Calc.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
-                        <span>IVA (15%):</span>
+                        <span>IVA ({(facturaCliente.detalles[0]?.tarifaIva ?? 0)}%):</span>
                         <span className="font-semibold text-emerald-600">${ivaCalc.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-sm font-black border-t border-[var(--border)] pt-2 text-[var(--foreground)]">
@@ -6418,12 +6454,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       <div className="flex justify-end">
                         <div className="w-72 space-y-1.5">
                           <div className="flex justify-between text-[11px] text-slate-700">
-                            <span>SUBTOTAL 15%:</span>
-                            <span className="font-bold font-mono">${subtotalCalc.toFixed(2)}</span>
+                            <span>SUBTOTAL 0%:</span>
+                            <span className="font-bold font-mono">${subtotal0Calc.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-[11px] text-slate-700">
-                            <span>SUBTOTAL 0%:</span>
-                            <span className="font-bold font-mono">$0.00</span>
+                            <span>SUBTOTAL 15%:</span>
+                            <span className="font-bold font-mono">${subtotal15Calc.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-[11px] text-slate-700">
                             <span>DESCUENTO:</span>
