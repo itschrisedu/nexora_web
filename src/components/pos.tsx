@@ -687,7 +687,7 @@ export default function PosComponent() {
             }
           : undefined;
 
-      await ApiService.post("/pos/venta-directa", {
+      const resVenta: any = await ApiService.post("/pos/venta-directa", {
         metodoPago,
         tipoComprobante,
         clienteId: tipoComprobante === "FACTURA" && clienteFactura.id ? clienteFactura.id : undefined,
@@ -713,6 +713,121 @@ export default function PosComponent() {
         })),
       });
       showToast("Venta registrada exitosamente", "success");
+
+      // ── Emisión de Factura SRI y envío por correo en segundo plano (Exclusivo POS) ──
+      const saleNoteId = resVenta?.saleNote?.id;
+      if (saleNoteId) {
+        const esFacturaConDatos = tipoComprobante === "FACTURA" && Boolean(clienteFactura.cedula.trim());
+        const cedulaLimpia = esFacturaConDatos ? clienteFactura.cedula.trim() : "9999999999999";
+        let tipoId = "07";
+        if (esFacturaConDatos) {
+          if (cedulaLimpia.length === 13) tipoId = "04";
+          else if (cedulaLimpia.length === 10) tipoId = "05";
+        }
+        const compradorNombre = esFacturaConDatos
+          ? `${clienteFactura.nombre} ${clienteFactura.apellido}`.trim()
+          : "CONSUMIDOR FINAL";
+        const compradorEmail = esFacturaConDatos ? clienteFactura.email.trim() : "";
+        const compradorDireccion = esFacturaConDatos && clienteFactura.direccion.trim()
+          ? clienteFactura.direccion.trim()
+          : "Cevallos, Tungurahua";
+        const compradorTelefono = esFacturaConDatos ? clienteFactura.telefono.trim() : "";
+        const formaPagoSri = metodoPago === "TARJETA" ? "19" : metodoPago === "TRANSFERENCIA" ? "20" : "01";
+        const totalFacturaSri = Number(totalVenta.toFixed(2));
+        const nombreEmisorPos = negocioInfo?.nombre || "Calzado Cevallos";
+
+        // Agrupar modelos/series para la factura SRI
+        const grupoSriMap = new Map<string, { nombre: string; serie: string; cantidad: number; totalPrecio: number; productId: string }>();
+        itemsVenta.forEach((item) => {
+          const key = `${(item.nombre || 'Calzado').toLowerCase()}_${(item.serieNombre || 'general').toLowerCase()}`;
+          if (!grupoSriMap.has(key)) {
+            grupoSriMap.set(key, {
+              nombre: item.nombre || 'Calzado de Cuero',
+              serie: item.serieNombre || '',
+              cantidad: 0,
+              totalPrecio: 0,
+              productId: item.productId || 'CALZ-01',
+            });
+          }
+          const g = grupoSriMap.get(key)!;
+          const cant = Number(item.cantidad) || 1;
+          const precioUnit = Number((item.precioUnitario * factorDescuento).toFixed(2));
+          g.cantidad += cant;
+          g.totalPrecio += cant * precioUnit;
+        });
+
+        const detallesSri = Array.from(grupoSriMap.values()).map((g) => {
+          let descripcion = '';
+          if (g.cantidad === 12) {
+            descripcion = `1 Docena - ${g.nombre}`;
+          } else if (g.cantidad === 6) {
+            descripcion = `Media Docena - ${g.nombre}`;
+          } else {
+            descripcion = `${g.cantidad} ${g.cantidad === 1 ? 'Par' : 'Pares'} - ${g.nombre}`;
+          }
+          if (g.serie && g.serie.toLowerCase() !== 'general' && g.serie.toLowerCase() !== 'estándar') {
+            descripcion += ` (${g.serie})`;
+          }
+          const unitario = g.cantidad > 0 ? Number((g.totalPrecio / g.cantidad).toFixed(2)) : 0;
+          return {
+            codigoProducto: g.productId.slice(0, 8).toUpperCase(),
+            descripcion,
+            cantidad: g.cantidad,
+            precioUnitario: unitario,
+            descuento: 0,
+            tarifaIva: 0,
+            codigoIva: '0',
+          };
+        });
+
+        // Ejecutar en segundo plano sin bloquear el mostrador
+        (async () => {
+          try {
+            const sriPayload = {
+              saleNoteId,
+              fecha: new Date(),
+              comprador: {
+                tipoIdentificacion: tipoId,
+                identificacion: cedulaLimpia,
+                razonSocial: compradorNombre,
+                direccion: compradorDireccion,
+                email: compradorEmail || "facturas@calzado.com",
+                telefono: compradorTelefono || "0999999999",
+              },
+              detalles: detallesSri,
+              formaPago: formaPagoSri,
+              totalConImpuestos: totalFacturaSri,
+            };
+
+            const resSri: any = await ApiService.post("/facturacion-sri/emitir", sriPayload);
+
+            if (resSri?.estadoSri === "AUTORIZADO") {
+              showToast(`Factura electrónica ${resSri.numeroComprobante} AUTORIZADA por el SRI`, "success");
+
+              if (compradorEmail) {
+                ApiService.post("/notificaciones/email-comprobante", {
+                  destinatario: compradorEmail,
+                  asunto: `Factura Electrónica Autorizada ${resSri.numeroComprobante} — ${nombreEmisorPos}`,
+                  tipo: "GENERAL",
+                  detalles: {
+                    nombreEmisor: nombreEmisorPos,
+                    numeroFactura: resSri.numeroComprobante,
+                    claveAcceso: resSri.claveAcceso,
+                    mensaje: `Estimado(a) ${compradorNombre}, su compra en mostrador ha sido facturada electrónicamente con autorización del SRI No. ${resSri.numeroComprobante} por un total de $${totalFacturaSri.toFixed(2)}.\n\nClave de Acceso SRI:\n${resSri.claveAcceso}`,
+                  },
+                })
+                  .then(() => showToast(`Factura electrónica enviada al correo ${compradorEmail}`, "success"))
+                  .catch((e) => console.warn("Error enviando email factura POS:", e));
+              }
+            } else if (resSri?.estadoSri) {
+              console.warn("Emisión SRI POS registrada con estado:", resSri.estadoSri, resSri.errorMensaje);
+            }
+          } catch (errSri: any) {
+            console.warn("Emisión SRI POS en segundo plano:", errSri?.message || errSri);
+          }
+        })();
+      }
+
       setVentaExitosa(true);
       setComprobanteEnviadoPOS(false);
 
