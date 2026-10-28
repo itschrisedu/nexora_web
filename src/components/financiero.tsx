@@ -2468,8 +2468,16 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     // Seleccionar notas a facturar (excluir estrictamente las que ya tienen factura AUTORIZADA)
     const cobroValido = cobroItem && cobroItem.facturaSri?.estadoSri !== 'AUTORIZADO' ? cobroItem : null;
-    const todasLasNotas = cobroValido ? [cobroValido] : cliente.cobros;
-    const notasParaFacturar = todasLasNotas.filter((n) => n.facturaSri?.estadoSri !== 'AUTORIZADO');
+    
+    // Por defecto seleccionar SOLO la última nota (la más actual) que no esté facturada
+    const notasPendientes = (cliente.cobros || [])
+      .filter((n) => n.facturaSri?.estadoSri !== 'AUTORIZADO')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const notasParaFacturar = cobroValido
+      ? [cobroValido]
+      : (notasPendientes.length > 0 ? [notasPendientes[0]] : []);
+
     // Usar agrupación concisa
     const detalles = agruparLineasParaFactura(notasParaFacturar);
 
@@ -2477,7 +2485,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     const direccionReal = cliente.clienteDireccion || 'Cevallos, Tungurahua';
     const emailReal = cliente.clienteEmail || '';
 
-    // Vincular la primera nota no autorizada
+    // Vincular la nota no autorizada seleccionada
     const primeraNotaValida = notasParaFacturar[0];
 
     setFacturaCliente({
@@ -2570,15 +2578,19 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           email: facturaCliente.email.trim() || 'facturas@cliente.com',
           telefono: facturaCliente.telefono.trim() || '0999999999',
         },
-        detalles: facturaCliente.detalles.map((d) => ({
-          codigoProducto: d.codigoProducto,
-          descripcion: d.descripcion,
-          cantidad: d.cantidad,
-          precioUnitario: d.precioUnitario,
-          descuento: d.descuento || 0,
-          codigoIva: d.codigoIva || '4',
-          tarifaIva: d.tarifaIva || 15,
-        })),
+        detalles: facturaCliente.detalles.map((d) => {
+          const tarifa = Number(d.tarifaIva ?? 0);
+          const codigo = tarifa === 0 ? '0' : (d.codigoIva || '4');
+          return {
+            codigoProducto: d.codigoProducto,
+            descripcion: d.descripcion,
+            cantidad: d.cantidad,
+            precioUnitario: d.precioUnitario,
+            descuento: d.descuento || 0,
+            codigoIva: codigo,
+            tarifaIva: tarifa,
+          };
+        }),
         formaPago: facturaCliente.formaPago || '01',
         totalConImpuestos: Number(totalConImpuestos.toFixed(2)),
       };
