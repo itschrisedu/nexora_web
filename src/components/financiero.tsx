@@ -2684,22 +2684,33 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               total: totalConImpuestos,
             },
           };
-          generarUrlPublicaFactura(pdfDataEmail as any).then((urlCorta) => {
-            ApiService.post('/notificaciones/email-comprobante', {
-              destinatario: emailCliente,
-              asunto: `Factura Electronica ${res.numeroComprobante} - ${negocioNombre}`,
-              tipo: 'FACTURA',
-              detalles: {
-                numeroFactura: res.numeroComprobante,
-                claveAcceso: res.claveAcceso,
-                nombreEmisor: negocioNombre,
-                urlComprobante: urlCorta,
-                mensaje: `Estimado/a ${facturaCliente.nombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electronica ante el Servicio de Rentas Internas (SRI):\n\nFactura No: ${res.numeroComprobante}\nClave de Acceso SRI:\n${res.claveAcceso || 'Autorizada'}\n\nDescargue su comprobante digital oficial aqui:\n${urlCorta}\n\nMuchas gracias por su preferencia!`,
-              },
-            })
-              .then(() => showToast(`Factura enviada automaticamente al correo ${emailCliente}`, 'success'))
-              .catch((err) => console.warn('Envio de factura por correo en segundo plano:', err));
-          }).catch((e) => console.warn('Error generando URL corta para factura:', e));
+
+          // Despacho obligatorio de correo para facturación electrónica (rompe switches)
+          (async () => {
+            let urlCorta = '';
+            try {
+              urlCorta = await generarUrlPublicaFactura(pdfDataEmail as any);
+            } catch (e) {
+              console.warn('URL pública de factura no disponible, enviando correo directo:', e);
+            }
+            try {
+              await ApiService.post('/notificaciones/email-comprobante', {
+                destinatario: emailCliente,
+                asunto: `Factura Electrónica ${res.numeroComprobante} — ${negocioNombre}`,
+                tipo: 'FACTURA',
+                detalles: {
+                  numeroFactura: res.numeroComprobante,
+                  claveAcceso: res.claveAcceso,
+                  nombreEmisor: negocioNombre,
+                  urlComprobante: urlCorta,
+                  mensaje: `Estimado/a ${facturaCliente.nombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\nFactura No: ${res.numeroComprobante}\nClave de Acceso SRI:\n${res.claveAcceso || 'Autorizada'}${urlCorta ? `\n\nDescargue su comprobante digital oficial aquí:\n${urlCorta}` : ''}\n\n¡Muchas gracias por su preferencia!`,
+                },
+              });
+              showToast(`Factura enviada automáticamente al correo ${emailCliente}`, 'success');
+            } catch (err) {
+              console.warn('Error al despachar factura por correo:', err);
+            }
+          })();
         }
       } else {
         showToast(`Factura registrada con estado: ${res.estadoSri}`, 'info');
