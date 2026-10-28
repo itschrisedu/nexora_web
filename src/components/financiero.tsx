@@ -2382,6 +2382,10 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
   // ── Agrupación de líneas por modelo para la factura ─────
   const agruparLineasParaFactura = (notas: Cobro[]) => {
+    const esRegimenGeneral = businessConfig?.sriRegimen === 'GENERAL_15';
+    const tarifaPorDefecto = esRegimenGeneral ? 15 : 0;
+    const codigoPorDefecto = esRegimenGeneral ? '4' : '0';
+
     const agrupados: {
       codigoProducto: string;
       descripcion: string;
