@@ -5,6 +5,7 @@ import { ApiService } from "@/services/api.service";
 import { useToast } from "./ui/toast";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from "@/utils/text-formatters";
+import { generarFacturaPdfDoc, type FacturaPdfData } from '@/services/pdf-factura.service';
 import {
   generarUrlPublicaFactura,
   generarUrlPublicaVentaPOS,
@@ -13,6 +14,7 @@ import {
 } from "@/services/comprobante-url.service";
 import { abrirWhatsAppUniversal } from "../utils/whatsapp";
 import {
+  Download,
   Store,
   DollarSign,
   CreditCard,
@@ -809,18 +811,29 @@ export default function PosComponent() {
               // Facturación electrónica rompe switches: se despacha siempre al correo del cliente con enlace corto
               const correoDestinoPos = (compradorEmail || "").trim();
               if (correoDestinoPos && correoDestinoPos.includes('@') && correoDestinoPos !== 'facturas@cliente.com') {
+                const esRegimenGeneral = negocioInfo?.sriRegimen === 'GENERAL_15';
+                const tarifaIvaPos = esRegimenGeneral ? 15 : 0;
+                const subtotal15Pos = tarifaIvaPos === 15 ? Number((totalFacturaSri / 1.15).toFixed(2)) : 0;
+                const subtotal0Pos = tarifaIvaPos === 0 ? totalFacturaSri : 0;
+                const iva15Pos = tarifaIvaPos === 15 ? Number((totalFacturaSri - subtotal15Pos).toFixed(2)) : 0;
+
                 const pdfDataEmail: any = {
                   emisor: {
                     nombre: nombreEmisorPos,
-                    ruc: negocioInfo?.ruc || "",
-                    direccion: negocioInfo?.direccion || "Cevallos, Tungurahua",
+                    ruc: negocioInfo?.ruc || "1805274790001",
+                    direccion: negocioInfo?.direccion || "LA DELICIA Y MIRABELES",
                     telefono: negocioInfo?.telefono,
-                    email: negocioInfo?.email,
+                    email: negocioInfo?.email || "chrispaucar49@gmail.com",
+                    obligadoContabilidad: Boolean(negocioInfo?.sriObligadoContabilidad),
+                    ambiente: negocioInfo?.sriAmbiente || "1",
+                    establecimiento: negocioInfo?.sriEstablecimiento || "001",
+                    puntoEmision: negocioInfo?.sriPuntoEmision || "001",
                   },
                   comprobante: {
                     numero: resSri.numeroComprobante,
                     fecha: new Date().toLocaleDateString("es-EC", { year: "numeric", month: "long", day: "numeric" }),
                     claveAcceso: resSri.claveAcceso,
+                    formaPago: formaPagoSri,
                   },
                   comprador: {
                     nombre: compradorNombre,
@@ -829,20 +842,28 @@ export default function PosComponent() {
                     telefono: compradorTelefono,
                     email: correoDestinoPos,
                   },
-                  detalles: (detallesSri || []).map((d: any) => ({
-                    descripcion: d.descripcion,
-                    cantidad: d.cantidad,
-                    precioUnitario: d.precioUnitario,
-                    descuento: d.descuento || 0,
-                    subtotal: d.cantidad * d.precioUnitario,
-                  })),
+                  detalles: (detallesSri || []).map((d: any) => {
+                    const cant = d.cantidad || 1;
+                    const precioUnit = tarifaIvaPos === 15 ? Number((d.precioUnitario / 1.15).toFixed(2)) : Number(d.precioUnitario.toFixed(2));
+                    const sub = Number((cant * precioUnit).toFixed(2));
+                    return {
+                      descripcion: d.descripcion,
+                      cantidad: cant,
+                      precioUnitario: precioUnit,
+                      descuento: d.descuento || 0,
+                      tarifaIva: tarifaIvaPos,
+                      subtotal: sub,
+                    };
+                  }),
                   totales: {
-                    subtotal15: 0,
-                    subtotal0: totalFacturaSri,
-                    iva15: 0,
+                    subtotal15: subtotal15Pos,
+                    subtotal0: subtotal0Pos,
+                    descuento: 0,
+                    iva15: iva15Pos,
                     total: totalFacturaSri,
                   },
                 };
+                ultimoPdfDataFactura = pdfDataEmail;
 
                 let urlCorta = "";
                 try {
@@ -851,8 +872,8 @@ export default function PosComponent() {
                   console.warn("Error generando enlace corto de factura POS:", e);
                 }
 
-                const urlTextoPos = urlCorta ? `\n\nDescargue su factura digital en PDF aquí:\n${urlCorta}` : '';
-                const mensajeFactura = `Estimado/a ${compradorNombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura Nº: ${resSri.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${resSri.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!${urlTextoPos}`;
+                // Quitar enlace duplicado del mensaje: el botón y enlace van en su sección dedicada
+                const mensajeFactura = `Estimado/a ${compradorNombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura Nº: ${resSri.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${resSri.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!`;
 
                 ApiService.post("/notificaciones/email-comprobante", {
                   destinatario: correoDestinoPos,
@@ -860,6 +881,7 @@ export default function PosComponent() {
                   tipo: "FACTURA",
                   detalles: {
                     nombreEmisor: nombreEmisorPos,
+                    responsable: negocioInfo?.sriRazonSocial || negocioInfo?.propietario || "ICHINA REMACHE HECTOR GONZALO",
                     numeroFactura: resSri.numeroComprobante,
                     claveAcceso: resSri.claveAcceso,
                     urlComprobante: urlCorta,
@@ -914,6 +936,7 @@ export default function PosComponent() {
           direccion: negocioInfo?.direccion || "Cevallos, Tungurahua",
           telefono: negocioInfo?.telefono || "",
         },
+        facturaPdfData: ultimoPdfDataFactura,
       };
 
       if (cuponAplicadoPOS?.promocion?.codigo) {
@@ -3089,6 +3112,20 @@ export default function PosComponent() {
 
               {/* Botón Único de Envío de Comprobante y Botones de Acción */}
               <div className="space-y-2">
+                {ultimoTicket.tipoComprobante === "FACTURA" && ultimoTicket.facturaPdfData && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const doc = generarFacturaPdfDoc(ultimoTicket.facturaPdfData);
+                      doc.save(`Factura_${ultimoTicket.facturaPdfData.comprobante.numero || 'SRI'}.pdf`);
+                    }}
+                    className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer border border-slate-700"
+                    title="Descargar Factura Electrónica autorizada en PDF oficial"
+                  >
+                    <Download size={14} className="text-emerald-400" />
+                    <span>Descargar Factura Electrónica (PDF RIDE)</span>
+                  </button>
+                )}
                 {(ultimoTicket.clienteTelefono || ultimoTicket.clienteEmail) && (
                   <button
                     type="button"
