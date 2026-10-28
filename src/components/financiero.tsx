@@ -2433,8 +2433,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             cantidad: g.cantidad,
             precioUnitario: Number(precioUnitarioGrupo.toFixed(2)),
             descuento: 0,
-            tarifaIva: 0,
-            codigoIva: '0',
+            tarifaIva: tarifaPorDefecto,
+            codigoIva: codigoPorDefecto,
           });
         });
       } else {
@@ -2445,8 +2445,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           cantidad: 1,
           precioUnitario: monto,
           descuento: 0,
-          tarifaIva: 0,
-          codigoIva: '0',
+          tarifaIva: tarifaPorDefecto,
+          codigoIva: codigoPorDefecto,
         });
       }
     });
@@ -6327,9 +6327,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                     <div className="p-4 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-3">
                       <div>
-                        <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)] mb-1">
-                          Régimen Tributario / Tarifa IVA *
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)]">
+                            Régimen Tributario / Tarifa IVA *
+                          </label>
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                            Guardado en Facturación SRI
+                          </span>
+                        </div>
                         <select
                           value={facturaCliente.detalles[0]?.tarifaIva === 15 ? '15' : '0'}
                           onChange={(e) => {

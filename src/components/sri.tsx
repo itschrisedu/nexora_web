@@ -52,6 +52,7 @@ export default function SriComponent() {
       sriPuntoEmision: "001",
       sriAmbiente: "1", // 1: Pruebas, 2: Producción
       sriObligadoContabilidad: false,
+      sriRegimen: "RIMPE_POPULAR",
       tieneP12: false,
       logoUrl: "",
       primaryColor: "#0F172A",
@@ -91,6 +92,7 @@ export default function SriComponent() {
           sriPuntoEmision: data.sriPuntoEmision || prev.sriPuntoEmision,
           sriAmbiente: data.sriAmbiente || prev.sriAmbiente,
           sriObligadoContabilidad: !!data.sriObligadoContabilidad,
+          sriRegimen: data.sriRegimen || "RIMPE_POPULAR",
           tieneP12: !!data.tieneP12 || !!data.firmaP12Path,
           logoUrl: data.logoUrl || prev.logoUrl,
           primaryColor: (data.primaryColor && (data.primaryColor.includes("6366f1") || data.primaryColor.includes("8b5cf6"))) ? "#0F172A" : (data.primaryColor || prev.primaryColor),
@@ -141,6 +143,7 @@ export default function SriComponent() {
         sriPuntoEmision: config.sriPuntoEmision || "001",
         sriAmbiente: config.sriAmbiente || "1",
         sriObligadoContabilidad: config.sriObligadoContabilidad,
+        sriRegimen: config.sriRegimen || "RIMPE_POPULAR",
       });
       setMsgConfig({ type: "success", text: "Configuración y datos de emisor guardados con éxito." });
       showToast("Configuración SRI guardada con éxito", "success");
@@ -380,6 +383,25 @@ export default function SriComponent() {
                     <option value="2">2 - PRODUCCIÓN (cel.sri.gob.ec)</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[var(--muted-foreground)] mb-1 font-medium">
+                  Régimen Tributario / Tarifa IVA por Defecto
+                </label>
+                <select
+                  value={config.sriRegimen || "RIMPE_POPULAR"}
+                  onChange={(e) => setConfig({ ...config, sriRegimen: e.target.value })}
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
+                >
+                  <option value="RIMPE_POPULAR">RIMPE - Negocio Popular (Tarifa IVA 0%)</option>
+                  <option value="GENERAL_15">Régimen General / Emprendedor (Tarifa IVA 15%)</option>
+                </select>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                  {config.sriRegimen === "GENERAL_15"
+                    ? "Tus comprobantes se emitirán con tarifa general de IVA 15%."
+                    : "Los negocios populares facturan a tarifa 0% de IVA según normativa SRI."}
+                </p>
               </div>
 
               <button
