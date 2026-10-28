@@ -51,6 +51,7 @@ export default function SriComponent() {
       sriEstablecimiento: "001",
       sriPuntoEmision: "001",
       sriAmbiente: "1", // 1: Pruebas, 2: Producción
+      sriObligadoContabilidad: false,
       tieneP12: false,
       logoUrl: "",
       primaryColor: "#0F172A",
@@ -88,6 +89,7 @@ export default function SriComponent() {
           sriEstablecimiento: data.sriEstablecimiento || prev.sriEstablecimiento,
           sriPuntoEmision: data.sriPuntoEmision || prev.sriPuntoEmision,
           sriAmbiente: data.sriAmbiente || prev.sriAmbiente,
+          sriObligadoContabilidad: !!data.sriObligadoContabilidad,
           tieneP12: !!data.tieneP12 || !!data.firmaP12Path,
           logoUrl: data.logoUrl || prev.logoUrl,
           primaryColor: (data.primaryColor && (data.primaryColor.includes("6366f1") || data.primaryColor.includes("8b5cf6"))) ? "#0F172A" : (data.primaryColor || prev.primaryColor),
@@ -130,6 +132,7 @@ export default function SriComponent() {
         sriEstablecimiento: config.sriEstablecimiento || "001",
         sriPuntoEmision: config.sriPuntoEmision || "001",
         sriAmbiente: config.sriAmbiente || "1",
+        sriObligadoContabilidad: config.sriObligadoContabilidad,
       });
       setMsgConfig({ type: "success", text: "Configuración y datos de emisor guardados con éxito." });
       showToast("Configuración SRI guardada con éxito", "success");
@@ -259,25 +262,8 @@ export default function SriComponent() {
               Datos del Emisor y Parámetros SRI
             </h2>
             <form onSubmit={handleSaveConfig} className="space-y-4 text-sm">
-              {/* Indicador Informativo del Local Comercial */}
-              <div className="bg-[var(--muted)]/40 p-3.5 rounded-xl border border-[var(--border)] flex items-center justify-between">
-                <div>
-                  <span className="text-xs uppercase font-bold text-[var(--muted-foreground)] tracking-wider block">Nombre Comercial del Negocio</span>
-                  <p className="text-sm font-semibold text-[var(--foreground)] mt-0.5">{config.nombreComercial || "Local Comercial"}</p>
-                </div>
-                <span className="text-xs text-[var(--muted-foreground)] bg-[var(--background)] px-2.5 py-1 rounded-lg border border-[var(--border)]">
-                  Configurado en Identidad del Negocio
-                </span>
-              </div>
-
-              {/* Razón Social del Emisor (Exclusivo SRI) */}
               <div>
-                <label className="block text-[var(--muted-foreground)] mb-1 font-medium">
-                  Razón Social del Emisor (SRI)
-                  <span className="text-xs text-[var(--muted-foreground)] font-normal ml-2">
-                    (Nombre legal del titular o contribuyente en el SRI)
-                  </span>
-                </label>
+                <label className="block text-[var(--muted-foreground)] mb-1 font-medium">Razón Social del Emisor (SRI)</label>
                 <input
                   type="text"
                   value={config.sriRazonSocial}
@@ -286,9 +272,6 @@ export default function SriComponent() {
                   className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
                   required
                 />
-                <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                  Este dato se utiliza únicamente para el XML y autorización tributaria del SRI. No modifica el nombre comercial ni las sucursales del sistema.
-                </p>
               </div>
 
               <div>
@@ -339,22 +322,35 @@ export default function SriComponent() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[var(--muted-foreground)] mb-1 font-medium">Ambiente SRI</label>
-                <select
-                  value={config.sriAmbiente}
-                  onChange={(e) => setConfig({ ...config, sriAmbiente: e.target.value })}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
-                >
-                  <option value="1">1 - PRUEBAS (celcer.sri.gob.ec)</option>
-                  <option value="2">2 - PRODUCCIÓN (cel.sri.gob.ec)</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[var(--muted-foreground)] mb-1 font-medium">Obligado Contabilidad</label>
+                  <select
+                    value={config.sriObligadoContabilidad ? "SI" : "NO"}
+                    onChange={(e) => setConfig({ ...config, sriObligadoContabilidad: e.target.value === "SI" })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="NO">NO</option>
+                    <option value="SI">SÍ</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[var(--muted-foreground)] mb-1 font-medium">Ambiente SRI</label>
+                  <select
+                    value={config.sriAmbiente}
+                    onChange={(e) => setConfig({ ...config, sriAmbiente: e.target.value })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
+                  >
+                    <option value="1">1 - PRUEBAS (celcer.sri.gob.ec)</option>
+                    <option value="2">2 - PRODUCCIÓN (cel.sri.gob.ec)</option>
+                  </select>
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loadingConfig}
-                className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+                className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loadingConfig ? "Guardando..." : "Guardar Configuración"}
               </button>

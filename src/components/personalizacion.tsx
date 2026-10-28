@@ -94,7 +94,7 @@ interface BusinessConfig {
   diasRotacionTemporadaBaja?: number;
 }
 
-type TabType = "general" | "estrategia" | "credito" | "operaciones" | "fiscal" | "catalogo" | "seguridad";
+type TabType = "general" | "estrategia" | "credito" | "operaciones" | "catalogo" | "seguridad";
 
 export default function PersonalizacionComponent({ online }: PersonalizacionProps) {
   const user = useMemo(() => {
@@ -676,8 +676,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     const label = specificTabLabel || (
       activeTab === "general" ? "Identidad & Negocio" :
       activeTab === "credito" ? "Scoring & Crédito" :
-      activeTab === "operaciones" ? "Operaciones & Logística" :
-      activeTab === "fiscal" ? "Parámetros Fiscales" : "Sitio Web & Catálogo"
+      activeTab === "operaciones" ? "Operaciones & Logística" : "Sitio Web & Catálogo"
     );
 
     // ── Validación previa de campos requeridos ──
@@ -890,7 +889,6 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         { id: "estrategia", label: "Estrategia Comercial", icon: <Sliders size={16} /> },
         { id: "credito", label: "Scoring & Crédito", icon: <DollarSign size={16} /> },
         { id: "operaciones", label: "Operaciones & Logística", icon: <Truck size={16} /> },
-        { id: "fiscal", label: "Parámetros Fiscales", icon: <Shield size={16} /> },
         { id: "catalogo", label: "Sitio Web & Catálogo", icon: <Globe size={16} /> },
         { id: "seguridad", label: "Seguridad & Contraseña", icon: <KeyRound size={16} /> },
       ];
@@ -2054,113 +2052,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
           </div>
         )}
 
-        {/* ══════════════ PESTAÑA 4: PARÁMETROS FISCALES ══════════════ */}
-        {activeTab === "fiscal" && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
-              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
-                <Shield className="text-amber-500" size={18} />
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--foreground)]">Parámetros Operativos de Comprobantes</h3>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Identificadores de serie y puntos de emisión para notas de venta internas.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Ambiente SRI
-                  </label>
-                  <select
-                    value={config.sriAmbiente || "1"}
-                    onChange={(e) => setConfig(prev => ({ ...prev, sriAmbiente: e.target.value }))}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="1">1 - Pruebas / Sandbox</option>
-                    <option value="2">2 - Producción</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Establecimiento
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={3}
-                    value={config.sriEstablecimiento || "001"}
-                    onChange={(e) => setConfig(prev => ({ ...prev, sriEstablecimiento: e.target.value }))}
-                    placeholder="001"
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold text-center font-mono focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Punto de Emisión
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={3}
-                    value={config.sriPuntoEmision || "001"}
-                    onChange={(e) => setConfig(prev => ({ ...prev, sriPuntoEmision: e.target.value }))}
-                    placeholder="001"
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold text-center font-mono focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Obligado Contabilidad
-                  </label>
-                  <select
-                    value={config.sriObligadoContabilidad ? "SI" : "NO"}
-                    onChange={(e) => setConfig(prev => ({ ...prev, sriObligadoContabilidad: e.target.value === "SI" }))}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="NO">NO</option>
-                    <option value="SI">SÍ</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* ACCIÓN DE GUARDAR PESTAÑA PARÁMETROS FISCALES */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xs">
-              <div className="text-xs">
-                {hasChanges ? (
-                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-500 animate-pulse">
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Tienes cambios pendientes en Parámetros Fiscales
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]">
-                    <CheckCircle size={13} className="text-emerald-500" />
-                    Parámetros de comprobantes al día
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => handleSave(undefined, "Parámetros Fiscales")}
-                disabled={!hasChanges || saving}
-                title={!hasChanges ? "No hay cambios pendientes por guardar" : "Guardar cambios realizados"}
-                className={`flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto ${
-                  hasChanges && !saving
-                    ? "bg-slate-900 hover:bg-slate-800 dark:bg-amber-500 dark:hover:bg-amber-600 text-white dark:text-slate-950 cursor-pointer active:scale-95 hover:shadow-lg"
-                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-300 dark:border-slate-700"
-                }`}
-              >
-                {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
-                <span>{saving ? "Guardando..." : "Guardar Parámetros Fiscales"}</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════ PESTAÑA 5: SITIO WEB & CATÁLOGO / PORTAL SAAS ══════════════ */}
+        {/* ══════════════ PESTAÑA 4: SITIO WEB & CATÁLOGO / PORTAL SAAS ══════════════ */}
         {activeTab === "catalogo" && (
           <div className="space-y-4 animate-in fade-in duration-200">
             {isSuperAdmin ? (
