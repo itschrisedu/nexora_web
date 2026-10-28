@@ -114,63 +114,62 @@ export function generarFacturaPdfDoc(data: FacturaPdfData): jsPDF {
   let y = 15;
 
   // ── 1. Encabezado / Emisor ─────────────
+  const headerHeight = 44;
   doc.setFillColor(15, 23, 42); // Slate 900
-  doc.roundedRect(12, y, pageWidth - 24, 38, 2, 2, "F");
+  doc.roundedRect(12, y, pageWidth - 24, headerHeight, 2, 2, "F");
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text(data.emisor.nombre || "NEXORA - CALZADO DE CUERO", 18, y + 8);
+  doc.setFontSize(13);
+  doc.text(data.emisor.nombre || "CALZADO DE CUERO", 18, y + 8);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(203, 213, 225); // Slate 300
   doc.text(`RUC: ${data.emisor.ruc || "1804884664001"}`, 18, y + 15);
-  doc.text(`Matriz: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 20);
-  doc.text(`Obligado a llevar Contabilidad: ${data.emisor.obligadoContabilidad ? "SI" : "NO"}`, 18, y + 25);
+  doc.text(`Matriz: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 21);
+  doc.text(`Obligado a llevar Contabilidad: ${data.emisor.obligadoContabilidad ? "SI" : "NO"}`, 18, y + 27);
   if (data.emisor.email) {
-    doc.text(`Email: ${data.emisor.email}`, 18, y + 30);
+    doc.text(`Email: ${data.emisor.email}`, 18, y + 33);
   }
 
-  // Cuadro Número Factura (derecha)
+  // Cuadro Número Factura y Código de Barras (dentro del mismo recuadro blanco)
+  const boxWidth = 78;
+  const boxX = pageWidth - 12 - boxWidth - 2;
+  const boxY = y + 2;
+  const boxHeight = 40;
+
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(pageWidth - 75, y + 4, 58, 28, 1.5, 1.5, "F");
+  doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 1.5, 1.5, "F");
+
+  const centerX = boxX + boxWidth / 2;
   doc.setTextColor(15, 23, 42);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.text("FACTURA ELECTRÓNICA", pageWidth - 46, y + 11, { align: "center" });
-
   doc.setFontSize(8.5);
+  doc.text("FACTURA ELECTRÓNICA", centerX, boxY + 5.5, { align: "center" });
+
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
-  doc.text(`No. ${data.comprobante.numero || "001-001-000000001"}`, pageWidth - 46, y + 17, { align: "center" });
-  doc.text(`Fecha: ${data.comprobante.fecha || new Date().toLocaleDateString("es-EC")}`, pageWidth - 46, y + 23, { align: "center" });
-  doc.text(`Ambiente: ${data.emisor.ambiente === "2" ? "PRODUCCIÓN" : "PRUEBAS"}`, pageWidth - 46, y + 28, { align: "center" });
+  doc.text(`No. ${data.comprobante.numero || "001-001-000000001"}`, centerX, boxY + 10, { align: "center" });
+  doc.text(`Fecha: ${data.comprobante.fecha || new Date().toLocaleDateString("es-EC")}`, centerX, boxY + 14, { align: "center" });
+  doc.text(`Ambiente: ${data.emisor.ambiente === "2" ? "PRODUCCIÓN" : "PRUEBAS"}`, centerX, boxY + 18, { align: "center" });
 
-  y += 42;
-
-  // Clave de Acceso y Código de Barras si existe
+  // Código de barras debajo del Ambiente, proporcionado dentro del recuadro blanco
   if (data.comprobante.claveAcceso) {
-    const boxHeight = 22;
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(12, y, pageWidth - 24, boxHeight, 1.5, 1.5, "FD");
+    dibujarCodigoBarras128(doc, data.comprobante.claveAcceso, centerX, boxY + 20, 68, 6.5);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(100, 116, 139);
-    doc.text("CLAVE DE ACCESO Y AUTORIZACIÓN SRI", pageWidth / 2, y + 3.8, { align: "center" });
-
-    // Código de barras vectorial Code 128
-    dibujarCodigoBarras128(doc, data.comprobante.claveAcceso, pageWidth / 2, y + 5.2, 130, 9);
-
-    // Texto numérico de 49 dígitos debajo de las barras
     doc.setFont("courier", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(5);
     doc.setTextColor(15, 23, 42);
-    doc.text(data.comprobante.claveAcceso, pageWidth / 2, y + 18.5, { align: "center" });
+    doc.text(data.comprobante.claveAcceso, centerX, boxY + 29.5, { align: "center" });
 
-    y += boxHeight + 4;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(4.8);
+    doc.setTextColor(100, 116, 139);
+    doc.text("CLAVE DE ACCESO / AUTORIZACIÓN SRI", centerX, boxY + 33, { align: "center" });
   }
+
+  y += headerHeight + 5;
 
   // ── 2. Datos del Comprador ─────────────
   doc.setFillColor(248, 250, 252);
@@ -261,12 +260,8 @@ export function generarFacturaPdfDoc(data: FacturaPdfData): jsPDF {
   doc.text("VALOR TOTAL:", startTotalsX + 4, y + 23);
   doc.text(`$${data.totales.total.toFixed(2)}`, startTotalsX + 64, y + 23, { align: "right" });
 
-  // Pie de página
-  y += 34;
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7.5);
-  doc.setTextColor(148, 163, 184);
-  doc.text(`Documento generado electrónicamente por ${data.emisor.nombre || "el establecimiento"} — Comprobante Tributario Oficial`, pageWidth / 2, y, { align: "center" });
+  // Pie de página limpio
+  y += 20;
 
   return doc;
 }

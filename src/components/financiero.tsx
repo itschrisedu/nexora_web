@@ -2495,6 +2495,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     const direccionReal = cliente.clienteDireccion || 'Cevallos, Tungurahua';
     const emailReal = cliente.clienteEmail || '';
 
+    // Detectar automáticamente la forma de pago utilizada en el cobro/nota
+    const mapearMetodoPagoSRI = (nota?: Cobro): string => {
+      if (!nota) return '01';
+      const ultAbono = nota.abonos && nota.abonos.length > 0 ? nota.abonos[nota.abonos.length - 1] : null;
+      const metodoStr = (ultAbono?.metodo || (nota as any).tipo || (nota as any).saleNote?.order?.tipoPago || '').toUpperCase();
+      if (metodoStr.includes('TRANSF') || metodoStr.includes('DEPOS')) return '20';
+      if (metodoStr.includes('DEBITO') || metodoStr.includes('DÉBITO')) return '16';
+      if (metodoStr.includes('CREDITO') || metodoStr.includes('CRÉDITO') || metodoStr.includes('TARJETA')) return '19';
+      return '01';
+    };
+
     // Vincular la nota no autorizada seleccionada
     const primeraNotaValida = notasParaFacturar[0];
 
@@ -2507,7 +2518,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       direccion: direccionReal,
       email: emailReal,
       tipoIdentificacion: tipoId,
-      formaPago: '01', // 01=Efectivo por defecto
+      formaPago: mapearMetodoPagoSRI(primeraNotaValida),
       detalles,
       notasSeleccionadas: notasParaFacturar.map((n) => n.id),
     });
@@ -2533,9 +2544,20 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     const nuevosDetalles = agruparLineasParaFactura(notasActualizadas);
     const primeraNotaActiva = notasActualizadas.find((c) => c.facturaSri?.estadoSri !== 'AUTORIZADO');
 
+    const mapearMetodoPagoSRI = (nota?: Cobro): string => {
+      if (!nota) return '01';
+      const ultAbono = nota.abonos && nota.abonos.length > 0 ? nota.abonos[nota.abonos.length - 1] : null;
+      const metodoStr = (ultAbono?.metodo || (nota as any).tipo || (nota as any).saleNote?.order?.tipoPago || '').toUpperCase();
+      if (metodoStr.includes('TRANSF') || metodoStr.includes('DEPOS')) return '20';
+      if (metodoStr.includes('DEBITO') || metodoStr.includes('DÉBITO')) return '16';
+      if (metodoStr.includes('CREDITO') || metodoStr.includes('CRÉDITO') || metodoStr.includes('TARJETA')) return '19';
+      return '01';
+    };
+
     setFacturaCliente({
       ...facturaCliente,
       saleNoteId: primeraNotaActiva?.saleNote?.id || undefined,
+      formaPago: mapearMetodoPagoSRI(primeraNotaActiva),
       detalles: nuevosDetalles,
       notasSeleccionadas: nuevasNotasIds,
     });
@@ -2621,6 +2643,26 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       if (esAutorizado) {
         showToast(`¡Factura ${res.numeroComprobante} AUTORIZADA por el SRI!`, 'success');
         loadCobros(true);
+
+        // Envío automático en segundo plano al correo registrado del comprador
+        const emailCliente = (facturaCliente.email || '').trim();
+        if (emailCliente && emailCliente !== 'facturas@cliente.com' && emailCliente.includes('@')) {
+          const negocioNombre = businessConfig?.nombre || 'Calzado de Cuero';
+          ApiService.post('/notificaciones/email-comprobante', {
+            destinatario: emailCliente,
+            asunto: `Factura Electrónica ${res.numeroComprobante} — ${negocioNombre}`,
+            tipo: 'FACTURA',
+            detalles: {
+              numeroFactura: res.numeroComprobante,
+              claveAcceso: res.claveAcceso,
+              nombreEmisor: negocioNombre,
+              urlComprobante: res.ridePdfUrl || res.xmlUrl || '',
+              mensaje: `Estimado/a ${facturaCliente.nombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura N°: ${res.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${res.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!`,
+            },
+          })
+            .then(() => showToast(`Factura enviada automáticamente al correo ${emailCliente}`, 'success'))
+            .catch((err) => console.warn('Envío de factura por correo en segundo plano:', err));
+        }
       } else {
         showToast(`Factura registrada con estado: ${res.estadoSri}`, 'info');
       }
@@ -6331,67 +6373,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     </div>
                   </div>
 
-                  {/* 4. Forma de Pago y Resumen Tributario */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    <div className="p-4 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)]">
-                            Régimen Tributario / Tarifa IVA *
-                          </label>
-                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                            Guardado en Facturación SRI
-                          </span>
-                        </div>
-                        <select
-                          value={facturaCliente.detalles[0]?.tarifaIva === 15 ? '15' : '0'}
-                          onChange={(e) => {
-                            const nuevaTarifa = Number(e.target.value);
-                            const nuevoCodigo = nuevaTarifa === 0 ? '0' : '4';
-                            setFacturaCliente({
-                              ...facturaCliente,
-                              detalles: facturaCliente.detalles.map((d) => ({
-                                ...d,
-                                tarifaIva: nuevaTarifa,
-                                codigoIva: nuevoCodigo,
-                              })),
-                            });
-                          }}
-                          className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                        >
-                          <option value="0">RIMPE - Negocio Popular (Tarifa IVA 0%)</option>
-                          <option value="15">Régimen General / Emprendedor (Tarifa IVA 15%)</option>
-                        </select>
-                        <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                          {facturaCliente.detalles[0]?.tarifaIva === 15
-                            ? 'Tarifa general de IVA 15% para Régimen General o Emprendedor.'
-                            : 'Los negocios populares facturan a tarifa 0% de IVA según normativa SRI.'}
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[var(--foreground)] mb-1">
-                          Forma de Pago SRI *
-                        </label>
-                        <select
-                          value={facturaCliente.formaPago}
-                          onChange={(e) =>
-                            setFacturaCliente({ ...facturaCliente, formaPago: e.target.value })
-                          }
-                          className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
-                        >
-                          <option value="01">01 - Sin utilización del sistema financiero (Efectivo)</option>
-                          <option value="20">20 - Otros con utilización del sistema financiero (Transferencia / Depósito)</option>
-                          <option value="16">16 - Tarjeta de Débito</option>
-                          <option value="19">19 - Tarjeta de Crédito</option>
-                        </select>
-                        <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                          Código oficial del catálogo de formas de pago del SRI Ecuador.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-1.5 shadow-xs">
+                  {/* 4. Resumen de Totales */}
+                  <div className="flex justify-end pt-2">
+                    <div className="w-full sm:max-w-xs p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-1.5 shadow-xs">
                       <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
                         <span>Subtotal Base 0%:</span>
                         <span className="font-semibold">${subtotal0Calc.toFixed(2)}</span>
