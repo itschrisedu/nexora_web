@@ -2466,8 +2466,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     if (cedulaLimpia.length === 13) tipoId = '04'; // RUC
     else if (cedulaLimpia === '9999999999999' || !cedulaLimpia) tipoId = '07'; // Consumidor Final
 
-    // Seleccionar notas a facturar (excluir las que ya tienen factura AUTORIZADA)
-    const todasLasNotas = cobroItem ? [cobroItem] : cliente.cobros;
+    // Seleccionar notas a facturar (excluir estrictamente las que ya tienen factura AUTORIZADA)
+    const cobroValido = cobroItem && cobroItem.facturaSri?.estadoSri !== 'AUTORIZADO' ? cobroItem : null;
+    const todasLasNotas = cobroValido ? [cobroValido] : cliente.cobros;
     const notasParaFacturar = todasLasNotas.filter((n) => n.facturaSri?.estadoSri !== 'AUTORIZADO');
     // Usar agrupación concisa
     const detalles = agruparLineasParaFactura(notasParaFacturar);
@@ -2476,9 +2477,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     const direccionReal = cliente.clienteDireccion || 'Cevallos, Tungurahua';
     const emailReal = cliente.clienteEmail || '';
 
+    // Vincular la primera nota no autorizada
+    const primeraNotaValida = notasParaFacturar[0];
+
     setFacturaCliente({
       clientId: cliente.clientId,
-      saleNoteId: cobroItem?.saleNote?.id || undefined,
+      saleNoteId: primeraNotaValida?.saleNote?.id || undefined,
       nombre: cliente.clienteNombre,
       cedula: cedulaLimpia || (tipoId === '07' ? '9999999999999' : ''),
       telefono: cliente.clienteTelefono !== '—' ? cliente.clienteTelefono : '',
@@ -2509,9 +2513,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
     const notasActualizadas = carteraSeleccionada.cobros.filter((c) => nuevasNotasIds.includes(c.id));
     const nuevosDetalles = agruparLineasParaFactura(notasActualizadas);
+    const primeraNotaActiva = notasActualizadas.find((c) => c.facturaSri?.estadoSri !== 'AUTORIZADO');
 
     setFacturaCliente({
       ...facturaCliente,
+      saleNoteId: primeraNotaActiva?.saleNote?.id || undefined,
       detalles: nuevosDetalles,
       notasSeleccionadas: nuevasNotasIds,
     });
@@ -2543,11 +2549,18 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     );
     const totalConImpuestos = subtotal + iva;
 
+    // Resolver dinámicamente la nota de venta seleccionada válida que no esté autorizada
+    const notasSeleccionadasCobros = (carteraSeleccionada?.cobros || []).filter(
+      (c) => facturaCliente.notasSeleccionadas.includes(c.id) && c.facturaSri?.estadoSri !== 'AUTORIZADO',
+    );
+    const targetSaleNoteId =
+      notasSeleccionadasCobros[0]?.saleNote?.id || facturaCliente.saleNoteId || undefined;
+
     setEmittingFactura(true);
     setFacturaResultado(null);
     try {
       const payload = {
-        saleNoteId: facturaCliente.saleNoteId,
+        saleNoteId: targetSaleNoteId,
         fecha: new Date(),
         comprador: {
           tipoIdentificacion: facturaCliente.tipoIdentificacion,
@@ -2585,6 +2598,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
       if (esAutorizado) {
         showToast(`¡Factura ${res.numeroComprobante} AUTORIZADA por el SRI!`, 'success');
+        loadCobros(true);
       } else {
         showToast(`Factura registrada con estado: ${res.estadoSri}`, 'info');
       }
