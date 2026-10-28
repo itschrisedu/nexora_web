@@ -60,6 +60,7 @@ export default function SriComponent() {
 
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [msgConfig, setMsgConfig] = useState({ type: "", text: "" });
+  const [rucError, setRucError] = useState(false);
 
   // Firma P12
   const [fileP12, setFileP12] = useState<File | null>(null);
@@ -122,13 +123,20 @@ export default function SriComponent() {
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
+    const rucLimpio = config.ruc.trim();
+    if (rucLimpio.length !== 13) {
+      setRucError(true);
+      showToast("El RUC debe tener exactamente 13 dígitos numéricos.", "error");
+      return;
+    }
+    setRucError(false);
     setLoadingConfig(true);
     setMsgConfig({ type: "", text: "" });
     try {
       await ApiService.put("/configuracion/negocio", {
-        sriRazonSocial: config.sriRazonSocial.trim(),
-        ruc: config.ruc.trim(),
-        direccion: config.direccion.trim() || "Cevallos, Tungurahua",
+        sriRazonSocial: config.sriRazonSocial.trim().toUpperCase(),
+        ruc: rucLimpio,
+        direccion: config.direccion.trim().toUpperCase() || "CEVALLOS, TUNGURAHUA",
         sriEstablecimiento: config.sriEstablecimiento || "001",
         sriPuntoEmision: config.sriPuntoEmision || "001",
         sriAmbiente: config.sriAmbiente || "1",
@@ -267,23 +275,49 @@ export default function SriComponent() {
                 <input
                   type="text"
                   value={config.sriRazonSocial}
-                  onChange={(e) => setConfig({ ...config, sriRazonSocial: e.target.value })}
+                  onChange={(e) => setConfig((prev) => ({ ...prev, sriRazonSocial: e.target.value.toUpperCase() }))}
                   placeholder="Ej: APELLIDOS NOMBRES o RAZÓN SOCIAL S.A."
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] uppercase focus:outline-none focus:border-[#0F172A]"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-[var(--muted-foreground)] mb-1 font-medium">RUC (13 dígitos)</label>
+                <label className="block text-[var(--muted-foreground)] mb-1 font-medium flex items-center justify-between">
+                  <span>RUC (13 dígitos)</span>
+                  {config.ruc.length > 0 && config.ruc.length < 13 && (
+                    <span className="text-xs text-rose-500 font-semibold">({config.ruc.length}/13 dígitos)</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={config.ruc}
-                  onChange={(e) => setConfig({ ...config, ruc: e.target.value })}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
+                  onChange={(e) => {
+                    const soloDigitos = e.target.value.replace(/\D/g, '').slice(0, 13);
+                    setConfig((prev) => ({ ...prev, ruc: soloDigitos }));
+                    if (soloDigitos.length === 13) setRucError(false);
+                  }}
+                  onBlur={() => {
+                    if (config.ruc.length > 0 && config.ruc.length < 13) {
+                      setRucError(true);
+                    } else {
+                      setRucError(false);
+                    }
+                  }}
+                  placeholder="1801234567001"
+                  className={`w-full bg-[var(--background)] border rounded-xl px-4 py-2.5 text-[var(--foreground)] font-mono transition-all focus:outline-none ${
+                    rucError
+                      ? "border-rose-500 ring-2 ring-rose-500/20 text-rose-600 dark:text-rose-400 font-bold focus:border-rose-500"
+                      : "border-[var(--border)] focus:border-[#0F172A]"
+                  }`}
                   maxLength={13}
                   required
                 />
+                {rucError && (
+                  <p className="text-xs text-rose-500 font-semibold mt-1">
+                    El RUC debe tener exactamente 13 dígitos numéricos (actualmente tiene {config.ruc.length}).
+                  </p>
+                )}
               </div>
 
               <div>
@@ -291,8 +325,9 @@ export default function SriComponent() {
                 <input
                   type="text"
                   value={config.direccion}
-                  onChange={(e) => setConfig({ ...config, direccion: e.target.value })}
-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
+                  onChange={(e) => setConfig((prev) => ({ ...prev, direccion: e.target.value.toUpperCase() }))}
+                  placeholder="Ej: AV. 24 DE MAYO Y 10 DE AGOSTO, CEVALLOS"
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] uppercase focus:outline-none focus:border-[#0F172A]"
                   required
                 />
               </div>
