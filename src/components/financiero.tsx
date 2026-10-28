@@ -5874,15 +5874,30 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         <span>Descargar Factura PDF</span>
                       </button>
                       {facturaResultado.xmlUrl && (
-                        <a
-                          href={facturaResultado.xmlUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-slate-700"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const xmlContent = facturaResultado.xmlUrl;
+                            if (!xmlContent) return;
+                            if (xmlContent.startsWith('http://') || xmlContent.startsWith('https://')) {
+                              window.open(xmlContent, '_blank');
+                            } else {
+                              const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `factura-${facturaResultado.numeroComprobante || 'sri'}.xml`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-slate-700 cursor-pointer"
                         >
-                          <ExternalLink size={13} />
-                          <span>Ver XML Firmado</span>
-                        </a>
+                          <Download size={13} />
+                          <span>Descargar XML Firmado</span>
+                        </button>
                       )}
                       {/* Botón WhatsApp directo con Factura Oficial */}
                       {facturaCliente.telefono && (
