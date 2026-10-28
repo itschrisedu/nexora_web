@@ -44,7 +44,8 @@ export default function SriComponent() {
       } catch (e) {}
     }
     return {
-      nombre: initialName,
+      nombreComercial: initialName,
+      sriRazonSocial: "",
       ruc: "",
       direccion: "",
       sriEstablecimiento: "001",
@@ -80,7 +81,8 @@ export default function SriComponent() {
       if (data) {
         setConfig((prev) => ({
           ...prev,
-          nombre: data.nombre || prev.nombre,
+          nombreComercial: data.nombre || prev.nombreComercial,
+          sriRazonSocial: data.sriRazonSocial || "",
           ruc: data.ruc || prev.ruc,
           direccion: data.direccion || prev.direccion,
           sriEstablecimiento: data.sriEstablecimiento || prev.sriEstablecimiento,
@@ -122,7 +124,7 @@ export default function SriComponent() {
     setMsgConfig({ type: "", text: "" });
     try {
       await ApiService.put("/configuracion/negocio", {
-        nombre: config.nombre.trim(),
+        sriRazonSocial: config.sriRazonSocial.trim(),
         ruc: config.ruc.trim(),
         direccion: config.direccion.trim() || "Cevallos, Tungurahua",
         sriEstablecimiento: config.sriEstablecimiento || "001",
@@ -257,15 +259,36 @@ export default function SriComponent() {
               Datos del Emisor y Parámetros SRI
             </h2>
             <form onSubmit={handleSaveConfig} className="space-y-4 text-sm">
+              {/* Indicador Informativo del Local Comercial */}
+              <div className="bg-[var(--muted)]/40 p-3.5 rounded-xl border border-[var(--border)] flex items-center justify-between">
+                <div>
+                  <span className="text-xs uppercase font-bold text-[var(--muted-foreground)] tracking-wider block">Nombre Comercial del Negocio</span>
+                  <p className="text-sm font-semibold text-[var(--foreground)] mt-0.5">{config.nombreComercial || "Local Comercial"}</p>
+                </div>
+                <span className="text-xs text-[var(--muted-foreground)] bg-[var(--background)] px-2.5 py-1 rounded-lg border border-[var(--border)]">
+                  Configurado en Identidad del Negocio
+                </span>
+              </div>
+
+              {/* Razón Social del Emisor (Exclusivo SRI) */}
               <div>
-                <label className="block text-[var(--muted-foreground)] mb-1 font-medium">Razón Social / Nombre Comercial</label>
+                <label className="block text-[var(--muted-foreground)] mb-1 font-medium">
+                  Razón Social del Emisor (SRI)
+                  <span className="text-xs text-[var(--muted-foreground)] font-normal ml-2">
+                    (Nombre legal del titular o contribuyente en el SRI)
+                  </span>
+                </label>
                 <input
                   type="text"
-                  value={config.nombre}
-                  onChange={(e) => setConfig({ ...config, nombre: e.target.value })}
+                  value={config.sriRazonSocial}
+                  onChange={(e) => setConfig({ ...config, sriRazonSocial: e.target.value })}
+                  placeholder="Ej: APELLIDOS NOMBRES o RAZÓN SOCIAL S.A."
                   className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-[#0F172A]"
                   required
                 />
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                  Este dato se utiliza únicamente para el XML y autorización tributaria del SRI. No modifica el nombre comercial ni las sucursales del sistema.
+                </p>
               </div>
 
               <div>
