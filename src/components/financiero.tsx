@@ -180,6 +180,13 @@ interface Cobro {
   costoEnvio?: number;
   notasPedido?: string;
   lines?: any[];
+  facturaSri?: {
+    id: string;
+    saleNoteId: string;
+    numeroComprobante: string;
+    claveAcceso?: string;
+    estadoSri: string;
+  } | null;
 }
 
 interface ClienteCartera {
@@ -2414,7 +2421,6 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             descripcion = `${g.cantidad} ${g.cantidad === 1 ? 'Par' : 'Pares'} - ${g.nombre}`;
           }
           if (g.serie) descripcion += ` (${g.serie})`;
-          descripcion += ` [${numNota}]`;
 
           const precioUnitarioGrupo = g.cantidad > 0 ? g.totalPrecio / g.cantidad : 0;
 
@@ -2432,7 +2438,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         const monto = Number(c.montoOriginal ?? c.montoTotal ?? 0);
         agrupados.push({
           codigoProducto: `VENTA-${c.id.slice(0, 6).toUpperCase()}`,
-          descripcion: `${businessConfig?.nombre || 'Calzado Artesanal'} — ${numNota}`,
+          descripcion: businessConfig?.nombre || 'Calzado Artesanal de Cuero',
           cantidad: 1,
           precioUnitario: monto,
           descuento: 0,
@@ -2459,8 +2465,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     if (cedulaLimpia.length === 13) tipoId = '04'; // RUC
     else if (cedulaLimpia === '9999999999999' || !cedulaLimpia) tipoId = '07'; // Consumidor Final
 
-    // Seleccionar notas a facturar
-    const notasParaFacturar = cobroItem ? [cobroItem] : cliente.cobros;
+    // Seleccionar notas a facturar (excluir las que ya tienen factura AUTORIZADA)
+    const todasLasNotas = cobroItem ? [cobroItem] : cliente.cobros;
+    const notasParaFacturar = todasLasNotas.filter((n) => n.facturaSri?.estadoSri !== 'AUTORIZADO');
     // Usar agrupación concisa
     const detalles = agruparLineasParaFactura(notasParaFacturar);
 
@@ -2487,6 +2494,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
   const handleToggleNotaFacturar = (cobroItem: Cobro) => {
     if (!facturaCliente || !carteraSeleccionada) return;
+    if (cobroItem.facturaSri?.estadoSri === 'AUTORIZADO') return;
 
     const yaSeleccionada = facturaCliente.notasSeleccionadas.includes(cobroItem.id);
     const nuevasNotasIds = yaSeleccionada
@@ -6043,6 +6051,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         const monto = Number(c.montoOriginal ?? c.montoTotal ?? 0);
                         const isChecked = facturaCliente.notasSeleccionadas.includes(c.id);
                         const isExpanded = notaExpandidaFacturaId === c.id;
+                        const yaFacturada = c.facturaSri?.estadoSri === 'AUTORIZADO';
                         const lineasNota = (c.lines && c.lines.length > 0) ? c.lines : (c.saleNote?.lines || []);
 
                         return (
@@ -6051,7 +6060,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             className={`p-3 rounded-xl border transition-all ${
                               isExpanded ? 'sm:col-span-2' : ''
                             } ${
-                              isChecked
+                              yaFacturada
+                                ? 'bg-emerald-500/5 border-emerald-500/30 opacity-60 cursor-not-allowed'
+                                : isChecked
                                 ? 'bg-[#0F172A]/10 border-[#0F172A]/40 shadow-xs ring-1 ring-[#0F172A]/20'
                                 : 'bg-[var(--card)] border-[var(--border)] hover:border-slate-400 opacity-90 hover:opacity-100'
                             }`}
@@ -6062,12 +6073,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 <input
                                   type="checkbox"
                                   checked={isChecked}
+                                  disabled={yaFacturada}
                                   onChange={(e) => {
                                     e.stopPropagation();
                                     handleToggleNotaFacturar(c);
                                   }}
-                                  className="w-4 h-4 mt-1 rounded text-[#0F172A] accent-[#0F172A] focus:ring-0 cursor-pointer shrink-0"
-                                  title={isChecked ? 'Deseleccionar nota' : 'Seleccionar nota para facturar'}
+                                  className={`w-4 h-4 mt-1 rounded focus:ring-0 shrink-0 ${yaFacturada ? 'opacity-40 cursor-not-allowed' : 'text-[#0F172A] accent-[#0F172A] cursor-pointer'}`}
+                                  title={yaFacturada ? 'Esta nota ya tiene factura AUTORIZADA' : isChecked ? 'Deseleccionar nota' : 'Seleccionar nota para facturar'}
                                 />
 
                                 {/* Bloque interactivo con Chevron, Código y Badge Presencial / Envíos */}
@@ -6087,6 +6099,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                     <div className="font-extrabold text-xs text-[var(--foreground)] group-hover:text-[#0F172A] transition-colors">
                                       {numNota}
                                     </div>
+                                    {yaFacturada && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-extrabold mt-1">
+                                        <span>✓ Factura {c.facturaSri?.numeroComprobante} — AUTORIZADA</span>
+                                      </span>
+                                    )}
                                     <div className="mt-1">
                                       {c.tipoEntrega === 'ENVIO' ? (
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-extrabold">
