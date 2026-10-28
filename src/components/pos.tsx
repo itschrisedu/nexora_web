@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "./ui/toast";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
-import { capitalizarNombreCompleto, formatearNombreSerie } from "@/utils/text-formatters";
+import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from "@/utils/text-formatters";
 import {
   generarUrlPublicaVentaPOS,
   armarMensajeWhatsAppVentaPOS,
@@ -69,6 +69,7 @@ interface CajaEstado {
 interface ProductoBusqueda {
   id: string;
   baseCode: string;
+  code?: string;
   modelName: string;
   color: string;
   costPrice?: number;
@@ -1090,17 +1091,37 @@ export default function PosComponent() {
 
     const grupos = Array.from(mapGrupos.values());
 
+    const rawBusqueda = normalizarParaBusqueda(busqueda);
+    if (!rawBusqueda) return grupos;
+
+    // Buscador Inteligente Multicriterio (Modelo + Color + Código + Serie + Talla):
+    // Divide los términos de búsqueda en palabras individuales (tokens).
+    // Permite buscar combinaciones como "superstar negro/blanco", "mocasín café 40", etc.
+    const tokens = rawBusqueda
+      .replace(/[/\\+,_-]/g, ' ')
+      .split(/\s+/)
+      .filter((t) => t.length > 0);
+
     return grupos.filter((g) => {
-      if (!q) return true;
-      const coincideModelo = g.modelName.toLowerCase().includes(q);
-      const coincideColor = g.color.toLowerCase().includes(q);
-      const coincideSerie = g.series.some(
-        (s) =>
-          s.serieNombre.toLowerCase().includes(q) ||
-          s.baseCode.toLowerCase().includes(q) ||
-          s.tallas.some((t) => t.numero.toString() === q || `t${t.numero}` === q)
+      const colorNorm = normalizarParaBusqueda(g.color);
+      const colorLimpio = colorNorm.replace(/[/\\+,_-]/g, ' ');
+
+      const seriesText = g.series
+        .map((s) => {
+          const tallasNums = s.tallas.map((t) => `${t.numero} t${t.numero}`).join(' ');
+          return `${s.serieNombre || ''} ${s.baseCode || ''} ${s.code || ''} ${tallasNums}`;
+        })
+        .join(' ');
+
+      const fullGrupoTexto = normalizarParaBusqueda(
+        `${g.modelName} ${g.color} ${colorLimpio} ${seriesText}`
       );
-      return coincideModelo || coincideColor || coincideSerie;
+
+      // 1. Si la frase completa coincide directamente
+      if (fullGrupoTexto.includes(rawBusqueda)) return true;
+
+      // 2. Si TODOS los términos (tokens) individuales están presentes en el calzado
+      return tokens.every((tok) => fullGrupoTexto.includes(tok));
     });
   }, [productos, busqueda]);
 
@@ -1356,11 +1377,21 @@ export default function PosComponent() {
                     <Search className="absolute left-3.5 top-3 text-[var(--muted-foreground)]" size={16} />
                     <input
                       type="text"
-                      placeholder="Buscar calzado por modelo, color o código..."
+                      placeholder="Buscar por modelo, color, serie o talla (ej: superstar negro/blanco)..."
                       value={busqueda}
                       onChange={(e) => setBusqueda(e.target.value)}
-                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-10 pr-4 py-2.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl pl-10 pr-9 py-2.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-emerald-500"
                     />
+                    {busqueda && (
+                      <button
+                        type="button"
+                        onClick={() => setBusqueda("")}
+                        className="absolute right-3 top-2.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 rounded-full hover:bg-[var(--muted)]"
+                        title="Limpiar búsqueda"
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-h-[58vh] overflow-y-auto pr-1">

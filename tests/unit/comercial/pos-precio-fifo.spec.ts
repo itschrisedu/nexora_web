@@ -52,5 +52,80 @@ describe('Lógica Comercial de Precios y Márgenes POS / FIFO (nexora_web)', () 
 
     expect(costoSugeridoCompra).toBe(16.0);
   });
+
+  describe('Buscador Inteligente Multicriterio en Punto de Venta (POS)', () => {
+    const catalogoGrupos = [
+      {
+        modelName: 'Superstar',
+        color: 'Negro/Blanco',
+        series: [
+          { serieNombre: 'Caballero', baseCode: 'SUP-01', code: 'SUP-NEG-38', tallas: [{ numero: 38 }, { numero: 39 }, { numero: 40 }] },
+        ],
+      },
+      {
+        modelName: 'Superstar',
+        color: 'Blanco Puro',
+        series: [
+          { serieNombre: 'Damas', baseCode: 'SUP-02', code: 'SUP-BLA-36', tallas: [{ numero: 36 }, { numero: 37 }] },
+        ],
+      },
+      {
+        modelName: 'Mocasín Clásico',
+        color: 'Café Moro',
+        series: [
+          { serieNombre: 'Caballero', baseCode: 'MOC-01', code: 'MOC-CAF-41', tallas: [{ numero: 41 }, { numero: 42 }] },
+        ],
+      },
+    ];
+
+    const filtrarCatalogoInteligente = (busqueda: string) => {
+      const normalizar = (txt?: string | null) =>
+        (txt || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+      const raw = normalizar(busqueda);
+      if (!raw) return catalogoGrupos;
+
+      const tokens = raw.replace(/[/\\+,_-]/g, ' ').split(/\s+/).filter((t) => t.length > 0);
+
+      return catalogoGrupos.filter((g) => {
+        const colorLimpio = normalizar(g.color).replace(/[/\\+,_-]/g, ' ');
+        const seriesText = g.series
+          .map((s) => `${s.serieNombre} ${s.baseCode} ${s.code} ${s.tallas.map((t) => `${t.numero} t${t.numero}`).join(' ')}`)
+          .join(' ');
+        const full = normalizar(`${g.modelName} ${g.color} ${colorLimpio} ${seriesText}`);
+
+        if (full.includes(raw)) return true;
+        return tokens.every((tok) => full.includes(tok));
+      });
+    };
+
+    it('debe encontrar el modelo exacto cuando el usuario busca "modelo + color" juntos (ej: superstar negro/blanco)', () => {
+      const res = filtrarCatalogoInteligente('superstar negro/blanco');
+      expect(res).toHaveLength(1);
+      expect(res[0].modelName).toBe('Superstar');
+      expect(res[0].color).toBe('Negro/Blanco');
+    });
+
+    it('debe encontrar coincidencias con palabras separadas o en orden inverso (ej: negro superstar)', () => {
+      const res = filtrarCatalogoInteligente('negro superstar');
+      expect(res).toHaveLength(1);
+      expect(res[0].modelName).toBe('Superstar');
+      expect(res[0].color).toBe('Negro/Blanco');
+    });
+
+    it('debe permitir buscar por modelo y talla simultáneamente (ej: superstar 39)', () => {
+      const res = filtrarCatalogoInteligente('superstar 39');
+      expect(res).toHaveLength(1);
+      expect(res[0].modelName).toBe('Superstar');
+      expect(res[0].color).toBe('Negro/Blanco');
+    });
+
+    it('debe ignorar tildes al buscar calzados (ej: mocasin cafe)', () => {
+      const res = filtrarCatalogoInteligente('mocasin cafe');
+      expect(res).toHaveLength(1);
+      expect(res[0].modelName).toBe('Mocasín Clásico');
+      expect(res[0].color).toBe('Café Moro');
+    });
+  });
 });
 
