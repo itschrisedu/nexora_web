@@ -74,7 +74,7 @@ import {
   preCargarImagenesHistorial,
   HistorialComercialPdfData,
 } from '../services/pdf-historial.service';
-import { generarUrlPublicaAbono, generarUrlPublicaHistorial } from '../services/comprobante-url.service';
+import { generarUrlPublicaAbono, generarUrlPublicaHistorial, generarUrlPublicaFactura } from '../services/comprobante-url.service';
 import ConfirmModal from './ui/confirm-modal';
 import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from '@/utils/text-formatters';
 import { descargarReporteDeudoresPdf } from '../services/pdf-deudores.service';
@@ -2644,24 +2644,62 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         showToast(`¡Factura ${res.numeroComprobante} AUTORIZADA por el SRI!`, 'success');
         loadCobros(true);
 
-        // Envío automático en segundo plano al correo registrado del comprador
+        // Envio automatico en segundo plano al correo registrado del comprador
         const emailCliente = (facturaCliente.email || '').trim();
         if (emailCliente && emailCliente !== 'facturas@cliente.com' && emailCliente.includes('@')) {
           const negocioNombre = businessConfig?.nombre || 'Calzado de Cuero';
-          ApiService.post('/notificaciones/email-comprobante', {
-            destinatario: emailCliente,
-            asunto: `Factura Electrónica ${res.numeroComprobante} — ${negocioNombre}`,
-            tipo: 'FACTURA',
-            detalles: {
-              numeroFactura: res.numeroComprobante,
-              claveAcceso: res.claveAcceso,
-              nombreEmisor: negocioNombre,
-              urlComprobante: res.ridePdfUrl || res.xmlUrl || '',
-              mensaje: `Estimado/a ${facturaCliente.nombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura N°: ${res.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${res.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!`,
+          // Generar enlace publico corto accesible por cualquier persona
+          const pdfDataEmail = {
+            emisor: {
+              nombre: negocioNombre,
+              ruc: businessConfig?.ruc || '',
+              direccion: businessConfig?.direccion || 'Ecuador',
+              telefono: businessConfig?.telefono,
+              email: businessConfig?.email,
             },
-          })
-            .then(() => showToast(`Factura enviada automáticamente al correo ${emailCliente}`, 'success'))
-            .catch((err) => console.warn('Envío de factura por correo en segundo plano:', err));
+            comprobante: {
+              numero: res.numeroComprobante || '001-001-000000001',
+              fecha: new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' }),
+              claveAcceso: res.claveAcceso,
+              formaPago: facturaCliente.formaPago,
+            },
+            comprador: {
+              nombre: facturaCliente.nombre,
+              cedula: facturaCliente.cedula,
+              direccion: facturaCliente.direccion,
+              telefono: facturaCliente.telefono,
+              email: facturaCliente.email,
+            },
+            detalles: facturaCliente.detalles.map((d) => ({
+              descripcion: d.descripcion,
+              cantidad: d.cantidad,
+              precioUnitario: d.precioUnitario,
+              descuento: d.descuento || 0,
+              subtotal: d.cantidad * d.precioUnitario,
+            })),
+            totales: {
+              subtotal15: subtotal,
+              subtotal0: 0,
+              iva15: iva,
+              total: totalConImpuestos,
+            },
+          };
+          generarUrlPublicaFactura(pdfDataEmail as any).then((urlCorta) => {
+            ApiService.post('/notificaciones/email-comprobante', {
+              destinatario: emailCliente,
+              asunto: `Factura Electronica ${res.numeroComprobante} - ${negocioNombre}`,
+              tipo: 'FACTURA',
+              detalles: {
+                numeroFactura: res.numeroComprobante,
+                claveAcceso: res.claveAcceso,
+                nombreEmisor: negocioNombre,
+                urlComprobante: urlCorta,
+                mensaje: `Estimado/a ${facturaCliente.nombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electronica ante el Servicio de Rentas Internas (SRI):\n\nFactura No: ${res.numeroComprobante}\nClave de Acceso SRI:\n${res.claveAcceso || 'Autorizada'}\n\nDescargue su comprobante digital oficial aqui:\n${urlCorta}\n\nMuchas gracias por su preferencia!`,
+              },
+            })
+              .then(() => showToast(`Factura enviada automaticamente al correo ${emailCliente}`, 'success'))
+              .catch((err) => console.warn('Envio de factura por correo en segundo plano:', err));
+          }).catch((e) => console.warn('Error generando URL corta para factura:', e));
         }
       } else {
         showToast(`Factura registrada con estado: ${res.estadoSri}`, 'info');

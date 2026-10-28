@@ -810,7 +810,7 @@ export default function PosComponent() {
                 ApiService.post("/notificaciones/email-comprobante", {
                   destinatario: compradorEmail,
                   asunto: `Factura Electrónica Autorizada ${resSri.numeroComprobante} — ${nombreEmisorPos}`,
-                  tipo: "GENERAL",
+                  tipo: "FACTURA",
                   detalles: {
                     nombreEmisor: nombreEmisorPos,
                     numeroFactura: resSri.numeroComprobante,
