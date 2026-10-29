@@ -653,6 +653,8 @@ export default function PosComponent() {
       return;
     }
 
+    let ultimoPdfDataFactura: any = null;
+
     try {
       const factorDescuento = subtotalVenta > 0 ? totalVenta / subtotalVenta : 1;
 
@@ -808,63 +810,64 @@ export default function PosComponent() {
             if (resSri?.estadoSri === "AUTORIZADO") {
               showToast(`Factura electrónica ${resSri.numeroComprobante} AUTORIZADA por el SRI`, "success");
 
+              const esRegimenGeneral = negocioInfo?.sriRegimen === 'GENERAL_15';
+              const tarifaIvaPos = esRegimenGeneral ? 15 : 0;
+              const subtotal15Pos = tarifaIvaPos === 15 ? Number((totalFacturaSri / 1.15).toFixed(2)) : 0;
+              const subtotal0Pos = tarifaIvaPos === 0 ? totalFacturaSri : 0;
+              const iva15Pos = tarifaIvaPos === 15 ? Number((totalFacturaSri - subtotal15Pos).toFixed(2)) : 0;
+
+              const pdfDataEmail: any = {
+                emisor: {
+                  nombre: nombreEmisorPos,
+                  ruc: negocioInfo?.ruc || "1805274790001",
+                  direccion: negocioInfo?.direccion || "LA DELICIA Y MIRABELES",
+                  telefono: negocioInfo?.telefono,
+                  email: negocioInfo?.email || "chrispaucar49@gmail.com",
+                  obligadoContabilidad: Boolean(negocioInfo?.sriObligadoContabilidad),
+                  ambiente: negocioInfo?.sriAmbiente || "1",
+                  establecimiento: negocioInfo?.sriEstablecimiento || "001",
+                  puntoEmision: negocioInfo?.sriPuntoEmision || "001",
+                },
+                comprobante: {
+                  numero: resSri.numeroComprobante,
+                  fecha: new Date().toLocaleDateString("es-EC", { year: "numeric", month: "long", day: "numeric" }),
+                  claveAcceso: resSri.claveAcceso,
+                  formaPago: formaPagoSri,
+                },
+                comprador: {
+                  nombre: compradorNombre,
+                  cedula: cedulaLimpia,
+                  direccion: compradorDireccion,
+                  telefono: compradorTelefono,
+                  email: compradorEmail || "facturas@calzado.com",
+                },
+                detalles: (detallesSri || []).map((d: any) => {
+                  const cant = d.cantidad || 1;
+                  const precioUnit = tarifaIvaPos === 15 ? Number((d.precioUnitario / 1.15).toFixed(2)) : Number(d.precioUnitario.toFixed(2));
+                  const sub = Number((cant * precioUnit).toFixed(2));
+                  return {
+                    descripcion: d.descripcion,
+                    cantidad: cant,
+                    precioUnitario: precioUnit,
+                    descuento: d.descuento || 0,
+                    tarifaIva: tarifaIvaPos,
+                    subtotal: sub,
+                  };
+                }),
+                totales: {
+                  subtotal15: subtotal15Pos,
+                  subtotal0: subtotal0Pos,
+                  descuento: 0,
+                  iva15: iva15Pos,
+                  total: totalFacturaSri,
+                },
+              };
+              ultimoPdfDataFactura = pdfDataEmail;
+              setUltimoTicket((prev: any) => (prev ? { ...prev, facturaPdfData: pdfDataEmail } : prev));
+
               // Facturación electrónica rompe switches: se despacha siempre al correo del cliente con enlace corto
               const correoDestinoPos = (compradorEmail || "").trim();
               if (correoDestinoPos && correoDestinoPos.includes('@') && correoDestinoPos !== 'facturas@cliente.com') {
-                const esRegimenGeneral = negocioInfo?.sriRegimen === 'GENERAL_15';
-                const tarifaIvaPos = esRegimenGeneral ? 15 : 0;
-                const subtotal15Pos = tarifaIvaPos === 15 ? Number((totalFacturaSri / 1.15).toFixed(2)) : 0;
-                const subtotal0Pos = tarifaIvaPos === 0 ? totalFacturaSri : 0;
-                const iva15Pos = tarifaIvaPos === 15 ? Number((totalFacturaSri - subtotal15Pos).toFixed(2)) : 0;
-
-                const pdfDataEmail: any = {
-                  emisor: {
-                    nombre: nombreEmisorPos,
-                    ruc: negocioInfo?.ruc || "1805274790001",
-                    direccion: negocioInfo?.direccion || "LA DELICIA Y MIRABELES",
-                    telefono: negocioInfo?.telefono,
-                    email: negocioInfo?.email || "chrispaucar49@gmail.com",
-                    obligadoContabilidad: Boolean(negocioInfo?.sriObligadoContabilidad),
-                    ambiente: negocioInfo?.sriAmbiente || "1",
-                    establecimiento: negocioInfo?.sriEstablecimiento || "001",
-                    puntoEmision: negocioInfo?.sriPuntoEmision || "001",
-                  },
-                  comprobante: {
-                    numero: resSri.numeroComprobante,
-                    fecha: new Date().toLocaleDateString("es-EC", { year: "numeric", month: "long", day: "numeric" }),
-                    claveAcceso: resSri.claveAcceso,
-                    formaPago: formaPagoSri,
-                  },
-                  comprador: {
-                    nombre: compradorNombre,
-                    cedula: cedulaLimpia,
-                    direccion: compradorDireccion,
-                    telefono: compradorTelefono,
-                    email: correoDestinoPos,
-                  },
-                  detalles: (detallesSri || []).map((d: any) => {
-                    const cant = d.cantidad || 1;
-                    const precioUnit = tarifaIvaPos === 15 ? Number((d.precioUnitario / 1.15).toFixed(2)) : Number(d.precioUnitario.toFixed(2));
-                    const sub = Number((cant * precioUnit).toFixed(2));
-                    return {
-                      descripcion: d.descripcion,
-                      cantidad: cant,
-                      precioUnitario: precioUnit,
-                      descuento: d.descuento || 0,
-                      tarifaIva: tarifaIvaPos,
-                      subtotal: sub,
-                    };
-                  }),
-                  totales: {
-                    subtotal15: subtotal15Pos,
-                    subtotal0: subtotal0Pos,
-                    descuento: 0,
-                    iva15: iva15Pos,
-                    total: totalFacturaSri,
-                  },
-                };
-                ultimoPdfDataFactura = pdfDataEmail;
-
                 let urlCorta = "";
                 try {
                   urlCorta = await generarUrlPublicaFactura(pdfDataEmail);
@@ -891,6 +894,7 @@ export default function PosComponent() {
                   .then(() => showToast(`Factura electrónica enviada al correo ${correoDestinoPos}`, "success"))
                   .catch((e) => console.warn("Error enviando email factura POS:", e));
               }
+            }
             } else if (resSri?.estadoSri) {
               console.warn("Emisión SRI POS registrada con estado:", resSri.estadoSri, resSri.errorMensaje);
             }
