@@ -894,7 +894,6 @@ export default function PosComponent() {
                   .then(() => showToast(`Factura electrónica enviada al correo ${correoDestinoPos}`, "success"))
                   .catch((e) => console.warn("Error enviando email factura POS:", e));
               }
-            }
             } else if (resSri?.estadoSri) {
               console.warn("Emisión SRI POS registrada con estado:", resSri.estadoSri, resSri.errorMensaje);
             }
