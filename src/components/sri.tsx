@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ApiService } from "@/services/api.service";
 import {
   FileText,
@@ -16,6 +16,8 @@ import {
   KeyRound,
   Eye,
   EyeOff,
+  Trash2,
+  FileCheck,
 } from "lucide-react";
 
 import { useToast } from "./ui/toast";
@@ -68,6 +70,14 @@ export default function SriComponent() {
   const [passwordP12, setPasswordP12] = useState("");
   const [showPasswordP12, setShowPasswordP12] = useState(false);
   const [uploadingFirma, setUploadingFirma] = useState(false);
+  const [eliminandoFirma, setEliminandoFirma] = useState(false);
+  const [nombreArchivoGuardado, setNombreArchivoGuardado] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nexora_sri_p12_filename") || "";
+    }
+    return "";
+  });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Listado de Facturas
   const [facturas, setFacturas] = useState<FacturaSRI[]>([]);
@@ -162,21 +172,54 @@ export default function SriComponent() {
     setMsgConfig({ type: "", text: "" });
 
     try {
+      const fileName = fileP12.name;
       const formData = new FormData();
       formData.append("firma", fileP12);
       formData.append("password", passwordP12);
 
       await ApiService.postFormData("/configuracion/sri/firma-p12", formData);
-      setMsgConfig({ type: "success", text: "Certificado de firma .p12 subido y encriptado con éxito." });
+      if (typeof window !== "undefined") {
+        localStorage.setItem("nexora_sri_p12_filename", fileName);
+      }
+      setNombreArchivoGuardado(fileName);
+      setMsgConfig({ type: "success", text: `Certificado de firma (${fileName}) guardado y encriptado con éxito.` });
       showToast("Firma electrónica cargada y validada con éxito", "success");
       setConfig((prev) => ({ ...prev, tieneP12: true }));
       setFileP12(null);
       setPasswordP12("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (err: any) {
       setMsgConfig({ type: "error", text: err.message || "Error al procesar el archivo .p12." });
       showToast(err.message || "Error al subir la firma .p12", "error");
     } finally {
       setUploadingFirma(false);
+    }
+  };
+
+  const handleEliminarFirma = async () => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar la firma electrónica actual? Podrás subir una nueva inmediatamente.")) {
+      return;
+    }
+    setEliminandoFirma(true);
+    try {
+      await ApiService.delete("/configuracion/sri/firma-p12");
+      setConfig((prev) => ({ ...prev, tieneP12: false }));
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("nexora_sri_p12_filename");
+      }
+      setNombreArchivoGuardado("");
+      setFileP12(null);
+      setPasswordP12("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      showToast("Firma electrónica eliminada. Ahora puedes subir una nueva.", "success");
+    } catch (err: any) {
+      showToast("Error al eliminar la firma: " + (err.message || ""), "error");
+    } finally {
+      setEliminandoFirma(false);
     }
   };
 
@@ -422,38 +465,76 @@ export default function SriComponent() {
                 Certificado Digital de Firma (.p12)
               </h2>
 
-              <div className="mb-6 p-4 bg-[var(--muted)]/60 rounded-xl border border-[var(--border)] flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${
-                    config.tieneP12 ? "bg-emerald-500 shadow-md animate-pulse" : "bg-rose-500"
-                  }`}
-                />
-                <div>
-                  <p className="text-sm font-semibold text-[var(--card-foreground)]">
-                    {config.tieneP12 ? "Firma Electrónica Cargada y Cifrada" : "No hay Firma Electrónica activa"}
-                  </p>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    {config.tieneP12
-                      ? "La contraseña se encuentra encriptada con AES-256 en el servidor."
-                      : "Sube tu certificado PKCS#12 (.p12) emitido por BCE, Security Data, UANATACA, etc."}
-                  </p>
+              <div className="mb-6 p-4 bg-[var(--muted)]/60 rounded-xl border border-[var(--border)] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-4 h-4 rounded-full shrink-0 ${
+                      config.tieneP12 ? "bg-emerald-500 shadow-md animate-pulse" : "bg-rose-500"
+                    }`}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--card-foreground)] flex items-center gap-2 truncate">
+                      <span>{config.tieneP12 ? "Firma Electrónica Cargada y Cifrada" : "No hay Firma Electrónica activa"}</span>
+                    </p>
+                    <p className="text-xs text-[var(--muted-foreground)] truncate">
+                      {config.tieneP12
+                        ? (
+                          <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
+                            <FileCheck size={13} className="shrink-0" />
+                            Archivo activo: <span className="font-mono underline font-bold">{nombreArchivoGuardado || "Certificado .p12 activo"}</span> (AES-256)
+                          </span>
+                        )
+                        : "Sube tu certificado PKCS#12 (.p12) emitido por BCE, Security Data, UANATACA, etc."}
+                    </p>
+                  </div>
                 </div>
+
+                {config.tieneP12 && (
+                  <button
+                    type="button"
+                    onClick={handleEliminarFirma}
+                    disabled={eliminandoFirma}
+                    className="shrink-0 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-lg border border-rose-500/30 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    title="Eliminar certificado actual para subir uno nuevo"
+                  >
+                    <Trash2 size={13} />
+                    <span>{eliminandoFirma ? "Eliminando..." : "Eliminar firma"}</span>
+                  </button>
+                )}
               </div>
 
               <form onSubmit={handleUploadFirma} className="space-y-4 text-sm">
                 <div>
-                  <label className="block text-[var(--muted-foreground)] mb-1 font-medium">Archivo de Firma (.p12 / .pfx)</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[var(--muted-foreground)] font-medium">
+                      {config.tieneP12 ? "Reemplazar firma con nuevo archivo (.p12 / .pfx)" : "Archivo de Firma (.p12 / .pfx)"}
+                    </label>
+                    {fileP12 && (
+                      <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                        <FileCheck size={12} />
+                        {fileP12.name}
+                      </span>
+                    )}
+                  </div>
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".p12,.pfx"
                     onChange={(e) => setFileP12(e.target.files?.[0] || null)}
                     className="w-full text-xs text-[var(--muted-foreground)] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[var(--muted)] file:text-[var(--foreground)] hover:file:opacity-80"
                     required
                   />
+                  {config.tieneP12 && !fileP12 && (
+                    <p className="text-[11px] text-[var(--muted-foreground)] mt-1">
+                      Si seleccionas un nuevo archivo, se reemplazará automáticamente la firma actual por la nueva.
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-[var(--muted-foreground)] mb-1 font-medium">Contraseña de la Firma</label>
+                  <label className="block text-[var(--muted-foreground)] mb-1 font-medium">
+                    {config.tieneP12 ? "Nueva Contraseña de la Firma" : "Contraseña de la Firma"}
+                  </label>
                   <div className="relative">
                     <KeyRound className="absolute left-3 top-3 text-[var(--muted-foreground)]" size={16} />
                     <input
@@ -479,10 +560,14 @@ export default function SriComponent() {
                 <button
                   type="submit"
                   disabled={uploadingFirma || !fileP12 || !passwordP12}
-                  className="w-full mt-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+                  className="w-full mt-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Upload size={18} />
-                  {uploadingFirma ? "Cifrando y Guardando..." : "Subir Firma Segura"}
+                  {uploadingFirma
+                    ? "Cifrando y Guardando..."
+                    : config.tieneP12
+                    ? "Reemplazar Firma Electrónica"
+                    : "Subir Firma Segura"}
                 </button>
               </form>
             </div>
