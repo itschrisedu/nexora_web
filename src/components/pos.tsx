@@ -896,9 +896,16 @@ export default function PosComponent() {
               }
             } else if (resSri?.estadoSri) {
               console.warn("Emisión SRI POS registrada con estado:", resSri.estadoSri, resSri.errorMensaje);
+              showToast(`Factura SRI: ${resSri.estadoSri}. ${resSri.errorMensaje || ""}`, "warning");
             }
           } catch (errSri: any) {
             console.warn("Emisión SRI POS en segundo plano:", errSri?.message || errSri);
+            const msg = errSri?.message || "";
+            if (msg.includes("p12") || msg.includes("firma")) {
+              showToast("Factura SRI: Falta configurar la firma electrónica (.p12) en Configuración -> SRI.", "warning");
+            } else if (msg) {
+              showToast(`Factura SRI en segundo plano: ${msg}`, "warning");
+            }
           }
         })();
       }
@@ -1073,12 +1080,11 @@ export default function PosComponent() {
     if (!ultimoTicket) return;
     setEnviandoComprobantePOS(true);
     try {
-      const autoEmailLocalPos2 = typeof window !== "undefined" ? localStorage.getItem("nexora_auto_email_comprobante") : null;
-      const autoEmail = autoEmailLocalPos2 !== null ? autoEmailLocalPos2 === "true" : (negocioInfo?.autoEmailHabilitado ?? false);
-      const autoWhatsApp = typeof window !== "undefined" ? (localStorage.getItem("nexora_auto_whatsapp_abono") !== "false" && localStorage.getItem("nexora_auto_whatsapp_comprobante") !== "false") : true;
+      const tieneTelefono = Boolean(ultimoTicket.clienteTelefono && String(ultimoTicket.clienteTelefono).trim().length >= 7);
+      const tieneEmail = Boolean(ultimoTicket.clienteEmail && String(ultimoTicket.clienteEmail).trim().includes("@"));
 
-      if (!autoEmail && !autoWhatsApp) {
-        showToast("Los envíos automáticos por WhatsApp y Correo están desactivados en Personalización/Configuración.", "info");
+      if (!tieneTelefono && !tieneEmail) {
+        showToast("El cliente no tiene teléfono ni correo registrado para enviar el comprobante.", "warning");
         return;
       }
 
@@ -1086,26 +1092,29 @@ export default function PosComponent() {
       const urlComprobante = await generarUrlPublicaVentaPOS(data);
       const mensaje = armarMensajeWhatsAppVentaPOS(data, urlComprobante);
 
-      // 1. Envío automático por Correo en segundo plano (si está activado y hay email)
       let enviadoCorreo = false;
-      if (autoEmail && ultimoTicket.clienteEmail) {
-        ApiService.post("/notificaciones/email-comprobante", {
-          destinatario: ultimoTicket.clienteEmail,
-          asunto: `Comprobante de Venta — $${ultimoTicket.total.toFixed(2)} — ${ultimoTicket.negocio?.nombre || "Calzado"}`,
-          tipo: "GENERAL",
-          detalles: {
-            mensaje: mensaje,
-            urlComprobante,
-          },
-        })
-          .then(() => showToast(`Comprobante enviado por correo a ${ultimoTicket.clienteEmail}`, "success"))
-          .catch((e) => console.warn("Error enviando email POS:", e));
-        enviadoCorreo = true;
+      let enviadoWhatsApp = false;
+
+      // 1. Envío por Correo si el cliente tiene email registrado
+      if (tieneEmail) {
+        try {
+          await ApiService.post("/notificaciones/email-comprobante", {
+            destinatario: String(ultimoTicket.clienteEmail).trim(),
+            asunto: `Comprobante de Venta — $${ultimoTicket.total.toFixed(2)} — ${ultimoTicket.negocio?.nombre || "Calzado"}`,
+            tipo: "GENERAL",
+            detalles: {
+              mensaje: mensaje,
+              urlComprobante,
+            },
+          });
+          enviadoCorreo = true;
+        } catch (e) {
+          console.warn("Error enviando email POS:", e);
+        }
       }
 
-      // 2. Abrir WhatsApp directamente (si está activado)
-      let enviadoWhatsApp = false;
-      if (autoWhatsApp) {
+      // 2. Abrir WhatsApp directamente si el cliente tiene teléfono
+      if (tieneTelefono) {
         enviadoWhatsApp = abrirWhatsAppUniversal(ultimoTicket.clienteTelefono, mensaje);
       }
 
