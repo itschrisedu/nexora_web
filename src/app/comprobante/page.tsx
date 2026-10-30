@@ -533,6 +533,7 @@ function ComprobanteContent() {
           totalAbonosMonto: Number(data.abo_m || 0),
           totalDevolucionesMonto: Number(data.dev_m || 0),
           saldoPendienteFinal: Number(data.saldo || 0),
+          saldoAnteriorPeriodo: Number(data.ant_m || 0),
         },
         entregas: (data.entregas || []).map((e: any) => ({
           fecha: e.f,

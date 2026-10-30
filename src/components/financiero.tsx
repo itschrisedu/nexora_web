@@ -240,7 +240,7 @@ interface ClienteHistorial {
   movimientos: {
     id: string;
     pedidoId?: string;
-    tipo: 'COMPRA_PEDIDO' | 'ABONO' | 'DEVOLUCION';
+    tipo: 'COMPRA_PEDIDO' | 'ABONO' | 'DEVOLUCION' | 'DEUDA_INICIAL';
     titulo: string;
     numeroCodigo?: string;
     descripcion: string;
@@ -1784,8 +1784,39 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
           entregadoPor: m.entregadoPor,
           fechaEntrega: m.fechaEntrega || m.fecha,
           montoTotal: m.monto,
-          totalPares: paresPedido || undefined,
+          totalPares: paresPedido || 0,
           items: itemsEntrega,
+          tipo: 'ENTREGA',
+        });
+      } else if (m.tipo === 'DEUDA_INICIAL') {
+        const montoDeuda = Number(m.monto || 0);
+        totalEntregasMonto += montoDeuda;
+        entregas.push({
+          fecha: m.fecha ? m.fecha.split('T')[0] : '',
+          fechaRaw: m.fecha || '',
+          pedidoId: m.id,
+          numeroNota: m.numeroCodigo || (m.titulo ? m.titulo.replace(/[^0-9]/g, '') : 'MANUAL'),
+          vendedor: m.vendedorNombre || 'Administración',
+          entregadoPor: m.entregadoPor || 'Administración',
+          fechaEntrega: m.fecha,
+          montoTotal: montoDeuda,
+          totalPares: 0,
+          tipo: 'DEUDA_INICIAL',
+          items: [
+            {
+              modelo: m.titulo || 'Deuda / Saldo a Crédito Inicial',
+              color: '',
+              serie: 'Cuenta Corriente',
+              codigo: m.numeroCodigo || '',
+              imageUrl: null,
+              tallas: [],
+              curvaTallas: '',
+              totalPares: 0,
+              etiquetaVolumen: m.descripcion || 'Registro de deuda previa migrada',
+              precioUnitario: montoDeuda,
+              subtotal: montoDeuda,
+            },
+          ],
         });
       } else if (m.tipo === 'ABONO') {
         totalAbonosMonto += m.monto || 0;
@@ -1841,48 +1872,79 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     });
 
     const esCompleto =
-      filtroCompartirFechaInicio === rangoFechasHistorial.minFecha &&
-      filtroCompartirFechaFin === rangoFechasHistorial.maxFecha;
+      (!filtroCompartirFechaInicio || filtroCompartirFechaInicio <= rangoFechasHistorial.minFecha) &&
+      (!filtroCompartirFechaFin || filtroCompartirFechaFin >= rangoFechasHistorial.maxFecha);
 
-      const saldoPendienteCalculado = Math.max(
-        0,
-        Math.round((totalEntregasMonto - totalAbonosMonto - totalDevolucionesMonto) * 100) / 100
+    // Calcular Saldo Anterior al Período (si se filtró desde una fecha posterior al inicio histórico)
+    let saldoAnteriorPeriodo = 0;
+    if (!esCompleto && filtroCompartirFechaInicio && filtroCompartirFechaInicio > rangoFechasHistorial.minFecha) {
+      const movsAnteriores = (historialCliente.movimientos || [])
+        .filter((m) => {
+          const fMov = m.fecha ? m.fecha.split('T')[0] : '';
+          return fMov < filtroCompartirFechaInicio;
+        })
+        .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+
+      if (movsAnteriores.length > 0) {
+        const ultimoAnterior = movsAnteriores[movsAnteriores.length - 1];
+        saldoAnteriorPeriodo = Number(ultimoAnterior.nuevoSaldo ?? 0);
+      }
+    }
+
+    // Saldo Final Pendiente Oficial del Cliente en el Período
+    let saldoPendienteFinal = 0;
+    if (esCompleto || !filtroCompartirFechaFin || filtroCompartirFechaFin >= rangoFechasHistorial.maxFecha) {
+      // Si cubre hasta el corte actual, el saldo es la verdad contable absoluta del sistema
+      saldoPendienteFinal = Number(historialCliente.resumen.saldoPendienteTotal ?? 0);
+    } else {
+      // Si es un corte intermedio en el pasado, tomar el nuevoSaldo del último movimiento del rango
+      const movsEnRango = [...movimientosFiltradosCompartir].sort(
+        (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
       );
+      if (movsEnRango.length > 0) {
+        const ultimoDelRango = movsEnRango[movsEnRango.length - 1];
+        saldoPendienteFinal = Number(ultimoDelRango.nuevoSaldo ?? 0);
+      } else {
+        saldoPendienteFinal = saldoAnteriorPeriodo;
+      }
+    }
+    saldoPendienteFinal = Math.max(0, Math.round(saldoPendienteFinal * 100) / 100);
 
-      return {
-        emisor: {
-          nombre: emisorNombre,
-          ruc: emisorRuc,
-          direccion: emisorDireccion,
-          telefono: emisorTelefono,
-          email: emisorEmail,
-          sucursal: 'Matriz Cevallos',
-        },
-        cliente: {
-          nombre: historialCliente.cliente.nombre,
-          cedula: historialCliente.cliente.cedula,
-          telefono: compartirTelefonoDestino || historialCliente.cliente.telefono,
-          email: compartirEmailDestino || historialCliente.cliente.email,
-          direccion: historialCliente.cliente.direccion,
-          nivelCredito: historialCliente.cliente.nivelCredito,
-          limiteCredito: historialCliente.cliente.limiteCredito,
-        },
-        periodo: {
-          fechaInicio: filtroCompartirFechaInicio || rangoFechasHistorial.minFecha,
-          fechaFin: filtroCompartirFechaFin || rangoFechasHistorial.maxFecha,
-          esHistoricoCompleto: esCompleto,
-        },
-        resumen: {
-          totalEntregasMonto: Math.round(totalEntregasMonto * 100) / 100,
-          totalParesEntregados,
-          totalAbonosMonto: Math.round(totalAbonosMonto * 100) / 100,
-          totalDevolucionesMonto: Math.round(totalDevolucionesMonto * 100) / 100,
-          saldoPendienteFinal: saldoPendienteCalculado,
-        },
-        entregas,
-        abonos,
-        devoluciones,
-      };
+    return {
+      emisor: {
+        nombre: emisorNombre,
+        ruc: emisorRuc,
+        direccion: emisorDireccion,
+        telefono: emisorTelefono,
+        email: emisorEmail,
+        sucursal: 'Matriz Cevallos',
+      },
+      cliente: {
+        nombre: historialCliente.cliente.nombre,
+        cedula: historialCliente.cliente.cedula,
+        telefono: compartirTelefonoDestino || historialCliente.cliente.telefono,
+        email: compartirEmailDestino || historialCliente.cliente.email,
+        direccion: historialCliente.cliente.direccion,
+        nivelCredito: historialCliente.cliente.nivelCredito,
+        limiteCredito: historialCliente.cliente.limiteCredito,
+      },
+      periodo: {
+        fechaInicio: filtroCompartirFechaInicio || rangoFechasHistorial.minFecha,
+        fechaFin: filtroCompartirFechaFin || rangoFechasHistorial.maxFecha,
+        esHistoricoCompleto: esCompleto,
+      },
+      resumen: {
+        totalEntregasMonto: Math.round(totalEntregasMonto * 100) / 100,
+        totalParesEntregados,
+        totalAbonosMonto: Math.round(totalAbonosMonto * 100) / 100,
+        totalDevolucionesMonto: Math.round(totalDevolucionesMonto * 100) / 100,
+        saldoPendienteFinal,
+        saldoAnteriorPeriodo: Math.round(saldoAnteriorPeriodo * 100) / 100,
+      },
+      entregas,
+      abonos,
+      devoluciones,
+    };
   };
 
   const handleDescargarHistorialPdf = async () => {
@@ -4815,14 +4877,14 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   <div className="space-y-3">
                     {historialCliente.movimientos
                       .filter((m) => {
-                        if (filtroHistorial === 'COMPRAS') return m.tipo === 'COMPRA_PEDIDO';
+                        if (filtroHistorial === 'COMPRAS') return m.tipo === 'COMPRA_PEDIDO' || m.tipo === 'DEUDA_INICIAL';
                         if (filtroHistorial === 'ABONOS') return m.tipo === 'ABONO';
                         if (filtroHistorial === 'DEVOLUCIONES') return m.tipo === 'DEVOLUCION';
                         return true;
                       })
                       .map((m) => {
                         const isAbono = m.tipo === 'ABONO';
-                        const isPedido = m.tipo === 'COMPRA_PEDIDO';
+                        const isPedido = m.tipo === 'COMPRA_PEDIDO' || m.tipo === 'DEUDA_INICIAL';
                         const isDevolucion = m.tipo === 'DEVOLUCION';
                         const canExpand = isPedido || isDevolucion;
                         const isExpanded = canExpand && (pedidoHistorialExpandidoId === m.id);

@@ -492,6 +492,7 @@ export async function generarUrlPublicaHistorial(data: any): Promise<string> {
     ent_p: Number(data.resumen?.totalParesEntregados || 0),
     abo_m: Number(data.resumen?.totalAbonosMonto || 0),
     dev_m: Number(data.resumen?.totalDevolucionesMonto || 0),
+    ant_m: Number(data.resumen?.saldoAnteriorPeriodo || 0),
     saldo: Number(data.resumen?.saldoPendienteFinal || 0),
     entregas: (data.entregas || []).slice(0, 15).map((e: any) => ({
       f: e.fecha,

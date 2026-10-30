@@ -12,7 +12,7 @@ export interface HistorialComercialItemEntrega {
   color?: string;
   serie?: string;
   codigo?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   loadedImageBase64?: string | null;
   curvaTallas?: string;
   tallas?: HistorialComercialTallaItem[];
@@ -31,7 +31,8 @@ export interface HistorialEntregaDetallada {
   entregadoPor?: string;
   fechaEntrega?: string;
   montoTotal: number;
-  totalPares: number;
+  totalPares?: number;
+  tipo?: string;
   items: HistorialComercialItemEntrega[];
 }
 
@@ -85,6 +86,7 @@ export interface HistorialComercialPdfData {
     totalAbonosMonto: number;
     totalDevolucionesMonto: number;
     saldoPendienteFinal: number;
+    saldoAnteriorPeriodo?: number;
   };
   entregas: HistorialEntregaDetallada[];
   abonos: HistorialAbonoDetallado[];
@@ -349,15 +351,17 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
 
   // ── 3. Resumen Financiero del Período (KPIs) ───────────────────
   const cardW = (pageWidth - 24 - 9) / 4;
-  const saldoMatematico = Math.max(
-    0,
-    Math.round((data.resumen.totalEntregasMonto - data.resumen.totalAbonosMonto - data.resumen.totalDevolucionesMonto) * 100) / 100
-  );
+  const saldoFinalReal = typeof data.resumen.saldoPendienteFinal === "number"
+    ? data.resumen.saldoPendienteFinal
+    : Math.max(
+        0,
+        Math.round((data.resumen.totalEntregasMonto - data.resumen.totalAbonosMonto - data.resumen.totalDevolucionesMonto) * 100) / 100
+      );
   const kpis = [
-    { label: 'TOTAL ENTREGADO', val: `$${data.resumen.totalEntregasMonto.toFixed(2)}`, sub: `${data.resumen.totalParesEntregados} pares`, color: [37, 99, 235] },
-    { label: 'TOTAL ABONADO', val: `-$${data.resumen.totalAbonosMonto.toFixed(2)}`, sub: `${data.abonos.length} pagos`, color: [16, 185, 129] },
-    { label: 'DEVOLUCIONES', val: `-$${data.resumen.totalDevolucionesMonto.toFixed(2)}`, sub: `${data.devoluciones.length} reg.`, color: [225, 29, 72] },
-    { label: 'SALDO DEUDOR', val: `$${saldoMatematico.toFixed(2)}`, sub: 'Saldo al corte', color: saldoMatematico > 0 ? [225, 29, 72] : [16, 185, 129] },
+    { label: "TOTAL ENTREGADO", val: `$${data.resumen.totalEntregasMonto.toFixed(2)}`, sub: `${data.resumen.totalParesEntregados} pares`, color: [37, 99, 235] },
+    { label: "TOTAL ABONADO", val: `-$${data.resumen.totalAbonosMonto.toFixed(2)}`, sub: `${data.abonos.length} pagos`, color: [16, 185, 129] },
+    { label: "DEVOLUCIONES", val: `-$${data.resumen.totalDevolucionesMonto.toFixed(2)}`, sub: `${data.devoluciones.length} reg.`, color: [225, 29, 72] },
+    { label: "SALDO DEUDOR", val: `$${saldoFinalReal.toFixed(2)}`, sub: "Saldo al corte", color: saldoFinalReal > 0 ? [225, 29, 72] : [16, 185, 129] },
   ];
 
   kpis.forEach((kpi, idx) => {
@@ -783,56 +787,78 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
       y += rowHeight;
     });
 
-    // ── Cuadro de Cierre Contable Matemático ──
-    checkSaltoPagina(26);
+    const tieneSaldoAnterior = Boolean(data.resumen.saldoAnteriorPeriodo && data.resumen.saldoAnteriorPeriodo > 0);
+    const tieneDevoluciones = Boolean(data.resumen.totalDevolucionesMonto && data.resumen.totalDevolucionesMonto > 0);
+    let extraFilas = 0;
+    if (tieneSaldoAnterior) extraFilas++;
+    if (tieneDevoluciones) extraFilas++;
+    const boxH = 23 + extraFilas * 4;
+
+    checkSaltoPagina(boxH + 3);
     y += 2;
     const cierreW = 88;
     const cierreX = pageWidth - 12 - cierreW;
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(203, 213, 225);
-    doc.roundedRect(cierreX, y, cierreW, 23, 1.5, 1.5, 'FD');
+    doc.roundedRect(cierreX, y, cierreW, boxH, 1.5, 1.5, "FD");
 
-    doc.setFont('helvetica', 'normal');
+    let curY = y + 5.5;
+
+    if (tieneSaldoAnterior) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.2);
+      doc.setTextColor(71, 85, 105);
+      doc.text("Saldo Anterior al Período (+):", cierreX + 4, curY);
+      doc.setTextColor(30, 41, 59);
+      doc.setFont("helvetica", "bold");
+      doc.text(`+$${(data.resumen.saldoAnteriorPeriodo || 0).toFixed(2)}`, cierreX + cierreW - 4, curY, { align: "right" });
+      curY += 4;
+    }
+
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(7.2);
     doc.setTextColor(71, 85, 105);
-    doc.text('Total Mercadería Entregada (+):', cierreX + 4, y + 5.5);
+    doc.text("Total Mercadería Entregada (+):", cierreX + 4, curY);
     doc.setTextColor(37, 99, 235);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`+$${data.resumen.totalEntregasMonto.toFixed(2)}`, cierreX + cierreW - 4, y + 5.5, { align: 'right' });
+    doc.setFont("helvetica", "bold");
+    doc.text(`+$${data.resumen.totalEntregasMonto.toFixed(2)}`, cierreX + cierreW - 4, curY, { align: "right" });
+    curY += 4;
 
-    doc.setFont('helvetica', 'normal');
+    doc.setFont("helvetica", "normal");
     doc.setTextColor(71, 85, 105);
-    doc.text('Total Abonos Recibidos (-):', cierreX + 4, y + 9.5);
+    doc.text("Total Abonos Recibidos (-):", cierreX + 4, curY);
     doc.setTextColor(16, 185, 129);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`-$${data.resumen.totalAbonosMonto.toFixed(2)}`, cierreX + cierreW - 4, y + 9.5, { align: 'right' });
+    doc.setFont("helvetica", "bold");
+    doc.text(`-$${data.resumen.totalAbonosMonto.toFixed(2)}`, cierreX + cierreW - 4, curY, { align: "right" });
+    curY += 4;
 
-    if (data.resumen.totalDevolucionesMonto > 0) {
-      doc.setFont('helvetica', 'normal');
+    if (tieneDevoluciones) {
+      doc.setFont("helvetica", "normal");
       doc.setTextColor(71, 85, 105);
-      doc.text('Total Devoluciones Acreditadas (-):', cierreX + 4, y + 13.5);
+      doc.text("Total Devoluciones Acreditadas (-):", cierreX + 4, curY);
       doc.setTextColor(225, 29, 72);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`-$${data.resumen.totalDevolucionesMonto.toFixed(2)}`, cierreX + cierreW - 4, y + 13.5, { align: 'right' });
+      doc.setFont("helvetica", "bold");
+      doc.text(`-$${data.resumen.totalDevolucionesMonto.toFixed(2)}`, cierreX + cierreW - 4, curY, { align: "right" });
+      curY += 4;
     }
 
     doc.setDrawColor(203, 213, 225);
-    doc.line(cierreX + 4, y + 16, cierreX + cierreW - 4, y + 16);
+    doc.line(cierreX + 4, curY - 1.5, cierreX + cierreW - 4, curY - 1.5);
 
-    doc.setFont('helvetica', 'bold');
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(8.2);
     doc.setTextColor(15, 23, 42);
-    doc.text('SALDO FINAL PENDIENTE (=):', cierreX + 4, y + 20.2);
+    doc.text("SALDO FINAL PENDIENTE (=):", cierreX + 4, curY + 2.7);
 
-    if (saldoMatematico > 0) {
+    if (saldoFinalReal > 0) {
       doc.setTextColor(225, 29, 72); // Rose
-      doc.text(`$${saldoMatematico.toFixed(2)}`, cierreX + cierreW - 4, y + 20.2, { align: 'right' });
+      doc.text(`$${saldoFinalReal.toFixed(2)}`, cierreX + cierreW - 4, curY + 2.7, { align: "right" });
     } else {
       doc.setTextColor(5, 150, 105); // Emerald
-      doc.text('$0.00 (AL DÍA)', cierreX + cierreW - 4, y + 20.2, { align: 'right' });
+      doc.text("$0.00 (AL DÍA)", cierreX + cierreW - 4, curY + 2.7, { align: "right" });
     }
 
-    y += 27;
+    y += boxH + 4;
   }
 
   // ── Pie de Página en Todas las Hojas ───────────────────────────
