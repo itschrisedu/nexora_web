@@ -769,16 +769,18 @@ function MainApp() {
     e.preventDefault();
     setLoginError('');
     setLoading(true);
+    const cleanEmail = username.trim().toLowerCase();
+    const cleanPassword = password.trim();
     try {
       if (online) {
         const response = await ApiService.post('/auth/login', {
-          email: username.trim(),
-          password: password.trim(),
+          email: cleanEmail,
+          password: cleanPassword,
         });
 
         if (response.sessionConflict) {
-          setConflictData({ email: username.trim(), password: password.trim() });
-          setMaskedEmail(response.maskedEmail || username.trim());
+          setConflictData({ email: cleanEmail, password: cleanPassword });
+          setMaskedEmail(response.maskedEmail || cleanEmail);
           setOtpMode('session-transfer');
           setOtpDebugCode(response.debugCode);
           setShowOtpModal(true);
@@ -788,9 +790,9 @@ function MainApp() {
         finalizeLogin(response);
       } else {
         let mockUser;
-        if (username.trim() === 'superadmin@nexora.com' && password.trim() === 'SuperAdmin2026!') {
+        if (cleanEmail === 'superadmin@nexora.com' && cleanPassword === 'SuperAdmin2026!') {
           mockUser = { id: 'offline-superadmin', email: 'superadmin@nexora.com', nombre: 'Super Administrador Global', rol: 'ROL_SUPER_ADMIN', termsAcceptedAt: new Date().toISOString() };
-        } else if (username.trim() === 'admin@nexora.com' && password.trim() === 'Admin123!') {
+        } else if (cleanEmail === 'admin@nexora.com' && cleanPassword === 'Admin123!') {
           mockUser = { id: 'offline-admin', email: 'admin@nexora.com', nombre: 'Administrador Local', rol: 'ROL_ADMIN', termsAcceptedAt: new Date().toISOString() };
         } else {
           throw new Error('Modo Offline: use superadmin@nexora.com / SuperAdmin2026! o admin@nexora.com / Admin123!');
@@ -1133,7 +1135,7 @@ function MainApp() {
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-200 uppercase tracking-wider mb-1.5">
-                  Usuario o Correo
+                  Cuenta de Acceso
                 </label>
                 <div className="relative group">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within:text-amber-400 transition-colors">
@@ -1142,9 +1144,9 @@ function MainApp() {
                   <input
                     type="text"
                     required
-                    placeholder="ej. admin@nexora.com"
+                    placeholder="ej. usuario@comercial.com"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase())}
                     className="w-full pl-10 pr-4 py-3 bg-black/40 border border-white/15 rounded-2xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 backdrop-blur-md transition-all"
                   />
                 </div>
