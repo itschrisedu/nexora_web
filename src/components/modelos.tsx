@@ -7,7 +7,7 @@ import { uploadToCloudinary, deleteFromCloudinary } from "../services/cloudinary
 import {
   Plus, Search, Loader2, ImageIcon, Package, Edit2, Edit3, Trash2, AlertTriangle,
   DollarSign, CheckCircle, AlertCircle, X, RefreshCw, ChevronDown, ChevronUp, Palette,
-  Layers, Boxes, Truck, Sparkles, Copy, Building2, PackageCheck, Info, Check, TrendingUp
+  Layers, Boxes, Truck, Sparkles, Copy, Building2, PackageCheck, Info, Check, TrendingUp, ZoomIn
 } from "lucide-react";
 import { getStoredProfitMargin, calculateSuggestedPrice, calculateRealMarginPercent, calculateProfitAmount } from "../utils/pricing";
 import { dividirDocenaEnMediaDocena } from "../utils/curvas";
@@ -418,6 +418,15 @@ export default function ModelosComponent({
   const [seriesPrices, setSeriesPrices] = useState<Record<string, { costPrice: string; salePrice: string }>>({});
   const [stockInicial, setStockInicial] = useState("1"); // 1 por defecto
 
+  // Estado para el modal de ampliación de imagen (Lightbox)
+  const [zoomImage, setZoomImage] = useState<{
+    url: string;
+    title: string;
+    subtitle?: string;
+    color?: string;
+    brand?: string;
+  } | null>(null);
+
   // Estado para el modal de añadir nuevo color a modelo existente
   const [showAddColorModal, setShowAddColorModal] = useState(false);
   const [selectedModelForColor, setSelectedModelForColor] = useState<ModeloAgrupado | null>(null);
@@ -568,6 +577,11 @@ export default function ModelosComponent({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      if (zoomImage) {
+        e.preventDefault();
+        setZoomImage(null);
+        return;
+      }
       if (showDiscardModal) return;
       if (confirmModal.isOpen) {
         e.preventDefault();
@@ -623,7 +637,7 @@ export default function ModelosComponent({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [
-    showDiscardModal, confirmModal.isOpen, showQuickSupplier, showCreateSeriesModal,
+    zoomImage, showDiscardModal, confirmModal.isOpen, showQuickSupplier, showCreateSeriesModal,
     showEditSeriesModal, showPrice, showAddColorModal, showEditProduct, showEditModel,
     showCreate, safeDismiss, isDirtyQuickSupplier, isDirtyCreateSeries, isDirtyEditSeries,
     isDirtyPrice, isDirtyAddColor, isDirtyEditProduct, isDirtyEditModel, isDirtyCreate
@@ -2862,9 +2876,31 @@ export default function ModelosComponent({
                     {/* Resumen del Modelo */}
                     <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex items-start sm:items-center gap-4">
-                        <div className="w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                        <div
+                          onClick={(e) => {
+                            if (activeProduct?.fotoUrl) {
+                              e.stopPropagation();
+                              setZoomImage({
+                                url: activeProduct.fotoUrl,
+                                title: m.name,
+                                subtitle: m.baseCode,
+                                color: activeColor,
+                                brand: m.brand,
+                              });
+                            }
+                          }}
+                          className={`w-16 h-16 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative group/img ${
+                            activeProduct?.fotoUrl ? "cursor-zoom-in hover:ring-2 hover:ring-emerald-500 hover:shadow-md transition-all" : ""
+                          }`}
+                          title={activeProduct?.fotoUrl ? "Clic para ampliar foto" : undefined}
+                        >
                           {activeProduct?.fotoUrl ? (
-                            <img src={activeProduct.fotoUrl} alt={m.name} className="w-full h-full object-cover" />
+                            <>
+                              <img src={activeProduct.fotoUrl} alt={m.name} className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-200" />
+                              <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white">
+                                <ZoomIn size={16} />
+                              </div>
+                            </>
                           ) : (
                             <ImageIcon size={20} className="text-[var(--muted-foreground)] opacity-40" />
                           )}
@@ -3210,18 +3246,39 @@ export default function ModelosComponent({
                   >
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                       <div className="flex items-start gap-4">
-                        <div className="w-20 h-20 bg-white border border-[var(--border)] rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative">
+                        <div
+                          onClick={(e) => {
+                            if (m.fotoPrincipal) {
+                              e.stopPropagation();
+                              setZoomImage({
+                                url: m.fotoPrincipal,
+                                title: m.name,
+                                subtitle: m.baseCode,
+                                brand: m.brand,
+                              });
+                            }
+                          }}
+                          className={`w-20 h-20 bg-white border border-[var(--border)] rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs relative group/img ${
+                            m.fotoPrincipal ? "cursor-zoom-in hover:ring-2 hover:ring-emerald-500 transition-all" : ""
+                          }`}
+                          title={m.fotoPrincipal ? "Clic para ampliar foto" : undefined}
+                        >
                           {m.fotoPrincipal ? (
-                            <img
-                              src={m.fotoPrincipal}
-                              alt={m.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'flex';
-                              }}
-                            />
+                            <>
+                              <img
+                                src={m.fotoPrincipal}
+                                alt={m.name}
+                                className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white">
+                                <ZoomIn size={18} />
+                              </div>
+                            </>
                           ) : null}
                           <div className={`w-full h-full items-center justify-center ${m.fotoPrincipal ? 'hidden' : 'flex'}`}>
                             <ImageIcon size={28} className="text-slate-300" />
@@ -5931,6 +5988,74 @@ export default function ModelosComponent({
           }
         }}
       />
+
+      {/* ── MODAL LIGHTBOX PARA AMPLIAR IMAGEN DE MODELO ── */}
+      {zoomImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
+          onClick={() => setZoomImage(null)}
+        >
+          <div
+            className="relative max-w-3xl w-full bg-[var(--card)] border border-[var(--border)] rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between gap-4 bg-[var(--muted)]/20">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-black text-base sm:text-lg text-[var(--foreground)] truncate uppercase tracking-tight">
+                    {zoomImage.title}
+                  </h3>
+                  {zoomImage.subtitle && (
+                    <span className="px-2 py-0.5 bg-slate-900 text-white rounded-lg text-[10px] font-mono font-bold uppercase">
+                      {zoomImage.subtitle}
+                    </span>
+                  )}
+                  {zoomImage.color && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-800 px-2.5 py-0.5 rounded-full">
+                      🎨 {zoomImage.color}
+                    </span>
+                  )}
+                  {zoomImage.brand && (
+                    <span className="text-xs font-semibold text-[var(--muted-foreground)]">
+                      {zoomImage.brand}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setZoomImage(null)}
+                className="p-2 rounded-xl text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors cursor-pointer shrink-0"
+                title="Cerrar (Esc)"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Imagen ampliada */}
+            <div className="p-4 sm:p-6 flex items-center justify-center bg-slate-950/40 min-h-[300px] overflow-auto">
+              <img
+                src={zoomImage.url}
+                alt={zoomImage.title}
+                className="max-h-[68vh] max-w-full object-contain rounded-2xl shadow-xl transition-transform hover:scale-105 duration-300"
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--muted-foreground)] bg-[var(--muted)]/10">
+              <span>Vista detallada del calzado de cuero</span>
+              <button
+                type="button"
+                onClick={() => setZoomImage(null)}
+                className="px-4 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

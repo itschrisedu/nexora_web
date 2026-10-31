@@ -55,6 +55,8 @@ import {
   Filter,
   Package,
   UserCheck,
+  Save,
+  Phone,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
 import { compartirFacturaPdf, generarFacturaPdfDoc } from '../services/pdf-factura.service';
@@ -2625,8 +2627,60 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
     });
   };
 
+  const [guardandoCliente, setGuardandoCliente] = useState(false);
+
+  const handleGuardarDatosCliente = async (silencioso = false) => {
+    if (!facturaCliente?.clientId) return;
+    setGuardandoCliente(true);
+    try {
+      const emailTrim = facturaCliente.email.trim();
+      const dirTrim = facturaCliente.direccion.trim();
+      const telTrim = facturaCliente.telefono.trim();
+      const nomTrim = facturaCliente.nombre.trim();
+      const cedTrim = facturaCliente.cedula.trim();
+
+      await ApiService.patch(`/clientes/${facturaCliente.clientId}`, {
+        email: emailTrim || undefined,
+        direccion: dirTrim || undefined,
+        telefono: telTrim || undefined,
+        nombre: nomTrim || undefined,
+        cedula: cedTrim && facturaCliente.tipoIdentificacion === '05' ? cedTrim : undefined,
+        ruc: cedTrim && facturaCliente.tipoIdentificacion === '04' ? cedTrim : undefined,
+      });
+
+      if (!silencioso) {
+        showToast('Datos del cliente actualizados y guardados en la base de datos con éxito.', 'success');
+      }
+
+      if (carteraSeleccionada) {
+        setCarteraSeleccionada((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            cliente: {
+              ...prev.cliente,
+              clienteNombre: nomTrim || prev.cliente.clienteNombre,
+              clienteEmail: emailTrim || prev.cliente.clienteEmail,
+              clienteDireccion: dirTrim || prev.cliente.clienteDireccion,
+              clienteTelefono: telTrim || prev.cliente.clienteTelefono,
+            },
+          };
+        });
+      }
+    } catch (err: any) {
+      if (!silencioso) {
+        showToast(err.message || 'Error al guardar datos del cliente', 'error');
+      }
+    } finally {
+      setGuardandoCliente(false);
+    }
+  };
+
   const handleEmitirFacturaSRI = async () => {
     if (!facturaCliente) return;
+
+    // Guardar automáticamente los cambios del cliente en la base de datos
+    await handleGuardarDatosCliente(true);
 
     if (!facturaCliente.cedula && facturaCliente.tipoIdentificacion !== '07') {
       showToast('Ingresa la Cédula o RUC del comprador.', 'warning');
@@ -2709,11 +2763,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         // Envio automatico en segundo plano al correo registrado del comprador
         const emailCliente = (facturaCliente.email || '').trim();
         if (emailCliente && emailCliente !== 'facturas@cliente.com' && emailCliente.includes('@')) {
-          const negocioNombre = businessConfig?.nombre || 'Calzado de Cuero';
+          const emisorRazonSocial = businessConfig?.sriRazonSocial?.trim() || businessConfig?.nombre || 'Calzado de Cuero';
+          const negocioNombre = businessConfig?.nombre || emisorRazonSocial;
           // Generar enlace publico corto accesible por cualquier persona
           const pdfDataEmail = {
             emisor: {
-              nombre: negocioNombre,
+              nombre: emisorRazonSocial,
+              nombreComercial: negocioNombre,
               ruc: businessConfig?.ruc || '',
               direccion: businessConfig?.direccion || 'Ecuador',
               telefono: businessConfig?.telefono,
@@ -2763,8 +2819,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 detalles: {
                   numeroFactura: res.numeroComprobante,
                   claveAcceso: res.claveAcceso,
-                  nombreEmisor: negocioNombre,
-                  responsable: businessConfig?.sriRazonSocial || businessConfig?.nombre || "ICHINA REMACHE HECTOR GONZALO",
+                  nombreEmisor: emisorRazonSocial,
+                  responsable: emisorRazonSocial,
+                  nombreComercial: negocioNombre,
                   urlComprobante: urlCorta,
                   mensaje: `Estimado/a ${facturaCliente.nombre},\n\nLe notificamos que se ha emitido y autorizado su Factura Electrónica ante el Servicio de Rentas Internas (SRI):\n\n📄 Factura Nº: ${res.numeroComprobante}\n🔑 Clave de Acceso SRI:\n${res.claveAcceso || 'Autorizada'}\n\nPuede consultar y descargar la validez de su comprobante electrónico. ¡Muchas gracias por su preferencia!`,
                 },
@@ -5893,7 +5950,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
         const armarDatosPdf = () => ({
           emisor: {
-            nombre: businessConfig?.nombre || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')?.tenantName : '') || 'Comercializadora de Calzado',
+            nombre: businessConfig?.sriRazonSocial?.trim() || businessConfig?.nombre || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')?.tenantName : '') || 'Comercializadora de Calzado',
+            nombreComercial: businessConfig?.nombre,
             ruc: businessConfig?.ruc || '',
             direccion: businessConfig?.direccion || 'Ecuador',
             telefono: businessConfig?.telefono,
@@ -6130,9 +6188,21 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         <User size={14} className="text-[#0F172A]" />
                         <span>1. Datos del Comprador (Cliente)</span>
                       </span>
-                      <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
-                        Nivel: {carteraSeleccionada.clienteNivel}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
+                          Nivel: {carteraSeleccionada.clienteNivel}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleGuardarDatosCliente(false)}
+                          disabled={guardandoCliente}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                          title="Guardar de forma permanente este correo y datos en la ficha del cliente"
+                        >
+                          <Save size={12} />
+                          <span>{guardandoCliente ? 'Guardando...' : 'Guardar en Base de Datos'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -6215,6 +6285,22 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                           value={facturaCliente.email}
                           onChange={(e) =>
                             setFacturaCliente({ ...facturaCliente, email: e.target.value })
+                          }
+                          className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[var(--muted-foreground)] mb-1 flex items-center gap-1">
+                          <Phone size={11} />
+                          Teléfono / Celular
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="0991234567"
+                          value={facturaCliente.telefono}
+                          onChange={(e) =>
+                            setFacturaCliente({ ...facturaCliente, telefono: e.target.value })
                           }
                           className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                         />
@@ -6520,8 +6606,13 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                         {/* Datos del Emisor (Dueño del Negocio) */}
                         <div className="space-y-1">
                           <h4 className="font-black text-sm text-slate-900 uppercase tracking-tight">
-                            {businessConfig?.nombre || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')?.tenantName : '') || 'Comercializadora de Calzado'}
+                            {businessConfig?.sriRazonSocial?.trim() || businessConfig?.nombre || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')?.tenantName : '') || 'Comercializadora de Calzado'}
                           </h4>
+                          {businessConfig?.nombre && businessConfig.sriRazonSocial && businessConfig.nombre !== businessConfig.sriRazonSocial && (
+                            <p className="text-[10px] font-bold text-slate-600 uppercase">
+                              Nombre Comercial: {businessConfig.nombre}
+                            </p>
+                          )}
                           <p className="text-[10px] text-slate-600 leading-tight">
                             {businessConfig?.email ? `Email: ${businessConfig.email}` : 'Comercialización y Distribución de Calzado'}
                           </p>

@@ -740,7 +740,7 @@ export default function PosComponent() {
         const compradorTelefono = esFacturaConDatos ? clienteFactura.telefono.trim() : "";
         const formaPagoSri = metodoPago === "TARJETA" ? "19" : metodoPago === "TRANSFERENCIA" ? "20" : "01";
         const totalFacturaSri = Number(totalVenta.toFixed(2));
-        const nombreEmisorPos = negocioInfo?.nombre || "Calzado Cevallos";
+        const nombreEmisorPos = negocioInfo?.sriRazonSocial?.trim() || negocioInfo?.nombre || "Calzado Cevallos";
 
         // Agrupar modelos/series para la factura SRI
         const grupoSriMap = new Map<string, { nombre: string; serie: string; cantidad: number; totalPrecio: number; productId: string }>();
@@ -884,7 +884,7 @@ export default function PosComponent() {
                   tipo: "FACTURA",
                   detalles: {
                     nombreEmisor: nombreEmisorPos,
-                    responsable: negocioInfo?.sriRazonSocial || negocioInfo?.propietario || "ICHINA REMACHE HECTOR GONZALO",
+                    responsable: negocioInfo?.sriRazonSocial?.trim() || negocioInfo?.propietario || negocioInfo?.nombre || "EMISOR AUTORIZADO",
                     numeroFactura: resSri.numeroComprobante,
                     claveAcceso: resSri.claveAcceso,
                     urlComprobante: urlCorta,
