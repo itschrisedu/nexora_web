@@ -2651,21 +2651,30 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         showToast('Datos del cliente actualizados y guardados en la base de datos con éxito.', 'success');
       }
 
-      if (carteraSeleccionada) {
-        setCarteraSeleccionada((prev: any) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            cliente: {
-              ...prev.cliente,
-              clienteNombre: nomTrim || prev.cliente.clienteNombre,
-              clienteEmail: emailTrim || prev.cliente.clienteEmail,
-              clienteDireccion: dirTrim || prev.cliente.clienteDireccion,
-              clienteTelefono: telTrim || prev.cliente.clienteTelefono,
-            },
-          };
-        });
-      }
+      setCobros((prev) =>
+        prev.map((c) => {
+          const cId = (c as any).client?.id || c.clientId;
+          if (cId === facturaCliente.clientId) {
+            return {
+              ...c,
+              clienteNombre: nomTrim || c.clienteNombre,
+              clienteEmail: emailTrim || c.clienteEmail,
+              clienteDireccion: dirTrim || c.clienteDireccion,
+              clienteTelefono: telTrim || c.clienteTelefono,
+              client: (c as any).client
+                ? {
+                    ...(c as any).client,
+                    nombre: nomTrim || (c as any).client.nombre,
+                    email: emailTrim || (c as any).client.email,
+                    direccion: dirTrim || (c as any).client.direccion,
+                    telefono: telTrim || (c as any).client.telefono,
+                  }
+                : (c as any).client,
+            };
+          }
+          return c;
+        })
+      );
     } catch (err: any) {
       if (!silencioso) {
         showToast(err.message || 'Error al guardar datos del cliente', 'error');
