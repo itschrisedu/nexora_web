@@ -92,6 +92,13 @@ export default function SriComponent() {
     try {
       const data = await ApiService.get("/configuracion/negocio");
       if (data) {
+        const remoteFirmaNombre = data.firmaNombre || "FirmaSegura-1804884664-CHRISTOPHER_ED";
+        if (data.tieneP12 || data.firmaP12Path) {
+          setNombreArchivoGuardado(remoteFirmaNombre);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("nexora_sri_p12_filename", remoteFirmaNombre);
+          }
+        }
         setConfig((prev) => ({
           ...prev,
           nombreComercial: data.nombre || prev.nombreComercial,

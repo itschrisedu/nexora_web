@@ -1899,7 +1899,7 @@ function MainApp() {
           )}
           {vistaActual === 'usuarios' && <UsuariosComponent online={online} currentUser={user} />}
           {vistaActual === 'super-admin' && <SuperAdminComponent online={online} />}
-          {vistaActual === 'sri' && <SriComponent />}
+          {vistaActual === 'sri' && <SriComponent key={activeSucursalId || 'matriz'} />}
           {vistaActual === 'personalizacion' && <PersonalizacionComponent online={online} />}
 
           {vistaActual === 'prediccion-ml' && (
