@@ -56,7 +56,6 @@ import {
   Package,
   UserCheck,
   Save,
-  Phone,
 } from 'lucide-react';
 import { useToast } from './ui/toast';
 import { compartirFacturaPdf, generarFacturaPdfDoc } from '../services/pdf-factura.service';
@@ -6595,99 +6594,109 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 </div>
               )}
 
-              {/* ═══ PESTAÑA: VISTA PREVIA PDF ═══ */}
+              {/* ═══ PESTAÑA: VISTA PREVIA PDF (DISEÑO ESTÁNDAR IDENTICO AL OFICIAL) ═══ */}
               {tabFactura === 'PREVISUALIZAR' && (
                 <div className="p-4 sm:p-6 bg-slate-900/5 dark:bg-slate-950/40 rounded-3xl border border-[var(--border)] flex justify-center shadow-inner" id="seccion-factura-pdf">
-                  {/* Comprobante PDF Oficial con diseño centrado y márgenes impecables */}
-                  <div className="w-full max-w-3xl border border-slate-300 dark:border-slate-700 rounded-2xl overflow-hidden bg-white text-slate-900 shadow-xl">
-                    {/* Encabezado con Datos del Dueño del Negocio / RUC Emisor */}
-                    <div className="p-6 border-b-2 border-slate-300">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Datos del Emisor (Dueño del Negocio) */}
-                        <div className="space-y-1">
-                          <h4 className="font-black text-sm text-slate-900 uppercase tracking-tight">
-                            {businessConfig?.sriRazonSocial?.trim() || businessConfig?.nombre || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')?.tenantName : '') || 'Comercializadora de Calzado'}
-                          </h4>
-                          {businessConfig?.nombre && businessConfig.sriRazonSocial && businessConfig.nombre !== businessConfig.sriRazonSocial && (
-                            <p className="text-[10px] font-bold text-slate-600 uppercase">
-                              Nombre Comercial: {businessConfig.nombre}
-                            </p>
-                          )}
-                          <p className="text-[10px] text-slate-600 leading-tight">
-                            {businessConfig?.email ? `Email: ${businessConfig.email}` : 'Comercialización y Distribución de Calzado'}
-                          </p>
-                          <p className="text-[10px] text-slate-700 font-bold">
-                            RUC: {businessConfig?.ruc || 'S/RUC'}
-                          </p>
-                          <p className="text-[10px] text-slate-600">
-                            Matriz: {businessConfig?.direccion || 'Ecuador'}
-                          </p>
-                          <p className="text-[10px] text-slate-600">
-                            Obligado a llevar Contabilidad: {businessConfig?.sriObligadoContabilidad ? 'SI' : 'NO'}
-                          </p>
+                  {/* Comprobante con el diseño idéntico solicitado */}
+                  <div className="w-full max-w-3xl bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200">
+                    
+                    {/* ── 1. ENCABEZADO OSCURO (BANNER NAVY CON TARJETA BLANCA SRI) ── */}
+                    <div className="bg-[#0F172A] text-white rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start gap-4 shadow-md">
+                      {/* Lado izquierdo: Datos del Emisor */}
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <h3 className="font-black text-xl sm:text-2xl text-white uppercase tracking-wider leading-tight">
+                          {businessConfig?.nombre || businessConfig?.sriRazonSocial || 'IVOR'}
+                        </h3>
+                        <div className="text-xs text-slate-300 space-y-1 pt-2 font-medium">
+                          <p>RUC: <span className="font-mono text-white font-bold">{businessConfig?.ruc || '1805274790001'}</span></p>
+                          <p>Matriz: {businessConfig?.direccion || 'LA DELICIA Y MIRABELES'}</p>
+                          <p>Obligado a llevar Contabilidad: {businessConfig?.sriObligadoContabilidad ? 'SI' : 'NO'}</p>
+                          {businessConfig?.email && <p>Email: {businessConfig.email}</p>}
                         </div>
-                        {/* Datos del Comprobante */}
-                        <div className="sm:text-right space-y-1">
-                          <div className="inline-block px-3.5 py-2 border-2 border-slate-900 rounded-xl bg-slate-50">
-                            <p className="font-black text-xs text-slate-900 uppercase">Factura</p>
-                            <p className="text-[11px] text-slate-700 font-bold font-mono">
-                              No. {businessConfig?.sriEstablecimiento || '001'}-{businessConfig?.sriPuntoEmision || '001'}-000000001
-                            </p>
+                      </div>
+
+                      {/* Lado derecho: Tarjeta blanca de Factura Electrónica con Código de Barras */}
+                      <div className="bg-white text-slate-900 rounded-2xl p-4 w-full md:w-80 shadow-md text-center flex flex-col items-center justify-center shrink-0 border border-slate-100">
+                        <h4 className="font-black text-xs uppercase tracking-wider text-slate-900">FACTURA ELECTRÓNICA</h4>
+                        <p className="text-[11px] font-bold text-slate-800 mt-1 font-mono">
+                          No. {facturaResultado?.numeroComprobante || `${businessConfig?.sriEstablecimiento || '001'}-${businessConfig?.sriPuntoEmision || '001'}-000000022`}
+                        </p>
+                        <p className="text-[10px] text-slate-600 mt-0.5">
+                          Fecha: {new Date().toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                        <p className="text-[10px] text-slate-700 font-bold uppercase mt-0.5">
+                          Ambiente: {businessConfig?.sriAmbiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS'}
+                        </p>
+
+                        {/* Código de barras simulado idéntico al PDF */}
+                        <div className="w-full my-2.5 px-1">
+                          <div className="h-7 w-full flex items-stretch justify-center gap-[1.5px] overflow-hidden bg-white">
+                            {Array.from({ length: 65 }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`bg-slate-900 h-full ${
+                                  (i % 7 === 0 || i % 11 === 0) ? 'w-[3px]' : (i % 3 === 0 || i % 5 === 0) ? 'w-[2px]' : 'w-[1px]'
+                                }`}
+                              />
+                            ))}
                           </div>
-                          <p className="text-[10px] text-slate-600 mt-2">
-                            Fecha de Emisión: {new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          <p className="font-mono text-[7.5px] font-bold text-slate-900 tracking-wider mt-1 break-all">
+                            {facturaResultado?.claveAcceso || `${new Date().toISOString().slice(0, 10).replace(/-/g, '')}01${(businessConfig?.ruc || '1805274790001').padEnd(13, '0')}10010010000000225189638715`}
                           </p>
-                          <p className="text-[10px] text-slate-700 font-mono font-bold">
-                            Ambiente: {businessConfig?.sriAmbiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS'}
+                          <p className="text-[7px] text-slate-500 uppercase tracking-wider font-bold mt-0.5">
+                            CLAVE DE ACCESO / AUTORIZACIÓN SRI
                           </p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Datos del Comprador */}
-                    <div className="px-6 py-3.5 border-b border-slate-200 bg-slate-50">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
-                        <div className="flex gap-1.5 text-[11px]">
-                          <span className="font-bold text-slate-700">Razón Social:</span>
-                          <span className="text-slate-900 font-semibold">{facturaCliente.nombre}</span>
+                    {/* ── 2. DATOS DEL CLIENTE / COMPRADOR ── */}
+                    <div className="mt-5 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4">
+                      <h5 className="font-extrabold text-[11px] uppercase tracking-wider text-slate-700 mb-2.5">
+                        DATOS DEL CLIENTE / COMPRADOR
+                      </h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-6 text-xs text-slate-700">
+                        <div>
+                          <span className="font-medium text-slate-600">Razón Social: </span>
+                          <span className="font-bold text-slate-900">{facturaCliente.nombre || 'Consumidor Final'}</span>
                         </div>
-                        <div className="flex gap-1.5 text-[11px]">
-                          <span className="font-bold text-slate-700">Identificación:</span>
-                          <span className="text-slate-900 font-semibold font-mono">{facturaCliente.cedula}</span>
+                        <div>
+                          <span className="font-medium text-slate-600">Dirección: </span>
+                          <span className="text-slate-900">{facturaCliente.direccion || 'Cevallos, Ecuador'}</span>
                         </div>
-                        <div className="flex gap-1.5 text-[11px]">
-                          <span className="font-bold text-slate-700">Dirección:</span>
-                          <span className="text-slate-900">{facturaCliente.direccion || 'No registrada'}</span>
+                        <div>
+                          <span className="font-medium text-slate-600">Identificación: </span>
+                          <span className="font-mono font-bold text-slate-900">{facturaCliente.cedula || '9999999999999'}</span>
                         </div>
-                        <div className="flex gap-1.5 text-[11px]">
-                          <span className="font-bold text-slate-700">Email:</span>
+                        <div>
+                          <span className="font-medium text-slate-600">Email: </span>
                           <span className="text-slate-900">{facturaCliente.email || 'No registrado'}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Tabla de Detalle */}
-                    <div className="px-6 py-4 overflow-x-auto">
-                      <table className="w-full text-[11px]">
-                        <thead>
-                          <tr className="border-b-2 border-slate-300 text-slate-700 font-black uppercase">
-                            <th className="py-2 text-left">Descripción</th>
-                            <th className="py-2 text-center w-16">Cant.</th>
-                            <th className="py-2 text-right w-24">P. Unit.</th>
-                            <th className="py-2 text-right w-20">Desc.</th>
-                            <th className="py-2 text-right w-24">Subtotal</th>
+                    {/* ── 3. TABLA DE PRODUCTOS ── */}
+                    <div className="mt-5 rounded-xl overflow-hidden border border-slate-200">
+                      <table className="w-full text-xs">
+                        <thead className="bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-wider">
+                          <tr>
+                            <th className="py-2.5 px-4 text-left">DESCRIPCIÓN PRODUCTO</th>
+                            <th className="py-2.5 px-3 text-center w-16">CANT.</th>
+                            <th className="py-2.5 px-3 text-right w-24">P. UNIT.</th>
+                            <th className="py-2.5 px-3 text-center w-16">IVA</th>
+                            <th className="py-2.5 px-4 text-right w-24">SUBTOTAL</th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100 bg-white">
                           {facturaCliente.detalles.map((d, idx) => {
                             const sub = d.cantidad * d.precioUnitario - (d.descuento || 0);
                             return (
-                              <tr key={idx} className="border-b border-slate-200">
-                                <td className="py-2 text-left font-semibold text-slate-900">{d.descripcion}</td>
-                                <td className="py-2 text-center font-bold">{d.cantidad}</td>
-                                <td className="py-2 text-right font-mono">${d.precioUnitario.toFixed(2)}</td>
-                                <td className="py-2 text-right font-mono">${(d.descuento || 0).toFixed(2)}</td>
-                                <td className="py-2 text-right font-bold font-mono">${sub.toFixed(2)}</td>
+                              <tr key={idx} className="hover:bg-slate-50/60">
+                                <td className="py-3 px-4 font-semibold text-slate-900">{d.descripcion}</td>
+                                <td className="py-3 px-3 text-center font-bold text-slate-800">{d.cantidad}</td>
+                                <td className="py-3 px-3 text-right font-mono text-slate-700">${d.precioUnitario.toFixed(2)}</td>
+                                <td className="py-3 px-3 text-center font-bold text-slate-700">{d.tarifaIva ?? 15}%</td>
+                                <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">${sub.toFixed(2)}</td>
                               </tr>
                             );
                           })}
@@ -6695,38 +6704,26 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       </table>
                     </div>
 
-                    {/* Totales PDF */}
-                    <div className="px-6 py-4 border-t-2 border-slate-300 bg-slate-50">
-                      <div className="flex justify-end">
-                        <div className="w-72 space-y-1.5">
-                          <div className="flex justify-between text-[11px] text-slate-700">
-                            <span>SUBTOTAL 0%:</span>
-                            <span className="font-bold font-mono">${subtotal0Calc.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-700">
-                            <span>SUBTOTAL 15%:</span>
-                            <span className="font-bold font-mono">${subtotal15Calc.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-700">
-                            <span>DESCUENTO:</span>
-                            <span className="font-bold font-mono">$0.00</span>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-700">
-                            <span>IVA 15%:</span>
-                            <span className="font-bold font-mono">${ivaCalc.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm font-black text-slate-900 border-t-2 border-slate-400 pt-2">
-                            <span>VALOR TOTAL:</span>
-                            <span className="font-mono text-emerald-700">${totalCalc.toFixed(2)}</span>
-                          </div>
+                    {/* ── 4. RESUMEN DE TOTALES ── */}
+                    <div className="mt-4 flex justify-end">
+                      <div className="w-72 bg-slate-50/80 border border-slate-200 rounded-2xl p-4 space-y-1.5 text-xs text-slate-700">
+                        <div className="flex justify-between">
+                          <span>SUBTOTAL 15%:</span>
+                          <span className="font-mono font-bold text-slate-900">${subtotal15Calc.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>SUBTOTAL 0%:</span>
+                          <span className="font-mono font-bold text-slate-900">${subtotal0Calc.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>IVA 15%:</span>
+                          <span className="font-mono font-bold text-slate-900">${ivaCalc.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-300">
+                          <span>VALOR TOTAL:</span>
+                          <span className="font-mono text-base font-black text-slate-900">${totalCalc.toFixed(2)}</span>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Información adicional PDF */}
-                    <div className="px-6 py-3 border-t border-slate-200 text-[10px] text-slate-500 space-y-0.5 bg-slate-100/50">
-                      <p>Forma de Pago: {facturaCliente.formaPago === '01' ? 'Sin utilización del sistema financiero (Efectivo)' : facturaCliente.formaPago === '20' ? 'Otros con utilización del sistema financiero' : facturaCliente.formaPago === '16' ? 'Tarjeta de Débito' : 'Tarjeta de Crédito'} — Plazo: 30 días</p>
-                      <p>Este documento es una previsualización PDF de la factura electrónica a emitirse ante el SRI.</p>
                     </div>
                   </div>
                 </div>
