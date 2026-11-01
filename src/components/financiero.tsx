@@ -2782,6 +2782,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
               direccion: businessConfig?.direccion || 'Ecuador',
               telefono: businessConfig?.telefono,
               email: businessConfig?.email,
+              regimen: businessConfig?.sriRegimen === 'RIMPE_POPULAR' ? 'CONTRIBUYENTE RÉGIMEN RIMPE' : 'RÉGIMEN GENERAL',
             },
             comprobante: {
               numero: res.numeroComprobante || '001-001-000000001',
@@ -5968,6 +5969,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             ambiente: businessConfig?.sriAmbiente,
             establecimiento: businessConfig?.sriEstablecimiento,
             puntoEmision: businessConfig?.sriPuntoEmision,
+            regimen: businessConfig?.sriRegimen === 'RIMPE_POPULAR' ? 'CONTRIBUYENTE RÉGIMEN RIMPE' : 'RÉGIMEN GENERAL',
           },
           comprobante: {
             numero: facturaResultado?.numeroComprobante || `${businessConfig?.sriEstablecimiento || '001'}-${businessConfig?.sriPuntoEmision || '001'}-000000001`,
@@ -6620,7 +6622,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                           <p>RUC: <span className="font-mono text-white font-bold">{businessConfig?.ruc || '1805274790001'}</span></p>
                           <p>Matriz: {businessConfig?.direccion || 'LA DELICIA Y MIRABELES'}</p>
                           <p>Obligado a llevar Contabilidad: {businessConfig?.sriObligadoContabilidad ? 'SI' : 'NO'}</p>
-                          {businessConfig?.email && <p>Email: {businessConfig.email}</p>}
+                          <p className="font-bold text-slate-200 uppercase">
+                            {businessConfig?.sriRegimen === 'RIMPE_POPULAR' ? 'CONTRIBUYENTE RÉGIMEN RIMPE' : 'RÉGIMEN GENERAL'}
+                          </p>
                         </div>
                       </div>
 

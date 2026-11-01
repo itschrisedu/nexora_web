@@ -14,6 +14,7 @@ export interface FacturaPdfData {
     ambiente?: string;
     establecimiento?: string;
     puntoEmision?: string;
+    regimen?: string;
   };
   comprobante: {
     numero: string;
@@ -129,9 +130,13 @@ export function generarFacturaPdfDoc(data: FacturaPdfData): jsPDF {
   doc.text(`RUC: ${data.emisor.ruc || "1804884664001"}`, 18, y + 15);
   doc.text(`Matriz: ${data.emisor.direccion || "Cevallos, Tungurahua, Ecuador"}`, 18, y + 21);
   doc.text(`Obligado a llevar Contabilidad: ${data.emisor.obligadoContabilidad ? "SI" : "NO"}`, 18, y + 27);
-  if (data.emisor.email) {
-    doc.text(`Email: ${data.emisor.email}`, 18, y + 33);
-  }
+  const rawReg = (data.emisor.regimen || "").toUpperCase();
+  const regimenTexto = rawReg.includes("RIMPE")
+    ? "CONTRIBUYENTE RÉGIMEN RIMPE"
+    : "RÉGIMEN GENERAL";
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  doc.text(regimenTexto, 18, y + 33);
 
   // Cuadro Número Factura y Código de Barras (dentro del mismo recuadro blanco)
   const boxWidth = 78;

@@ -259,6 +259,25 @@ const buildTallaIdsFromCurva = (sObj: SerieConfig, curva: Record<number, number>
 
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
 
+export const normalizeDecimalInput = (val: string): string => {
+  let cleaned = val.replace(',', '.').replace(/[^0-9.]/g, '');
+  const parts = cleaned.split('.');
+  if (parts.length > 2) {
+    cleaned = parts[0] + '.' + parts.slice(1).join('');
+  }
+  if (cleaned.length > 1 && cleaned.startsWith('0') && cleaned[1] !== '.') {
+    cleaned = cleaned.replace(/^0+/, '');
+    if (cleaned === '') cleaned = '0';
+  }
+  return cleaned;
+};
+
+export const parseDecimalNumber = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  const num = parseFloat(String(val).replace(',', '.'));
+  return isNaN(num) ? 0 : num;
+};
+
 function Lbl({ t, req }: { t: string; req?: boolean }) {
   return (
     <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
@@ -1477,7 +1496,7 @@ export default function ModelosComponent({
         setError(`Ingresa ambos precios para la serie "${getNombreSerie(serieName)}".`);
         return;
       }
-      if (parseFloat(sp.costPrice) <= 0 || parseFloat(sp.salePrice) <= 0) {
+      if (parseDecimalNumber(sp.costPrice) <= 0 || parseDecimalNumber(sp.salePrice) <= 0) {
         setError(`Los precios de la serie "${getNombreSerie(serieName)}" deben ser mayores a 0.`);
         return;
       }
@@ -1487,8 +1506,8 @@ export default function ModelosComponent({
     for (const sid of newColorSerieIds) {
       const sp = newColorSeriesPrices[sid];
       seriesPricesMap[sid] = {
-        costPrice: parseFloat(sp.costPrice),
-        salePrice: parseFloat(sp.salePrice),
+        costPrice: parseDecimalNumber(sp.costPrice),
+        salePrice: parseDecimalNumber(sp.salePrice),
       };
     }
 
@@ -1572,7 +1591,7 @@ export default function ModelosComponent({
         setError(`Ingresa ambos precios para la serie "${getNombreSerie(serieName)}".`);
         return;
       }
-      if (parseFloat(sp.costPrice) <= 0 || parseFloat(sp.salePrice) <= 0) {
+      if (parseDecimalNumber(sp.costPrice) <= 0 || parseDecimalNumber(sp.salePrice) <= 0) {
         setError(`Los precios de la serie "${getNombreSerie(serieName)}" deben ser mayores a 0.`);
         return;
       }
@@ -1583,8 +1602,8 @@ export default function ModelosComponent({
     for (const sid of serieIds) {
       const sp = seriesPrices[sid];
       seriesPricesMap[sid] = {
-        costPrice: parseFloat(sp.costPrice),
-        salePrice: parseFloat(sp.salePrice),
+        costPrice: parseDecimalNumber(sp.costPrice),
+        salePrice: parseDecimalNumber(sp.salePrice),
       };
     }
 
@@ -1682,8 +1701,8 @@ export default function ModelosComponent({
         setExpandedModels(prev => ({ ...prev, [priceProd.modelId!]: true }));
       }
       await ApiService.patch(`/inventario/productos/${priceProd.id}/precio`, {
-        nuevoPrecioCosto: parseFloat(newCosto),
-        nuevoPrecioVenta: parseFloat(newVenta),
+        nuevoPrecioCosto: parseDecimalNumber(newCosto),
+        nuevoPrecioVenta: parseDecimalNumber(newVenta),
         motivo: motivo || "Actualización manual de precios",
       });
       setSuccess("Precios actualizados.");
@@ -2029,8 +2048,8 @@ export default function ModelosComponent({
 
     for (const sid of supplierSeriesActiveIds) {
       const sp = supplierSeriesPrices[sid];
-      const cost = parseFloat(sp?.costPrice || "0");
-      const sale = parseFloat(sp?.salePrice || "0");
+      const cost = parseDecimalNumber(sp?.costPrice);
+      const sale = parseDecimalNumber(sp?.salePrice);
       if (isNaN(cost) || cost <= 0 || isNaN(sale) || sale <= 0) {
         const sName = series.find(s => s.id === sid)?.nombre || "seleccionada";
         setError(`Debes ingresar un precio de compra y venta válidos (mayores a 0) para la serie activa "${sName}".`);
@@ -2045,8 +2064,8 @@ export default function ModelosComponent({
         const sp = supplierSeriesPrices[sid];
         if (sp) {
           seriesPricesNumeric[sid] = {
-            costPrice: parseFloat(sp.costPrice) || 0,
-            salePrice: parseFloat(sp.salePrice) || 0,
+            costPrice: parseDecimalNumber(sp.costPrice),
+            salePrice: parseDecimalNumber(sp.salePrice),
           };
         }
       }
@@ -2187,8 +2206,8 @@ export default function ModelosComponent({
     }
 
     const currentPrices = supplierSeriesPrices[currentSerieId] || { costPrice: editProductCosto, salePrice: editProductVenta };
-    const costo = parseFloat(currentPrices.costPrice);
-    const venta = parseFloat(currentPrices.salePrice);
+    const costo = parseDecimalNumber(currentPrices.costPrice);
+    const venta = parseDecimalNumber(currentPrices.salePrice);
     if (isNaN(costo) || costo <= 0 || isNaN(venta) || venta <= 0) {
       setError("Debes ingresar un precio de compra y venta válidos (mayores a 0) en la serie activa.");
       return;
@@ -2397,8 +2416,8 @@ export default function ModelosComponent({
         const sp = editModelSeriesPrices[sid];
         if (sp) {
           seriesPricesNumeric[sid] = {
-            costPrice: parseFloat(sp.costPrice) || 0,
-            salePrice: parseFloat(sp.salePrice) || 0,
+            costPrice: parseDecimalNumber(sp.costPrice),
+            salePrice: parseDecimalNumber(sp.salePrice),
           };
         }
       }
@@ -3854,8 +3873,8 @@ export default function ModelosComponent({
 
                         {/* Detalle si la serie está activa */}
                         {isActive && (() => {
-                          const costVal = parseFloat(prices.costPrice);
-                          const saleVal = parseFloat(prices.salePrice);
+                          const costVal = parseDecimalNumber(prices.costPrice);
+                          const saleVal = parseDecimalNumber(prices.salePrice);
                           const hasCost = !isNaN(costVal) && costVal > 0;
                           const hasSale = !isNaN(saleVal) && saleVal > 0;
                           const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
@@ -3870,22 +3889,28 @@ export default function ModelosComponent({
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <Lbl t="Precio de Compra ($)" req />
-                                  <input type="number" min="0.01" step="0.01"
+                                  <input type="text" inputMode="decimal"
                                     value={prices.costPrice}
-                                    onChange={e => setSeriesPrices(prev => ({
-                                      ...prev,
-                                      [s.id]: { ...prev[s.id], costPrice: e.target.value }
-                                    }))}
+                                    onChange={e => {
+                                      const val = normalizeDecimalInput(e.target.value);
+                                      setSeriesPrices(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...prev[s.id], costPrice: val }
+                                      }));
+                                    }}
                                     placeholder="0.00" className={INPUT} />
                                 </div>
                                 <div>
                                   <Lbl t="Precio de Venta ($)" req />
-                                  <input type="number" min="0.01" step="0.01"
+                                  <input type="text" inputMode="decimal"
                                     value={prices.salePrice}
-                                    onChange={e => setSeriesPrices(prev => ({
-                                      ...prev,
-                                      [s.id]: { ...prev[s.id], salePrice: e.target.value }
-                                    }))}
+                                    onChange={e => {
+                                      const val = normalizeDecimalInput(e.target.value);
+                                      setSeriesPrices(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...prev[s.id], salePrice: val }
+                                      }));
+                                    }}
                                     placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
                                     className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
                                 </div>
@@ -4254,8 +4279,8 @@ export default function ModelosComponent({
 
                         {/* Inputs de Precio */}
                         {isActive && (() => {
-                          const costVal = parseFloat(prices.costPrice);
-                          const saleVal = parseFloat(prices.salePrice);
+                          const costVal = parseDecimalNumber(prices.costPrice);
+                          const saleVal = parseDecimalNumber(prices.salePrice);
                           const hasCost = !isNaN(costVal) && costVal > 0;
                           const hasSale = !isNaN(saleVal) && saleVal > 0;
                           const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
@@ -4269,12 +4294,15 @@ export default function ModelosComponent({
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <Lbl t="Precio Entrega Proveedor ($)" req />
-                                  <input type="number" min="0.01" step="0.01"
+                                  <input type="text" inputMode="decimal"
                                     value={prices.costPrice}
-                                    onChange={e => setNewColorSeriesPrices(prev => ({
-                                      ...prev,
-                                      [s.id]: { ...prev[s.id], costPrice: e.target.value }
-                                    }))}
+                                    onChange={e => {
+                                      const val = normalizeDecimalInput(e.target.value);
+                                      setNewColorSeriesPrices(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...prev[s.id], costPrice: val }
+                                      }));
+                                    }}
                                     placeholder="0.00" className={INPUT} />
                                 </div>
                                 <div>
@@ -4294,12 +4322,15 @@ export default function ModelosComponent({
                                       </button>
                                     )}
                                   </div>
-                                  <input type="number" min="0.01" step="0.01"
+                                  <input type="text" inputMode="decimal"
                                     value={prices.salePrice}
-                                    onChange={e => setNewColorSeriesPrices(prev => ({
-                                      ...prev,
-                                      [s.id]: { ...prev[s.id], salePrice: e.target.value }
-                                    }))}
+                                    onChange={e => {
+                                      const val = normalizeDecimalInput(e.target.value);
+                                      setNewColorSeriesPrices(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...prev[s.id], salePrice: val }
+                                      }));
+                                    }}
                                     placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
                                     className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
                                 </div>
@@ -4538,18 +4569,18 @@ export default function ModelosComponent({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Lbl t="Precio de Costo ($)" req />
-                    <input type="number" min="0.01" step="0.01" value={newCosto} onChange={e => setNewCosto(e.target.value)} className={INPUT} />
+                    <input type="text" inputMode="decimal" value={newCosto} onChange={e => setNewCosto(normalizeDecimalInput(e.target.value))} placeholder="0.00" className={INPUT} />
                   </div>
                   <div>
                     <Lbl t="Precio de Venta ($)" req />
-                    <input type="number" min="0.01" step="0.01" value={newVenta} onChange={e => setNewVenta(e.target.value)} className={INPUT} />
+                    <input type="text" inputMode="decimal" value={newVenta} onChange={e => setNewVenta(normalizeDecimalInput(e.target.value))} placeholder="0.00" className={INPUT} />
                   </div>
                 </div>
 
                 {/* Recomendación y Margen de Rentabilidad */}
                 {(() => {
-                  const c = parseFloat(newCosto) || 0;
-                  const v = parseFloat(newVenta) || 0;
+                  const c = parseDecimalNumber(newCosto);
+                  const v = parseDecimalNumber(newVenta);
                   const rec20 = c > 0 ? (c * 1.20).toFixed(2) : "0.00";
                   const diff = v - c;
                   const pct = c > 0 ? ((diff / c) * 100).toFixed(1) : "0";
@@ -4975,8 +5006,8 @@ export default function ModelosComponent({
 
                         {/* Detalle si la serie está activa */}
                         {isActive && (() => {
-                          const costVal = parseFloat(prices.costPrice);
-                          const saleVal = parseFloat(prices.salePrice);
+                          const costVal = parseDecimalNumber(prices.costPrice);
+                          const saleVal = parseDecimalNumber(prices.salePrice);
                           const hasCost = !isNaN(costVal) && costVal > 0;
                           const hasSale = !isNaN(saleVal) && saleVal > 0;
                           const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
@@ -4992,12 +5023,11 @@ export default function ModelosComponent({
                                 <div>
                                   <Lbl t="Precio de Compra ($)" req />
                                   <input
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={prices.costPrice}
                                     onChange={e => {
-                                      const val = e.target.value;
+                                      const val = normalizeDecimalInput(e.target.value);
                                       setSupplierSeriesPrices(prev => ({
                                         ...prev,
                                         [s.id]: { ...prev[s.id], costPrice: val }
@@ -5027,12 +5057,11 @@ export default function ModelosComponent({
                                     )}
                                   </div>
                                   <input
-                                    type="number"
-                                    min="0.01"
-                                    step="0.01"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={prices.salePrice}
                                     onChange={e => {
-                                      const val = e.target.value;
+                                      const val = normalizeDecimalInput(e.target.value);
                                       setSupplierSeriesPrices(prev => ({
                                         ...prev,
                                         [s.id]: { ...prev[s.id], salePrice: val }
@@ -5368,8 +5397,8 @@ export default function ModelosComponent({
 
                         {/* Detalle si la serie está activa */}
                         {isActive && (() => {
-                          const costVal = parseFloat(prices.costPrice);
-                          const saleVal = parseFloat(prices.salePrice);
+                          const costVal = parseDecimalNumber(prices.costPrice);
+                          const saleVal = parseDecimalNumber(prices.salePrice);
                           const hasCost = !isNaN(costVal) && costVal > 0;
                           const hasSale = !isNaN(saleVal) && saleVal > 0;
                           const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
@@ -5384,22 +5413,28 @@ export default function ModelosComponent({
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <Lbl t="Precio de Compra ($)" req />
-                                  <input type="number" min="0.01" step="0.01"
+                                  <input type="text" inputMode="decimal"
                                     value={prices.costPrice}
-                                    onChange={e => setEditModelSeriesPrices(prev => ({
-                                      ...prev,
-                                      [s.id]: { ...prev[s.id], costPrice: e.target.value }
-                                    }))}
+                                    onChange={e => {
+                                      const val = normalizeDecimalInput(e.target.value);
+                                      setEditModelSeriesPrices(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...prev[s.id], costPrice: val }
+                                      }));
+                                    }}
                                     placeholder="0.00" className={INPUT} />
                                 </div>
                                 <div>
                                   <Lbl t="Precio de Venta ($)" req />
-                                  <input type="number" min="0.01" step="0.01"
+                                  <input type="text" inputMode="decimal"
                                     value={prices.salePrice}
-                                    onChange={e => setEditModelSeriesPrices(prev => ({
-                                      ...prev,
-                                      [s.id]: { ...prev[s.id], salePrice: e.target.value }
-                                    }))}
+                                    onChange={e => {
+                                      const val = normalizeDecimalInput(e.target.value);
+                                      setEditModelSeriesPrices(prev => ({
+                                        ...prev,
+                                        [s.id]: { ...prev[s.id], salePrice: val }
+                                      }));
+                                    }}
                                     placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
                                     className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`} />
                                 </div>
@@ -5661,8 +5696,8 @@ export default function ModelosComponent({
 
                           {/* Detalle si la serie está activa */}
                           {isActive && (() => {
-                            const costVal = parseFloat(prices.costPrice);
-                            const saleVal = parseFloat(prices.salePrice);
+                            const costVal = parseDecimalNumber(prices.costPrice);
+                            const saleVal = parseDecimalNumber(prices.salePrice);
                             const hasCost = !isNaN(costVal) && costVal > 0;
                             const hasSale = !isNaN(saleVal) && saleVal > 0;
                             const suggestedSale = hasCost ? calculateSuggestedPrice(costVal, marginPct).toFixed(2) : "";
@@ -5678,16 +5713,16 @@ export default function ModelosComponent({
                                   <div>
                                     <Lbl t="Precio de Compra ($)" req />
                                     <input
-                                      type="number"
-                                      min="0.01"
-                                      step="0.01"
+                                      type="text"
+                                      inputMode="decimal"
                                       value={prices.costPrice}
-                                      onChange={e =>
+                                      onChange={e => {
+                                        const val = normalizeDecimalInput(e.target.value);
                                         setSupplierSeriesPrices(prev => ({
                                           ...prev,
-                                          [s.id]: { ...prev[s.id], costPrice: e.target.value },
-                                        }))
-                                      }
+                                          [s.id]: { ...prev[s.id], costPrice: val },
+                                        }));
+                                      }}
                                       placeholder="0.00"
                                       className={INPUT}
                                     />
@@ -5695,16 +5730,16 @@ export default function ModelosComponent({
                                   <div>
                                     <Lbl t="Precio de Venta ($)" req />
                                     <input
-                                      type="number"
-                                      min="0.01"
-                                      step="0.01"
+                                      type="text"
+                                      inputMode="decimal"
                                       value={prices.salePrice}
-                                      onChange={e =>
+                                      onChange={e => {
+                                        const val = normalizeDecimalInput(e.target.value);
                                         setSupplierSeriesPrices(prev => ({
                                           ...prev,
-                                          [s.id]: { ...prev[s.id], salePrice: e.target.value },
-                                        }))
-                                      }
+                                          [s.id]: { ...prev[s.id], salePrice: val },
+                                        }));
+                                      }}
                                       placeholder={suggestedSale ? `$${suggestedSale} (${marginPct}% margen)` : "0.00"}
                                       className={`${INPUT} ${isLoss ? "border-red-500 text-red-500 bg-red-500/5" : ""}`}
                                     />

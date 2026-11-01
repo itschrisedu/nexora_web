@@ -359,6 +359,7 @@ function ComprobanteContent() {
           ambiente: data.amb === '2' ? '2' : '1',
           establecimiento: data.e_est || '001',
           puntoEmision: data.e_pto || '001',
+          regimen: data.reg || 'RÉGIMEN GENERAL',
         },
         comprador: {
           nombre: data.c_nom || 'Cliente',

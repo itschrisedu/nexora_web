@@ -827,6 +827,7 @@ export default function PosComponent() {
                   ambiente: negocioInfo?.sriAmbiente || "1",
                   establecimiento: negocioInfo?.sriEstablecimiento || "001",
                   puntoEmision: negocioInfo?.sriPuntoEmision || "001",
+                  regimen: negocioInfo?.sriRegimen === 'RIMPE_POPULAR' ? 'CONTRIBUYENTE RÉGIMEN RIMPE' : 'RÉGIMEN GENERAL',
                 },
                 comprobante: {
                   numero: resSri.numeroComprobante,
