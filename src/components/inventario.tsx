@@ -309,7 +309,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
         await ApiService.post(`/inventario/productos/${movProd.id}/entrada-lote`, {
           items,
           motivo: movMotivo.trim(),
-          precioCosto: parseFloat(movPrecioCosto) || undefined,
+          precioCosto: parseFloat(String(movPrecioCosto).replace(',', '.')) || undefined,
         });
 
         const totalPares = items.reduce((s, i) => s + i.cantidad, 0);
@@ -961,10 +961,10 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                         {isAdmin && (
                           <>
                             <div className="text-[11px] text-[var(--muted-foreground)]">
-                              ${(parseFloat(movPrecioCosto) || Number(movProd.precioCosto || 10)).toFixed(2)} / par
+                              ${(parseFloat(String(movPrecioCosto).replace(',', '.')) || Number(movProd.precioCosto || 10)).toFixed(2)} / par
                             </div>
                             <div className={`font-black text-sm ${movType === "entrada" ? "text-emerald-600" : "text-rose-600"}`}>
-                              ${(totalParesLote * (parseFloat(movPrecioCosto) || Number(movProd.precioCosto || 10))).toFixed(2)}
+                              ${(totalParesLote * (parseFloat(String(movPrecioCosto).replace(',', '.')) || Number(movProd.precioCosto || 10))).toFixed(2)}
                             </div>
                           </>
                         )}
@@ -1172,11 +1172,18 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                             <div className="relative w-28 sm:w-32">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                               <input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 value={movPrecioCosto}
-                                onChange={(e) => setMovPrecioCosto(e.target.value)}
+                                onChange={(e) => {
+                                  let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                                  const parts = val.split('.');
+                                  if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                  if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                    val = val.replace(/^0+/, '') || '0';
+                                  }
+                                  setMovPrecioCosto(val);
+                                }}
                                 className="w-full pl-7 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-right font-mono focus:ring-2 focus:ring-emerald-500 text-[var(--foreground)]"
                                 placeholder="0.00"
                               />
@@ -1188,7 +1195,7 @@ export default function InventarioComponent({ online, userRole, activeSucursalId
                             Inversión Total del Lote ({totalParesLote} pares):
                           </span>
                           <span className="font-black text-xs text-emerald-600 font-mono">
-                            ${(totalParesLote * (parseFloat(movPrecioCosto) || 0)).toFixed(2)}
+                            ${(totalParesLote * (parseFloat(String(movPrecioCosto).replace(',', '.')) || 0)).toFixed(2)}
                           </span>
                         </div>
                       </div>

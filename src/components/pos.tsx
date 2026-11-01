@@ -491,7 +491,7 @@ export default function PosComponent() {
     try {
       setAbriendoCaja(true);
       await ApiService.post("/pos/caja/abrir", {
-        montoInicial: parseFloat(montoApertura) || 0,
+        montoInicial: parseFloat(String(montoApertura).replace(',', '.')) || 0,
       });
       showToast("Caja abierta exitosamente", "success");
       await cargarEstadoCaja();
@@ -643,7 +643,7 @@ export default function PosComponent() {
   };
 
   const subtotalVenta = itemsVenta.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0);
-  const valorDescuento = Math.min(subtotalVenta, Math.max(0, parseFloat(descuentoVenta) || 0));
+  const valorDescuento = Math.min(subtotalVenta, Math.max(0, parseFloat(String(descuentoVenta).replace(',', '.')) || 0));
   const totalVenta = Math.max(0, subtotalVenta - valorDescuento);
 
   const handleRegistrarVenta = async () => {
@@ -939,8 +939,8 @@ export default function PosComponent() {
         total: totalVenta,
         metodoPago,
         detallePago: detallePagoPayload,
-        pagaCon: metodoPago === "EFECTIVO" ? parseFloat(pagaCon) || totalVenta : totalVenta,
-        vuelto: metodoPago === "EFECTIVO" ? Math.max(0, (parseFloat(pagaCon) || totalVenta) - totalVenta) : 0,
+        pagaCon: metodoPago === "EFECTIVO" ? parseFloat(String(pagaCon).replace(',', '.')) || totalVenta : totalVenta,
+        vuelto: metodoPago === "EFECTIVO" ? Math.max(0, (parseFloat(String(pagaCon).replace(',', '.')) || totalVenta) - totalVenta) : 0,
         negocio: {
           nombre: nombreComercial,
           ruc: negocioInfo?.ruc || "1800000000001",
@@ -997,7 +997,7 @@ export default function PosComponent() {
     try {
       setCerrandoCaja(true);
       const res = await ApiService.post("/pos/caja/cerrar", {
-        montoRealEfectivo: parseFloat(montoRealEfectivo) || 0,
+        montoRealEfectivo: parseFloat(String(montoRealEfectivo).replace(',', '.')) || 0,
         notas: notasCierre.trim() || undefined,
       });
       setResultadoCierre(res);
@@ -1320,12 +1320,19 @@ export default function PosComponent() {
                     Monto Inicial en Efectivo (USD) *
                   </label>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     required
                     value={montoApertura}
-                    onChange={(e) => setMontoApertura(e.target.value)}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                      const parts = val.split('.');
+                      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                      if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                        val = val.replace(/^0+/, '') || '0';
+                      }
+                      setMontoApertura(val);
+                    }}
                     className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-4 py-3 text-2xl text-center font-mono font-black text-emerald-600 dark:text-emerald-400 focus:outline-none focus:border-emerald-500"
                     placeholder="0.00"
                   />
@@ -1842,12 +1849,19 @@ export default function PosComponent() {
                             🎁 Descuento ($):
                           </span>
                           <input
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={descuentoVenta}
-                            onChange={(e) => setDescuentoVenta(e.target.value)}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                              const parts = val.split('.');
+                              if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                              if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                val = val.replace(/^0+/, '') || '0';
+                              }
+                              setDescuentoVenta(val);
+                            }}
                             className="w-20 px-2 py-0.5 bg-[var(--card)] border border-[var(--border)] rounded-md text-right font-bold text-amber-500 text-xs focus:outline-none focus:border-amber-500"
                           />
                         </div>
@@ -2101,20 +2115,28 @@ export default function PosComponent() {
                           <div className="flex items-center justify-between">
                             <label className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">Paga con ($):</label>
                             <input
-                              type="number"
-                              step="0.01"
+                              type="text"
+                              inputMode="decimal"
                               placeholder={totalVenta.toFixed(2)}
                               value={pagaCon}
-                              onChange={(e) => setPagaCon(e.target.value)}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                                const parts = val.split('.');
+                                if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                  val = val.replace(/^0+/, '') || '0';
+                                }
+                                setPagaCon(val);
+                              }}
                               className="w-24 px-2 py-1 bg-[var(--card)] border border-emerald-500/30 rounded-lg text-right font-black text-sm text-[var(--foreground)] focus:outline-none focus:border-emerald-600"
                             />
                           </div>
 
-                          {pagaCon && parseFloat(pagaCon) >= totalVenta && (
+                          {pagaCon && parseFloat(String(pagaCon).replace(',', '.')) >= totalVenta && (
                             <div className="flex justify-between items-center pt-1 border-t border-emerald-500/20 font-bold">
                               <span className="text-emerald-700 dark:text-emerald-300">Vuelto a entregar:</span>
                               <span className="text-emerald-600 dark:text-emerald-400 text-sm font-black font-mono">
-                                ${(parseFloat(pagaCon) - totalVenta).toFixed(2)}
+                                ${(parseFloat(String(pagaCon).replace(',', '.')) - totalVenta).toFixed(2)}
                               </span>
                             </div>
                           )}
@@ -2937,11 +2959,19 @@ export default function PosComponent() {
                     Monto Real en Efectivo (conteo físico en gaveta) *
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     required
                     value={montoRealEfectivo}
-                    onChange={(e) => setMontoRealEfectivo(e.target.value)}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                      const parts = val.split('.');
+                      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                      if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                        val = val.replace(/^0+/, '') || '0';
+                      }
+                      setMontoRealEfectivo(val);
+                    }}
                     className="w-full bg-[var(--background)] border border-[var(--border)] rounded-2xl px-4 py-3 text-xl text-center font-mono font-black text-amber-500 focus:outline-none focus:border-amber-500"
                     placeholder="0.00"
                   />

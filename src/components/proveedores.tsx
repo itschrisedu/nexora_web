@@ -628,6 +628,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [subtipoCurva, setSubtipoCurva] = useState<TipoCurva>('MEDIA_A');
   const [cantidadCurvas, setCantidadCurvas] = useState<number>(2); // Por defecto 2 medias docenas = 12 pares
   const [precioCostoInput, setPrecioCostoInput] = useState<number>(0);
+  const [precioCostoStr, setPrecioCostoStr] = useState<string>('');
   const [observacionItemInput, setObservacionItemInput] = useState<string>('');
   const [mostrarObsModeloOrden, setMostrarObsModeloOrden] = useState(false);
 
@@ -900,7 +901,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         email: email.trim() ? formatearEmail(email) : undefined,
       });
 
-      const montoNum = parseFloat(deudaAnteriorMonto);
+      const montoNum = parseFloat(String(deudaAnteriorMonto).replace(',', '.'));
       if (tieneDeudaAnterior && res?.id && !isNaN(montoNum) && montoNum > 0) {
         try {
           await ApiService.post('/proveedores/deuda-manual', {
@@ -971,7 +972,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         email: updatedEmail,
       });
 
-      const montoNum = parseFloat(deudaAnteriorMonto);
+      const montoNum = parseFloat(String(deudaAnteriorMonto).replace(',', '.'));
       if (tieneDeudaAnterior && editingSupplier.id && !isNaN(montoNum) && montoNum > 0) {
         try {
           await ApiService.post('/proveedores/deuda-manual', {
@@ -1183,7 +1184,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     setProductoSeleccionado(null);
     setBusquedaModelo('');
     setCantidadCurvas(2);
-    setPrecioCostoInput(0);
+    setPrecioCostoInput(0); setPrecioCostoStr('');
     setObservacionItemInput('');
     setMostrarObsModeloOrden(false);
     setAddingModelToDetail(false);
@@ -1876,7 +1877,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
   const handleGuardarPago = async (e: React.FormEvent) => {
     e.preventDefault();
-    const montoNum = parseFloat(montoPago);
+    const montoNum = parseFloat(String(montoPago).replace(',', '.'));
     if (isNaN(montoNum) || montoNum <= 0) {
       showToast('Ingrese un monto válido mayor a $0.00.', 'error');
       return;
@@ -4494,11 +4495,20 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               <div className="w-full">
                                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Precio Costo Unit ($) *</label>
                                 <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  value={precioCostoInput}
-                                  onChange={(e) => setPrecioCostoInput(parseFloat(e.target.value) || 0)}
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="0.00"
+                                  value={precioCostoStr !== '' ? precioCostoStr : (precioCostoInput > 0 ? String(precioCostoInput) : '')}
+                                  onChange={(e) => {
+                                    let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                                    const parts = val.split('.');
+                                    if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                    if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                      val = val.replace(/^0+/, '') || '0';
+                                    }
+                                    setPrecioCostoStr(val);
+                                    setPrecioCostoInput(parseFloat(val) || 0);
+                                  }}
                                   className="w-full px-3 py-1.5 bg-[var(--card)] border rounded-lg text-xs font-mono font-bold"
                                 />
                               </div>
@@ -5349,13 +5359,20 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   Monto a Pagar / Adelantar ($ USD) *
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  type="text"
+                  inputMode="decimal"
                   required
                   placeholder="0.00"
                   value={montoPago}
-                  onChange={(e) => setMontoPago(e.target.value)}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                    const parts = val.split('.');
+                    if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                    if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                      val = val.replace(/^0+/, '') || '0';
+                    }
+                    setMontoPago(val);
+                  }}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm font-bold font-mono focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -5851,11 +5868,20 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       <div className="w-full">
                         <label className="block text-[10px] font-bold text-[var(--muted-foreground)] mb-1">Precio Costo Unit ($) *</label>
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          value={precioCostoInput}
-                          onChange={(e) => setPrecioCostoInput(parseFloat(e.target.value) || 0)}
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={precioCostoStr !== '' ? precioCostoStr : (precioCostoInput > 0 ? String(precioCostoInput) : '')}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                            const parts = val.split('.');
+                            if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                            if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                              val = val.replace(/^0+/, '') || '0';
+                            }
+                            setPrecioCostoStr(val);
+                            setPrecioCostoInput(parseFloat(val) || 0);
+                          }}
                           className="w-full px-3 py-1.5 bg-[var(--card)] border rounded-lg text-xs font-mono font-bold"
                         />
                       </div>
@@ -6207,12 +6233,19 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700 dark:text-amber-400">$</span>
                           <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={deudaAnteriorMonto}
-                            onChange={(e) => setDeudaAnteriorMonto(e.target.value)}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                              const parts = val.split('.');
+                              if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                              if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                val = val.replace(/^0+/, '') || '0';
+                              }
+                              setDeudaAnteriorMonto(val);
+                            }}
                             className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-bold focus:outline-none focus:border-amber-600 transition-colors"
                             required={tieneDeudaAnterior}
                           />
@@ -6455,12 +6488,19 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700 dark:text-amber-400">$</span>
                           <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={deudaAnteriorMonto}
-                            onChange={(e) => setDeudaAnteriorMonto(e.target.value)}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                              const parts = val.split('.');
+                              if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                              if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                val = val.replace(/^0+/, '') || '0';
+                              }
+                              setDeudaAnteriorMonto(val);
+                            }}
                             className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-bold focus:outline-none focus:border-amber-600 transition-colors"
                             required={tieneDeudaAnterior}
                           />

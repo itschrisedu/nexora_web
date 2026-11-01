@@ -453,7 +453,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
     // Validación de Deuda Anterior al crear o editar cliente
     if ((showCreate || showEdit) && tieneDeudaAnterior) {
-      const montoNum = parseFloat(deudaAnteriorMonto);
+      const montoNum = parseFloat(String(deudaAnteriorMonto).replace(',', '.'));
       if (isNaN(montoNum) || montoNum <= 0) {
         setError("El monto de la deuda anterior debe ser mayor a $0.00.");
         return false;
@@ -491,7 +491,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
         clienteCreadoId = res?.id || res?.data?.id || (typeof res === 'string' ? res : "");
 
         // Si se indicó saldo anterior / deuda previa, se asocia automáticamente a la cartera de cobros
-        const montoNum = parseFloat(deudaAnteriorMonto);
+        const montoNum = parseFloat(String(deudaAnteriorMonto).replace(',', '.'));
         if (tieneDeudaAnterior && clienteCreadoId && !isNaN(montoNum) && montoNum > 0) {
           try {
             await ApiService.post('/financiero/cobros/deuda-manual', {
@@ -555,7 +555,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       });
 
       // Si se indicó saldo anterior / deuda pendiente al editar
-      const montoNum = parseFloat(deudaAnteriorMonto);
+      const montoNum = parseFloat(String(deudaAnteriorMonto).replace(',', '.'));
       if (tieneDeudaAnterior && selected.id && !isNaN(montoNum) && montoNum > 0) {
         try {
           await ApiService.post('/financiero/cobros/deuda-manual', {
@@ -2651,12 +2651,19 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700 dark:text-amber-400">$</span>
                             <input
-                              type="number"
-                              step="0.01"
-                              min="0.01"
+                              type="text"
+                              inputMode="decimal"
                               placeholder="0.00"
                               value={deudaAnteriorMonto}
-                              onChange={(e) => setDeudaAnteriorMonto(e.target.value)}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                                const parts = val.split('.');
+                                if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                  val = val.replace(/^0+/, '') || '0';
+                                }
+                                setDeudaAnteriorMonto(val);
+                              }}
                               className="w-full pl-7 pr-3 py-2 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-bold focus:outline-none focus:border-amber-600 transition-colors"
                               required={tieneDeudaAnterior}
                             />

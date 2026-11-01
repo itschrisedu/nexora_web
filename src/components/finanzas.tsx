@@ -470,7 +470,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
   // Guardar Gasto
   const handleGuardarGasto = async (e: React.FormEvent) => {
     e.preventDefault();
-    const montoNum = parseFloat(gastoForm.monto);
+    const montoNum = parseFloat(String(gastoForm.monto).replace(',', '.'));
     if (isNaN(montoNum) || montoNum <= 0) {
       setError('Por favor ingresa un monto válido mayor a $0.00');
       return;
@@ -1824,12 +1824,19 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-orange-500">$</span>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="0.00"
                       value={gastoForm.monto}
-                      onChange={(e) => setGastoForm({ ...gastoForm, monto: e.target.value })}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                        const parts = val.split('.');
+                        if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                        if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                          val = val.replace(/^0+/, '') || '0';
+                        }
+                        setGastoForm({ ...gastoForm, monto: val });
+                      }}
                       className="w-full pl-7 pr-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-mono font-black focus:outline-none focus:border-orange-500"
                       required
                     />

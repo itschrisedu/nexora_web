@@ -600,6 +600,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   const [devolucionCantidadParesInput, setDevolucionCantidadParesInput] = useState<string>('1');
   const [devolucionCantidadSeries, setDevolucionCantidadSeries] = useState<number>(1);
   const [devolucionPrecioUnitario, setDevolucionPrecioUnitario] = useState<number>(0);
+  const [devolucionPrecioStr, setDevolucionPrecioStr] = useState<string>('');
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [savingDevolucion, setSavingDevolucion] = useState(false);
   const [lineasDevolucion, setLineasDevolucion] = useState<LineaDevolucionItem[]>([]);
@@ -1487,7 +1488,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       showToast('Por favor, ingresa el monto del abono.', 'warning');
       return;
     }
-    const valor = parseFloat(montoAbono);
+    const valor = parseFloat(String(montoAbono).replace(',', '.'));
     if (isNaN(valor) || valor <= 0) {
       showToast('Ingresa un monto válido mayor a $0.00', 'warning');
       return;
@@ -1504,7 +1505,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       showToast('Ingresa el monto del abono.', 'warning');
       return;
     }
-    const valor = parseFloat(montoAbono);
+    const valor = parseFloat(String(montoAbono).replace(',', '.'));
     if (isNaN(valor) || valor <= 0) {
       showToast('Ingresa un monto válido mayor a $0.00', 'warning');
       return;
@@ -2882,7 +2883,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         nuevoTipo: nuevoTipoVenta,
         diasPlazo: cambioTipoDiasPlazo,
         fechaVencimiento: nuevoTipoVenta === 'CREDITO' ? cambioTipoFechaVencimiento : undefined,
-        montoAbonadoInicial: nuevoTipoVenta === 'CREDITO' ? (parseFloat(cambioTipoMontoAbonado) || 0) : undefined,
+        montoAbonadoInicial: nuevoTipoVenta === 'CREDITO' ? (parseFloat(String(cambioTipoMontoAbonado).replace(',', '.')) || 0) : undefined,
         metodoAbonoInicial: cambioTipoMetodoAbono,
         notas: cambioTipoNotas,
       });
@@ -3987,13 +3988,19 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                       </div>
                     </div>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      max={carteraSeleccionada.saldoTotalPendiente}
+                      type="text"
+                      inputMode="decimal"
                       placeholder="0.00"
                       value={montoAbono}
-                      onChange={(e) => setMontoAbono(e.target.value)}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                        const parts = val.split('.');
+                        if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                        if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                          val = val.replace(/^0+/, '') || '0';
+                        }
+                        setMontoAbono(val);
+                      }}
                       className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-sm font-bold text-emerald-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                     />
                   </div>
@@ -4729,7 +4736,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                 <div className="flex items-center justify-between border-t border-[var(--border)] pt-2 font-bold">
                   <span className="text-[var(--foreground)]">Saldo restante tras el abono:</span>
                   <span className="text-emerald-600 dark:text-emerald-400 font-extrabold font-mono">
-                    ${Math.max(0, Number(carteraSeleccionada.saldoTotalPendiente) - (parseFloat(montoAbono) || 0)).toFixed(2)}
+                    ${Math.max(0, Number(carteraSeleccionada.saldoTotalPendiente) - (parseFloat(String(montoAbono).replace(',', '.')) || 0)).toFixed(2)}
                   </span>
                 </div>
                 {notasAbono.trim() && (
@@ -5522,11 +5529,20 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                             <div className="relative">
                               <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
                               <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={devolucionPrecioUnitario || ''}
-                                onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0.00"
+                                value={devolucionPrecioStr !== '' ? devolucionPrecioStr : (devolucionPrecioUnitario > 0 ? String(devolucionPrecioUnitario) : '')}
+                                onChange={(e) => {
+                                  let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                                  const parts = val.split('.');
+                                  if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                  if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                    val = val.replace(/^0+/, '') || '0';
+                                  }
+                                  setDevolucionPrecioStr(val);
+                                  setDevolucionPrecioUnitario(parseFloat(val) || 0);
+                                }}
                                 className="w-24 pl-5 pr-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-right"
                               />
                             </div>
@@ -5602,11 +5618,20 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                               <div className="relative">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--muted-foreground)]">$</span>
                                 <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={devolucionPrecioUnitario || ''}
-                                  onChange={(e) => setDevolucionPrecioUnitario(parseFloat(e.target.value) || 0)}
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="0.00"
+                                  value={devolucionPrecioStr !== '' ? devolucionPrecioStr : (devolucionPrecioUnitario > 0 ? String(devolucionPrecioUnitario) : '')}
+                                  onChange={(e) => {
+                                    let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                                    const parts = val.split('.');
+                                    if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                    if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                                      val = val.replace(/^0+/, '') || '0';
+                                    }
+                                    setDevolucionPrecioStr(val);
+                                    setDevolucionPrecioUnitario(parseFloat(val) || 0);
+                                  }}
                                   className="w-20 pl-5 pr-2 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-bold text-right"
                                 />
                               </div>
@@ -6955,13 +6980,19 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                           Monto Recibido ($):
                         </label>
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max={Number(cobroParaCambiarTipo.montoOriginal ?? cobroParaCambiarTipo.montoTotal ?? 0)}
+                          type="text"
+                          inputMode="decimal"
                           placeholder="0.00"
                           value={cambioTipoMontoAbonado}
-                          onChange={(e) => setCambioTipoMontoAbonado(e.target.value)}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                            const parts = val.split('.');
+                            if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                            if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                              val = val.replace(/^0+/, '') || '0';
+                            }
+                            setCambioTipoMontoAbonado(val);
+                          }}
                           className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-emerald-600 focus:outline-none focus:border-emerald-500"
                         />
                       </div>
@@ -6999,7 +7030,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                   {/* Resumen del Saldo que quedará en Cartera */}
                   {(() => {
                     const total = Number(cobroParaCambiarTipo.montoOriginal ?? cobroParaCambiarTipo.montoTotal ?? 0);
-                    const abono = Math.min(total, parseFloat(cambioTipoMontoAbonado) || 0);
+                    const abono = Math.min(total, parseFloat(String(cambioTipoMontoAbonado).replace(',', '.')) || 0);
                     const saldoFinal = Math.max(0, total - abono);
 
                     return (

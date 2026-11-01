@@ -8770,12 +8770,11 @@ export default function ComercialComponent({
                                     placeholder="0.00"
                                     value={valorString}
                                     onChange={(e) => {
-                                      let val = e.target.value;
-                                      val = val.replace(/[^0-9.]/g, '');
+                                      let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
                                       const parts = val.split('.');
                                       if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
                                       if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
-                                        val = val.replace(/^0+/, '');
+                                        val = val.replace(/^0+/, '') || '0';
                                       }
                                       setPreciosCorregirMap((prev) => ({
                                         ...prev,
