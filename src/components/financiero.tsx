@@ -1226,47 +1226,35 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       numeroNota?: string;
       usuarioNombre?: string;
       sucursalNombre?: string;
+      saldoAnterior?: number;
+      nuevoSaldo?: number;
     }
   ): ComprobanteAbonoPdfData => {
     const hoy = new Date();
-    const hoyStr = hoy.toISOString().split('T')[0];
     const fechaLegible = abonoInfo.fecha || hoy.toLocaleDateString('es-EC');
     const horaLegible = hoy.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
 
-    // Cobros/entregas de hoy
-    const cobrosDeHoy = cartera.cobros.filter((c) => c.createdAt && c.createdAt.startsWith(hoyStr));
-    const montoComprasHoy = cobrosDeHoy.reduce((sum, c) => sum + Number(c.montoOriginal || c.montoTotal || 0), 0);
-    const entregasHoy = cobrosDeHoy.map((c) => {
-      const lineas = c.lines || c.saleNote?.lines || [];
-      const modelos = agruparLineasPorModelo(lineas, catalogoProductos);
+    // Saldos transparentes y directos:
+    // 1. Si vienen especificados del backend o del movimiento registrado, respetarlos estrictamente.
+    // 2. Si se comparte desde la lista de abonos del cliente:
+    //    cartera.saldoTotalPendiente es el saldo remanente actual.
+    //    El saldo anterior adeudado antes del abono era: saldoRestante + abonoInfo.monto.
+    let saldoAnterior = 0;
+    let saldoRestante = 0;
 
-      const items = modelos.map((m) => {
-        const tallasStr = m.tallas.map((t) => `T${t.numero}: ${t.cantidad}`).join(', ');
-        return {
-          modelo: m.modelName,
-          color: m.color,
-          serie: m.serieNombre,
-          tallas: tallasStr,
-          cantidadPares: m.totalPares,
-          etiquetaVolumen: m.etiquetaVolumen,
-          precioUnitario: m.precioUnitario,
-          subtotal: m.subtotal,
-        };
-      });
+    if (abonoInfo.saldoAnterior !== undefined && !isNaN(Number(abonoInfo.saldoAnterior))) {
+      saldoAnterior = Number(abonoInfo.saldoAnterior);
+      saldoRestante = abonoInfo.nuevoSaldo !== undefined && !isNaN(Number(abonoInfo.nuevoSaldo))
+        ? Number(abonoInfo.nuevoSaldo)
+        : Math.max(0, saldoAnterior - abonoInfo.monto);
+    } else {
+      saldoRestante = Number(cartera.saldoTotalPendiente || 0);
+      saldoAnterior = Math.round((saldoRestante + abonoInfo.monto) * 100) / 100;
+    }
 
-      return {
-        nota: c.saleNote?.numero ? `Nota #${String(c.saleNote.numero).padStart(4, '0')}` : (c.numeroCobro || 'Nota de Entrega'),
-        monto: Number(c.montoOriginal || c.montoTotal || 0),
-        items: items.length > 0 ? items : undefined,
-      };
-    });
-
-    // Saldos
-    const saldoRestante = Math.max(0, cartera.saldoTotalPendiente - abonoInfo.monto);
-    let saldoAnterior = saldoRestante + abonoInfo.monto - montoComprasHoy;
-    if (saldoAnterior < 0) saldoAnterior = 0;
-
-    const numRecibo = `REC-${hoy.getFullYear()}${(hoy.getMonth() + 1).toString().padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const numRecibo = abonoInfo.numeroNota && abonoInfo.numeroNota.startsWith('REC-')
+      ? abonoInfo.numeroNota
+      : `REC-${hoy.getFullYear()}${(hoy.getMonth() + 1).toString().padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const targetSucursalId = (cartera.cobros[0] as any)?.sucursalId || selectedSucursalCobroId || activeSucursalId;
     const sucEmisor = (sucursalesEmpresa || []).find((s: any) => s.id === targetSucursalId) ||
@@ -1304,12 +1292,11 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         nivelCredito: cartera.clienteNivel,
       },
       movimiento: {
-        numeroNota: abonoInfo.numeroNota,
+        numeroNota: abonoInfo.numeroNota && abonoInfo.numeroNota.startsWith('REC-') ? abonoInfo.numeroNota : undefined,
         saldoAnterior,
         montoAbonado: abonoInfo.monto,
         saldoRestante,
         totalNotasPendientes: cartera.totalComprasPendientes,
-        entregasHoy: entregasHoy.length > 0 ? entregasHoy : undefined,
       },
     };
   };
@@ -1388,97 +1375,55 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       return;
     }
 
-    const hoyStr = new Date().toISOString().split('T')[0];
     const hoyLegible = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
     const negocioNombre = businessConfig?.nombre || 'Administración de Cobros';
 
-    // 1. Obtener el último abono (ya sea el recién ingresado o el último registrado en el historial)
+    // 1. Obtener el último abono registrado unificado
     let ultimoAbono = abonoInfoParam;
-    if (!ultimoAbono) {
-      const todosAbonos: any[] = [];
-      cartera.cobros.forEach((c) => {
-        if (c.abonos && Array.isArray(c.abonos)) {
-          c.abonos.forEach((a) => {
-            todosAbonos.push({
-              monto: Number(a.monto),
-              metodo: a.metodo,
-              fecha: a.createdAt ? new Date(a.createdAt).toLocaleDateString('es-EC') : hoyLegible,
-              createdAt: a.createdAt,
-            });
-          });
-        }
-      });
-      todosAbonos.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      if (todosAbonos.length > 0) {
-        ultimoAbono = todosAbonos[0];
-      }
+    if (!ultimoAbono && ultimos3AbonosCliente.length > 0) {
+      const u = ultimos3AbonosCliente[0];
+      ultimoAbono = {
+        monto: u.montoTotal,
+        metodo: u.metodo,
+        fecha: new Date(u.createdAt).toLocaleDateString('es-EC'),
+      };
     }
 
-    // 2. Revisar si hay compras / notas entregadas hoy
-    const cobrosDeHoy = cartera.cobros.filter((c) => c.createdAt && c.createdAt.startsWith(hoyStr));
-    const montoComprasHoy = cobrosDeHoy.reduce((sum, c) => sum + Number(c.montoOriginal || c.montoTotal || 0), 0);
-
-    // 3. Saldo actual que queda debiendo
-    let saldoActual = cartera.saldoTotalPendiente;
+    // 2. Saldo actual deudor real
+    let saldoActual = Number(cartera.saldoTotalPendiente || 0);
     if (abonoInfoParam) {
-      // Si se acaba de registrar en este instante, el saldo final es el que queda tras este abono
-      saldoActual = Math.max(0, cartera.saldoTotalPendiente - abonoInfoParam.monto);
+      saldoActual = Math.max(0, saldoActual - abonoInfoParam.monto);
     }
 
     const montoAbono = ultimoAbono ? ultimoAbono.monto : 0;
+    // Saldo anterior real antes de este abono
+    const saldoAnterior = montoAbono > 0 ? Math.round((saldoActual + montoAbono) * 100) / 100 : saldoActual;
 
-    // 4. Saldo anterior: lo que debía ANTES de esta entrega y de este abono
-    let saldoAnterior = saldoActual + montoAbono - montoComprasHoy;
-    if (saldoAnterior < 0) saldoAnterior = 0;
+    let msg = `Estimado/a *${capitalizarNombreCompleto(cartera.clienteNombre)}*,\n\n`;
+    msg += `Le saludamos de *${negocioNombre}*. Le compartimos el estado actual de su cuenta:\n\n`;
+    msg += `📅 *Fecha:* ${hoyLegible}\n`;
 
-    const subtotalConCompra = saldoAnterior + montoComprasHoy;
-
-    let msg = `Estimado/a *${capitalizarNombreCompleto(cartera.clienteNombre)}*,\n\nLe saludamos de *${negocioNombre}*. Le compartimos el comprobante de su movimiento actual:\n\n*Fecha:* ${hoyLegible}\n`;
-
-    // Si había saldo anterior antes de este movimiento
-    if (saldoAnterior > 0) {
-      msg += `\n*Saldo Anterior:* $${saldoAnterior.toFixed(2)}`;
-    }
-
-    // Si hubo entrega de calzado en este movimiento
-    if (montoComprasHoy > 0) {
-      msg += `\n\n📦 *Entrega de Calzado / Mercadería Nueva:*`;
-      cobrosDeHoy.forEach((c) => {
-        const monto = Number(c.montoOriginal || c.montoTotal || 0);
-        const lineas = c.lines || c.saleNote?.lines || [];
-        const modelos = agruparLineasPorModelo(lineas, catalogoProductos);
-
-        if (modelos.length > 0) {
-          modelos.forEach((m) => {
-            const colorStr = m.color ? ` (${m.color})` : '';
-            const serieStr = m.serieNombre && m.serieNombre !== 'Estándar' && m.serieNombre !== 'General' ? ` • ${m.serieNombre}` : '';
-            const tallasStr = m.tallas.length > 0 ? ` [${m.tallas.map((t) => `T${t.numero}: ${t.cantidad}`).join(', ')}]` : '';
-            const volStr = m.etiquetaVolumen || `${m.totalPares} ${m.totalPares === 1 ? 'par' : 'pares'}`;
-            msg += `\n   ▫️ ${m.modelName}${colorStr}${serieStr}\n      ${volStr}${tallasStr} • $${m.subtotal.toFixed(2)}`;
-          });
-        } else {
-          msg += `\n   ▫️ Mercadería entregada • $${monto.toFixed(2)}`;
-        }
-      });
-      msg += `\n   💰 *Subtotal mercadería:* $${montoComprasHoy.toFixed(2)}`;
-      if (saldoAnterior > 0) {
-        msg += `\n\n*Total a la fecha:* $${subtotalConCompra.toFixed(2)}`;
+    if (montoAbono > 0) {
+      msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+      msg += `💵 *Saldo Anterior:* $${saldoAnterior.toFixed(2)}\n`;
+      msg += `✅ *Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono?.metodo || 'EFECTIVO'})\n`;
+      if (saldoActual <= 0) {
+        msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (CUENTA SALDADA)*\n`;
+      } else {
+        msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
       }
-    }
-
-    // Si hubo abono en este movimiento
-    if (ultimoAbono && montoAbono > 0) {
-      msg += `\n\n*Abono Recibido:* -$${montoAbono.toFixed(2)} (${ultimoAbono.metodo})`;
-    }
-
-    // Saldo Final
-    msg += `\n\n━━━━━━━━━━━━━━━━━━━━━`;
-    if (saldoActual > 0) {
-      msg += `\n*SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*`;
+      msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
     } else {
-      msg += `\n*SALDO PENDIENTE ACTUAL: $0.00 (CUENTA SALDADA)*`;
+      msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+      if (saldoActual <= 0) {
+        msg += `🎉 *SALDO PENDIENTE ACTUAL: $0.00 (SIN DEUDA PENDIENTE)*\n`;
+      } else {
+        msg += `📌 *SALDO PENDIENTE ACTUAL: $${saldoActual.toFixed(2)}*\n`;
+      }
+      msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
     }
-    msg += `\n━━━━━━━━━━━━━━━━━━━━━\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
+
+    msg += `\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*`;
 
     handleEnviarWhatsAppTexto(cartera.clienteTelefono, msg);
   };
@@ -4140,7 +4085,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                 metodo: a.metodo,
                                 fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
                                 notas: a.notas,
-                                numeroNota: a.reciboRef || (a.notasAfectadas.length > 0 ? a.notasAfectadas.map((n) => n.numeroNota).join(', ') : 'Abono unificado'),
+                                numeroNota: a.reciboRef || 'Abono a cuenta',
                                 usuarioNombre: a.usuarioNombre,
                                 sucursalNombre: a.usuarioSucursal,
                               });
@@ -4164,7 +4109,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                     metodo: a.metodo,
                                     fecha: new Date(a.createdAt).toLocaleDateString('es-EC'),
                                     notas: a.notas,
-                                    numeroNota: a.reciboRef || (a.notasAfectadas.length > 0 ? a.notasAfectadas.map((n) => n.numeroNota).join(', ') : 'Abono unificado'),
+                                    numeroNota: a.reciboRef || 'Abono a cuenta',
                                     usuarioNombre: a.usuarioNombre,
                                     sucursalNombre: a.usuarioSucursal,
                                   },
@@ -5117,6 +5062,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                           metodo: m.metodo || 'EFECTIVO',
                                           fecha: new Date(m.fecha).toLocaleDateString('es-EC'),
                                           notas: m.descripcion,
+                                          saldoAnterior: m.saldoAnterior !== undefined ? Number(m.saldoAnterior) : undefined,
+                                          nuevoSaldo: m.nuevoSaldo !== undefined ? Number(m.nuevoSaldo) : undefined,
                                         });
                                         descargarComprobanteAbonoPdf(dataAbono);
                                         showToast('Comprobante PDF descargado.', 'success');
@@ -5140,6 +5087,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                                               metodo: m.metodo || 'EFECTIVO',
                                               fecha: new Date(m.fecha).toLocaleDateString('es-EC'),
                                               notas: m.descripcion,
+                                              saldoAnterior: m.saldoAnterior !== undefined ? Number(m.saldoAnterior) : undefined,
+                                              nuevoSaldo: m.nuevoSaldo !== undefined ? Number(m.nuevoSaldo) : undefined,
                                             },
                                             formatoEnvioAbono
                                           );

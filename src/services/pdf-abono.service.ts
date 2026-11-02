@@ -228,7 +228,7 @@ export function generarComprobanteAbonoPdfDoc(data: ComprobanteAbonoPdfData): js
   const filas: Array<{ concepto: string; desc: string; monto: number; tipo: 'NORMAL' | 'ENTREGA' | 'ABONO' | 'SALDO_FINAL' }> = [
     {
       concepto: 'Saldo Anterior Adeudado por el Cliente',
-      desc: data.movimiento.numeroNota ? `Cuenta corriente asociada (${data.movimiento.numeroNota})` : 'Total consolidado pendiente antes del movimiento',
+      desc: 'Total pendiente antes de la recepción del abono',
       monto: data.movimiento.saldoAnterior,
       tipo: 'NORMAL',
     },
@@ -405,33 +405,8 @@ export async function armarMensajeWhatsAppAbono(data: ComprobanteAbonoPdfData, i
   }
 
   msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-  const tieneEntregas = data.movimiento.entregasHoy && data.movimiento.entregasHoy.length > 0;
-  const totalEntregas = (data.movimiento.entregasHoy || []).reduce((sum, e) => sum + e.monto, 0);
-
-  if (data.movimiento.saldoAnterior > 0 || tieneEntregas) {
+  if (data.movimiento.saldoAnterior > 0) {
     msg += `💵 *Saldo Anterior:* $${data.movimiento.saldoAnterior.toFixed(2)}\n`;
-  }
-
-  if (tieneEntregas && data.movimiento.entregasHoy) {
-    msg += `📦 *Entrega de Calzado / Mercadería Nueva:*\n`;
-    data.movimiento.entregasHoy.forEach((e) => {
-      if (e.items && e.items.length > 0) {
-        e.items.forEach((it) => {
-          const colorStr = it.color ? ` (${it.color})` : '';
-          const serieStr = it.serie && it.serie !== 'Estándar' && it.serie !== 'General' ? ` • ${it.serie}` : '';
-          const tallasStr = it.tallas ? ` [${it.tallas}]` : '';
-          const volStr = it.etiquetaVolumen || `${it.cantidadPares} ${it.cantidadPares === 1 ? 'par' : 'pares'}`;
-          msg += `   ▫️ ${it.modelo}${colorStr}${serieStr}\n      ${volStr}${tallasStr} • $${it.subtotal.toFixed(2)}\n`;
-        });
-      } else {
-        msg += `   ▫️ Mercadería entregada • $${e.monto.toFixed(2)}\n`;
-      }
-    });
-    msg += `   💰 *Subtotal mercadería:* $${totalEntregas.toFixed(2)}\n`;
-    if (data.movimiento.saldoAnterior > 0) {
-      const subtotalConCompra = data.movimiento.saldoAnterior + totalEntregas;
-      msg += `📊 *Total a la fecha:* $${subtotalConCompra.toFixed(2)}\n`;
-    }
   }
 
   msg += `✅ *Abono Aplicado:* -$${data.movimiento.montoAbonado.toFixed(2)}\n`;
