@@ -1311,6 +1311,8 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       numeroNota?: string;
       usuarioNombre?: string;
       sucursalNombre?: string;
+      saldoAnterior?: number;
+      nuevoSaldo?: number;
     },
     _modo?: 'PDF' | 'TEXTO'
   ) => {
