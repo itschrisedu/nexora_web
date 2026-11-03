@@ -1437,7 +1437,25 @@ export default function ModelosComponent({
       setNewSerieNombre("");
       await loadData();
       if (createdSerie?.id) {
-        toggleSerie(createdSerie.id);
+        if (showEditProduct) {
+          setSupplierSeriesActiveIds([createdSerie.id]);
+          setEditProductSerieId(createdSerie.id);
+          const docena = getDocenaBaseParaSerie(createdSerie);
+          const ids = buildTallaIdsFromCurva(createdSerie, docena);
+          setSupplierSeriesCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
+        } else if (showSupplierSeriesModal) {
+          setSupplierSeriesActiveIds(prev => (prev.includes(createdSerie.id) ? prev : [...prev, createdSerie.id]));
+          const docena = getDocenaBaseParaSerie(createdSerie);
+          const ids = buildTallaIdsFromCurva(createdSerie, docena);
+          setSupplierSeriesCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
+        } else if (showAddColorModal) {
+          setNewColorSerieIds(prev => (prev.includes(createdSerie.id) ? prev : [...prev, createdSerie.id]));
+          const docena = getDocenaBaseParaSerie(createdSerie);
+          const ids = buildTallaIdsFromCurva(createdSerie, docena);
+          setNewColorCustomTallas(ct => ({ ...ct, [createdSerie.id]: ids }));
+        } else {
+          toggleSerie(createdSerie.id);
+        }
       }
       setTimeout(() => setSuccess(""), 4000);
     } catch (err: any) {
@@ -1957,6 +1975,12 @@ export default function ModelosComponent({
     if (showEditProduct) {
       setSupplierSeriesActiveIds([id]);
       setEditProductSerieId(id);
+      const sObj = series.find(s => s.id === id);
+      if (sObj && sObj.tallas && (!supplierSeriesCustomTallas[id] || supplierSeriesCustomTallas[id].length === 0)) {
+        const docena = getDocenaBaseParaSerie(sObj);
+        const ids = buildTallaIdsFromCurva(sObj, docena);
+        setSupplierSeriesCustomTallas(ct => ({ ...ct, [id]: ids }));
+      }
       return;
     }
     setSupplierSeriesActiveIds(prev => {
@@ -1964,16 +1988,10 @@ export default function ModelosComponent({
         return prev.filter(x => x !== id);
       } else {
         const sObj = series.find(s => s.id === id);
-        if (sObj && sObj.tallas && !supplierSeriesCustomTallas[id]) {
-          const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
-          if (Object.keys(curva).length > 0) {
-            const ids = buildTallaIdsFromCurva(sObj, curva);
-            setSupplierSeriesCustomTallas(ct => ({ ...ct, [id]: ids }));
-          } else {
-            const ids: string[] = [];
-            sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
-            setSupplierSeriesCustomTallas(ct => ({ ...ct, [id]: ids }));
-          }
+        if (sObj && sObj.tallas && (!supplierSeriesCustomTallas[id] || supplierSeriesCustomTallas[id].length === 0)) {
+          const docena = getDocenaBaseParaSerie(sObj);
+          const ids = buildTallaIdsFromCurva(sObj, docena);
+          setSupplierSeriesCustomTallas(ct => ({ ...ct, [id]: ids }));
         }
         if (!supplierSeriesPrices[id]) {
           setSupplierSeriesPrices(sp => ({
@@ -5205,7 +5223,7 @@ export default function ModelosComponent({
                                       title="Suma 1 docena completa (12 pares distribuidos según la serie) al stock actual"
                                     >
                                       <Plus size={13} />
-                                      <span>+ 1 Docena en Bodega (+12 pares según serie)</span>
+                                      <span>1 Docena en Bodega (+12 pares según serie)</span>
                                     </button>
                                     <button
                                       type="button"

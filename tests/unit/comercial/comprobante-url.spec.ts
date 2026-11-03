@@ -99,7 +99,6 @@ describe('Servicio de Enlaces Públicos y Comprobantes (comprobante-url.service)
         },
         detalles: [
           {
-            codigo: 'ZAP-01',
             descripcion: 'Zapato Escolar Cuero Negro T38',
             cantidad: 2,
             precioUnitario: 20,
@@ -110,6 +109,7 @@ describe('Servicio de Enlaces Públicos y Comprobantes (comprobante-url.service)
         totales: {
           subtotal15: 40,
           subtotal0: 0,
+          descuento: 0,
           iva15: 6,
           total: 46,
         },
