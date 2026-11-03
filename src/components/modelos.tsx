@@ -2335,6 +2335,67 @@ export default function ModelosComponent({
     }
   };
 
+  // ── Helper: Obtener series, precios y tallas aislados estrictamente por proveedor ──
+  const getSeriesConfigForSupplier = (m: ModeloAgrupado, supId: string | null) => {
+    const prodsSup = (m.products || []).filter(prod => {
+      const prodSupId = prod.supplierId || (prod as any).supplier?.id;
+      if (supId) {
+        return prodSupId === supId || (!prodSupId && supId === m.supplierId);
+      } else {
+        return !prodSupId || prodSupId === m.supplierId;
+      }
+    });
+
+    const activeSerieIds = Array.from(
+      new Set(
+        prodsSup
+          .filter(prod => prod.activo !== false)
+          .map(prod => (prod.serie as any)?.id || (prod as any).serieId)
+          .filter(Boolean)
+      )
+    ) as string[];
+
+    const prices: Record<string, { costPrice: string; salePrice: string }> = {};
+    const customTallas: Record<string, string[]> = {};
+
+    series.forEach(s => {
+      const prodConPrecio = prodsSup.find(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
+      if (prodConPrecio) {
+        prices[s.id] = {
+          costPrice: String(prodConPrecio.precioCosto || ""),
+          salePrice: String(prodConPrecio.precioVenta || ""),
+        };
+      } else {
+        const cacheKey = `${s.id}_${supId || 'default'}`;
+        if (knownSeriesCosts[cacheKey]) {
+          prices[s.id] = { ...knownSeriesCosts[cacheKey] };
+        } else {
+          prices[s.id] = { costPrice: "", salePrice: "" };
+        }
+      }
+
+      if (s.tallas) {
+        const prodConStock = prodsSup.find(prod => ((prod.serie as any)?.id === s.id || (prod as any).serieId === s.id));
+        const tallasList = prodConStock?.tallas || (prodConStock as any)?.stockPorTalla || [];
+        const tallasConStock = tallasList.filter((t: any) => Number(t.cantidad ?? t.stock ?? 0) > 0);
+        if (tallasConStock.length > 0) {
+          const ids: string[] = [];
+          tallasConStock.forEach((t: any) => {
+            const count = Number(t.cantidad ?? t.stock ?? 0);
+            const tid = t.tallaId || t.id;
+            for (let i = 0; i < count; i++) ids.push(tid);
+          });
+          customTallas[s.id] = ids;
+        } else {
+          const docena = getDocenaBaseParaSerie(s);
+          customTallas[s.id] = buildTallaIdsFromCurva(s, docena);
+        }
+      }
+    });
+
+    return { activeSerieIds, prices, customTallas };
+  };
+
   // ── Abrir modal de edición del modelo base y sus series ──
   const openEditModel = (m: ModeloAgrupado) => {
     lastActiveModelIdRef.current = m.id;
@@ -2347,48 +2408,10 @@ export default function ModelosComponent({
     // El proveedor principal nunca debe estar duplicado en los alternos
     setEditModelAlternateIds((m.alternateSupplierIds || []).filter(id => id && id !== m.supplierId));
 
-    const activeSerieIds: string[] = [];
-    const initialPrices: Record<string, { costPrice: string; salePrice: string }> = {};
-    const initialCustomTallas: Record<string, string[]> = {};
-
-    (m.products || []).forEach(p => {
-      const sid = (p.serie as any)?.id || (p as any).serieId;
-      if (sid && !activeSerieIds.includes(sid)) {
-        activeSerieIds.push(sid);
-      }
-      if (sid) {
-        const isPrimarySup = !p.supplierId || p.supplierId === m.supplierId;
-        if (!initialPrices[sid] || isPrimarySup) {
-          initialPrices[sid] = {
-            costPrice: p.precioCosto ? String(p.precioCosto) : "",
-            salePrice: p.precioVenta ? String(p.precioVenta) : "",
-          };
-        }
-        if (!initialCustomTallas[sid]) {
-          const sObj = series.find(s => s.id === sid);
-          if (sObj?.tallas) {
-            const tallasList = p.tallas || (p as any).stockPorTalla || [];
-            const tallasConStock = tallasList.filter((t: any) => Number(t.cantidad ?? t.stock ?? 0) > 0);
-            if (tallasConStock.length > 0) {
-              const ids: string[] = [];
-              tallasConStock.forEach((t: any) => {
-                const count = Number(t.cantidad ?? t.stock ?? 0);
-                const tid = t.tallaId || t.id;
-                for (let i = 0; i < count; i++) ids.push(tid);
-              });
-              initialCustomTallas[sid] = ids;
-            } else {
-              const docena = getDocenaBaseParaSerie(sObj);
-              initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, docena);
-            }
-          }
-        }
-      }
-    });
-
-    setEditModelSerieIds(activeSerieIds);
-    setEditModelSeriesPrices(initialPrices);
-    setEditModelCustomTallas(initialCustomTallas);
+    const cfg = getSeriesConfigForSupplier(m, m.supplierId || null);
+    setEditModelSerieIds(cfg.activeSerieIds);
+    setEditModelSeriesPrices(cfg.prices);
+    setEditModelCustomTallas(cfg.customTallas);
     setError("");
     setShowEditModel(true);
   };
@@ -5351,6 +5374,14 @@ export default function ModelosComponent({
                         }
                         return updated;
                       });
+
+                      // Conmutar series, precios y tallas correspondientes EXCLUSIVAMENTE al proveedor seleccionado
+                      if (editModel) {
+                        const nextCfg = getSeriesConfigForSupplier(editModel, newPrincipal || null);
+                        setEditModelSerieIds(nextCfg.activeSerieIds);
+                        setEditModelSeriesPrices(nextCfg.prices);
+                        setEditModelCustomTallas(nextCfg.customTallas);
+                      }
                     }}
                     className={`${INPUT} flex-1`}
                   >
