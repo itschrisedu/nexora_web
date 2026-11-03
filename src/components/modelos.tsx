@@ -1487,11 +1487,19 @@ export default function ModelosComponent({
     setSaving(true);
     setError("");
     try {
-      await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
+      const updatedSerieRes = await ApiService.put(`/configuracion/series/${editingSerie.id}`, {
         nombre: editSerieNombre,
         tallasDesde: desde,
         tallasHasta: hasta,
       });
+      const sUpdated = updatedSerieRes?.serie || updatedSerieRes;
+      if (sUpdated && sUpdated.tallas && sUpdated.tallas.length > 0) {
+        const docena = getDocenaBaseParaSerie(sUpdated);
+        const ids = buildTallaIdsFromCurva(sUpdated, docena);
+        setEditModelCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        setSupplierSeriesCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+        setNewColorCustomTallas(prev => ({ ...prev, [editingSerie.id]: ids }));
+      }
       setSuccess(`Serie "${editSerieNombre}" actualizada correctamente.`);
       setShowEditSeriesModal(false);
       setEditingSerie(null);
@@ -2359,13 +2367,19 @@ export default function ModelosComponent({
         if (!initialCustomTallas[sid]) {
           const sObj = series.find(s => s.id === sid);
           if (sObj?.tallas) {
-            const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
-            if (Object.keys(curva).length > 0) {
-              initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, curva);
+            const tallasList = p.tallas || (p as any).stockPorTalla || [];
+            const tallasConStock = tallasList.filter((t: any) => Number(t.cantidad ?? t.stock ?? 0) > 0);
+            if (tallasConStock.length > 0) {
+              const ids: string[] = [];
+              tallasConStock.forEach((t: any) => {
+                const count = Number(t.cantidad ?? t.stock ?? 0);
+                const tid = t.tallaId || t.id;
+                for (let i = 0; i < count; i++) ids.push(tid);
+              });
+              initialCustomTallas[sid] = ids;
             } else {
-              const defaultIds: string[] = [];
-              sObj.tallas.forEach(t => { defaultIds.push(t.id); defaultIds.push(t.id); });
-              initialCustomTallas[sid] = defaultIds;
+              const docena = getDocenaBaseParaSerie(sObj);
+              initialCustomTallas[sid] = buildTallaIdsFromCurva(sObj, docena);
             }
           }
         }
@@ -2386,15 +2400,9 @@ export default function ModelosComponent({
       } else {
         const sObj = series.find(s => s.id === id);
         if (sObj && sObj.tallas && !editModelCustomTallas[id]) {
-          const curva = getCurvaDocena(sObj.nombre, 'DOCENA');
-          if (Object.keys(curva).length > 0) {
-            const ids = buildTallaIdsFromCurva(sObj, curva);
-            setEditModelCustomTallas(ct => ({ ...ct, [id]: ids }));
-          } else {
-            const ids: string[] = [];
-            sObj.tallas.forEach(t => { ids.push(t.id); ids.push(t.id); });
-            setEditModelCustomTallas(ct => ({ ...ct, [id]: ids }));
-          }
+          const docena = getDocenaBaseParaSerie(sObj);
+          const ids = buildTallaIdsFromCurva(sObj, docena);
+          setEditModelCustomTallas(ct => ({ ...ct, [id]: ids }));
         }
         if (!editModelSeriesPrices[id]) {
           setEditModelSeriesPrices(sp => ({
@@ -2410,17 +2418,9 @@ export default function ModelosComponent({
   const aplicarCurvaEnEditModelSerie = (serieId: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B') => {
     const sObj = series.find(s => s.id === serieId);
     if (!sObj || !sObj.tallas) return;
-    const curva = getCurvaDocena(sObj.nombre, tipo);
-    const hasCustomCurva = Object.keys(curva).length > 0;
-    if (hasCustomCurva) {
-      const ids = buildTallaIdsFromCurva(sObj, curva);
-      setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
-    } else {
-      const factor = tipo === 'DOCENA' ? 2 : 1;
-      const ids: string[] = [];
-      sObj.tallas.forEach(t => { for (let i = 0; i < factor; i++) ids.push(t.id); });
-      setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
-    }
+    const docena = getDocenaBaseParaSerie(sObj);
+    const ids = buildTallaIdsFromCurva(sObj, docena);
+    setEditModelCustomTallas(ct => ({ ...ct, [serieId]: ids }));
   };
 
   const addTallaRepeatInEditModel = (serieId: string, tallaId: string) => {
@@ -2928,7 +2928,7 @@ export default function ModelosComponent({
                 const products = m.products || [];
                 const uniqueColors = Array.from(new Set(products.map(p => p.color)));
                 const activeColor = selectedColorForModel[m.id] || uniqueColors[0] || "";
-                const activeProduct = products.find(p => p.color === activeColor);
+                const activeProduct = products.find(p => p.color === activeColor && p.fotoUrl) || products.find(p => p.color === activeColor);
                 const isExpanded = expandedModels[m.id];
 
                 return (
@@ -5530,7 +5530,7 @@ export default function ModelosComponent({
 
                                 {/* Steppers por talla */}
                                 <div className="flex flex-wrap gap-2">
-                                  {s.tallas?.sort((a, b) => a.numero - b.numero).map(t => {
+                                  {[...(s.tallas || [])].sort((a, b) => a.numero - b.numero).map(t => {
                                     const count = selectedTallaIds.filter(id => id === t.id).length;
                                     return (
                                       <div key={t.id} className="flex items-center gap-0 bg-[var(--muted)]/30 border border-[var(--border)] rounded-lg px-1 py-0.5">
@@ -5565,10 +5565,10 @@ export default function ModelosComponent({
                                     type="button"
                                     onClick={() => restablecerDocenaEstandarEnEditModel(s.id)}
                                     className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                                    title="Restablecer curva base estándar (38 al 42 con 39 y 40 repetidos = 12 pares)"
+                                    title={`Restablecer curva base de 12 pares según las tallas de la serie ${getNombreSerie(s, series)}`}
                                   >
                                     <RefreshCw size={11} />
-                                    <span>Restablecer estándar (38-42)</span>
+                                    <span>Restablecer docena estándar</span>
                                   </button>
                                 </div>
                               </div>
