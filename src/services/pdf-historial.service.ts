@@ -615,11 +615,13 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
   (data.entregas || []).forEach((ent) => {
     const resumenModelos = ent.items.map((it) => `${it.totalPares}p ${it.modelo}`).join(', ');
     const descCorta = resumenModelos.length > 58 ? resumenModelos.substring(0, 55) + '...' : resumenModelos;
+    const cleanNota = (ent.numeroNota || '').replace(/^(Nota\s*#*|#)+/i, '').trim();
+    const refFinal = cleanNota ? `Nota #${cleanNota}` : 'Nota de Entrega';
     movimientosCronologicos.push({
       fecha: ent.fecha,
       fechaRaw: ent.fechaRaw || ent.fechaEntrega || ent.fecha,
       tipo: 'ENTREGA',
-      referencia: ent.numeroNota ? `Nota #${ent.numeroNota}` : 'Nota de Entrega',
+      referencia: refFinal,
       detalle: descCorta ? `Despacho ${ent.totalPares}p (${descCorta})` : `Despacho de ${ent.totalPares} pares`,
       cargo: Number(ent.montoTotal || 0),
       abono: 0,
@@ -688,8 +690,30 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
   });
 
   // Realizar la corrida contable matemática secuencial paso a paso
-  let saldoAcumulado = 0;
+  const saldoInicialPeriodo = Number(data.resumen.saldoAnteriorPeriodo || 0);
+
+  // Si existe saldo anterior al período filtrado, insertar como primer renglón el Saldo Anterior
+  if (saldoInicialPeriodo > 0) {
+    const fechaCorte = data.periodo.fechaInicio || (movimientosCronologicos[0]?.fecha ?? '');
+    movimientosCronologicos.unshift({
+      fecha: fechaCorte,
+      fechaRaw: '',
+      tipo: 'ENTREGA',
+      referencia: 'SALDO ANTERIOR',
+      detalle: 'Saldo pendiente acumulado previo al corte',
+      cargo: 0,
+      abono: 0,
+      saldoResultante: saldoInicialPeriodo,
+      secuenciaDoc: -999999,
+    });
+  }
+
+  let saldoAcumulado = saldoInicialPeriodo;
   movimientosCronologicos.forEach((mov) => {
+    if (mov.referencia === 'SALDO ANTERIOR') {
+      mov.saldoResultante = saldoInicialPeriodo;
+      return;
+    }
     if (mov.tipo === 'ENTREGA') {
       saldoAcumulado += mov.cargo;
     } else {
@@ -742,7 +766,9 @@ export function generarHistorialPdfDoc(data: HistorialComercialPdfData): jsPDF {
 
       // Comprobante
       doc.setFont('helvetica', 'bold');
-      if (mov.tipo === 'ENTREGA') {
+      if (mov.referencia === 'SALDO ANTERIOR') {
+        doc.setTextColor(71, 85, 105);
+      } else if (mov.tipo === 'ENTREGA') {
         doc.setTextColor(37, 99, 235);
       } else if (mov.tipo === 'ABONO') {
         doc.setTextColor(16, 185, 129);
@@ -921,6 +947,9 @@ export async function armarMensajeWhatsAppHistorial(
 
   msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `📊 *RESUMEN DE MOVIMIENTOS:*\n`;
+  if (data.resumen.saldoAnteriorPeriodo && data.resumen.saldoAnteriorPeriodo > 0) {
+    msg += `💵 *Saldo Anterior al Período:* $${data.resumen.saldoAnteriorPeriodo.toFixed(2)}\n`;
+  }
   msg += `📦 *Total Mercadería Entregada:* $${data.resumen.totalEntregasMonto.toFixed(2)} (${data.resumen.totalParesEntregados} pares)\n`;
   msg += `✅ *Total Abonos Recibidos:* -$${data.resumen.totalAbonosMonto.toFixed(2)}\n`;
   if (data.resumen.totalDevolucionesMonto > 0) {
