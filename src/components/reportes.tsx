@@ -2260,6 +2260,11 @@ export default function ReportesComponent({
                 if (p.serieId !== filtroRotacionSerie) return false;
               }
 
+              if (filtroCategoriaModelo !== 'TODAS') {
+                const cat = p.categoria || p.material || '';
+                if (cat !== filtroCategoriaModelo) return false;
+              }
+
               if (filtroRotacionEstado !== 'TODOS') {
                 if (filtroRotacionEstado === 'CON_STOCK') {
                   if (p.stockTotal <= 0) return false;
@@ -2284,6 +2289,7 @@ export default function ReportesComponent({
             const hayFiltrosActivos =
               filtroRotacionTexto.trim() !== '' ||
               filtroRotacionSerie !== 'TODAS' ||
+              filtroCategoriaModelo !== 'TODAS' ||
               filtroRotacionEstado !== 'TODOS' ||
               filtroRotacionOrden !== 'VENTAS_DESC';
 
@@ -2623,28 +2629,29 @@ export default function ReportesComponent({
 
                 {/* 3. Barra de Filtros, Series y Búsqueda */}
                 <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-3 shadow-xs">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    {/* Búsqueda */}
-                    <div className="relative flex-1 min-w-[240px]">
-                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                      <input
-                        type="text"
-                        value={filtroRotacionTexto}
-                        onChange={(e) => setFiltroRotacionTexto(e.target.value)}
-                        placeholder="Buscar por modelo, color o serie..."
-                        className="w-full pl-10 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-hidden focus:border-blue-500 transition-colors"
-                      />
-                      {filtroRotacionTexto && (
-                        <button
-                          type="button"
-                          onClick={() => setFiltroRotacionTexto('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
+                  {/* Fila 1: Búsqueda */}
+                  <div className="relative w-full">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                    <input
+                      type="text"
+                      value={filtroRotacionTexto}
+                      onChange={(e) => setFiltroRotacionTexto(e.target.value)}
+                      placeholder="Buscar por modelo, color o serie..."
+                      className="w-full pl-10 pr-4 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-hidden focus:border-blue-500 transition-colors"
+                    />
+                    {filtroRotacionTexto && (
+                      <button
+                        type="button"
+                        onClick={() => setFiltroRotacionTexto('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
 
+                  {/* Fila 2: Filtros en línea con wrap */}
+                  <div className="flex flex-wrap items-center gap-3">
                     {/* Filtro por Serie */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
@@ -2665,25 +2672,32 @@ export default function ReportesComponent({
                       </select>
                     </div>
 
-                    {/* Filtro por Categoría / Material (FASE 8) */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
-                        <Tag size={14} />
-                        Categoría:
-                      </span>
-                      <select
-                        value={filtroCategoriaModelo}
-                        onChange={(e) => setFiltroCategoriaModelo(e.target.value)}
-                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
-                      >
-                        <option value="TODAS">Todas las Categorías</option>
-                        {(modelosMargenData?.categorias || []).map((cat: string) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Filtro por Categoría / Material */}
+                    {(() => {
+                      const categoriasDelCatalogo = Array.from(new Set(
+                        catalogoOriginal.map((p: any) => p.categoria || p.material || '').filter((c: string) => c && c !== 'General' && c.trim())
+                      )).sort() as string[];
+                      return categoriasDelCatalogo.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[var(--muted-foreground)] whitespace-nowrap flex items-center gap-1">
+                            <Tag size={14} />
+                            Categoría:
+                          </span>
+                          <select
+                            value={filtroCategoriaModelo}
+                            onChange={(e) => setFiltroCategoriaModelo(e.target.value)}
+                            className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                          >
+                            <option value="TODAS">Todas las Categorías</option>
+                            {categoriasDelCatalogo.map((cat: string) => (
+                              <option key={cat} value={cat}>
+                                {cat}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null;
+                    })()}
 
                     {/* Filtro por Estado / Nivel de Rotación */}
                     <div className="flex items-center gap-2">
@@ -2714,7 +2728,7 @@ export default function ReportesComponent({
                       <select
                         value={filtroRotacionOrden}
                         onChange={(e) => setFiltroRotacionOrden(e.target.value as any)}
-                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                        className="px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] focus:outline-hidden focus:border-blue-500 cursor-pointer max-w-[220px]"
                       >
                         <option value="VENTAS_DESC">Mayor Demanda (Más vendidos)</option>
                         <option value="VENTAS_ASC">Menor Demanda (Menos vendidos)</option>
@@ -2734,6 +2748,7 @@ export default function ReportesComponent({
                           setFiltroRotacionSerie('TODAS');
                           setFiltroRotacionEstado('TODOS');
                           setFiltroRotacionOrden('VENTAS_DESC');
+                          setFiltroCategoriaModelo('TODAS');
                         }}
                         className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 rounded-xl transition-all flex items-center gap-1 cursor-pointer shrink-0"
                         title="Restaurar todos los filtros"
