@@ -206,10 +206,26 @@ const getNombreSerie = (s: SerieConfig | string | null | undefined, seriesList?:
 // Curvas estándar de distribución por serie
 const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B'): Record<number, number> => {
   const name = (serieName || '').toUpperCase();
-  if (name.includes('ADULTO') || name === 'TALLA_GRANDE') {
+  if (name.includes('ADULTO') || name.includes('CABALLERO') || name.includes('HOMBRE') || name === 'TALLA_GRANDE') {
+    if (name.includes('43') || name.includes('38-43') || name.includes('38 A 43')) {
+      // 38 al 43 (6 tallas estándar Cevallos: 2 pares c/u = 12 pares)
+      if (tipo === 'DOCENA') return { 38: 2, 39: 2, 40: 2, 41: 2, 42: 2, 43: 2 };
+      if (tipo === 'MEDIA_A') return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+      return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+    }
     if (tipo === 'DOCENA') return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
     if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
     return { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1 };
+  }
+  if (name.includes('DAMA') || name.includes('MUJER')) {
+    if (name.includes('34') || name.includes('39')) {
+      if (tipo === 'DOCENA') return { 34: 1, 35: 2, 36: 3, 37: 3, 38: 2, 39: 1 };
+      if (tipo === 'MEDIA_A') return { 34: 1, 35: 1, 36: 2, 37: 1, 38: 1, 39: 0 };
+      return { 34: 0, 35: 1, 36: 1, 37: 2, 38: 1, 39: 1 };
+    }
+    if (tipo === 'DOCENA') return { 35: 2, 36: 3, 37: 3, 38: 2, 39: 2 };
+    if (tipo === 'MEDIA_A') return { 35: 1, 36: 2, 37: 1, 38: 1, 39: 1 };
+    return { 35: 1, 36: 1, 37: 2, 38: 1, 39: 1 };
   }
   if (name.includes('JUVENIL')) {
     if (tipo === 'DOCENA') return { 34: 2, 35: 3, 36: 3, 37: 2, 38: 2 };
@@ -222,17 +238,28 @@ const getCurvaDocena = (serieName: string, tipo: 'DOCENA' | 'MEDIA_A' | 'MEDIA_B
 // Genera la distribución base de 12 pares (1 docena) para cualquier serie
 const getDocenaBaseParaSerie = (sObj?: SerieConfig | null): Record<number, number> => {
   if (!sObj || !sObj.tallas || sObj.tallas.length === 0) return {};
-  const std = getCurvaDocena(sObj.nombre || '', 'DOCENA');
-  if (Object.keys(std).length > 0) return std;
-
   const sorted = [...sObj.tallas].sort((a, b) => a.numero - b.numero);
   const n = sorted.length;
   const result: Record<number, number> = {};
 
+  // Caso estándar 6 tallas (ej. 38 a 43 en Adulto, 34 a 39 en Dama): 2 pares por cada talla = 12 pares exactos
   if (n === 6) {
-    // Caso estándar Cevallos: Serie de 6 tallas (ej. 38 a 43) -> 2 pares por número = 12 pares
     sorted.forEach(t => { result[t.numero] = 2; });
-  } else if (n > 0) {
+    return result;
+  }
+
+  // Verificar si las tallas del modelo coinciden exactamente con la plantilla estándar por nombre
+  const std = getCurvaDocena(sObj.nombre || '', 'DOCENA');
+  const tallasNumeros = sorted.map(t => t.numero);
+  const stdKeys = Object.keys(std).map(Number).sort((a, b) => a - b);
+  const coincideExacto = stdKeys.length > 0 &&
+    tallasNumeros.length === stdKeys.length &&
+    tallasNumeros.every((num, idx) => num === stdKeys[idx]);
+
+  if (coincideExacto) return std;
+
+  // Distribución proporcional si la serie tiene otra cantidad de tallas
+  if (n > 0) {
     const base = Math.floor(12 / n);
     let rem = 12 % n;
     const startRem = Math.floor((n - rem) / 2);
@@ -2004,8 +2031,11 @@ export default function ModelosComponent({
 
     if (tipo === 'DOCENA') {
       const docena = getDocenaBaseParaSerie(sObj);
-      const ids = buildTallaIdsFromCurva(sObj, docena);
-      setSupplierSeriesCustomTallas(prev => ({ ...prev, [serieId]: ids }));
+      const idsParaSumar = buildTallaIdsFromCurva(sObj, docena);
+      setSupplierSeriesCustomTallas(prev => {
+        const actuales = prev[serieId] || [];
+        return { ...prev, [serieId]: [...actuales, ...idsParaSumar] };
+      });
     } else if (tipo === 'NINGUNA') {
       setSupplierSeriesCustomTallas(prev => ({ ...prev, [serieId]: [] }));
     }
@@ -5143,15 +5173,23 @@ export default function ModelosComponent({
                                       </span>
                                     )}
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => restablecerDocenaEstandarEnSupplierSeries(s.id)}
-                                    className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                                    title="Restablecer curva base estándar (38 al 42 con 39 y 40 repetidos = 12 pares)"
-                                  >
-                                    <RefreshCw size={11} />
-                                    <span>Restablecer estándar (38-42)</span>
-                                  </button>
+                                  {(() => {
+                                    const tallasSorted = (s.tallas || []).slice().sort((a, b) => a.numero - b.numero);
+                                    const minTalla = tallasSorted[0]?.numero;
+                                    const maxTalla = tallasSorted[tallasSorted.length - 1]?.numero;
+                                    const rangoTexto = minTalla && maxTalla ? `${minTalla}-${maxTalla}` : 'estándar';
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => restablecerDocenaEstandarEnSupplierSeries(s.id)}
+                                        className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                        title={`Reemplazar y dejar exactamente 1 docena base (${rangoTexto} = 12 pares)`}
+                                      >
+                                        <RefreshCw size={11} />
+                                        <span>Restablecer estándar ({rangoTexto})</span>
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
 
                                 {/* Selección de Stock en Bodega */}
@@ -5163,14 +5201,11 @@ export default function ModelosComponent({
                                     <button
                                       type="button"
                                       onClick={() => aplicarCurvaEnSupplierSeries(s.id, 'DOCENA')}
-                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                        selectedTallaIds.length === 12 && supplierSeriesStockOption[s.id] === 'DOCENA'
-                                          ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
-                                          : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]"
-                                      }`}
+                                      className="px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 active:scale-95 shadow-xs"
+                                      title="Suma 1 docena completa (12 pares distribuidos según la serie) al stock actual"
                                     >
-                                      {selectedTallaIds.length === 12 && supplierSeriesStockOption[s.id] === 'DOCENA' && <Check size={13} />}
-                                      1 Docena en Bodega (12 pares según serie de arriba)
+                                      <Plus size={13} />
+                                      <span>+ 1 Docena en Bodega (+12 pares según serie)</span>
                                     </button>
                                     <button
                                       type="button"

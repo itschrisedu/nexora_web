@@ -25,6 +25,12 @@ export const getCurvaDocena = (serieName: string, tipo: TipoCurva): Record<numbe
       if (tipo === 'MEDIA_A') return { 43: 2, 44: 2, 45: 2 };
       return { 43: 2, 44: 2, 45: 2 };
     }
+    if (name.includes('43') || name.includes('38-43') || name.includes('38 A 43')) {
+      // 38 al 43 (6 tallas estándar Cevallos: 2 pares c/u = 12 pares)
+      if (tipo === 'DOCENA') return { 38: 2, 39: 2, 40: 2, 41: 2, 42: 2, 43: 2 };
+      if (tipo === 'MEDIA_A') return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+      return { 38: 1, 39: 1, 40: 1, 41: 1, 42: 1, 43: 1 };
+    }
     // 38 al 42 estándar Cevallos (5 tallas: 39 y 40 repetidos = 12 pares; Media A y B = 6 pares cada una)
     if (tipo === 'DOCENA') return { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 };
     if (tipo === 'MEDIA_A') return { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 };
