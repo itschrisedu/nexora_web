@@ -161,7 +161,28 @@ interface SerieConfig {
   tallas?: SerieTallaConfig[];
 }
 
-/** Normaliza el nombre de un color para comparaciones y agrupación.
+/** Estandariza el nombre de un color al formato canónico y elegante:
+ *  - Siempre espacios alrededor de '/': " / "
+ *  - Mayúscula inicial en cada palabra: "Negro / Blanco", "Negro Planta Goma"
+ *  - Espacios limpios simples
+ */
+const formatearColorEstandar = (color: string): string => {
+  if (!color) return "";
+  return color
+    .trim()
+    .replace(/\s*\/\s*/g, ' / ')
+    .replace(/\s+/g, ' ')
+    .split(' / ')
+    .map(part =>
+      part
+        .split(' ')
+        .map(w => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : '')
+        .join(' ')
+    )
+    .join(' / ');
+};
+
+/** Normaliza el nombre de un color para comparaciones y agrupación interna.
  *  "Negro / Blanco", "negro/blanco", "Negro /Blanco" → "negro/blanco" */
 const normalizeColor = (color: string): string =>
   color
@@ -172,11 +193,10 @@ const normalizeColor = (color: string): string =>
     .replace(/\s+/g, ' ');
 
 /** De un grupo de variantes con el mismo color normalizado, devuelve
- *  el nombre «más bonito» (con mayúsculas, sin espacios raros). */
+ *  el nombre estandarizado y canónico (ej. "Negro / Blanco"). */
 const bestColorLabel = (variants: { color: string }[]): string => {
-  // Preferir la variante cuyo nombre empiece con mayúscula
-  const nice = variants.find(v => /^[A-ZÁÉÍÓÚÑ]/.test(v.color.trim()));
-  return (nice || variants[0]).color.trim();
+  const first = variants[0]?.color || "";
+  return formatearColorEstandar(first);
 };
 
 const SERIES_ORDEN = [
@@ -1603,8 +1623,10 @@ export default function ModelosComponent({
       const totalParesColor = Object.values(customTallasParaBackend).reduce((sum, arr) => sum + (arr?.length || 0), 0);
       const effectiveStockInicialColor = totalParesColor > 0 ? 1 : 0;
 
+      const addedColor = formatearColorEstandar(newColorName);
+
       await ApiService.post(`/inventario/modelos/${selectedModelForColor.id}/colores`, {
-        color: newColorName.trim(),
+        color: addedColor,
         imageUrl: finalImageUrl,
         serieIds: newColorSerieIds,
         stockInicial: effectiveStockInicialColor,
@@ -1613,7 +1635,6 @@ export default function ModelosComponent({
         supplierId: newColorSupplierId || undefined,
       });
 
-      const addedColor = newColorName.trim();
       const modelId = selectedModelForColor.id;
 
       setSuccess(`Nuevo color "${addedColor}" añadido exitosamente al modelo "${selectedModelForColor.name}".`);
@@ -4336,7 +4357,8 @@ export default function ModelosComponent({
                         list="model-existing-colors-datalist"
                         value={newColorName}
                         onChange={e => setNewColorName(e.target.value)}
-                        placeholder="Ej. Azul Marino / Negro-Rojo"
+                        onBlur={() => setNewColorName(prev => formatearColorEstandar(prev))}
+                        placeholder="Ej. Azul Marino / Blanco"
                         className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                       />
                       <input
@@ -4348,7 +4370,11 @@ export default function ModelosComponent({
                     </div>
                     {(() => {
                       const existingColorLabels = Array.from(
-                        new Set((selectedModelForColor.products || []).map(p => p.color.trim()))
+                        new Set(
+                          (selectedModelForColor.products || [])
+                            .map(p => formatearColorEstandar(p.color))
+                            .filter(Boolean)
+                        )
                       );
                       if (existingColorLabels.length === 0) return null;
 
