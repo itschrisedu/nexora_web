@@ -2020,14 +2020,14 @@ function MainApp() {
             </button>
 
             <button
-              onClick={() => navigateToView('inventario')}
+              onClick={() => navigateToView('financiero')}
               className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-                vistaActual === 'inventario' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                vistaActual === 'financiero' ? 'font-bold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
               }`}
-              style={vistaActual === 'inventario' ? { color: 'var(--primary)' } : {}}
+              style={vistaActual === 'financiero' ? { color: 'var(--primary)' } : {}}
             >
-              <ShoppingBag size={19} />
-              <span className="text-[10px] mt-1 font-medium">Stock</span>
+              <Receipt size={19} />
+              <span className="text-[10px] mt-1 font-medium">Cobros</span>
             </button>
 
             <button
