@@ -1581,23 +1581,10 @@ function MainApp() {
           </nav>
         </div>
 
-        {/* Usuario (Fijo abajo) */}
-        <div className="shrink-0 p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
-          <div className="flex items-center gap-3">
-            <UserAvatar
-              nombre={user?.nombre}
-              email={user?.email}
-              sizeClassName="w-8 h-8"
-              textClassName="text-xs font-bold"
-            />
-            <div className="min-w-0">
-              <div className="text-xs font-semibold truncate max-w-[110px] capitalize">{capitalizarNombreCompleto(user?.nombre) || 'Usuario'}</div>
-              <div className="text-[10px] text-[var(--muted-foreground)] truncate max-w-[110px]">
-                {isSuperAdmin ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? (isGlobalAdmin ? 'Admin General' : 'Admin de Sucursal') : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
+        {/* Usuario y Accesos Rápidos (Fijo abajo) */}
+        <div className="shrink-0 border-t border-[var(--border)] bg-[var(--muted)]/30">
+          {/* Fila superior: Accesos rápidos del sistema */}
+          <div className="px-3 pt-3 pb-2 grid grid-cols-2 gap-2">
             <button
               onClick={() => {
                 window.dispatchEvent(
@@ -1607,29 +1594,49 @@ function MainApp() {
                 );
                 if (isMobile) setMobileMenuOpen(false);
               }}
-              className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer"
               title="Mi aplicación de WhatsApp (Business / Normal / Web)"
             >
-              <MessageSquare size={16} />
+              <MessageSquare size={14} />
+              <span className="text-[10px] font-bold">WhatsApp</span>
             </button>
             <button
               onClick={() => {
                 navigateToView('personalizacion');
                 if (isMobile) setMobileMenuOpen(false);
               }}
-              className="p-1.5 rounded-lg transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl border transition-colors cursor-pointer"
               style={
                 vistaActual === 'personalizacion'
-                  ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }
-                  : {}
+                  ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)', borderColor: 'var(--primary)' }
+                  : { borderColor: 'var(--border)', backgroundColor: 'var(--muted)' }
               }
               title="Configuración Global & Personalización ⚙️"
             >
-              <Settings size={16} />
+              <Settings size={14} />
+              <span className="text-[10px] font-bold">Ajustes</span>
             </button>
+          </div>
+
+          {/* Fila inferior: Identidad de sesión + Cerrar sesión */}
+          <div className="px-3 pb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <UserAvatar
+                nombre={user?.nombre}
+                email={user?.email}
+                sizeClassName="w-8 h-8"
+                textClassName="text-xs font-bold"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-semibold truncate capitalize">{capitalizarNombreCompleto(user?.nombre) || 'Usuario'}</div>
+                <div className="text-[10px] text-[var(--muted-foreground)] truncate">
+                  {isSuperAdmin ? 'Super Admin' : user?.rol === 'ROL_ADMIN' ? (isGlobalAdmin ? 'Admin General' : 'Admin de Sucursal') : user?.rol === 'ROL_VENDEDOR' ? 'Vendedor' : user?.rol === 'ROL_BODEGUERO' ? 'Bodeguero' : 'Desconocido'}
+                </div>
+              </div>
+            </div>
             <button
               onClick={() => setShowLogoutModal(true)}
-              className="p-1.5 rounded-lg text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-[var(--muted-foreground)] hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer shrink-0"
               title="Cerrar sesión"
             >
               <LogOut size={16} />
