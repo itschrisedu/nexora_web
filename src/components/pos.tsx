@@ -51,7 +51,6 @@ import {
   Receipt,
   BarChart3,
   Sparkles,
-  Send,
   Mail,
   MessageCircle,
   Phone,
@@ -2016,16 +2015,6 @@ export default function PosComponent() {
 
                         {tipoComprobante === "FACTURA" && (
                           <div className="space-y-2.5 pt-2 border-t border-[var(--border)] text-xs">
-                            {/* Aviso informativo de comprobante digital */}
-                            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1">
-                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                                <Send size={12} />
-                                Envío automático de comprobante
-                              </p>
-                              <p className="text-[10px] text-[var(--muted-foreground)]">
-                                Se enviará el comprobante digital al WhatsApp y correo del cliente al cobrar.
-                              </p>
-                            </div>
 
                             {/* Estado de Registro del Cliente */}
                             {clienteFactura.nombre && (
