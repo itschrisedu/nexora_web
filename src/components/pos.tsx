@@ -238,6 +238,10 @@ export default function PosComponent() {
   const [validandoCuponPOS, setValidandoCuponPOS] = useState(false);
   const [cuponErrorPOS, setCuponErrorPOS] = useState("");
 
+  // Campañas activas para sugerencias de cupón
+  const [campanasActivasPOS, setCampanasActivasPOS] = useState<any[]>([]);
+  const [showSugerenciasCupon, setShowSugerenciasCupon] = useState(false);
+
   // Tipo de Comprobante & Datos de Cliente
   const [tipoComprobante, setTipoComprobante] = useState<"CONSUMIDOR_FINAL" | "FACTURA">("FACTURA");
   const [clienteFactura, setClienteFactura] = useState({
@@ -370,6 +374,7 @@ export default function PosComponent() {
         cargarNegocioInfo(),
         cargarVendedores(),
         cargarEstrategiaComercial(),
+        cargarCampanasActivasPOS(),
       ]);
       setLoadingInicial(false);
     };
@@ -410,6 +415,22 @@ export default function PosComponent() {
     } catch (err) {
       console.warn("No se pudo cargar la estrategia comercial:", err);
     }
+  };
+
+  const cargarCampanasActivasPOS = async () => {
+    try {
+      const promos = await ApiService.get("/clientes/promociones");
+      if (Array.isArray(promos)) {
+        const ahora = new Date();
+        const activas = promos.filter((p: any) => {
+          if (!p.activo) return false;
+          if (p.fechaFin && new Date(p.fechaFin) < ahora) return false;
+          if (p.maximoCanjes && p.canjesUsados >= p.maximoCanjes) return false;
+          return true;
+        });
+        setCampanasActivasPOS(activas);
+      }
+    } catch {}
   };
 
   const cargarEstadoCaja = async () => {
@@ -1779,9 +1800,35 @@ export default function PosComponent() {
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs font-mono block">
-                                ${(item.precioUnitario * item.cantidad).toFixed(2)}
-                              </span>
+                              {estrategia?.politicaDescuentoVenta !== 'SOLO_CAMPANAS' ? (
+                                <div className="flex flex-col items-end gap-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={item.precioUnitario || ''}
+                                      onChange={(e) => {
+                                        const parsed = parseFloat(e.target.value);
+                                        const n = [...itemsVenta];
+                                        n[idx] = { ...n[idx], precioUnitario: isNaN(parsed) ? 0 : parsed };
+                                        setItemsVenta(n);
+                                      }}
+                                      className="w-16 px-1.5 py-0.5 bg-[var(--card)] border border-[var(--border)] rounded-md text-right font-bold text-emerald-600 dark:text-emerald-400 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                                    />
+                                  </div>
+                                  {item.cantidad > 1 && (
+                                    <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                      = ${(item.precioUnitario * item.cantidad).toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs font-mono block">
+                                  ${(item.precioUnitario * item.cantidad).toFixed(2)}
+                                </span>
+                              )}
                               <button
                                 onClick={() => handleRemoverItem(idx)}
                                 className="mt-1 text-[var(--muted-foreground)] hover:text-rose-500 transition-colors ml-auto"
@@ -1797,7 +1844,8 @@ export default function PosComponent() {
 
                   {itemsVenta.length > 0 && (
                     <div className="space-y-3 pt-3 border-t border-[var(--border)] mt-3">
-                      {/* Cupón Promocional */}
+                      {/* Cupón Promocional - Solo visible si hay campañas activas o cupón ya aplicado */}
+                      {(campanasActivasPOS.length > 0 || cuponAplicadoPOS) && (
                       <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold text-purple-600 dark:text-purple-300 flex items-center gap-1">
@@ -1815,23 +1863,61 @@ export default function PosComponent() {
                         </div>
 
                         {!cuponAplicadoPOS ? (
-                          <div className="flex gap-1.5">
-                            <input
-                              type="text"
-                              placeholder="Ej: CALZADO10"
-                              value={codigoCuponPOS}
-                              onChange={(e) => setCodigoCuponPOS(e.target.value.toUpperCase())}
-                              className="flex-1 px-2.5 py-1 bg-[var(--background)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold uppercase text-[var(--foreground)] focus:outline-none focus:border-purple-500"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleAplicarCuponPOS}
-                              disabled={validandoCuponPOS || !codigoCuponPOS.trim()}
-                              className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 cursor-pointer"
-                            >
-                              {validandoCuponPOS ? <Loader2 size={11} className="animate-spin" /> : null}
-                              <span>Aplicar</span>
-                            </button>
+                          <div className="relative">
+                            <div className="flex gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="Ej: CALZADO10"
+                                value={codigoCuponPOS}
+                                onChange={(e) => {
+                                  setCodigoCuponPOS(e.target.value.toUpperCase());
+                                  setShowSugerenciasCupon(true);
+                                }}
+                                onFocus={() => setShowSugerenciasCupon(true)}
+                                onBlur={() => setTimeout(() => setShowSugerenciasCupon(false), 200)}
+                                className="flex-1 px-2.5 py-1 bg-[var(--background)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold uppercase text-[var(--foreground)] focus:outline-none focus:border-purple-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAplicarCuponPOS}
+                                disabled={validandoCuponPOS || !codigoCuponPOS.trim()}
+                                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                              >
+                                {validandoCuponPOS ? <Loader2 size={11} className="animate-spin" /> : null}
+                                <span>Aplicar</span>
+                              </button>
+                            </div>
+                            {showSugerenciasCupon && campanasActivasPOS.length > 0 && (
+                              <div className="absolute z-20 left-0 right-0 mt-1 bg-[var(--card)] border border-purple-500/30 rounded-xl shadow-lg max-h-36 overflow-y-auto">
+                                {campanasActivasPOS
+                                  .filter((c) => !codigoCuponPOS || c.codigo?.toUpperCase().includes(codigoCuponPOS) || c.titulo?.toUpperCase().includes(codigoCuponPOS))
+                                  .map((c) => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                      setCodigoCuponPOS(c.codigo);
+                                      setShowSugerenciasCupon(false);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-purple-500/10 transition-colors flex items-center justify-between gap-2 border-b border-[var(--border)] last:border-b-0"
+                                  >
+                                    <div>
+                                      <span className="text-[11px] font-mono font-black text-purple-600 dark:text-purple-300">{c.codigo}</span>
+                                      <span className="text-[10px] text-[var(--muted-foreground)] block truncate">{c.titulo}</span>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-emerald-600 shrink-0">
+                                      {c.tipoDescuento === 'PORCENTAJE' ? Number(c.valorDescuento) + '%' : '$' + Number(c.valorDescuento || 0).toFixed(2)}
+                                    </span>
+                                  </button>
+                                ))}
+                                {campanasActivasPOS.filter((c) => !codigoCuponPOS || c.codigo?.toUpperCase().includes(codigoCuponPOS) || c.titulo?.toUpperCase().includes(codigoCuponPOS)).length === 0 && (
+                                  <div className="px-3 py-2 text-[10px] text-[var(--muted-foreground)] text-center">
+                                    No hay campanas que coincidan.
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 p-1.5 rounded-lg border border-emerald-500/20">
@@ -1844,6 +1930,7 @@ export default function PosComponent() {
                           <span className="text-[10px] text-rose-500 font-semibold block">{cuponErrorPOS}</span>
                         )}
                       </div>
+                      )}
 
                       {/* Desglose Subtotal, Descuento y Total */}
                       <div className="space-y-1.5 p-3 bg-[var(--background)] rounded-2xl border border-[var(--border)] text-xs">
