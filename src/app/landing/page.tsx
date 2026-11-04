@@ -30,7 +30,8 @@ import {
   Package,
   Check,
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  Tag
 } from "lucide-react";
 import { getContrastColor } from "@/components/ui/color-picker";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
@@ -105,6 +106,7 @@ interface ModeloCalzado {
   name: string;
   brand: string;
   material: string;
+  createdAt?: string;
   sucursalNombre?: string;
   precioMin: number;
   precioMax: number;
@@ -189,12 +191,29 @@ function LandingContent() {
   // Filtros del catálogo
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("TODAS");
+  const [selectedSerieFiltro, setSelectedSerieFiltro] = useState("TODAS");
+  const [filtroNuevos, setFiltroNuevos] = useState(false);
+  const [filtroSoloStock, setFiltroSoloStock] = useState(false);
 
   // Estado de variantes seleccionadas por modelo: { [modeloId]: varianteId }
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   // Estado de serie seleccionada por modelo: { [modeloId]: serieNombre }
   const [selectedSeries, setSelectedSeries] = useState<Record<string, string>>({});
+
+  // Cierre accesible de cualquier modal con la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setModalConfigOpen(false);
+        setIsCartOpen(false);
+        setModalAlerta(null);
+        setShowVerifyModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const fromParam = searchParams.get("tenantId");
@@ -306,21 +325,54 @@ function LandingContent() {
     return Array.from(set);
   }, [data]);
 
-  // Filtrado de modelos
+  // Lista de series disponibles en el catálogo para el filtro
+  const allSeriesDisponibles = useMemo(() => {
+    if (!data?.modelos) return [];
+    const set = new Set<string>();
+    data.modelos.forEach((m) => {
+      m.variantes.forEach((v) => {
+        if (v.serieNombre) set.add(v.serieNombre);
+      });
+    });
+    return Array.from(set);
+  }, [data]);
+
+  // Filtrado integral de modelos
   const filteredModelos = useMemo(() => {
     if (!data?.modelos) return [];
     return data.modelos.filter((m) => {
       const matchBrand = selectedBrand === "TODAS" || m.brand === selectedBrand;
+      const matchSerie =
+        selectedSerieFiltro === "TODAS" ||
+        m.variantes.some((v) => v.serieNombre === selectedSerieFiltro);
+
+      const matchStock =
+        !filtroSoloStock ||
+        m.variantes.some(
+          (v) => (v.totalStock || 0) > 0 || (v.tallas || []).some((t) => t.stock > 0)
+        );
+
+      const isNuevo = m.createdAt
+        ? Date.now() - new Date(m.createdAt).getTime() < 45 * 24 * 60 * 60 * 1000
+        : false;
+      const matchNuevos = !filtroNuevos || isNuevo;
+
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
         m.name.toLowerCase().includes(q) ||
         m.baseCode.toLowerCase().includes(q) ||
-        m.material.toLowerCase().includes(q) ||
-        m.variantes.some((v) => v.color.toLowerCase().includes(q) || v.code.toLowerCase().includes(q));
-      return matchBrand && matchSearch;
+        (m.material && m.material.toLowerCase().includes(q)) ||
+        m.variantes.some(
+          (v) =>
+            v.color.toLowerCase().includes(q) ||
+            v.code.toLowerCase().includes(q) ||
+            (v.serieNombre && v.serieNombre.toLowerCase().includes(q))
+        );
+
+      return matchBrand && matchSerie && matchStock && matchNuevos && matchSearch;
     });
-  }, [data, selectedBrand, searchQuery]);
+  }, [data, selectedBrand, selectedSerieFiltro, filtroSoloStock, filtroNuevos, searchQuery]);
 
   // bulletPoints debe estar ANTES de los early returns para respetar las reglas de Hooks
   const bulletPoints = useMemo(() => {
@@ -1067,33 +1119,97 @@ function LandingContent() {
               </p>
             </div>
 
-            {/* Barra de Búsqueda y Marcas */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-              <div className="relative">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar modelo, color..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900 w-full sm:w-60 shadow-xs"
-                />
+            {/* Barra de Búsqueda y Filtros */}
+            <div className="flex flex-col gap-3 w-full md:w-auto">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar modelo, color, serie..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-slate-900 w-full sm:w-60 shadow-xs"
+                  />
+                </div>
+
+                {brands.length > 1 && (
+                  <select
+                    value={selectedBrand}
+                    onChange={(e) => setSelectedBrand(e.target.value)}
+                    className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:border-slate-900 shadow-xs cursor-pointer"
+                  >
+                    <option value="TODAS">Todas las Marcas ({brands.length})</option>
+                    {brands.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {allSeriesDisponibles.length > 1 && (
+                  <select
+                    value={selectedSerieFiltro}
+                    onChange={(e) => setSelectedSerieFiltro(e.target.value)}
+                    className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:border-slate-900 shadow-xs cursor-pointer"
+                  >
+                    <option value="TODAS">Todas las Series ({allSeriesDisponibles.length})</option>
+                    {allSeriesDisponibles.map((s) => (
+                      <option key={s} value={s}>
+                        {formatearNombreSerie(s)}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
-              {brands.length > 1 && (
-                <select
-                  value={selectedBrand}
-                  onChange={(e) => setSelectedBrand(e.target.value)}
-                  className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:border-slate-900 shadow-xs"
+              {/* Píldoras rápidas de filtrado por novedad y disponibilidad */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroNuevos(false);
+                    setFiltroSoloStock(false);
+                    setSelectedBrand("TODAS");
+                    setSelectedSerieFiltro("TODAS");
+                    setSearchQuery("");
+                  }}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    !filtroNuevos && !filtroSoloStock && selectedBrand === "TODAS" && selectedSerieFiltro === "TODAS" && !searchQuery
+                      ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                  }`}
                 >
-                  <option value="TODAS">Todas las Marcas ({brands.length})</option>
-                  {brands.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-              )}
+                  Todos ({data?.modelos?.length || 0})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFiltroNuevos((prev) => !prev)}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    filtroNuevos
+                      ? "bg-slate-900 text-amber-400 border-slate-900 shadow-xs"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <Clock size={12} className={filtroNuevos ? "text-amber-400" : "text-slate-500"} />
+                  <span>Modelos Nuevos</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFiltroSoloStock((prev) => !prev)}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    filtroSoloStock
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-emerald-500 hover:text-emerald-700"
+                  }`}
+                >
+                  <CheckCircle2 size={12} className={filtroSoloStock ? "text-white" : "text-emerald-600"} />
+                  <span>Con Stock Inmediato</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1109,6 +1225,9 @@ function LandingContent() {
                 onClick={() => {
                   setSearchQuery("");
                   setSelectedBrand("TODAS");
+                  setSelectedSerieFiltro("TODAS");
+                  setFiltroNuevos(false);
+                  setFiltroSoloStock(false);
                 }}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl"
               >
@@ -1157,8 +1276,8 @@ function LandingContent() {
                         </div>
                       )}
 
-                      {/* Badge de Marca */}
-                      <div className="absolute top-3 left-3 flex flex-col gap-1">
+                      {/* Badge de Marca y Novedad */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
                         <span
                           className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold shadow-xs transition-colors"
                           style={{
@@ -1168,13 +1287,20 @@ function LandingContent() {
                         >
                           {modelo.brand || "Cuero"}
                         </span>
+                        {modelo.createdAt && Date.now() - new Date(modelo.createdAt).getTime() < 45 * 24 * 60 * 60 * 1000 && (
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-slate-900 text-amber-400 border border-amber-400/30 shadow-xs flex items-center gap-1">
+                            <Tag size={9} className="text-amber-400" />
+                            <span>NUEVO</span>
+                          </span>
+                        )}
                       </div>
 
                       {/* Badge de Serie (en la imagen como en la foto) */}
                       {(serieActual || seriesUnicas[0]) && (
                         <div className="absolute top-3 right-3">
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/95 backdrop-blur-sm border border-slate-200 text-slate-800 shadow-xs flex items-center gap-1">
-                            📦 {serieActual || seriesUnicas[0]}
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/95 backdrop-blur-sm border border-slate-200 text-slate-800 shadow-xs flex items-center gap-1.5">
+                            <Layers size={11} className="text-slate-500" />
+                            <span>{formatearNombreSerie(serieActual || seriesUnicas[0])}</span>
                           </span>
                         </div>
                       )}
@@ -1215,6 +1341,41 @@ function LandingContent() {
                             </span>
                           </div>
                         </div>
+
+                        {/* Selector de Serie (si el modelo tiene múltiples series) */}
+                        {tieneMúltiplesSeries && (
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-slate-500">Serie / Numeración:</span>
+                              <span className="font-extrabold text-amber-800">
+                                {formatearNombreSerie(serieActual)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {seriesUnicas.map((s) => {
+                                const isSel = s === serieActual;
+                                return (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSelectSerie(modelo.id, s, modelo.variantes);
+                                    }}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer flex items-center gap-1.5 ${
+                                      isSel
+                                        ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                                        : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                                    }`}
+                                  >
+                                    <Layers size={11} className={isSel ? "text-amber-400" : "text-slate-500"} />
+                                    <span>{formatearNombreSerie(s)}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Selector Interactivo de Colores / Variantes */}
                         {variantesFiltradas.length > 0 && (
@@ -1568,8 +1729,14 @@ function LandingContent() {
             : modeloConfig.variantes;
 
         return (
-          <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-200">
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+            onClick={() => setModalConfigOpen(false)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-200 cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* Cabecera del modal */}
               <div className="flex items-start justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3.5">
@@ -1612,7 +1779,7 @@ function LandingContent() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-700 uppercase tracking-wider">Serie del Modelo:</span>
-                  <span className="font-extrabold text-amber-800">{serieConfigNombre}</span>
+                  <span className="font-extrabold text-amber-800">{formatearNombreSerie(serieConfigNombre)}</span>
                 </div>
                 {seriesDelModeloConfig.length > 1 ? (
                   <div className="flex flex-wrap gap-2">
@@ -1630,7 +1797,7 @@ function LandingContent() {
                           }`}
                         >
                           <Package size={13} className={isSelected ? "text-amber-400" : "text-slate-500"} />
-                          <span>{s}</span>
+                          <span>{formatearNombreSerie(s)}</span>
                         </button>
                       );
                     })}
@@ -1638,7 +1805,7 @@ function LandingContent() {
                 ) : (
                   <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800">
                     <Package size={13} className="text-amber-600" />
-                    <span>{serieConfigNombre || seriesDelModeloConfig[0] || "Serie Estándar"}</span>
+                    <span>{formatearNombreSerie(serieConfigNombre || seriesDelModeloConfig[0])}</span>
                     <span className="text-[10px] text-slate-500 font-normal">(Curva comercial completa)</span>
                   </div>
                 )}
@@ -1913,8 +2080,14 @@ function LandingContent() {
 
       {/* Drawer Lateral del Carrito de Pedidos */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex justify-end">
-          <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl animate-in slide-in-from-right duration-300">
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex justify-end cursor-pointer"
+          onClick={() => setIsCartOpen(false)}
+        >
+          <div
+            className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl animate-in slide-in-from-right duration-300 cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Header del Carrito */}
             <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2.5">
@@ -2238,8 +2411,14 @@ function LandingContent() {
 
       {/* Modal de Alerta / Notificación Estilizado NEXORA */}
       {modalAlerta?.isOpen && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center animate-in zoom-in-95 duration-200 space-y-4">
+        <div
+          className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-pointer"
+          onClick={() => setModalAlerta(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center animate-in zoom-in-95 duration-200 space-y-4 cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-center">
               {modalAlerta.tipo === "warning" && (
                 <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-200/60 shadow-xs">

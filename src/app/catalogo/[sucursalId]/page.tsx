@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.service";
 import { updateTabFavicon } from "@/utils/favicon";
+import { formatearNombreSerie } from "@/utils/text-formatters";
+import { Layers } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
@@ -87,6 +89,16 @@ export default function CatalogoSucursalPage() {
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedVariante, setSelectedVariante] = useState<VarianteItem | null>(null);
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!sucursalId) return;
@@ -383,8 +395,9 @@ export default function CatalogoSucursalPage() {
                           </div>
                         )}
                         {/* Badge Serie */}
-                        <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-[10px] font-bold text-white/70 border border-white/10">
-                          {variante.serieNombre}
+                        <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-[10px] font-bold text-white/70 border border-white/10 flex items-center gap-1.5">
+                          <Layers size={11} className="text-white/60" />
+                          <span>{formatearNombreSerie(variante.serieNombre)}</span>
                         </div>
                       </div>
 
@@ -480,7 +493,10 @@ export default function CatalogoSucursalPage() {
                   <div className="flex flex-wrap items-center gap-3 mt-2">
                     <span className="px-3 py-1 bg-amber-400/10 text-amber-400 text-xs font-bold rounded-lg">{modelo.brand}</span>
                     <span className="px-3 py-1 bg-white/5 text-white/60 text-xs font-bold rounded-lg">{selectedVariante.color}</span>
-                    <span className="px-3 py-1 bg-white/5 text-white/60 text-xs font-bold rounded-lg">{selectedVariante.serieNombre}</span>
+                    <span className="px-3 py-1 bg-white/5 text-white/60 text-xs font-bold rounded-lg inline-flex items-center gap-1.5">
+                      <Layers size={11} className="text-white/40" />
+                      <span>{formatearNombreSerie(selectedVariante.serieNombre)}</span>
+                    </span>
                     {modelo.material && <span className="px-3 py-1 bg-white/5 text-white/40 text-xs font-bold rounded-lg">{modelo.material}</span>}
                   </div>
                 </div>
