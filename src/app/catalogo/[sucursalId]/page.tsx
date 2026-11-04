@@ -136,7 +136,7 @@ export default function CatalogoSucursalPage() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="text-6xl">👟</div>
+          <div className="flex justify-center"><Layers size={48} className="text-amber-400" /></div>
           <h2 className="text-2xl font-bold text-white">No se pudo cargar el catálogo</h2>
           <p className="text-white/60 text-sm">{error}</p>
           <a href="/landing" className="inline-block px-6 py-2 bg-amber-400/10 text-amber-400 font-bold text-sm rounded-xl hover:bg-amber-400/20 transition-all">

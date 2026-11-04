@@ -38,6 +38,7 @@ import { generarUrlPublicaPedidoCliente } from "@/services/comprobante-url.servi
 import SlideToVerifyModal, { isHumanVerified } from "@/components/slide-to-verify-modal";
 import { formatearNombreSerie } from "@/utils/text-formatters";
 import { updateTabFavicon } from "@/utils/favicon";
+import { getCurvaDocena, TipoCurva } from "@/utils/curvas";
 
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const API_BASE_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl.replace(/\/+$/, '')}/api`;
@@ -172,6 +173,7 @@ function LandingContent() {
   const [varianteConfig, setVarianteConfig] = useState<Variante | null>(null);
   const [serieConfigNombre, setSerieConfigNombre] = useState<string>("");
   const [tipoPedidoConfig, setTipoPedidoConfig] = useState<"PAR" | "SERIE_COMPLETA">("PAR");
+  const [subtipoCurvaConfig, setSubtipoCurvaConfig] = useState<TipoCurva>("MEDIA_A");
   const [tallaSeleccionadaConfig, setTallaSeleccionadaConfig] = useState<number | string>("");
   const [cantidadConfig, setCantidadConfig] = useState(1);
 
@@ -522,14 +524,30 @@ function LandingContent() {
   const ejecutarAgregarAlCarrito = () => {
     if (!modeloConfig || !varianteConfig) return;
 
-    const paresPorSerieCalc = varianteConfig.tallas && varianteConfig.tallas.length > 0 ? varianteConfig.tallas.length : 6;
-    const desgloseCalc =
-      varianteConfig.tallas && varianteConfig.tallas.length > 0
-        ? varianteConfig.tallas.map((t) => `T${t.numero}`).join(", ")
-        : "Curva comercial estándar";
+    const serieNom = serieConfigNombre || varianteConfig.serieNombre || "ADULTO";
+    let paresPorSerieCalc = 6;
+    let desgloseCalc = "Curva comercial estándar";
+
+    if (tipoPedidoConfig === "SERIE_COMPLETA") {
+      const curvaMap = getCurvaDocena(serieNom, subtipoCurvaConfig);
+      const entradasCurva = Object.entries(curvaMap);
+      if (entradasCurva.length > 0) {
+        paresPorSerieCalc = entradasCurva.reduce((sum, [, cant]) => sum + cant, 0);
+        const detalleTallas = entradasCurva.map(([talla, cant]) => `T${talla}(${cant})`).join(", ");
+        const etiquetaSubtipo =
+          subtipoCurvaConfig === "MEDIA_A"
+            ? "½ Media Serie A"
+            : subtipoCurvaConfig === "MEDIA_B"
+            ? "½ Media Serie B"
+            : "1 Docena Completa";
+        desgloseCalc = `${etiquetaSubtipo}: ${detalleTallas}`;
+      } else {
+        paresPorSerieCalc = subtipoCurvaConfig === "DOCENA" ? 12 : 6;
+      }
+    }
 
     const nuevoItem: ItemCarrito = {
-      id: `${modeloConfig.id}-${varianteConfig.id}-${tipoPedidoConfig}-${tallaSeleccionadaConfig}-${Date.now()}`,
+      id: `${modeloConfig.id}-${varianteConfig.id}-${tipoPedidoConfig}-${subtipoCurvaConfig}-${tallaSeleccionadaConfig}-${Date.now()}`,
       modeloId: modeloConfig.id,
       modeloNombre: modeloConfig.name,
       varianteId: varianteConfig.id,
@@ -1728,6 +1746,10 @@ function LandingContent() {
             ? modeloConfig.variantes.filter((v) => v.serieNombre === serieConfigNombre)
             : modeloConfig.variantes;
 
+        const serieEfectiva = serieConfigNombre || varianteConfig.serieNombre || "ADULTO";
+        const curvaActual = getCurvaDocena(serieEfectiva, subtipoCurvaConfig);
+        const paresPorLote = Object.values(curvaActual).reduce((sum, cant) => sum + cant, 0) || (subtipoCurvaConfig === "DOCENA" ? 12 : 6);
+
         return (
           <div
             className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
@@ -1883,7 +1905,7 @@ function LandingContent() {
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
-                    <span>👟</span>
+                    <Layers size={14} className="text-slate-600" />
                     <span>Por Par (Individual)</span>
                   </button>
                   <button
@@ -1990,18 +2012,88 @@ function LandingContent() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Selector de Curva de Serie (Media A, Media B o Docena) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                      Selecciona la Curva Comercial:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSubtipoCurvaConfig("MEDIA_A")}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                          subtipoCurvaConfig === "MEDIA_A"
+                            ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span className="block text-[11px] font-extrabold">½ Media Serie A</span>
+                        <span className={`text-[10px] ${subtipoCurvaConfig === "MEDIA_A" ? "text-amber-300 font-semibold" : "text-amber-700"}`}>
+                          6 pares (T39 repite)
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubtipoCurvaConfig("MEDIA_B")}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                          subtipoCurvaConfig === "MEDIA_B"
+                            ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span className="block text-[11px] font-extrabold">½ Media Serie B</span>
+                        <span className={`text-[10px] ${subtipoCurvaConfig === "MEDIA_B" ? "text-amber-300 font-semibold" : "text-amber-700"}`}>
+                          6 pares (T40 repite)
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubtipoCurvaConfig("DOCENA")}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                          subtipoCurvaConfig === "DOCENA"
+                            ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span className="block text-[11px] font-extrabold">1 Docena Completa</span>
+                        <span className={`text-[10px] ${subtipoCurvaConfig === "DOCENA" ? "text-amber-300 font-semibold" : "text-amber-700"}`}>
+                          12 pares balanceados
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Detalle de Curva Comercial de la Serie */}
                   <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-2">
-                    <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs">
-                      <Package size={15} className="text-amber-700" />
-                      <span>Curva Completa de la Serie {serieConfigNombre}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs">
+                        <Package size={15} className="text-amber-700" />
+                        <span>
+                          Curva de la Serie {formatearNombreSerie(serieEfectiva)} ({subtipoCurvaConfig === "DOCENA" ? "Docena Completa" : subtipoCurvaConfig === "MEDIA_A" ? "½ Media A" : "½ Media B"})
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-amber-200/80 text-amber-900 font-mono">
+                        {paresPorLote} pares
+                      </span>
                     </div>
                     <p className="text-xs text-amber-800 leading-relaxed">
-                      Cada serie completa incluye el lote con todas las tallas correspondientes de la curva comercial:
+                      Distribución comercial estándar por talla física:
                     </p>
                     <div className="flex flex-wrap gap-1.5 pt-1">
-                      {varianteConfig.tallas && varianteConfig.tallas.length > 0 ? (
-                        varianteConfig.tallas.map((t, idx) => (
+                      {Object.entries(curvaActual).length > 0 ? (
+                        Object.entries(curvaActual).map(([numTalla, cantidad]) => (
+                          <span
+                            key={numTalla}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-900 font-mono font-bold text-xs shadow-2xs"
+                          >
+                            <span>T{numTalla}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-extrabold">
+                              {cantidad} {cantidad === 1 ? "par" : "pares"}
+                            </span>
+                          </span>
+                        ))
+                      ) : (
+                        (varianteConfig.tallas || []).map((t, idx) => (
                           <span
                             key={idx}
                             className="px-2 py-0.5 rounded-md bg-white border border-amber-300 text-amber-900 font-mono font-bold text-[11px]"
@@ -2009,21 +2101,22 @@ function LandingContent() {
                             T{t.numero}
                           </span>
                         ))
-                      ) : (
-                        <span className="text-xs text-amber-700 font-semibold">Tallas completas del lote estándar</span>
                       )}
                     </div>
-                    <div className="text-[11px] font-bold text-amber-900 pt-1">
-                      Total: {varianteConfig.tallas?.length || 6} pares por cada serie completa.
+                    <div className="text-[11px] font-bold text-amber-900 pt-1 flex items-center justify-between border-t border-amber-200/60 mt-1">
+                      <span>Total de pares por cada serie:</span>
+                      <span className="font-mono">{paresPorLote} pares</span>
                     </div>
                   </div>
 
                   {/* Cantidad de Series Completas */}
                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
                     <div>
-                      <span className="text-xs font-bold text-slate-800 block">Cantidad de series completas:</span>
-                      <span className="text-[11px] text-slate-500">
-                        Total: {cantidadConfig * (varianteConfig.tallas?.length || 6)} pares en total
+                      <span className="text-xs font-bold text-slate-800 block">
+                        Cantidad de {subtipoCurvaConfig === "DOCENA" ? "docenas" : "medias docenas"}:
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        Total: {cantidadConfig * paresPorLote} pares en total
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
