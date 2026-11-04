@@ -2189,7 +2189,15 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">Rol en el Negocio *</label>
                 <select
                   value={rolOption}
-                  onChange={(e) => setRolOption(e.target.value as any)}
+                  onChange={(e) => {
+                    const newRol = e.target.value as any;
+                    setRolOption(newRol);
+                    if (newRol === 'ADMIN_SUCURSAL' || newRol === 'ADMIN_GENERAL') {
+                      setPermiteCambiarPrecio(true);
+                    } else {
+                      setPermiteCambiarPrecio(false);
+                    }
+                  }}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                 >
                   <option value="ROL_VENDEDOR">💼 Vendedor</option>
@@ -2361,11 +2369,11 @@ export default function UsuariosComponent({ online, currentUser }: UsuariosProps
                     onChange={(e) => {
                       const val = e.target.value;
                       if (val === 'ADMIN_GENERAL') {
-                        setEditingUser({ ...editingUser, rol: 'ROL_ADMIN', esAdminGeneral: true });
+                        setEditingUser({ ...editingUser, rol: 'ROL_ADMIN', esAdminGeneral: true, permiteCambiarPrecio: true });
                       } else if (val === 'ADMIN_SUCURSAL') {
-                        setEditingUser({ ...editingUser, rol: 'ROL_ADMIN', esAdminGeneral: false });
+                        setEditingUser({ ...editingUser, rol: 'ROL_ADMIN', esAdminGeneral: false, permiteCambiarPrecio: true });
                       } else {
-                        setEditingUser({ ...editingUser, rol: val as any, esAdminGeneral: false });
+                        setEditingUser({ ...editingUser, rol: val as any, esAdminGeneral: false, permiteCambiarPrecio: editingUser.permiteCambiarPrecio ?? false });
                       }
                     }}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
