@@ -109,6 +109,7 @@ interface EstrategiaComercialVigente {
     validarMargenMinimo: boolean;
     habilitarPromocionesBaja: boolean;
   };
+  politicaDescuentoVenta?: "LIBRE" | "SOLO_CAMPANAS";
 }
 
 interface GrupoModeloPos {
@@ -657,6 +658,13 @@ export default function PosComponent() {
 
     try {
       const factorDescuento = subtotalVenta > 0 ? totalVenta / subtotalVenta : 1;
+
+      // Validación de Política de Descuentos: SOLO_CAMPANAS
+      if (estrategia?.politicaDescuentoVenta === 'SOLO_CAMPANAS' && valorDescuento > 0 && !cuponAplicadoPOS) {
+        showToast("Descuentos habilitados solo mediante cupones de campaña activa. No se permiten rebajas manuales.", "error");
+        setProcesandoVenta(false);
+        return;
+      }
 
       // Validación de Margen Mínimo en Modelo Dinámico (Fase 9)
       if (estrategia?.reglas?.validarMargenMinimo) {
@@ -1853,6 +1861,7 @@ export default function PosComponent() {
                             inputMode="decimal"
                             placeholder="0.00"
                             value={descuentoVenta}
+                            disabled={estrategia?.politicaDescuentoVenta === 'SOLO_CAMPANAS'}
                             onChange={(e) => {
                               let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
                               const parts = val.split('.');
@@ -1862,9 +1871,19 @@ export default function PosComponent() {
                               }
                               setDescuentoVenta(val);
                             }}
-                            className="w-20 px-2 py-0.5 bg-[var(--card)] border border-[var(--border)] rounded-md text-right font-bold text-amber-500 text-xs focus:outline-none focus:border-amber-500"
+                            className={`w-20 px-2 py-0.5 border rounded-md text-right font-bold text-xs focus:outline-none ${
+                              estrategia?.politicaDescuentoVenta === 'SOLO_CAMPANAS'
+                                ? 'bg-[var(--muted)]/40 border-[var(--border)] text-[var(--muted-foreground)] cursor-not-allowed'
+                                : 'bg-[var(--card)] border-[var(--border)] text-amber-500 focus:border-amber-500'
+                            }`}
                           />
                         </div>
+
+                        {estrategia?.politicaDescuentoVenta === 'SOLO_CAMPANAS' && (
+                          <div className="text-[10px] text-purple-500 font-semibold px-1">
+                            Descuentos habilitados solo mediante cupones de campana activa.
+                          </div>
+                        )}
 
                         {valorDescuento > 0 && (
                           <div className="flex justify-between text-amber-500 text-[11px] font-bold">

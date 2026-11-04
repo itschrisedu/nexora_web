@@ -5409,7 +5409,7 @@ export default function ComercialComponent({
                                     step="0.01"
                                     min="0.01"
                                     placeholder="0.00"
-                                    disabled={!puedeCambiarPrecio}
+                                    disabled={!puedeCambiarPrecio || estrategia?.politicaDescuentoVenta === 'SOLO_CAMPANAS'}
                                     value={precioItemInput}
                                     onChange={(e) => {
                                       let valStr = e.target.value;
@@ -5421,13 +5421,19 @@ export default function ComercialComponent({
                                       setPrecioItem(isNaN(parsed) ? 0 : parsed);
                                     }}
                                     className={`w-20 px-2 py-1 border rounded-lg text-xs font-bold text-center focus:outline-none ${
-                                      !puedeCambiarPrecio
+                                      !puedeCambiarPrecio || estrategia?.politicaDescuentoVenta === 'SOLO_CAMPANAS'
                                         ? 'bg-[var(--muted)]/40 border-[var(--border)] text-[var(--muted-foreground)] cursor-not-allowed'
                                         : 'bg-[var(--card)] border-[var(--border)] focus:border-emerald-600 text-[var(--foreground)]'
                                     }`}
                                   />
                                   <span className="text-[11px] text-[var(--muted-foreground)] font-medium">/ par</span>
                                 </div>
+
+                                {estrategia?.politicaDescuentoVenta === 'SOLO_CAMPANAS' && (
+                                  <div className="mt-1 text-[10px] text-purple-500 font-semibold">
+                                    Precio fijado por catalogo. Descuentos solo mediante cupones de campana.
+                                  </div>
+                                )}
 
                                 {/* Sugerencia Inmediata del Último Precio Vendido al Cliente */}
                                 {ultimoPrecioCliente !== null && (

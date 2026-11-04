@@ -10,7 +10,7 @@ import {
   Truck, Star, Trash2, Plus, Phone, Globe,
   Image, ExternalLink, Eye, EyeOff, Share2,
   Copy, Check, MessageCircle, Upload, Sparkles,
-  Layers, Sliders, Settings2, HelpCircle, Crop, Mail, ShieldCheck, KeyRound, X
+  Layers, Sliders, Settings2, HelpCircle, Crop, Mail, ShieldCheck, KeyRound, X, Tag, Info
 } from "lucide-react";
 import ConfirmModal from "./ui/confirm-modal";
 import ColorPicker, { getContrastColor } from "./ui/color-picker";
@@ -92,6 +92,7 @@ interface BusinessConfig {
   temporadaComercial?: string;
   descuentoTemporadaBaja?: number;
   diasRotacionTemporadaBaja?: number;
+  politicaDescuentoVenta?: string;
 }
 
 type TabType = "general" | "estrategia" | "credito" | "operaciones" | "catalogo" | "seguridad";
@@ -391,6 +392,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
     temporadaComercial: "AUTO",
     descuentoTemporadaBaja: 10,
     diasRotacionTemporadaBaja: 30,
+    politicaDescuentoVenta: "LIBRE",
   });
 
   const [nivelesCredito, setNivelesCredito] = useState<CreditLevelConfigItem[]>([
@@ -599,6 +601,12 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
             autoWhatsAppHabilitado: data.autoWhatsAppHabilitado ?? true,
             autoEmailHabilitado: data.autoEmailHabilitado ?? true,
             autoDespachoHabilitado: data.autoDespachoHabilitado !== undefined ? Boolean(data.autoDespachoHabilitado) : true,
+            estrategiaComercialTipo: data.estrategiaComercialTipo || "ESTANDAR",
+            margenMinimoDinamico: data.margenMinimoDinamico !== undefined ? Number(data.margenMinimoDinamico) : 25,
+            temporadaComercial: data.temporadaComercial || "AUTO",
+            descuentoTemporadaBaja: data.descuentoTemporadaBaja !== undefined ? Number(data.descuentoTemporadaBaja) : 10,
+            diasRotacionTemporadaBaja: data.diasRotacionTemporadaBaja !== undefined ? Number(data.diasRotacionTemporadaBaja) : 30,
+            politicaDescuentoVenta: data.politicaDescuentoVenta || "LIBRE",
           };
 
           setConfig(loadedConfig);
@@ -769,6 +777,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         temporadaComercial: config.temporadaComercial || "AUTO",
         descuentoTemporadaBaja: Number(config.descuentoTemporadaBaja ?? 10),
         diasRotacionTemporadaBaja: Number(config.diasRotacionTemporadaBaja ?? 30),
+        politicaDescuentoVenta: config.politicaDescuentoVenta || "LIBRE",
         autoWhatsAppHabilitado: autoWhatsAppAbono,
         autoEmailHabilitado: autoEmailComprobante,
       };
@@ -1397,6 +1406,97 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     ? `El sistema valida en cada transacción de venta o pedido que el precio no descienda de costo FIFO + ${config.margenMinimoDinamico ?? 25}% de margen en temporadas alta/regular, y habilitará el descuento del ${config.descuentoTemporadaBaja ?? 10}% para modelos con más de ${config.diasRotacionTemporadaBaja ?? 30} días en temporada baja.`
                     : "El sistema opera con precios fijos definidos en catálogo sin restricciones automáticas de margen. Se puede alternar a dinámico en cualquier momento sin alterar datos históricos ni registros previos."}
                 </p>
+              </div>
+            </div>
+
+            {/* SELECTOR DE POLÍTICA DE PRECIOS Y DESCUENTOS EN VENTAS */}
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2.5">
+                <Tag className="text-amber-500" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">Política de Descuentos en Ventas (POS & Pedidos)</h3>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Define la política de aplicación de descuentos en mostrador (POS) y toma de pedidos comerciales.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Opción A: Modalidad Libre */}
+                <div
+                  onClick={() => setConfig((prev) => ({ ...prev, politicaDescuentoVenta: "LIBRE" }))}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${
+                    (config.politicaDescuentoVenta || "LIBRE") === "LIBRE"
+                      ? "border-amber-500 bg-amber-500/5 shadow-sm"
+                      : "border-[var(--border)] bg-[var(--muted)]/20 hover:border-slate-400"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                        (config.politicaDescuentoVenta || "LIBRE") === "LIBRE"
+                          ? "bg-amber-500 text-slate-950"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                      }`}>
+                        MAN
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-[var(--foreground)] uppercase">Modalidad Libre</h4>
+                        <span className="text-[10px] text-[var(--muted-foreground)]">Descuentos y precios manuales</span>
+                      </div>
+                    </div>
+                    {(config.politicaDescuentoVenta || "LIBRE") === "LIBRE" && (
+                      <span className="px-2 py-0.5 bg-amber-500 text-slate-950 text-[10px] font-bold rounded-lg uppercase">
+                        Activa
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                    Permite al vendedor editar precios unitarios y aplicar descuentos libres en mostrador y pedidos según la negociación directa con el comprador.
+                  </p>
+                </div>
+
+                {/* Opción B: Modalidad Solo Campañas */}
+                <div
+                  onClick={() => setConfig((prev) => ({ ...prev, politicaDescuentoVenta: "SOLO_CAMPANAS" }))}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${
+                    config.politicaDescuentoVenta === "SOLO_CAMPANAS"
+                      ? "border-purple-600 bg-purple-600/5 shadow-sm"
+                      : "border-[var(--border)] bg-[var(--muted)]/20 hover:border-slate-400"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                        config.politicaDescuentoVenta === "SOLO_CAMPANAS"
+                          ? "bg-purple-600 text-white"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                      }`}>
+                        CMP
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-[var(--foreground)] uppercase">Solo Campañas Comerciales</h4>
+                        <span className="text-[10px] text-purple-600 font-semibold">Bloqueo manual & cupones</span>
+                      </div>
+                    </div>
+                    {config.politicaDescuentoVenta === "SOLO_CAMPANAS" && (
+                      <span className="px-2 py-0.5 bg-purple-600 text-white text-[10px] font-bold rounded-lg uppercase">
+                        Activa
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                    Protege el precio oficial de catálogo en ventas y pedidos. Queda bloqueada la alteración manual de precios o descuentos libres; las rebajas se habilitan únicamente mediante cupones o promociones de campañas activas.
+                  </p>
+                </div>
+              </div>
+
+              {/* Nota Aclaratoria sobre el Catálogo de Modelos */}
+              <div className="p-3 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-[11px] text-[var(--muted-foreground)] flex items-start gap-2">
+                <Info size={15} className="shrink-0 text-amber-500 mt-0.5" />
+                <span>
+                  <strong>Independencia del Catálogo:</strong> El Catálogo de Modelos se mantiene siempre editable por el administrador para ajustar precios de venta, costos y series. Esta política rige exclusivamente para los vendedores en mostrador (POS) y toma de pedidos comerciales.
+                </span>
               </div>
             </div>
 

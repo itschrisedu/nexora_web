@@ -72,23 +72,6 @@ interface ClienteInactivo extends Cliente {
   rangoInactividad: '30_A_60_DIAS' | '60_A_90_DIAS' | 'MAS_DE_90_DIAS';
 }
 
-interface PromocionCupon {
-  id: string;
-  codigo: string;
-  titulo: string;
-  descripcion?: string;
-  tipoDescuento: 'PORCENTAJE' | 'MONTO_FIJO' | 'DESCUENTO_POR_PAR';
-  valorDescuento: number;
-  minimoPares: number;
-  maximoCanjes: number;
-  canjesUsados: number;
-  aplicaPara?: 'AMBAS' | 'SOLO_CONTADO' | 'SOLO_CREDITO';
-  fechaInicio: string;
-  fechaFin?: string;
-  activo: boolean;
-  mensajePlantilla?: string;
-}
-
 const INPUT = "w-full px-3 py-2.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[#0F172A] transition-colors";
 
 function Lbl({ t, req }: { t: string; req?: boolean }) {
@@ -116,7 +99,7 @@ function scoreColor(s: number) {
 
 export default function ClientesComponent({ online, activeSucursalId, sucursales }: ClientesProps) {
   // Pestañas de Navegación
-  const [vista, setVista] = useState<'DIRECTORIO' | 'INACTIVOS' | 'PROMOCIONES'>('DIRECTORIO');
+  const [vista, setVista] = useState<'DIRECTORIO' | 'INACTIVOS'>('DIRECTORIO');
 
   // Estado Directorio
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -140,31 +123,10 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
   const [mensajeWhatsAppCustom, setMensajeWhatsAppCustom] = useState('');
   const [plantillaSeleccionada, setPlantillaSeleccionada] = useState<'ABANDONO' | 'DESCUENTO_6_PARES' | 'NUEVA_COLECCION'>('ABANDONO');
 
-  // Estado Campañas y Cupones (Fase E2)
-  const [promociones, setPromociones] = useState<PromocionCupon[]>([]);
-  const [loadingPromociones, setLoadingPromociones] = useState(false);
-  const [showPromoModal, setShowPromoModal] = useState(false);
-  const [guardandoPromo, setGuardandoPromo] = useState(false);
-  const [promoError, setPromoError] = useState("");
-  const [promoForm, setPromoForm] = useState({
-    codigo: '',
-    titulo: '',
-    descripcion: '',
-    tipoDescuento: 'PORCENTAJE' as 'PORCENTAJE' | 'MONTO_FIJO' | 'DESCUENTO_POR_PAR',
-    valorDescuento: '10',
-    minimoPares: '1',
-    maximoCanjes: '10', // Ej: primeras 10 personas
-    aplicaPara: 'AMBAS' as 'AMBAS' | 'SOLO_CONTADO' | 'SOLO_CREDITO',
-    fechaFin: '',
-    mensajePlantilla: '',
-  });
-  const [copiadoId, setCopiadoId] = useState<string | null>(null);
-
   // === Estado para modal de cambios sin guardar ===
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const pendingCloseRef = useRef<(() => void) | null>(null);
   const clienteFormSnapshotRef = useRef<string>("");
-  const promoFormSnapshotRef = useRef<string>("");
 
   // Modal de Confirmación UI (reemplaza confirm nativo)
   const [confirmModal, setConfirmModal] = useState<{
@@ -211,7 +173,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     loadClientes();
     loadBusinessInfo();
     if (vista === 'INACTIVOS') loadInactivos();
-    if (vista === 'PROMOCIONES') loadPromociones();
   }, [online, vista, activeSucursalId]);
 
   // === Snapshot del formulario de cliente al abrir ===
@@ -221,24 +182,12 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     }
   }, [showCreate, showEdit]);
 
-  // === Snapshot del formulario de promo al abrir ===
-  useEffect(() => {
-    if (showPromoModal) {
-      promoFormSnapshotRef.current = JSON.stringify(promoForm);
-    }
-  }, [showPromoModal]);
-
   // === Dirty check helpers ===
   const isClienteFormDirty = useCallback(() => {
     if (!showCreate && !showEdit) return false;
     const current = JSON.stringify({ nombre, apellido, telefono, email, tipoDoc, numDoc, direccion, notas, tieneDeudaAnterior, deudaAnteriorMonto });
     return current !== clienteFormSnapshotRef.current;
   }, [showCreate, showEdit, nombre, apellido, telefono, email, tipoDoc, numDoc, direccion, notas, tieneDeudaAnterior, deudaAnteriorMonto]);
-
-  const isPromoFormDirty = useCallback(() => {
-    if (!showPromoModal) return false;
-    return JSON.stringify(promoForm) !== promoFormSnapshotRef.current;
-  }, [showPromoModal, promoForm]);
 
   // === Cierre seguro de modal (con dirty check) ===
   const safeDismissModal = useCallback((closeFn: () => void, isDirty: boolean) => {
@@ -258,10 +207,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     setShowModalWhatsApp(false);
   }, []);
 
-  const closePromoModal = useCallback(() => {
-    setShowPromoModal(false);
-  }, []);
-
   // === Global Escape key handler ===
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -270,12 +215,11 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       if (confirmModal.isOpen) { setConfirmModal(p => ({ ...p, isOpen: false })); return; }
       if (showMobileDetailModal) { e.preventDefault(); setShowMobileDetailModal(false); return; }
       if (showCreate || showEdit) { e.preventDefault(); safeDismissModal(closeClienteModal, isClienteFormDirty()); return; }
-      if (showPromoModal) { e.preventDefault(); safeDismissModal(closePromoModal, isPromoFormDirty()); return; }
       if (showModalWhatsApp) { e.preventDefault(); closeWhatsAppModal(); return; }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showMobileDetailModal, showCreate, showEdit, showPromoModal, showModalWhatsApp, showDiscardModal, confirmModal.isOpen, safeDismissModal, closeClienteModal, closeWhatsAppModal, closePromoModal, isClienteFormDirty, isPromoFormDirty]);
+  }, [showMobileDetailModal, showCreate, showEdit, showModalWhatsApp, showDiscardModal, confirmModal.isOpen, safeDismissModal, closeClienteModal, closeWhatsAppModal, isClienteFormDirty]);
 
   const loadBusinessInfo = async () => {
     try {
@@ -359,20 +303,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       console.error("Error cargando clientes inactivos:", e);
     } finally {
       setLoadingInactivos(false);
-    }
-  };
-
-  const loadPromociones = async () => {
-    setLoadingPromociones(true);
-    try {
-      if (online) {
-        const data = await ApiService.get("/clientes/promociones");
-        setPromociones(Array.isArray(data) ? data : []);
-      }
-    } catch (e: any) {
-      console.error("Error cargando promociones:", e);
-    } finally {
-      setLoadingPromociones(false);
     }
   };
 
@@ -643,177 +573,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
     setShowModalWhatsApp(false);
   };
 
-  // ── Generador automático de código de validación único ──
-  const generarCodigoCampanaUnico = (titulo: string) => {
-    if (!titulo || !titulo.trim()) return '';
-    const clean = titulo
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toUpperCase()
-      .replace(/[^A-Z0-9\s]/g, '')
-      .trim();
-
-    const words = clean.split(/\s+/).filter(Boolean);
-    let prefix = 'PROMO';
-    if (words.length === 1) {
-      prefix = words[0].slice(0, 6);
-    } else if (words.length >= 2) {
-      prefix = words.slice(0, 2).map((w) => w.slice(0, 4)).join('');
-    }
-
-    // Sufijo alfanumérico aleatorio y año para garantizar unicidad total e irrepetible
-    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const yearSuffix = new Date().getFullYear().toString().slice(-2);
-
-    return `${prefix}-${yearSuffix}${randomSuffix}`;
-  };
-
-  const handleTituloPromoChange = (titulo: string) => {
-    const nuevoCodigo = generarCodigoCampanaUnico(titulo);
-    setPromoForm((prev) => ({
-      ...prev,
-      titulo,
-      codigo: nuevoCodigo,
-    }));
-    if (promoError) setPromoError("");
-  };
-
-  const handleRegenerarCodigo = () => {
-    if (!promoForm.titulo.trim()) return;
-    const nuevoCodigo = generarCodigoCampanaUnico(promoForm.titulo);
-    setPromoForm((prev) => ({ ...prev, codigo: nuevoCodigo }));
-    if (promoError) setPromoError("");
-  };
-
-  // ── Gestión de Campañas Promocionales & Cupones ──
-  const handleCrearPromocion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPromoError("");
-
-    const tituloTrim = promoForm.titulo.trim();
-    if (!tituloTrim) {
-      setPromoError("El título de la campaña es obligatorio.");
-      return;
-    }
-
-    // Validación preventiva de duplicidad de nombre de campaña
-    const existeDuplicada = promociones.some(
-      (p) => p.titulo.trim().toLowerCase() === tituloTrim.toLowerCase() && (p as any).activo !== false
-    );
-
-    if (existeDuplicada) {
-      setPromoError(`Ya existe una campaña activa registrada con el nombre "${tituloTrim}". Por favor utiliza un título diferente o desactiva la campaña anterior.`);
-      return;
-    }
-
-    if (!promoForm.codigo.trim()) {
-      setPromoError("Debe generarse un código de validación para la campaña.");
-      return;
-    }
-
-    if (!promoForm.fechaFin) {
-      setPromoError("Debes seleccionar obligatoriamente una fecha de vigencia para la campaña.");
-      return;
-    }
-
-    const hoyStr = new Date().toISOString().split('T')[0];
-    if (promoForm.fechaFin < hoyStr) {
-      setPromoError("La fecha de vigencia no puede ser menor a la fecha actual ni una fecha pasada.");
-      return;
-    }
-
-    setGuardandoPromo(true);
-    try {
-      await ApiService.post("/clientes/promociones", {
-        codigo: promoForm.codigo.toUpperCase().trim(),
-        titulo: tituloTrim,
-        descripcion: promoForm.descripcion.trim() || undefined,
-        tipoDescuento: promoForm.tipoDescuento,
-        valorDescuento: parseFloat(promoForm.valorDescuento) || 10,
-        minimoPares: parseInt(promoForm.minimoPares, 10) || 1,
-        maximoCanjes: parseInt(promoForm.maximoCanjes, 10) || 10,
-        aplicaPara: promoForm.aplicaPara,
-        fechaFin: promoForm.fechaFin,
-        mensajePlantilla: promoForm.mensajePlantilla.trim() || undefined,
-      });
-
-      setSuccess(`¡Campaña "${tituloTrim}" creada con éxito!`);
-      setShowPromoModal(false);
-      setPromoError("");
-      setPromoForm({
-        codigo: '',
-        titulo: '',
-        descripcion: '',
-        tipoDescuento: 'PORCENTAJE',
-        valorDescuento: '10',
-        minimoPares: '1',
-        maximoCanjes: '10',
-        aplicaPara: 'AMBAS',
-        fechaFin: '',
-        mensajePlantilla: '',
-      });
-      await loadPromociones();
-      setTimeout(() => setSuccess(""), 4000);
-    } catch (err: any) {
-      console.error("Error al crear promoción:", err);
-      const errMsg = err.response?.data?.message || err.message || "Error al crear la campaña promocional.";
-      
-      if (err.response?.status === 409 || (typeof errMsg === "string" && (errMsg.toLowerCase().includes("ya existe") || errMsg.toLowerCase().includes("duplicad")))) {
-        setConfirmModal({
-          isOpen: true,
-          title: "Campaña Promocional Ya Registrada",
-          message: typeof errMsg === "string" ? errMsg : `Ya existe una campaña registrada con el nombre "${tituloTrim}". Por favor ingresa un título diferente.`,
-          confirmText: "Entendido, Cambiar Nombre",
-          cancelText: "Cerrar",
-          danger: false,
-          onConfirm: () => {
-            setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-          },
-        });
-      } else {
-        setPromoError(errMsg);
-      }
-    } finally {
-      setGuardandoPromo(false);
-    }
-  };
-
-  const handleEliminarPromocion = (id: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: "Desactivar Campaña Promocional",
-      message: "¿Deseas desactivar esta campaña promocional? Los clientes ya no podrán canjear este cupón de descuento.",
-      confirmText: "Sí, Desactivar",
-      cancelText: "Cancelar",
-      danger: true,
-      onConfirm: async () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        try {
-          await ApiService.delete(`/clientes/promociones/${id}`);
-          setSuccess("Promoción desactivada correctamente.");
-          await loadPromociones();
-          setTimeout(() => setSuccess(""), 4000);
-        } catch (err: any) {
-          setError(err.message || "Error al desactivar la promoción.");
-        }
-      },
-    });
-  };
-
-  const copiarMensajeDifusion = (promo: PromocionCupon) => {
-    const textoDescuento = promo.tipoDescuento === 'PORCENTAJE'
-      ? `${Number(promo.valorDescuento)}% de descuento directo`
-      : promo.tipoDescuento === 'DESCUENTO_POR_PAR'
-      ? `$${Number(promo.valorDescuento).toFixed(2)} de descuento por cada par`
-      : `$${Number(promo.valorDescuento).toFixed(2)} de descuento en tu compra`;
-
-    const texto = promo.mensajePlantilla || `🏭 ¡PROMOCIÓN MAYORISTA EXCLUSIVA EN ${businessNombre.toUpperCase()}! 🏭\n\nEstimados clientes y distribuidores, activamos el código promocional: *${promo.codigo}*.\n\nRecibe ${textoDescuento} en pedidos al por mayor a partir de ${promo.minimoPares} pares de calzado de cuero legítimo 👞💸.\n\n⚡ ¡Válido únicamente para los primeros ${promo.maximoCanjes} comerciantes en confirmar su pedido! (Quedan ${promo.maximoCanjes - promo.canjesUsados} cupos disponibles con despacho prioritario por Transporte Los Andes 🚚📦).\n\n📲 ¡Responde este mensaje con tu pedido y el código antes de que se completen los cupos de producción!`;
-
-    navigator.clipboard.writeText(texto);
-    setCopiadoId(promo.id);
-    setTimeout(() => setCopiadoId(null), 3000);
-  };
-
   // Filtrado y Ordenamiento Alfabético por Apellido (Directorio)
   const filtered = clientes
     .filter(c => {
@@ -873,7 +632,7 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
             )}
           </h2>
           <p className="text-xs text-[var(--muted-foreground)] mt-0.5 font-medium">
-            Directorio de contactos, scoring crediticio, fidelización de clientes inactivos y promociones
+            Directorio de contactos, scoring crediticio y fidelización de clientes inactivos
           </p>
         </div>
 
@@ -906,25 +665,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                 vista === 'INACTIVOS' ? 'bg-white text-amber-900' : 'bg-amber-500/20 text-amber-600'
               }`}>
                 {inactivos.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setVista('PROMOCIONES')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-              vista === 'PROMOCIONES'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'text-[var(--muted-foreground)] hover:text-purple-600'
-            }`}
-          >
-            <Gift size={14} />
-            <span>Campañas & Cupones</span>
-            {promociones.length > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                vista === 'PROMOCIONES' ? 'bg-white text-purple-900' : 'bg-purple-500/20 text-purple-600'
-              }`}>
-                {promociones.length}
               </span>
             )}
           </button>
@@ -976,17 +716,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
                   className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap"
                 >
                   <Plus size={16} /><span>Nuevo Cliente</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVista('PROMOCIONES');
-                    setShowPromoModal(true);
-                  }}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap"
-                >
-                  <Gift size={16} /><span>+ Nueva Promoción</span>
                 </button>
               </div>
             </div>
@@ -1892,168 +1621,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
       {/* ══════════════════════════════════════════════════════════════ */}
       {/* VISTA 3: CAMPAÑAS PROMOCIONALES & CUPONES LIMITADOS            */}
       {/* ══════════════════════════════════════════════════════════════ */}
-      {vista === 'PROMOCIONES' && (
-        <div className="space-y-5 animate-in fade-in duration-150">
-          {/* Header de Promociones */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-xs">
-            <div>
-              <h3 className="font-black text-sm text-[var(--foreground)] flex items-center gap-2">
-                <Gift size={16} className="text-purple-600" />
-                <span>Campañas Masivas de Descuento con Cupo Limitado</span>
-              </h3>
-              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                Crea códigos de validación limitados a N personas (ej. 10 compradores) y genera mensajes para difusión de WhatsApp.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowPromoModal(true)}
-              className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer"
-            >
-              <Plus size={15} />
-              <span>Crear Nueva Campaña / Cupón</span>
-            </button>
-          </div>
-
-          {/* Grid de Promociones */}
-          {loadingPromociones ? (
-            <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
-              <Loader2 className="animate-spin text-purple-600 mb-3" size={36} />
-              <span className="text-xs font-bold">Cargando campañas promocionales...</span>
-            </div>
-          ) : promociones.length === 0 ? (
-            <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] border-dashed rounded-2xl space-y-3">
-              <Gift size={44} className="mx-auto text-purple-400 opacity-60 mb-1" />
-              <p className="font-bold text-sm text-[var(--foreground)]">No hay campañas promocionales activas</p>
-              <p className="text-xs max-w-md mx-auto">
-                Crea promociones con códigos de validación para las primeras 10 personas y envía mensajes masivos a tus clientes de calzado.
-              </p>
-              <button
-                onClick={() => setShowPromoModal(true)}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5"
-              >
-                <Plus size={14} /> Crear Primera Promoción
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {promociones.map((p) => {
-                const cuposLibres = p.maximoCanjes - p.canjesUsados;
-                const porcentajeUso = Math.round((p.canjesUsados / p.maximoCanjes) * 100);
-                const estaAgotado = cuposLibres <= 0;
-
-                const textoDescuento = p.tipoDescuento === 'PORCENTAJE'
-                  ? `${Number(p.valorDescuento)}% OFF`
-                  : p.tipoDescuento === 'DESCUENTO_POR_PAR'
-                  ? `$${Number(p.valorDescuento).toFixed(2)} / par`
-                  : `$${Number(p.valorDescuento).toFixed(2)} OFF`;
-
-                return (
-                  <div
-                    key={p.id}
-                    className={`bg-[var(--card)] border rounded-2xl p-5 shadow-sm flex flex-col justify-between transition-all ${
-                      estaAgotado ? 'border-slate-300 opacity-75' : 'border-purple-500/30 hover:border-purple-500'
-                    }`}
-                  >
-                    <div className="space-y-3">
-                      {/* Badge y Código */}
-                      <div className="flex items-center justify-between">
-                        <span className="px-3 py-1 bg-purple-600 text-white rounded-lg text-xs font-mono font-black tracking-wider shadow-xs">
-                          {p.codigo}
-                        </span>
-                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-md text-[11px] font-extrabold">
-                          {textoDescuento}
-                        </span>
-                      </div>
-
-                      <div>
-                        <h4 className="font-extrabold text-sm text-[var(--foreground)]">{p.titulo}</h4>
-                        {p.descripcion && (
-                          <p className="text-xs text-[var(--muted-foreground)] mt-0.5 line-clamp-2">{p.descripcion}</p>
-                        )}
-                      </div>
-
-                      {/* Reglas de la promoción */}
-                      <div className="p-3 bg-[var(--muted)]/30 rounded-xl space-y-1.5 text-xs text-[var(--muted-foreground)]">
-                        <div className="flex justify-between">
-                          <span>Mínimo requerido:</span>
-                          <strong className="text-[var(--foreground)]">{p.minimoPares} pares de calzado</strong>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Condición de Pago:</span>
-                          <strong className="text-purple-700">
-                            {p.aplicaPara === 'SOLO_CONTADO' 
-                              ? '💵 Solo Contado' 
-                              : p.aplicaPara === 'SOLO_CREDITO'
-                              ? '💳 Solo Crédito'
-                              : '🟢 Contado y Crédito'}
-                          </strong>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Cupo total:</span>
-                          <strong className="text-[var(--foreground)]">Primeras {p.maximoCanjes} personas</strong>
-                        </div>
-                        {p.fechaFin && (
-                          <div className="flex justify-between">
-                            <span>Vence:</span>
-                            <strong className="text-purple-700">{new Date(p.fechaFin).toLocaleDateString('es-EC')}</strong>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Barra de Progreso de Canjes */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] font-bold">
-                          <span className={estaAgotado ? 'text-red-500 font-black' : 'text-purple-700'}>
-                            {estaAgotado ? '🚫 Cupos Agotados' : `🎯 Quedan ${cuposLibres} cupos disponibles`}
-                          </span>
-                          <span className="text-[var(--muted-foreground)] font-mono">
-                            {p.canjesUsados}/{p.maximoCanjes}
-                          </span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all duration-300 ${
-                              estaAgotado ? 'bg-red-500' : 'bg-gradient-to-r from-purple-600 to-emerald-500'
-                            }`}
-                            style={{ width: `${Math.min(100, porcentajeUso)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Acciones */}
-                    <div className="pt-4 border-t border-[var(--border)] mt-4 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => copiarMensajeDifusion(p)}
-                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
-                          copiadoId === p.id
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-[#0F172A] hover:bg-slate-800 text-white'
-                        }`}
-                      >
-                        {copiadoId === p.id ? <Check size={13} /> : <Copy size={13} />}
-                        <span>{copiadoId === p.id ? '¡Mensaje Copiado!' : 'Copiar Difusión WhatsApp'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleEliminarPromocion(p.id)}
-                        className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors"
-                        title="Eliminar campaña"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════ */}
       {/* MODAL: REACTIVACIÓN DE CLIENTE INACTIVO POR WHATSAPP           */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {showModalWhatsApp && clienteWhatsApp && (
@@ -2178,301 +1745,6 @@ export default function ClientesComponent({ online, activeSucursalId, sucursales
 
       {/* ══════════════════════════════════════════════════════════════ */}
       {/* MODAL: CREAR NUEVA CAMPAÑA PROMOCIONAL / CUPÓN                 */}
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {showPromoModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-             onMouseDown={(e) => { if (e.target === e.currentTarget) safeDismissModal(closePromoModal, isPromoFormDirty()); }}
-             onClick={(e) => { if (e.target === e.currentTarget) safeDismissModal(closePromoModal, isPromoFormDirty()); }}>
-          <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] w-full max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[88vh] animate-in zoom-in-95 duration-150">
-            <div className="p-4 sm:p-6 pr-14 sm:pr-16 border-b border-[var(--border)] bg-[#0F172A] text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="p-2 sm:p-2.5 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 text-purple-400 font-bold shrink-0">
-                  <Gift size={18} />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Crear Campaña con Cupo Limitado</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Genera cupones exclusivos para listas de difusión</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => safeDismissModal(closePromoModal, isPromoFormDirty())}
-                className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                aria-label="Cerrar modal"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCrearPromocion} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
-              {/* 1. TÍTULO DE LA CAMPAÑA (Primero) */}
-              <div>
-                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                  1. Título de la Campaña *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Descuento 10% por temporada escolar o feria artesanal"
-                  value={promoForm.titulo}
-                  onChange={(e) => handleTituloPromoChange(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 bg-[var(--muted)]/30 border ${
-                    promociones.some(p => p.titulo.trim().toLowerCase() === promoForm.titulo.trim().toLowerCase() && (p as any).activo !== false && promoForm.titulo.trim().length > 0)
-                      ? "border-amber-500 focus:border-amber-600"
-                      : "border-[var(--border)] focus:border-purple-600"
-                  } rounded-xl text-xs font-bold focus:outline-none`}
-                  required
-                  autoFocus
-                />
-                {promociones.some(p => p.titulo.trim().toLowerCase() === promoForm.titulo.trim().toLowerCase() && (p as any).activo !== false && promoForm.titulo.trim().length > 0) ? (
-                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded-xl flex items-center gap-2 text-[11px] font-semibold mt-1.5 animate-in fade-in duration-150">
-                    <AlertTriangle size={14} className="shrink-0 text-amber-600" />
-                    <span>Ya existe una campaña activa con este nombre. Se requerirá un nombre diferente para guardarla.</span>
-                  </div>
-                ) : (
-                  <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
-                    💡 Al escribir el título se generará automáticamente el código de validación único.
-                  </span>
-                )}
-              </div>
-
-              {/* 2. CÓDIGO DE VALIDACIÓN AUTOMÁTICO & CUPOS */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-[var(--foreground)]">
-                      2. Código de Validación *
-                    </label>
-                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-purple-500/15 text-purple-700 dark:text-purple-300 rounded">
-                      🔒 Automático
-                    </span>
-                  </div>
-                  <div className="relative flex items-center">
-                    <input
-                      type="text"
-                      readOnly
-                      placeholder="Escribe el título primero..."
-                      value={promoForm.codigo}
-                      className="w-full pl-3 pr-8 py-2 bg-[var(--muted)]/60 border border-[var(--border)] rounded-xl text-xs font-mono font-black text-purple-700 dark:text-purple-300 uppercase cursor-not-allowed select-all"
-                      required
-                    />
-                    {promoForm.codigo && (
-                      <button
-                        type="button"
-                        onClick={handleRegenerarCodigo}
-                        title="Regenerar código aleatorio"
-                        className="absolute right-2 p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <RefreshCw size={13} />
-                      </button>
-                    )}
-                  </div>
-                  <span className="text-[9.5px] text-[var(--muted-foreground)] mt-0.5 block">
-                    Código único e irrepetible en el sistema.
-                  </span>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                    Límite de Personas (Cupos) *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="10"
-                    value={promoForm.maximoCanjes}
-                    onChange={(e) => setPromoForm({ ...promoForm, maximoCanjes: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
-                    required
-                  />
-                  <span className="text-[9.5px] text-[var(--muted-foreground)] mt-0.5 block">
-                    Número máximo de canjes permitidos.
-                  </span>
-                </div>
-              </div>
-
-              {/* Modalidad de Descuento: Monto Fijo ($), Porcentaje (%) o Por Par */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-[var(--foreground)]">
-                  3. Modalidad de Descuento *
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPromoForm({ ...promoForm, tipoDescuento: 'MONTO_FIJO', valorDescuento: promoForm.valorDescuento || '10' })}
-                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                      promoForm.tipoDescuento === 'MONTO_FIJO'
-                        ? 'bg-emerald-600 text-white border-transparent shadow-xs'
-                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
-                    }`}
-                  >
-                    <span className="text-sm font-black">$ Monto Fijo</span>
-                    <span className="text-[10px] opacity-80">(ej. $10 dólares)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPromoForm({ ...promoForm, tipoDescuento: 'PORCENTAJE', valorDescuento: promoForm.valorDescuento || '10' })}
-                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                      promoForm.tipoDescuento === 'PORCENTAJE'
-                        ? 'bg-purple-600 text-white border-transparent shadow-xs'
-                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
-                    }`}
-                  >
-                    <span className="text-sm font-black">% Porcentaje</span>
-                    <span className="text-[10px] opacity-80">(ej. 5% o 10%)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPromoForm({ ...promoForm, tipoDescuento: 'DESCUENTO_POR_PAR', valorDescuento: promoForm.valorDescuento || '2' })}
-                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                      promoForm.tipoDescuento === 'DESCUENTO_POR_PAR'
-                        ? 'bg-blue-600 text-white border-transparent shadow-xs'
-                        : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-blue-500'
-                    }`}
-                  >
-                    <span className="text-sm font-black">👟 Por Cada Par</span>
-                    <span className="text-[10px] opacity-80">(ej. $2 / par)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Valor del Descuento */}
-              <div>
-                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                  {promoForm.tipoDescuento === 'MONTO_FIJO'
-                    ? 'Monto del Descuento en Dólares ($ USD) *'
-                    : promoForm.tipoDescuento === 'PORCENTAJE'
-                    ? 'Porcentaje de Descuento (%) *'
-                    : 'Descuento por Cada Par de Calzado ($/par) *'}
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="any"
-                    min="0.01"
-                    placeholder={
-                      promoForm.tipoDescuento === 'MONTO_FIJO'
-                        ? 'Ej: 10 (descuento directo de $10 dólares)'
-                        : promoForm.tipoDescuento === 'PORCENTAJE'
-                        ? 'Ej: 5, 10, 15 (descuento del 10%)'
-                        : 'Ej: 2.00 ($2 de descuento por cada par)'
-                    }
-                    value={promoForm.valorDescuento}
-                    onChange={(e) => setPromoForm({ ...promoForm, valorDescuento: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-bold focus:outline-none focus:border-purple-600"
-                    required
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-[var(--muted-foreground)]">
-                    {promoForm.tipoDescuento === 'PORCENTAJE' ? '%' : '$ USD'}
-                  </span>
-                </div>
-                <span className="text-[10px] text-[var(--muted-foreground)] mt-1 block">
-                  {promoForm.tipoDescuento === 'MONTO_FIJO'
-                    ? `💡 Se rebajarán $${promoForm.valorDescuento || 0} dólares directos del total del pedido o venta.`
-                    : promoForm.tipoDescuento === 'PORCENTAJE'
-                    ? `💡 Se aplicará el ${promoForm.valorDescuento || 0}% de descuento sobre el subtotal.`
-                    : `💡 Se multiplicarán $${promoForm.valorDescuento || 0} dólares por cada par de calzado incluido.`}
-                </span>
-              </div>
-
-              {/* Mínimo de pares y Fecha de Expiración */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                    Mínimo de Pares Requeridos *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={promoForm.minimoPares}
-                    onChange={(e) => setPromoForm({ ...promoForm, minimoPares: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                    Fecha Límite de la Campaña *
-                  </label>
-                  <input
-                    type="date"
-                    min={new Date().toISOString().split('T')[0]}
-                    value={promoForm.fechaFin}
-                    onChange={(e) => {
-                      setPromoForm({ ...promoForm, fechaFin: e.target.value });
-                      if (promoError) setPromoError("");
-                    }}
-                    className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
-                    required
-                  />
-                  <span className="text-[9.5px] text-[var(--muted-foreground)] mt-0.5 block">
-                    📅 Obligatorio: debe ser hoy o una fecha posterior.
-                  </span>
-                </div>
-              </div>
-
-              {/* Condición de Pago Permitida */}
-              <div>
-                <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                  Condición de Pago Permitida *
-                </label>
-                <select
-                  value={promoForm.aplicaPara}
-                  onChange={(e) => setPromoForm({ ...promoForm, aplicaPara: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-purple-600"
-                >
-                  <option value="AMBAS">🟢 Contado y Crédito (Ambas Modalidades)</option>
-                  <option value="SOLO_CONTADO">💵 Exclusivo para Pagos de Contado (Efectivo / Transferencia)</option>
-                  <option value="SOLO_CREDITO">💳 Exclusivo para Compras a Crédito</option>
-                </select>
-                <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
-                  {promoForm.aplicaPara === 'SOLO_CONTADO' 
-                    ? '💡 Incentiva la liquidez inmediata impidiendo que se aplique en ventas a crédito.'
-                    : promoForm.aplicaPara === 'SOLO_CREDITO'
-                    ? '💡 Exclusivo para clientes que compran por líneas de crédito autorizadas.'
-                    : '💡 Aplica para cualquier cliente independientemente de si paga al contado o a crédito.'}
-                </span>
-              </div>
-
-              <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-[11px] text-purple-900 dark:text-purple-300">
-                💡 El sistema llevará el control estricto de canjes. Cuando {promoForm.maximoCanjes} clientes utilicen este código, la promoción se desactivará automáticamente.
-              </div>
-
-              {/* Alerta de Error en la parte inferior (justo arriba del botón Crear Campaña) */}
-              {promoError && (
-                <div className="p-3.5 bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 rounded-2xl flex items-start gap-2.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
-                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
-                  <div className="flex-1">
-                    <span className="font-extrabold block">Atención:</span>
-                    <span className="font-semibold text-[11px] leading-relaxed">{promoError}</span>
-                  </div>
-                </div>
-              )}
-              </div>
-
-              <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => safeDismissModal(closePromoModal, isPromoFormDirty())}
-                  className="w-1/3 sm:w-auto px-4 py-2.5 border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] text-center transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={guardandoPromo}
-                  className="flex-1 sm:flex-none px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer min-h-[42px]"
-                >
-                  {guardandoPromo ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-                  <span>Crear Campaña</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* ══════════════════════════════════════════════════════════════ */}
       {/* MODAL CREAR / EDITAR CLIENTE                                   */}
       {/* ══════════════════════════════════════════════════════════════ */}

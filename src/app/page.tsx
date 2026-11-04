@@ -11,6 +11,7 @@ import {
   WifiOff,
   Database,
   Users,
+  Gift,
   TrendingUp,
   AlertTriangle,
   TrendingDown,
@@ -59,6 +60,7 @@ import WhatsAppSelectorModal from '@/components/ui/WhatsAppSelectorModal';
 const InventarioComponent = dynamic(() => import('@/components/inventario'), { ssr: false });
 const DashboardComponent = dynamic(() => import('@/components/dashboard'), { ssr: false });
 const ClientesComponent = dynamic(() => import('@/components/clientes'), { ssr: false });
+const CampanasComponent = dynamic(() => import('@/components/campanas'), { ssr: false });
 const ComercialComponent = dynamic(() => import('@/components/comercial'), { ssr: false });
 const FinancieroComponent = dynamic(() => import('@/components/financiero'), { ssr: false });
 const FinanzasComponent = dynamic(() => import('@/components/finanzas'), { ssr: false });
@@ -78,7 +80,7 @@ const NotificacionesModal = dynamic(() => import('@/components/notificaciones-mo
 const TermsModal = dynamic(() => import('@/components/terms-modal'), { ssr: false });
 const GpsConsentModal = dynamic(() => import('@/components/gps-consent-modal'), { ssr: false });
 
-type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'comercial' | 'financiero' | 'finanzas' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
+type Vista = 'dashboard' | 'reportes' | 'inventario' | 'modelos' | 'clientes' | 'campanas' | 'comercial' | 'financiero' | 'finanzas' | 'proveedores' | 'usuarios' | 'super-admin' | 'sri' | 'personalizacion' | 'pos' | 'prediccion-ml' | 'auditoria' | 'ubicaciones';
 
 interface NavItem {
   id: Vista;
@@ -94,10 +96,11 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'inventario',      label: 'Inventario',            icon: <Package size={18} /> },
 
   // ── Gestión Comercial ──
+  { id: 'modelos',         label: 'Catálogo de Modelos',   icon: <ShoppingBag size={18} /> },
+  { id: 'campanas',        label: 'Campañas & Cupones',    icon: <Gift size={18} /> },
   { id: 'clientes',        label: 'Clientes y Créditos',   icon: <Users size={18} /> },
   { id: 'financiero',      label: 'Cobros y Crédito',      icon: <Receipt size={18} /> },
   { id: 'proveedores',     label: 'Proveedores',           icon: <Truck size={18} /> },
-  { id: 'modelos',         label: 'Catálogo de Modelos',   icon: <ShoppingBag size={18} /> },
 
   // ── Finanzas & Analítica ──
   { id: 'finanzas',        label: 'Finanzas por Sucursal', icon: <DollarSign size={18} /> },
@@ -1389,7 +1392,7 @@ function MainApp() {
   const renderSidebarContent = (isMobile: boolean = false) => {
     const SECTION_GROUPS: { label: string; ids: Vista[] }[] = [
       { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
-      { label: 'Gestión Comercial', ids: ['clientes', 'financiero', 'proveedores', 'modelos'] },
+      { label: 'Gestión Comercial', ids: ['modelos', 'campanas', 'clientes', 'financiero', 'proveedores'] },
       { label: 'Finanzas & Analítica', ids: ['finanzas', 'reportes', 'prediccion-ml'] },
       { label: 'Administración', ids: ['usuarios', 'sri', 'auditoria', 'ubicaciones', 'super-admin'] },
     ];
@@ -1862,6 +1865,13 @@ function MainApp() {
             />
           )}
           {vistaActual === 'clientes' && <ClientesComponent online={online} />}
+          {vistaActual === 'campanas' && (
+            <CampanasComponent
+              online={online}
+              activeSucursalId={activeSucursalId}
+              sucursales={sucursales}
+            />
+          )}
           {vistaActual === 'comercial' && (
             <ComercialComponent
               online={online}
