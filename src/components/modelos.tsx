@@ -161,6 +161,24 @@ interface SerieConfig {
   tallas?: SerieTallaConfig[];
 }
 
+/** Normaliza el nombre de un color para comparaciones y agrupación.
+ *  "Negro / Blanco", "negro/blanco", "Negro /Blanco" → "negro/blanco" */
+const normalizeColor = (color: string): string =>
+  color
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+/g, ' ');
+
+/** De un grupo de variantes con el mismo color normalizado, devuelve
+ *  el nombre «más bonito» (con mayúsculas, sin espacios raros). */
+const bestColorLabel = (variants: { color: string }[]): string => {
+  // Preferir la variante cuyo nombre empiece con mayúscula
+  const nice = variants.find(v => /^[A-ZÁÉÍÓÚÑ]/.test(v.color.trim()));
+  return (nice || variants[0]).color.trim();
+};
+
 const SERIES_ORDEN = [
   "ADULTO",
   "JUVENIL",
@@ -2949,9 +2967,25 @@ export default function ModelosComponent({
             <div className="space-y-4">
               {filteredModelos.map(m => {
                 const products = m.products || [];
-                const uniqueColors = Array.from(new Set(products.map(p => p.color)));
-                const activeColor = selectedColorForModel[m.id] || uniqueColors[0] || "";
-                const activeProduct = products.find(p => p.color === activeColor && p.fotoUrl) || products.find(p => p.color === activeColor);
+
+                // Agrupar colores por nombre normalizado y obtener la etiqueta más legible
+                const colorGroupMap = new Map<string, Producto[]>();
+                for (const p of products) {
+                  const key = normalizeColor(p.color);
+                  if (!colorGroupMap.has(key)) colorGroupMap.set(key, []);
+                  colorGroupMap.get(key)!.push(p);
+                }
+                const uniqueColors = Array.from(colorGroupMap.keys()).map(key => ({
+                  normalized: key,
+                  label: bestColorLabel(colorGroupMap.get(key)!),
+                }));
+
+                const selectedNorm = selectedColorForModel[m.id]
+                  ? normalizeColor(selectedColorForModel[m.id])
+                  : uniqueColors[0]?.normalized || "";
+                const activeColorLabel = uniqueColors.find(c => c.normalized === selectedNorm)?.label || uniqueColors[0]?.label || "";
+                const activeColorProducts = colorGroupMap.get(selectedNorm) || [];
+                const activeProduct = activeColorProducts.find(p => p.fotoUrl) || activeColorProducts[0];
                 const isExpanded = expandedModels[m.id];
 
                 return (
@@ -2974,7 +3008,7 @@ export default function ModelosComponent({
                                 url: activeProduct.fotoUrl,
                                 title: m.name,
                                 subtitle: m.baseCode,
-                                color: activeColor,
+                                color: activeColorLabel,
                                 brand: m.brand,
                               });
                             }
@@ -3112,21 +3146,26 @@ export default function ModelosComponent({
                           <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
                             <Palette size={12}/> Color Activo:
                           </span>
-                          {uniqueColors.map(col => {
-                            const countActive = products.filter(p => p.color === col && p.activo).length;
-                            const countTotal = products.filter(p => p.color === col).length;
+                          {uniqueColors.map(({ normalized, label }) => {
+                            const groupProducts = colorGroupMap.get(normalized) || [];
+                            const countActive = groupProducts.filter(p => p.activo).length;
+                            const countTotal = groupProducts.length;
+                            const numSuppliers = new Set(groupProducts.map(p => p.supplierId || 'sin')).size;
 
                             return (
                               <button
-                                key={col}
-                                onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: col }))}
+                                key={normalized}
+                                onClick={() => setSelectedColorForModel(prev => ({ ...prev, [m.id]: label }))}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                                  activeColor === col
+                                  selectedNorm === normalized
                                     ? "bg-slate-900 text-white border-slate-900"
                                     : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400"
                                 }`}
                               >
-                                <span>{col}</span>
+                                <span>{label}</span>
+                                {numSuppliers > 1 && (
+                                  <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded text-[9px] font-mono">{numSuppliers} prov.</span>
+                                )}
                                 {countActive < countTotal && (
                                   <span className="w-1.5 h-1.5 rounded-full bg-red-400" title="Contiene variantes deshabilitadas" />
                                 )}
@@ -3135,130 +3174,186 @@ export default function ModelosComponent({
                           })}
                         </div>
 
-                        {/* Listado de Series para el Color Seleccionado */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {products.filter(p => p.color === activeColor).map(p => {
-                            const tallas = p.tallas || (p as any).stockPorTalla || [];
-                            const totalStock = tallas.reduce((acc, t) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
+                        {/* Listado de Series agrupadas por Proveedor para el Color Seleccionado */}
+                        {(() => {
+                          // Agrupar las variantes del color activo por proveedor
+                          const bySupplier = new Map<string, Producto[]>();
+                          for (const p of activeColorProducts) {
+                            const key = p.supplierId || 'sin-proveedor';
+                            if (!bySupplier.has(key)) bySupplier.set(key, []);
+                            bySupplier.get(key)!.push(p);
+                          }
+                          const supplierGroups = Array.from(bySupplier.entries());
+                          const hasMultipleSuppliers = supplierGroups.length > 1;
+
+                          return supplierGroups.map(([supKey, variants]) => {
+                            const firstVariant = variants[0];
+                            const supplierName = firstVariant.supplier?.razonSocial || 'Sin proveedor';
+                            const supplierImage = variants.find(v => v.fotoUrl)?.fotoUrl;
 
                             return (
-                              <div
-                                key={p.id}
-                                className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${
-                                  !p.activo ? "opacity-60 bg-[var(--muted)]/10 border-dashed" : ""
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Código Variante</span>
-                                      {!p.activo && (
-                                        <span className="px-1.5 py-0.5 bg-red-500/15 text-red-500 rounded text-[9px] font-bold leading-none">Deshabilitada</span>
-                                      )}
-                                    </div>
-                                    <span className="text-xs font-mono font-black text-slate-900 dark:text-slate-100">{p.codigo}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Serie</span>
-                                    <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100">{p.serie?.nombre ? getNombreSerie(p.serie.nombre) : "—"}</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Precio</span>
-                                    <span className="text-xs font-black text-slate-900 dark:text-white">${Number(p.precioVenta).toFixed(2)}</span>
-                                  </div>
-                                </div>
-
-                                {/* Insignia Discreta de Proveedor y Costo */}
-                                <div className="flex items-center justify-between text-[11px] px-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">Proveedor:</span>
-                                    {p.supplier ? (
-                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
-                                        <Truck size={10} />
-                                        <span>{p.supplier.razonSocial}</span>
-                                        {p.supplierSigla && (
-                                          <span className="bg-blue-600 text-white px-1 py-0.2 rounded text-[8px] font-mono font-black">{p.supplierSigla}</span>
+                              <div key={supKey} className="space-y-3">
+                                {/* Header de Proveedor (solo si hay más de uno) */}
+                                {hasMultipleSuppliers && (
+                                  <div className="flex items-center gap-3 pt-2">
+                                    {supplierImage && (
+                                      <div
+                                        className="w-10 h-10 rounded-lg overflow-hidden border border-[var(--border)] shrink-0 cursor-zoom-in"
+                                        onClick={() => supplierImage && setZoomImage({ url: supplierImage, title: m.name, subtitle: supplierName, color: activeColorLabel, brand: m.brand })}
+                                      >
+                                        <img src={supplierImage} alt={supplierName} className="w-full h-full object-cover" />
+                                      </div>
+                                    )}
+                                    <div>
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-xs font-bold">
+                                        <Truck size={12} />
+                                        {supplierName}
+                                        {firstVariant.supplierSigla && (
+                                          <span className="bg-blue-600 text-white px-1 py-0.5 rounded text-[8px] font-mono font-black">{firstVariant.supplierSigla}</span>
                                         )}
                                       </span>
-                                    ) : (
-                                      <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin proveedor asignado</span>
-                                    )}
+                                      <span className="text-[10px] text-[var(--muted-foreground)] ml-2">{variants.length} {variants.length === 1 ? 'serie' : 'series'}</span>
+                                    </div>
                                   </div>
-                                  <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
-                                    Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
-                                  </div>
-                                </div>
+                                )}
 
-                                {/* Detalle de Tallas y Stocks */}
-                                <div className="bg-[var(--muted)]/20 rounded-lg p-2.5 space-y-1.5">
-                                  <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Stock Físico por Talla</span>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {tallas.map(t => (
-                                      <span
-                                        key={t.tallaId}
-                                        title={`Stock: ${t.cantidad} pares`}
-                                        className={`px-2 py-1 rounded-md text-[10px] font-bold border ${
-                                          t.cantidad === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
-                                          : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                {/* Cards de variantes (series) de este proveedor */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {variants.map(p => {
+                                    const tallas = p.tallas || (p as any).stockPorTalla || [];
+                                    const totalStock = tallas.reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
+
+                                    return (
+                                      <div
+                                        key={p.id}
+                                        className={`bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-all ${
+                                          !p.activo ? "opacity-60 bg-[var(--muted)]/10 border-dashed" : ""
                                         }`}
                                       >
-                                        T{t.numero}: {t.cantidad}
-                                      </span>
-                                    ))}
-                                  </div>
-                                  <div className="text-[10px] text-[var(--muted-foreground)] pt-1 flex justify-between items-center flex-wrap gap-1">
-                                    <span>
-                                      Total: <b className="text-[var(--foreground)]">{totalStock} pares</b>
-                                      {totalStock > 0 && (
-                                        <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/20">
-                                          Invertido: ${(totalStock * Number(p.precioCosto || 0)).toFixed(2)}
-                                        </span>
-                                      )}
-                                    </span>
-                                    {totalStock === 0 && <span className="text-red-500 font-bold">Sin Stock</span>}
-                                  </div>
-                                </div>
+                                        <div className="flex items-center justify-between">
+                                          <div>
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Código Variante</span>
+                                              {!p.activo && (
+                                                <span className="px-1.5 py-0.5 bg-red-500/15 text-red-500 rounded text-[9px] font-bold leading-none">Deshabilitada</span>
+                                              )}
+                                            </div>
+                                            <span className="text-xs font-mono font-black text-slate-900 dark:text-slate-100">{p.codigo}</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Serie</span>
+                                            <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100">{p.serie?.nombre ? getNombreSerie(p.serie.nombre) : "—"}</span>
+                                          </div>
+                                          <div className="text-right">
+                                            <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold uppercase tracking-wider block">Precio</span>
+                                            <span className="text-xs font-black text-slate-900 dark:text-white">${Number(p.precioVenta).toFixed(2)}</span>
+                                          </div>
+                                        </div>
 
-                                {/* Botones de acción */}
-                                <div className="flex justify-end items-center gap-2 pt-1 flex-wrap">
-                                  {online && isAdmin && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleProduct(p.id, p.codigo, p.activo, m.id)}
-                                      className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
-                                        p.activo
-                                          ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
-                                          : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
-                                      }`}
-                                    >
-                                      {p.activo ? "Deshabilitar" : "Habilitar"}
-                                    </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditProduct(p, m.id)}
-                                    title="Editar variante: imagen, color, series, numeración, stock y precios"
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs cursor-pointer"
-                                  >
-                                    <Edit2 size={12} />
-                                    <span>Editar</span>
-                                  </button>
-                                                                    {online && isAdmin && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteProduct(p.id, m.name, p.color, p.serie?.nombre, m.id)}
-                                      title="Retirar variante de este local sin afectar a otros locales"
-                                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all cursor-pointer"
-                                    >
-                                      <Trash2 size={12} />
-                                      <span>Retirar</span>
-                                    </button>
-                                  )}
+                                        {/* Insignia Discreta de Proveedor y Costo */}
+                                        {!hasMultipleSuppliers && (
+                                        <div className="flex items-center justify-between text-[11px] px-1">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">Proveedor:</span>
+                                            {p.supplier ? (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded text-[10px] font-bold">
+                                                <Truck size={10} />
+                                                <span>{p.supplier.razonSocial}</span>
+                                                {p.supplierSigla && (
+                                                  <span className="bg-blue-600 text-white px-1 py-0.2 rounded text-[8px] font-mono font-black">{p.supplierSigla}</span>
+                                                )}
+                                              </span>
+                                            ) : (
+                                              <span className="text-[10px] text-[var(--muted-foreground)] italic">Sin proveedor asignado</span>
+                                            )}
+                                          </div>
+                                          <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
+                                            Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
+                                          </div>
+                                        </div>
+                                        )}
+                                        {hasMultipleSuppliers && (
+                                        <div className="flex items-center justify-end text-[11px] px-1">
+                                          <div className="text-[10px] text-slate-900 dark:text-slate-300 font-bold">
+                                            Costo: <strong className="text-slate-900 dark:text-emerald-400 font-mono font-black">${Number(p.precioCosto).toFixed(2)}</strong>
+                                          </div>
+                                        </div>
+                                        )}
+
+                                        {/* Detalle de Tallas y Stocks */}
+                                        <div className="bg-[var(--muted)]/20 rounded-lg p-2.5 space-y-1.5">
+                                          <span className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Stock Físico por Talla</span>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {tallas.map((t: any) => (
+                                              <span
+                                                key={t.tallaId}
+                                                title={`Stock: ${t.cantidad} pares`}
+                                                className={`px-2 py-1 rounded-md text-[10px] font-bold border ${
+                                                  t.cantidad === 0 ? "bg-red-500/10 text-red-500 border-red-500/20"
+                                                  : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                                }`}
+                                              >
+                                                T{t.numero}: {t.cantidad}
+                                              </span>
+                                            ))}
+                                          </div>
+                                          <div className="text-[10px] text-[var(--muted-foreground)] pt-1 flex justify-between items-center flex-wrap gap-1">
+                                            <span>
+                                              Total: <b className="text-[var(--foreground)]">{totalStock} pares</b>
+                                              {totalStock > 0 && (
+                                                <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/20">
+                                                  Invertido: ${(totalStock * Number(p.precioCosto || 0)).toFixed(2)}
+                                                </span>
+                                              )}
+                                            </span>
+                                            {totalStock === 0 && <span className="text-red-500 font-bold">Sin Stock</span>}
+                                          </div>
+                                        </div>
+
+                                        {/* Botones de acción */}
+                                        <div className="flex justify-end items-center gap-2 pt-1 flex-wrap">
+                                          {online && isAdmin && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleProduct(p.id, p.codigo, p.activo, m.id)}
+                                              className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+                                                p.activo
+                                                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+                                                  : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20"
+                                              }`}
+                                            >
+                                              {p.activo ? "Deshabilitar" : "Habilitar"}
+                                            </button>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => openEditProduct(p, m.id)}
+                                            title="Editar variante: imagen, color, series, numeración, stock y precios"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-xs cursor-pointer"
+                                          >
+                                            <Edit2 size={12} />
+                                            <span>Editar</span>
+                                          </button>
+                                          {online && isAdmin && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteProduct(p.id, m.name, p.color, p.serie?.nombre, m.id)}
+                                              title="Retirar variante de este local sin afectar a otros locales"
+                                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all cursor-pointer"
+                                            >
+                                              <Trash2 size={12} />
+                                              <span>Retirar</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             );
-                          })}
-                        </div>
+                          });
+                        })()}
                       </div>
                     )}
                   </div>
@@ -4238,6 +4333,7 @@ export default function ModelosComponent({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input
                         type="text"
+                        list="model-existing-colors-datalist"
                         value={newColorName}
                         onChange={e => setNewColorName(e.target.value)}
                         placeholder="Ej. Azul Marino / Negro-Rojo"
@@ -4250,6 +4346,50 @@ export default function ModelosComponent({
                         className="w-full text-[10px] text-[var(--muted-foreground)] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-slate-900 file:text-white file:text-[9px] file:font-semibold hover:file:opacity-90 cursor-pointer"
                       />
                     </div>
+                    {(() => {
+                      const existingColorLabels = Array.from(
+                        new Set((selectedModelForColor.products || []).map(p => p.color.trim()))
+                      );
+                      if (existingColorLabels.length === 0) return null;
+
+                      // Filtrar chips si el usuario ya escribió algo
+                      const searchTrim = newColorName.trim().toLowerCase();
+                      const filteredChips = searchTrim
+                        ? existingColorLabels.filter(c => c.toLowerCase().includes(searchTrim))
+                        : existingColorLabels;
+
+                      return (
+                        <>
+                          <datalist id="model-existing-colors-datalist">
+                            {existingColorLabels.map(col => (
+                              <option key={col} value={col} />
+                            ))}
+                          </datalist>
+                          {filteredChips.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                              <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
+                                {searchTrim ? 'Sugerencias:' : 'Colores ya existentes:'}
+                              </span>
+                              {filteredChips.map(col => (
+                                <button
+                                  type="button"
+                                  key={col}
+                                  onClick={() => setNewColorName(col)}
+                                  title={`Seleccionar color existente "${col}" para añadir este nuevo proveedor`}
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                                    normalizeColor(newColorName) === normalizeColor(col)
+                                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                      : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-slate-400'
+                                  }`}
+                                >
+                                  {col}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
