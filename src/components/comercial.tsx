@@ -484,12 +484,19 @@ export default function ComercialComponent({
   const [codigoCuponInput, setCodigoCuponInput] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState<any | null>(null);
   const [promocionesActivas, setPromocionesActivas] = useState<any[]>([]);
+  const [showSugerenciasCupon, setShowSugerenciasCupon] = useState(false);
 
   const loadPromociones = useCallback(async () => {
     try {
       const res = await ApiService.get('/clientes/promociones');
       if (Array.isArray(res)) {
-        const activas = res.filter((p: any) => p.activa !== false && (!p.fechaFin || new Date(p.fechaFin) >= new Date()));
+        const ahora = new Date();
+        const activas = res.filter((p: any) => {
+          if (!p.activo) return false;
+          if (p.fechaFin && new Date(p.fechaFin) < ahora) return false;
+          if (p.maximoCanjes && p.canjesUsados >= p.maximoCanjes) return false;
+          return true;
+        });
         setPromocionesActivas(activas);
       } else {
         setPromocionesActivas([]);
@@ -1039,6 +1046,12 @@ export default function ComercialComponent({
       setSelectedOrderSucursalId(initialTarget);
     }
   }, [online, activeSucursalId]);
+
+  useEffect(() => {
+    if (showModal) {
+      loadPromociones();
+    }
+  }, [showModal, loadPromociones]);
 
   const loadTransportes = async () => {
     try {
@@ -5429,12 +5442,6 @@ export default function ComercialComponent({
                                   <span className="text-[11px] text-[var(--muted-foreground)] font-medium">/ par</span>
                                 </div>
 
-                                {estrategia?.politicaDescuentoVenta === 'SOLO_CAMPANAS' && (
-                                  <div className="mt-1 text-[10px] text-purple-500 font-semibold">
-                                    Precio fijado por catalogo. Descuentos solo mediante cupones de campana.
-                                  </div>
-                                )}
-
                                 {/* Sugerencia Inmediata del Último Precio Vendido al Cliente */}
                                 {ultimoPrecioCliente !== null && (
                                   <div className="mt-1 flex flex-col items-start lg:items-end gap-0.5">
@@ -5898,6 +5905,134 @@ export default function ComercialComponent({
                 </div>
               )}
 
+              {/* CUPÓN DE CAMPAÑA PROMOCIONAL - Visible si hay campañas activas o cupón aplicado */}
+              {(promocionesActivas.length > 0 || cuponAplicado) && lineasPedido.length > 0 && (
+                <div className="p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
+                      <span>🎟️ Cupón de Campaña Promocional</span>
+                    </span>
+                    {cuponAplicado && (
+                      <button
+                        type="button"
+                        onClick={handleRemoverCupon}
+                        className="text-[11px] font-bold text-rose-500 hover:underline cursor-pointer"
+                      >
+                        Quitar cupón
+                      </button>
+                    )}
+                  </div>
+
+                  {!cuponAplicado ? (
+                    <div className="relative">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Digita un cupón o selecciona una campaña..."
+                          value={codigoCuponInput}
+                          onChange={(e) => {
+                            setCodigoCuponInput(e.target.value.toUpperCase());
+                            setShowSugerenciasCupon(true);
+                          }}
+                          onFocus={() => setShowSugerenciasCupon(true)}
+                          onBlur={() => setTimeout(() => setShowSugerenciasCupon(false), 200)}
+                          className="flex-1 px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold uppercase focus:outline-none focus:border-purple-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAplicarCupon}
+                          disabled={validandoCupon || !codigoCuponInput.trim()}
+                          className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-xs cursor-pointer"
+                        >
+                          {validandoCupon ? <Loader2 size={12} className="animate-spin" /> : null}
+                          <span>Aplicar</span>
+                        </button>
+                      </div>
+
+                      {showSugerenciasCupon && promocionesActivas.length > 0 && (
+                        <div className="absolute z-20 left-0 right-0 mt-1 bg-[var(--card)] border border-purple-500/30 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                          {promocionesActivas
+                            .filter(
+                              (c) =>
+                                !codigoCuponInput ||
+                                c.codigo?.toUpperCase().includes(codigoCuponInput) ||
+                                c.titulo?.toUpperCase().includes(codigoCuponInput)
+                            )
+                            .map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setCodigoCuponInput(c.codigo);
+                                  setShowSugerenciasCupon(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-purple-500/10 transition-colors flex items-center justify-between gap-2 border-b border-[var(--border)] last:border-b-0 cursor-pointer"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <span className="text-[11px] font-mono font-black text-purple-600 dark:text-purple-300">
+                                    {c.codigo}
+                                  </span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)] block truncate">
+                                    {c.titulo}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-bold text-emerald-600 shrink-0 px-1.5 py-0.5 bg-emerald-500/10 rounded">
+                                  {c.tipoDescuento === 'PORCENTAJE'
+                                    ? `${Number(c.valorDescuento)}% OFF`
+                                    : `$${Number(c.valorDescuento || 0).toFixed(2)} OFF`}
+                                </span>
+                              </button>
+                            ))}
+                          {promocionesActivas.filter(
+                            (c) =>
+                              !codigoCuponInput ||
+                              c.codigo?.toUpperCase().includes(codigoCuponInput) ||
+                              c.titulo?.toUpperCase().includes(codigoCuponInput)
+                          ).length === 0 && (
+                            <div className="px-3 py-2 text-[10px] text-[var(--muted-foreground)] text-center">
+                              No hay campañas que coincidan.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-purple-600 text-white font-mono text-[11px] font-black rounded-md">
+                            {cuponAplicado.promocion?.codigo}
+                          </span>
+                          <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                            Descuento: -${Number(cuponAplicado.descuentoCalculado || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-[var(--muted-foreground)]">
+                          {cuponAplicado.promocion?.titulo}
+                          {cuponAplicado.cuposRestantes !== undefined && ` · Quedan ${cuponAplicado.cuposRestantes} cupos`}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleRemoverCupon}
+                        className="text-xs font-bold text-rose-500 hover:underline px-2 py-1 cursor-pointer"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  )}
+
+                  {cuponErrorMsg && (
+                    <div className="p-2 bg-rose-500/10 border border-rose-500/20 text-rose-600 text-[11px] font-semibold rounded-lg flex items-center gap-1.5">
+                      <AlertCircle size={13} />
+                      <span>{cuponErrorMsg}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* MODALIDAD DE ENTREGA Y LOGÍSTICA (FLETE) */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
                 <div className="flex items-center justify-between">
@@ -6087,72 +6222,6 @@ export default function ComercialComponent({
                   </div>
                 )}
               </div>
-
-              {/* 3. CUPÓN DE DESCUENTO PROMOCIONAL (FASE E2) */}
-              {lineasPedido.length > 0 && promocionesActivas.length > 0 && (
-                <div className="p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
-                      <span>🎟️ Cupón de Descuento Promocional</span>
-                    </span>
-                    <span className="text-[10px] text-purple-700 dark:text-purple-400 font-semibold">
-                      (Válido por volumen / primeras personas)
-                    </span>
-                  </div>
-
-                  {!cuponAplicado ? (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Ej: NEXORA10, LOTE10..."
-                        value={codigoCuponInput}
-                        onChange={(e) => setCodigoCuponInput(e.target.value.toUpperCase())}
-                        className="flex-1 px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold uppercase focus:outline-none focus:border-purple-600"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAplicarCupon}
-                        disabled={validandoCupon || !codigoCuponInput.trim()}
-                        className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-xs cursor-pointer"
-                      >
-                        {validandoCupon ? <Loader2 size={12} className="animate-spin" /> : null}
-                        <span>Aplicar Cupón</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 bg-purple-600 text-white font-mono text-[11px] font-black rounded-md">
-                            {cuponAplicado.promocion?.codigo}
-                          </span>
-                          <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
-                            Descuento: -${Number(cuponAplicado.descuentoCalculado || 0).toFixed(2)}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-[var(--muted-foreground)]">
-                          {cuponAplicado.promocion?.titulo} · Quedan {cuponAplicado.cuposRestantes} cupos
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleRemoverCupon}
-                        className="text-xs font-bold text-rose-500 hover:underline px-2 py-1"
-                      >
-                        Quitar
-                      </button>
-                    </div>
-                  )}
-
-                  {cuponErrorMsg && (
-                    <div className="p-2 bg-rose-500/10 border border-rose-500/20 text-rose-600 text-[11px] font-semibold rounded-lg flex items-center gap-1.5">
-                      <AlertCircle size={13} />
-                      <span>{cuponErrorMsg}</span>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {errorMsg && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl font-medium">{errorMsg}</div>}
             </div>
