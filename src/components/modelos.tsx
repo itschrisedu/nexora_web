@@ -3214,29 +3214,41 @@ export default function ModelosComponent({
 
                             return (
                               <div key={supKey} className="space-y-3">
-                                {/* Header de Proveedor (solo si hay más de uno) */}
-                                {hasMultipleSuppliers && (
-                                  <div className="flex items-center gap-3 pt-2">
+                                {/* Header de Proveedor con acción de Gestionar/Activar Series */}
+                                <div className="flex items-center justify-between gap-3 pt-2 pb-1.5 border-b border-[var(--border)]/50 flex-wrap">
+                                  <div className="flex items-center gap-2.5">
                                     {supplierImage && (
                                       <div
-                                        className="w-10 h-10 rounded-lg overflow-hidden border border-[var(--border)] shrink-0 cursor-zoom-in"
+                                        className="w-8 h-8 rounded-lg overflow-hidden border border-[var(--border)] shrink-0 cursor-zoom-in"
                                         onClick={() => supplierImage && setZoomImage({ url: supplierImage, title: m.name, subtitle: supplierName, color: activeColorLabel, brand: m.brand })}
                                       >
                                         <img src={supplierImage} alt={supplierName} className="w-full h-full object-cover" />
                                       </div>
                                     )}
-                                    <div>
-                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-xs font-bold">
-                                        <Truck size={12} />
-                                        {supplierName}
-                                        {firstVariant.supplierSigla && (
-                                          <span className="bg-blue-600 text-white px-1 py-0.5 rounded text-[8px] font-mono font-black">{firstVariant.supplierSigla}</span>
-                                        )}
-                                      </span>
-                                      <span className="text-[10px] text-[var(--muted-foreground)] ml-2">{variants.length} {variants.length === 1 ? 'serie' : 'series'}</span>
-                                    </div>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 rounded-lg text-xs font-bold">
+                                      <Truck size={12} />
+                                      <span>{supplierName}</span>
+                                      {firstVariant.supplierSigla && (
+                                        <span className="bg-blue-600 text-white px-1 py-0.5 rounded text-[8px] font-mono font-black">{firstVariant.supplierSigla}</span>
+                                      )}
+                                    </span>
+                                    <span className="text-[10px] text-[var(--muted-foreground)]">
+                                      {variants.length} {variants.length === 1 ? 'serie activa' : 'series activas'}
+                                    </span>
                                   </div>
-                                )}
+
+                                  {online && isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openEditSupplierSeries(firstVariant, m)}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#0F172A] hover:bg-slate-800 text-white dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                      title="Activar o desactivar series (Adulto, Juvenil, Niño) y definir sus precios para este taller"
+                                    >
+                                      <Layers size={13} />
+                                      <span>Gestionar Series / + Activar Serie</span>
+                                    </button>
+                                  )}
+                                </div>
 
                                 {/* Cards de variantes (series) de este proveedor */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -5155,94 +5167,69 @@ export default function ModelosComponent({
                 })()}
               </div>
 
-                {/* Sección 3: Series y Precios (Idéntica a la Captura de Referencia) */}
+                {/* Sección 3: Serie y Precios de esta Variante */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
                   <h5 className="text-xs font-bold text-[#0F172A] dark:text-white uppercase tracking-widest">
-                    3. Series y Precios
+                    3. Serie, Precios y Stock de esta Variante
                   </h5>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewSerieNombre("");
-                      setNewSerieTallasDesde("38");
-                      setNewSerieTallasHasta("43");
-                      setError("");
-                      setShowCreateSeriesModal(true);
-                    }}
-                    className="flex items-center gap-1 text-[11px] font-bold text-[#0F172A] dark:text-blue-400 hover:underline cursor-pointer"
-                  >
-                    <Plus size={13} /> <span>Crear Nueva Serie</span>
-                  </button>
                 </div>
-                <p className="text-[10px] text-[var(--muted-foreground)] -mt-2">
-                  Activa las series que deseas generar, personaliza sus tallas y define precios.
-                </p>
+
+                {/* Banner informativo para gestionar otras series */}
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between gap-3 text-xs text-blue-700 dark:text-blue-300">
+                  <div className="flex items-center gap-2">
+                    <Info size={15} className="shrink-0" />
+                    <span className="text-[11px] leading-snug">
+                      Esta ventana edita únicamente esta variante. Para activar o agregar otras series (Adulto, Juvenil, etc.) para este taller, usa el Gestor de Series.
+                    </span>
+                  </div>
+                  {supplierSeriesTargetModel && editProduct && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditProduct(false);
+                        openEditSupplierSeries(editProduct, supplierSeriesTargetModel);
+                      }}
+                      className="px-2.5 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white dark:bg-blue-600 dark:hover:bg-blue-500 text-[11px] font-bold rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                    >
+                      <Layers size={12} />
+                      <span>Gestionar Series</span>
+                    </button>
+                  )}
+                </div>
 
                 <div className="space-y-3">
-                  {series.map(s => {
-                    const isActive = supplierSeriesActiveIds.includes(s.id);
-                    const prices = supplierSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
-                    const selectedTallaIds = supplierSeriesCustomTallas[s.id] || [];
+                  {(() => {
+                    const currentVariantSerie = series.find(s => s.id === editProductSerieId) || (series.length > 0 ? series[0] : null);
+                    const displaySeries = currentVariantSerie ? [currentVariantSerie] : series;
 
-                    return (
-                      <div
-                        key={s.id}
-                        className={`rounded-xl border transition-all overflow-hidden ${
-                          isActive
-                            ? "border-[#0F172A] bg-[#0F172A]/5 dark:border-white/20 dark:bg-white/5 shadow-sm"
-                            : "border-[var(--border)] bg-[var(--card)] opacity-70 hover:opacity-100"
-                        }`}
-                      >
-                        {/* Toggle Header */}
-                        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
-                          <div
-                            className="flex items-center gap-3 cursor-pointer select-none"
-                            onClick={() => toggleSupplierSerie(s.id)}
-                          >
-                            <div
-                              className={`w-10 h-5 rounded-full relative transition-colors ${
-                                isActive ? "bg-[#0F172A] dark:bg-blue-600" : "bg-[var(--border)]"
-                              }`}
-                            >
-                              <div
-                                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                  isActive ? "translate-x-5" : "translate-x-0.5"
-                                }`}
-                              />
-                            </div>
-                            <span
-                              className={`text-sm font-bold ${
-                                isActive ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"
-                              }`}
-                            >
-                              {getNombreSerie(s, series)}
-                            </span>
-                            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                              ({s.nombre})
-                            </span>
-                          </div>
+                    return displaySeries.map(s => {
+                      const isActive = true;
+                      const prices = supplierSeriesPrices[s.id] || { costPrice: "", salePrice: "" };
+                      const selectedTallaIds = supplierSeriesCustomTallas[s.id] || [];
 
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openEditSeriesModal(s)}
-                              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)]/50 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
-                              title="Editar rango o nombre de esta serie"
-                            >
-                              <Edit2 size={13} />
-                              <span>Editar</span>
-                            </button>
-                            {isActive && (
-                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">
-                                ACTIVA
+                      return (
+                        <div
+                          key={s.id}
+                          className="rounded-xl border border-[#0F172A] bg-[#0F172A]/5 dark:border-white/20 dark:bg-white/5 shadow-sm overflow-hidden"
+                        >
+                          {/* Header de la Serie Actual */}
+                          <div className="w-full flex items-center justify-between px-4 py-3 border-b border-[var(--border)]/30">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-extrabold text-[var(--foreground)]">
+                                {getNombreSerie(s, series)}
                               </span>
-                            )}
+                              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                                ({s.nombre})
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg">
+                              SERIE DE ESTA VARIANTE
+                            </span>
                           </div>
-                        </div>
 
-                        {/* Detalle si la serie está activa */}
-                        {isActive && (() => {
+                          {/* Detalle si la serie está activa */}
+                          {isActive && (() => {
                           const costVal = parseDecimalNumber(prices.costPrice);
                           const saleVal = parseDecimalNumber(prices.salePrice);
                           const hasCost = !isNaN(costVal) && costVal > 0;
@@ -5434,7 +5421,8 @@ export default function ModelosComponent({
                         })()}
                       </div>
                     );
-                  })}
+                  });
+                  })()}
                 </div>
               </div>
 
