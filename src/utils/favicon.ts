@@ -67,6 +67,9 @@ export function updateTabFavicon(iconUrl?: string | null): void {
         // Logo falló (CORS, URL rota, etc.) => revertir a favicon local
         link.href = '/favicon.ico';
         link.type = 'image/x-icon';
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('nexora_business_logo');
+        }
       };
       probe.src = targetIcon;
     }

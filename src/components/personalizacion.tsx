@@ -739,7 +739,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
         direccion: config.direccion.trim(),
         telefono: config.telefono?.trim() || undefined,
         email: config.email?.trim() || undefined,
-        logoUrl: finalLogoUrl || undefined,
+        logoUrl: finalLogoUrl !== undefined ? finalLogoUrl : "",
         primaryColor: config.primaryColor || "#0F172A",
         horaInicioOperativa: config.horaInicioOperativa || "08:00",
         horaFinOperativa: config.horaFinOperativa || "19:00",
@@ -1063,7 +1063,16 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                     <div className="w-16 h-16 rounded-xl bg-white border border-[var(--border)] p-1.5 flex items-center justify-center shrink-0 shadow-xs">
                       {config.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={config.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                        <img
+                          src={config.logoUrl}
+                          alt="Logo"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            img.onerror = null;
+                            img.src = '/logo.png';
+                          }}
+                          className="w-full h-full object-contain"
+                        />
                       ) : (
                         <Building2 className="text-slate-300" size={24} />
                       )}

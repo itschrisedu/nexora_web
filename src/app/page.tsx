@@ -1430,6 +1430,16 @@ function MainApp() {
                 <img
                   src={businessLogo}
                   alt="Logo"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    img.onerror = null;
+                    img.src = '/logo.png';
+                    setBusinessLogo('');
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('nexora_business_logo');
+                    }
+                    updateTabFavicon('/favicon.ico');
+                  }}
                   className="w-8 h-8 object-contain rounded-lg shrink-0 border border-[var(--border)] p-0.5 bg-white shadow-xs"
                 />
               ) : (
