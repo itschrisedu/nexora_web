@@ -1945,7 +1945,7 @@ export default function ModelosComponent({
   };
 
   // ── Abrir modal de Edición de Series y Precios del Proveedor para el Modelo ──
-  const openEditSupplierSeries = (p: Producto, m: ModeloAgrupado) => {
+  const openEditSupplierSeries = (p: Producto, m: ModeloAgrupado, specificSupplierVariants?: Producto[]) => {
     lastActiveModelIdRef.current = m.id;
     setSupplierSeriesTargetModel(m);
 
@@ -1955,21 +1955,38 @@ export default function ModelosComponent({
     const supObj = listaProveedores.find(s => s.id === supId);
     const supName = p.supplier?.razonSocial || supObj?.razonSocial || m.supplier?.razonSocial || "Proveedor";
     setSupplierSeriesTargetSupplierName(supName);
+    const supSigla = supObj?.razonSocial ? generarSiglaProveedor(supObj.razonSocial) : (p.supplierSigla || '');
 
-    // Identificar variantes de este modelo que pertenecen a este proveedor
+    // Identificar variantes de este modelo que pertenecen estrictamente a este proveedor
     const prodsSup = (m.products || []).filter(prod => {
       const prodSupId = prod.supplierId || (prod as any).supplier?.id;
       if (supId) {
-        return prodSupId === supId || (!prodSupId && supId === m.supplierId);
+        if (prodSupId === supId) return true;
+        if (prodSupId && prodSupId !== supId) return false;
+        if (supSigla && (prod.codigo || (prod as any).code)) {
+          const c = prod.codigo || (prod as any).code || '';
+          if (c.includes(`-${supSigla}-`)) return true;
+          const otherSiglas = listaProveedores
+            .filter(sp => sp.id !== supId)
+            .map(sp => generarSiglaProveedor(sp.razonSocial))
+            .filter(Boolean);
+          if (otherSiglas.some(os => c.includes(`-${os}-`))) return false;
+        }
+        return !prodSupId && supId === m.supplierId;
       } else {
-        return !prodSupId || prodSupId === m.supplierId;
+        return !prodSupId;
       }
     });
+
+    // Variantes de referencia para determinar qué series tiene activas este proveedor
+    const referenceVariants = (specificSupplierVariants && specificSupplierVariants.length > 0)
+      ? specificSupplierVariants
+      : prodsSup;
 
     // Series activas para este proveedor en este modelo (aquellas con al menos un producto activo)
     const activeSids = Array.from(
       new Set(
-        prodsSup
+        referenceVariants
           .filter(prod => prod.activo !== false)
           .map(prod => (prod.serie as any)?.id || (prod as any).serieId)
           .filter(Boolean)
@@ -1981,7 +1998,8 @@ export default function ModelosComponent({
     const initialTallas: Record<string, string[]> = {};
 
     series.forEach(s => {
-      const prodConPrecio = prodsSup.find(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
+      const prodConPrecio = referenceVariants.find(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0)
+        || prodsSup.find(prod => (((prod.serie as any)?.id === s.id) || (prod as any).serieId === s.id) && Number(prod.precioCosto) > 0);
       if (prodConPrecio) {
         initialPrices[s.id] = {
           costPrice: String(prodConPrecio.precioCosto || ""),
@@ -3240,7 +3258,7 @@ export default function ModelosComponent({
                                   {online && isAdmin && (
                                     <button
                                       type="button"
-                                      onClick={() => openEditSupplierSeries(firstVariant, m)}
+                                      onClick={() => openEditSupplierSeries(firstVariant, m, variants)}
                                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#0F172A] hover:bg-slate-800 text-white dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
                                       title="Activar o desactivar series (Adulto, Juvenil, Niño) y definir sus precios para este taller"
                                     >
