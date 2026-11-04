@@ -96,11 +96,11 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'inventario',      label: 'Inventario',            icon: <Package size={18} /> },
 
   // ── Gestión Comercial ──
+  { id: 'financiero',      label: 'Cobros y Crédito',      icon: <Receipt size={18} /> },
+  { id: 'clientes',        label: 'Clientes y Créditos',   icon: <Users size={18} /> },
+  { id: 'proveedores',     label: 'Proveedores',           icon: <Truck size={18} /> },
   { id: 'modelos',         label: 'Catálogo de Modelos',   icon: <ShoppingBag size={18} /> },
   { id: 'campanas',        label: 'Campañas & Cupones',    icon: <Gift size={18} /> },
-  { id: 'clientes',        label: 'Clientes y Créditos',   icon: <Users size={18} /> },
-  { id: 'financiero',      label: 'Cobros y Crédito',      icon: <Receipt size={18} /> },
-  { id: 'proveedores',     label: 'Proveedores',           icon: <Truck size={18} /> },
 
   // ── Finanzas & Analítica ──
   { id: 'finanzas',        label: 'Finanzas por Sucursal', icon: <DollarSign size={18} /> },
@@ -1392,7 +1392,7 @@ function MainApp() {
   const renderSidebarContent = (isMobile: boolean = false) => {
     const SECTION_GROUPS: { label: string; ids: Vista[] }[] = [
       { label: 'Operativo Diario', ids: ['dashboard', 'pos', 'comercial', 'inventario'] },
-      { label: 'Gestión Comercial', ids: ['modelos', 'campanas', 'clientes', 'financiero', 'proveedores'] },
+      { label: 'Gestión Comercial', ids: ['financiero', 'clientes', 'proveedores', 'modelos', 'campanas'] },
       { label: 'Finanzas & Analítica', ids: ['finanzas', 'reportes', 'prediccion-ml'] },
       { label: 'Administración', ids: ['usuarios', 'sri', 'auditoria', 'ubicaciones', 'super-admin'] },
     ];
