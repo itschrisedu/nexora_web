@@ -1051,8 +1051,8 @@ function MainApp() {
         {/* Contenedor principal Glassmorphism (Responsive: 2 columnas en Desktop, 1 columna fluida en Mobile/Tablet) */}
         <div className="w-full max-w-5xl z-10 grid grid-cols-1 lg:grid-cols-12 overflow-hidden rounded-3xl border border-white/15 backdrop-blur-2xl bg-slate-900/45 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] animate-in fade-in zoom-in-95 duration-300">
           
-          {/* Columna Izquierda: Identidad y Calzado de Cuero (Visible en LG/XL, resumida arriba en móvil) */}
-          <div className="lg:col-span-6 p-7 sm:p-10 lg:p-12 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 bg-gradient-to-b from-white/[0.08] via-white/[0.02] to-transparent relative">
+          {/* Columna Izquierda: Identidad y Calzado de Cuero (En móvil aparece debajo del formulario) */}
+          <div className="order-2 lg:order-1 lg:col-span-6 p-7 sm:p-10 lg:p-12 flex flex-col justify-between border-t lg:border-t-0 lg:border-r border-white/10 bg-gradient-to-b from-white/[0.08] via-white/[0.02] to-transparent relative">
             <div className="space-y-6">
               {/* Logo con badge premium */}
               <div className="flex items-center gap-3.5">
@@ -1113,18 +1113,10 @@ function MainApp() {
               </div>
             </div>
 
-            {/* Footer institucional de la columna izquierda */}
-            <div className="pt-5 mt-5 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Building2 size={14} className="text-amber-400 shrink-0" />
-                Cantón Cevallos · Tungurahua
-              </span>
-              <span className="text-[10.5px] text-slate-400 font-semibold">100% Cuero Vacuno</span>
-            </div>
           </div>
 
-          {/* Columna Derecha: Formulario Glassmorphism */}
-          <div className="lg:col-span-6 p-7 sm:p-10 lg:p-12 flex flex-col justify-center bg-slate-950/60 backdrop-blur-xl relative">
+          {/* Columna Derecha: Formulario Glassmorphism (En móvil aparece primero arriba) */}
+          <div className="order-1 lg:order-2 lg:col-span-6 p-7 sm:p-10 lg:p-12 flex flex-col justify-center bg-slate-950/60 backdrop-blur-xl relative">
             <div className="mb-6">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-300 mb-3">
                 <Lock size={12} /> Acceso Seguro al Sistema
@@ -1224,18 +1216,11 @@ function MainApp() {
               </button>
             </div>
 
-            <div className="mt-4 text-center text-[11px] text-slate-400">
-              {online ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Conexión segura SSL / Cifrado AES-256
-                </span>
-              ) : (
-                <span className="text-amber-300">
-                  Sin conexión: autenticación local activa
-                </span>
-              )}
-            </div>
+            {!online && (
+              <div className="mt-4 text-center text-[11px] text-amber-300">
+                Sin conexión: autenticación local activa
+              </div>
+            )}
           </div>
         </div>
 
