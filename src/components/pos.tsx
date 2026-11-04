@@ -667,6 +667,13 @@ export default function PosComponent() {
   const valorDescuento = Math.min(subtotalVenta, Math.max(0, parseFloat(String(descuentoVenta).replace(',', '.')) || 0));
   const totalVenta = Math.max(0, subtotalVenta - valorDescuento);
 
+  // Detección inteligente de turno abierto de un día anterior
+  const esTurnoDiaAnterior = Boolean(
+    caja.abierta &&
+    caja.fechaApertura &&
+    new Date(caja.fechaApertura).toDateString() !== new Date().toDateString()
+  );
+
   const handleRegistrarVenta = async () => {
     if (itemsVenta.length === 0) return;
     if (tipoComprobante === "FACTURA" && !clienteFactura.nombre.trim()) {
@@ -1388,6 +1395,53 @@ export default function PosComponent() {
           ) : (
             /* Vista de Caja Abierta y Terminal de Cobro */
             <div className="space-y-6">
+              {/* Alerta Inteligente: Turno de caja pendiente de un día anterior */}
+              {esTurnoDiaAnterior && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-800 dark:text-amber-200 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertTriangle size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wide flex items-center gap-2">
+                        <span>Turno pendiente de un día anterior</span>
+                        <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[9px] font-black uppercase">
+                          Requiere Arqueo
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+                        Este turno fue abierto el{" "}
+                        <span className="font-bold">
+                          {new Date(caja.fechaApertura!).toLocaleDateString("es-EC", {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </span>{" "}
+                        a las{" "}
+                        <span className="font-bold">
+                          {new Date(caja.fechaApertura!).toLocaleTimeString("es-EC", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>{" "}
+                        y aún no ha sido arqueado. Para iniciar las ventas de hoy en $0.00, realiza el arqueo y cierre.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalCierreOpen(true);
+                      setResultadoCierre(null);
+                    }}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <Receipt size={13} />
+                    <span>Cerrar Turno Anterior</span>
+                  </button>
+                </div>
+              )}
+
               {/* Header con resumen de la caja actual */}
               <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm p-4 rounded-2xl">
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -1396,9 +1450,22 @@ export default function PosComponent() {
                       <Clock className="text-emerald-600 dark:text-emerald-400" size={20} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm text-[var(--card-foreground)]">Turno Mostrador Activo</h3>
+                      <h3 className="font-bold text-sm text-[var(--card-foreground)] flex items-center gap-2">
+                        <span>Turno Mostrador Activo</span>
+                        {esTurnoDiaAnterior && (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-bold uppercase">
+                            Día anterior
+                          </span>
+                        )}
+                      </h3>
                       <p className="text-xs text-[var(--muted-foreground)] font-medium">
-                        Apertura: {caja.fechaApertura ? new Date(caja.fechaApertura).toLocaleTimeString("es-EC") : "Turno en curso"}
+                        Apertura: {caja.fechaApertura ? (
+                          esTurnoDiaAnterior ? (
+                            `${new Date(caja.fechaApertura).toLocaleDateString("es-EC", { day: "2-digit", month: "2-digit" })} a las ${new Date(caja.fechaApertura).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })}`
+                          ) : (
+                            new Date(caja.fechaApertura).toLocaleTimeString("es-EC")
+                          )
+                        ) : "Turno en curso"}
                       </p>
                     </div>
                   </div>
