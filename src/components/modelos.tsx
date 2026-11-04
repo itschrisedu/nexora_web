@@ -3218,14 +3218,30 @@ export default function ModelosComponent({
                           // Agrupar las variantes del color activo por proveedor
                           const bySupplier = new Map<string, Producto[]>();
                           for (const p of activeColorProducts) {
-                            const key = p.supplierId || 'sin-proveedor';
+                            const key = p.supplierId || (p.supplier as any)?.id || 'sin-proveedor';
                             if (!bySupplier.has(key)) bySupplier.set(key, []);
                             bySupplier.get(key)!.push(p);
                           }
                           const supplierGroups = Array.from(bySupplier.entries());
                           const hasMultipleSuppliers = supplierGroups.length > 1;
 
-                          return supplierGroups.map(([supKey, variants]) => {
+                          return supplierGroups.map(([supKey, rawVariants]) => {
+                            // Garantizar estrictamente una única tarjeta por serie para este proveedor, priorizando la que tiene stock físico
+                            const serieMap = new Map<string, Producto>();
+                            for (const v of rawVariants) {
+                              const sKey = (v.serie as any)?.id || (v as any).serieId || v.serie?.nombre || v.id;
+                              if (!serieMap.has(sKey)) {
+                                serieMap.set(sKey, v);
+                              } else {
+                                const existing = serieMap.get(sKey)!;
+                                const stockExisting = (existing.tallas || (existing as any).stockPorTalla || []).reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
+                                const stockNew = (v.tallas || (v as any).stockPorTalla || []).reduce((acc: number, t: any) => acc + (t.cantidad ?? t.disponible ?? 0), 0);
+                                if (stockNew > stockExisting) {
+                                  serieMap.set(sKey, v);
+                                }
+                              }
+                            }
+                            const variants = Array.from(serieMap.values());
                             const firstVariant = variants[0];
                             const supplierName = firstVariant.supplier?.razonSocial || 'Sin proveedor';
                             const supplierImage = variants.find(v => v.fotoUrl)?.fotoUrl;
