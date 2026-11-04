@@ -338,8 +338,7 @@ export default function PosComponent() {
       }
       if (modalCierreOpen) {
         e.preventDefault();
-        setModalCierreOpen(false);
-        setResultadoCierre(null);
+        cerrarModalCierre();
         return;
       }
       if (ventaDetalleModalOpen) {
@@ -1027,6 +1026,20 @@ export default function PosComponent() {
     }
   };
 
+  const abrirModalCierre = () => {
+    setMontoRealEfectivo("");
+    setNotasCierre("");
+    setResultadoCierre(null);
+    setModalCierreOpen(true);
+  };
+
+  const cerrarModalCierre = () => {
+    setModalCierreOpen(false);
+    setResultadoCierre(null);
+    setMontoRealEfectivo("");
+    setNotasCierre("");
+  };
+
   const handleCerrarCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -1036,6 +1049,8 @@ export default function PosComponent() {
         notas: notasCierre.trim() || undefined,
       });
       setResultadoCierre(res);
+      setMontoRealEfectivo("");
+      setNotasCierre("");
       showToast("Caja cerrada y arqueo completado", "success");
       await cargarEstadoCaja();
     } catch (err: any) {
@@ -1430,10 +1445,7 @@ export default function PosComponent() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setModalCierreOpen(true);
-                      setResultadoCierre(null);
-                    }}
+                    onClick={abrirModalCierre}
                     className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     <Receipt size={13} />
@@ -1496,10 +1508,7 @@ export default function PosComponent() {
                       </span>
                     </div>
                     <button
-                      onClick={() => {
-                        setModalCierreOpen(true);
-                        setResultadoCierre(null);
-                      }}
+                      onClick={abrirModalCierre}
                       className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl border border-rose-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Calculator size={14} /> Arqueo & Cierre
@@ -3009,20 +3018,18 @@ export default function PosComponent() {
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
-              setModalCierreOpen(false);
-              setResultadoCierre(null);
+              cerrarModalCierre();
             }
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setModalCierreOpen(false);
-              setResultadoCierre(null);
+              cerrarModalCierre();
             }
           }}
         >
           <div className="relative bg-[var(--card)] border-t sm:border border-[var(--border)] rounded-t-3xl sm:rounded-3xl max-w-md w-full h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <button
-              onClick={() => setModalCierreOpen(false)}
+              onClick={cerrarModalCierre}
               className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
             >
               <X size={20} />
@@ -3086,11 +3093,8 @@ export default function PosComponent() {
                 )}
 
                 <button
-                  onClick={() => {
-                    setModalCierreOpen(false);
-                    setResultadoCierre(null);
-                  }}
-                  className="w-full bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] font-bold py-3 rounded-2xl transition-all text-xs"
+                  onClick={cerrarModalCierre}
+                  className="w-full bg-[var(--muted)] hover:bg-[var(--muted)]/80 text-[var(--foreground)] font-bold py-3 rounded-2xl transition-all text-xs cursor-pointer"
                 >
                   Cerrar
                 </button>
