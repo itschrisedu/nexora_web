@@ -3518,7 +3518,7 @@ export default function ModelosComponent({
                               </span>
                             ) : (
                               <span className="px-2.5 py-0.5 bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 rounded-lg text-[10px] font-bold">
-                                ★ Modelo Nuevo en esta Sucursal
+                                Modelo Nuevo en esta Sucursal
                               </span>
                             )}
                           </div>
@@ -4122,7 +4122,7 @@ export default function ModelosComponent({
                                     isLoss ? (
                                       <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
                                         <AlertCircle size={14} className="shrink-0 animate-bounce" />
-                                        <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                        <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
                                       </div>
                                     ) : (
                                       <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
@@ -4179,7 +4179,7 @@ export default function ModelosComponent({
                                     </span>
                                     {selectedTallaIds.length !== 12 && (
                                       <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-                                        ⚠️ Una docena estándar suma 12 pares
+                                        Una docena estándar suma 12 pares
                                       </span>
                                     )}
                                   </div>
@@ -4457,7 +4457,7 @@ export default function ModelosComponent({
                         const isAlternate = (selectedModelForColor.alternateSupplierIds || []).includes(p.id);
                         return (
                           <option key={p.id} value={p.id}>
-                            {p.razonSocial} {p.ruc ? `(${p.ruc})` : ''} {isPrimary ? '★ [Principal del Modelo]' : isAlternate ? '⚡ [Alterno del Modelo]' : ''}
+                            {p.razonSocial} {p.ruc ? `(${p.ruc})` : ''} {isPrimary ? '[Principal del Modelo]' : isAlternate ? '[Alterno del Modelo]' : ''}
                           </option>
                         );
                       })}
@@ -4592,7 +4592,7 @@ export default function ModelosComponent({
                                     isLoss ? (
                                       <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
                                         <AlertCircle size={14} className="shrink-0 animate-bounce" />
-                                        <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                        <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
                                       </div>
                                     ) : (
                                       <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
@@ -4649,7 +4649,7 @@ export default function ModelosComponent({
                                     </span>
                                     {selectedTallaIds.length !== 12 && (
                                       <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-                                        ⚠️ Una docena estándar suma 12 pares
+                                        Una docena estándar suma 12 pares
                                       </span>
                                     )}
                                   </div>
@@ -4860,7 +4860,7 @@ export default function ModelosComponent({
                             : "bg-amber-500/10 border-amber-500/20 text-amber-500 font-semibold"
                         }`}>
                           <div>
-                            {esPerdida ? "⚠️ PÉRDIDA DETECTADA" : "Ganancia Estimada:"}
+                            {esPerdida ? "PÉRDIDA DETECTADA" : "Ganancia Estimada:"}
                           </div>
                           <div>
                             ${diff.toFixed(2)} ({pct}%)
@@ -5304,7 +5304,7 @@ export default function ModelosComponent({
                                     isLoss ? (
                                       <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
                                         <AlertCircle size={14} className="shrink-0 animate-bounce" />
-                                        <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                        <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
                                       </div>
                                     ) : (
                                       <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
@@ -5363,7 +5363,7 @@ export default function ModelosComponent({
                                     </span>
                                     {selectedTallaIds.length !== 12 && (
                                       <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-                                        ⚠️ Una docena estándar suma 12 pares
+                                        Una docena estándar suma 12 pares
                                       </span>
                                     )}
                                   </div>
@@ -5685,7 +5685,7 @@ export default function ModelosComponent({
                                     isLoss ? (
                                       <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
                                         <AlertCircle size={14} className="shrink-0 animate-bounce" />
-                                        <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                        <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
                                       </div>
                                     ) : (
                                       <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
@@ -5742,7 +5742,7 @@ export default function ModelosComponent({
                                     </span>
                                     {selectedTallaIds.length !== 12 && (
                                       <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md font-semibold">
-                                        ⚠️ Una docena estándar suma 12 pares
+                                        Una docena estándar suma 12 pares
                                       </span>
                                     )}
                                   </div>
@@ -5991,7 +5991,7 @@ export default function ModelosComponent({
                                       isLoss ? (
                                         <div className="p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center gap-1.5">
                                           <AlertCircle size={14} className="shrink-0 animate-bounce" />
-                                          <span>⚠️ Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
+                                          <span>Venta menor al costo: Margen {marginPercent.toFixed(1)}% (Pérdida de -${Math.abs(profitAmount).toFixed(2)}/par)</span>
                                         </div>
                                       ) : (
                                         <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-lg flex items-center gap-1.5">
