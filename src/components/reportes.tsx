@@ -2374,9 +2374,9 @@ export default function ReportesComponent({
 
                 {/* 1.2 FASE 8: Gráficas Comparativas (Barras Modernas + Donut de Participación %) */}
                 {modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0 && (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Gráfica de Barras Combinada: Volumen vs Margen % */}
-                    <div className="lg:col-span-2">
+                    <div>
                       <GraficoBarrasModerno
                         items={modelosMargenData.topModelosGrafica.map((m: any, idx: number) => ({
                           label: m.nombre,

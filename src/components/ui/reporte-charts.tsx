@@ -609,7 +609,7 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-1">
+      <div className="flex flex-col items-center gap-5 pt-1">
         {/* Anillo Donut SVG */}
         <div className="relative shrink-0" style={{ width: size, height: size }}>
           <svg width={size} height={size} className="transform -rotate-90 select-none">
@@ -657,8 +657,8 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
           </div>
         </div>
 
-        {/* Leyenda y Desglose lateral */}
-        <div className="flex-1 w-full space-y-2">
+        {/* Leyenda y Desglose debajo */}
+        <div className="w-full space-y-1.5">
           {segments.map((seg, idx) => {
             const isHovered = hoveredIdx === idx;
             return (
@@ -672,18 +672,18 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
                     : 'bg-transparent border-transparent'
                 }`}
               >
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span
-                      className="w-3 h-3 rounded-full shrink-0 shadow-2xs"
+                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
                       style={{ backgroundColor: seg.color }}
                     />
-                    <span className="font-bold text-[var(--foreground)] truncate">
+                    <span className="font-bold text-[var(--foreground)] truncate text-[11px]">
                       {seg.label}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono font-black text-xs text-[var(--foreground)]">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="font-mono font-black text-[11px] text-[var(--foreground)]">
                       {seg.valor.toLocaleString('es-EC')}
                     </span>
                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-[var(--muted)]/60 text-[var(--muted-foreground)]">
@@ -692,7 +692,7 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
                   </div>
                 </div>
                 {seg.subtexto && (
-                  <div className="text-[10px] text-[var(--muted-foreground)] pl-5">
+                  <div className="text-[10px] text-[var(--muted-foreground)] pl-5 truncate">
                     {seg.subtexto}
                   </div>
                 )}
