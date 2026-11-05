@@ -18,9 +18,20 @@ import {
   EyeOff,
   Trash2,
   FileCheck,
+  MessageSquare,
+  Send,
+  Mail,
+  X,
+  Printer,
+  Smartphone,
+  Check,
 } from "lucide-react";
 
 import { useToast } from "./ui/toast";
+import { generarFacturaPdfDoc, type FacturaPdfData } from "@/services/pdf-factura.service";
+import { generarUrlPublicaFactura, armarMensajeWhatsAppFactura } from "@/services/comprobante-url.service";
+import { abrirWhatsAppUniversal } from "@/utils/whatsapp";
+import { capitalizarNombreCompleto } from "@/utils/text-formatters";
 
 interface FacturaSRI {
   id: string;
@@ -30,6 +41,166 @@ interface FacturaSRI {
   createdAt: string;
   xmlUrl?: string;
   pdfUrl?: string;
+}
+
+
+/**
+ * Parsea el XML autorizado de la factura o construye los datos base
+ * para generar el PDF oficial RIDE y permitir compartir por WhatsApp y Correo.
+ */
+function parsearFacturaXmlAFacturaPdfData(factura: FacturaSRI, config: any): FacturaPdfData {
+  let emisorNombre = config?.sriRazonSocial || config?.nombreComercial || "COMERCIO DE CALZADO";
+  let emisorRuc = config?.ruc || "1804884664001";
+  let emisorDir = config?.direccion || "Cevallos, Tungurahua";
+  let emisorRegimen = config?.sriRegimen || "RIMPE_POPULAR";
+  let obligado = !!config?.sriObligadoContabilidad;
+
+  let fecha = new Date(factura.createdAt).toLocaleDateString("es-EC");
+  let numComprobante = factura.numeroComprobante || "001-001-000000001";
+  let claveAcceso = factura.claveAcceso || "";
+  let compradorNombre = "CONSUMIDOR FINAL";
+  let compradorCedula = "9999999999999";
+  let compradorDir = "Cevallos, Tungurahua";
+  let compradorTel = "";
+  let compradorEmail = "";
+  let formaPago = "01 - Sin utilizacion del sistema financiero";
+
+  const detalles: {
+    descripcion: string;
+    cantidad: number;
+    precioUnitario: number;
+    descuento: number;
+    subtotal: number;
+  }[] = [];
+
+  let subtotalSinImp = 0;
+  let totalDescuento = 0;
+  let totalIva = 0;
+  let totalFinal = 0;
+
+  if (factura.xmlUrl && typeof factura.xmlUrl === "string" && factura.xmlUrl.includes("<")) {
+    try {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(factura.xmlUrl, "text/xml");
+
+      const getVal = (parent: Element | Document, tag: string) =>
+        parent.getElementsByTagName(tag)[0]?.textContent?.trim() || "";
+
+      // infoTributaria
+      const infoTrib = xmlDoc.getElementsByTagName("infoTributaria")[0];
+      if (infoTrib) {
+        emisorNombre = getVal(infoTrib, "razonSocial") || getVal(infoTrib, "nombreComercial") || emisorNombre;
+        emisorRuc = getVal(infoTrib, "ruc") || emisorRuc;
+        claveAcceso = getVal(infoTrib, "claveAcceso") || claveAcceso;
+        emisorDir = getVal(infoTrib, "dirMatriz") || emisorDir;
+        const estab = getVal(infoTrib, "estab");
+        const ptoEmi = getVal(infoTrib, "ptoEmi");
+        const sec = getVal(infoTrib, "secuencial");
+        if (estab && ptoEmi && sec) {
+          numComprobante = `${estab}-${ptoEmi}-${sec}`;
+        }
+      }
+
+      // infoFactura
+      const infoFac = xmlDoc.getElementsByTagName("infoFactura")[0];
+      if (infoFac) {
+        fecha = getVal(infoFac, "fechaEmision") || fecha;
+        obligado = getVal(infoFac, "obligadoContabilidad") === "SI";
+        compradorNombre = getVal(infoFac, "razonSocialComprador") || compradorNombre;
+        compradorCedula = getVal(infoFac, "identificacionComprador") || compradorCedula;
+        compradorDir = getVal(infoFac, "direccionComprador") || compradorDir;
+        subtotalSinImp = parseFloat(getVal(infoFac, "totalSinImpuestos")) || 0;
+        totalDescuento = parseFloat(getVal(infoFac, "totalDescuento")) || 0;
+        totalFinal = parseFloat(getVal(infoFac, "importeTotal")) || 0;
+
+        const totalImpuesto = infoFac.getElementsByTagName("totalImpuesto");
+        for (let i = 0; i < totalImpuesto.length; i++) {
+          const v = parseFloat(getVal(totalImpuesto[i], "valor")) || 0;
+          totalIva += v;
+        }
+
+        const pago = infoFac.getElementsByTagName("pago")[0];
+        if (pago) {
+          const codForma = getVal(pago, "formaPago");
+          if (codForma === "01") formaPago = "01 - Sin utilizacion del sistema financiero (Efectivo)";
+          else if (codForma === "19") formaPago = "19 - Tarjeta de credito";
+          else if (codForma === "16") formaPago = "16 - Tarjeta de debito";
+          else if (codForma === "20") formaPago = "20 - Otros con utilizacion del sistema financiero (Transferencia)";
+        }
+      }
+
+      // detalles
+      const detallesXml = xmlDoc.getElementsByTagName("detalle");
+      for (let i = 0; i < detallesXml.length; i++) {
+        const d = detallesXml[i];
+        const desc = getVal(d, "descripcion") || "Calzado Artesanal";
+        const cant = parseFloat(getVal(d, "cantidad")) || 1;
+        const precio = parseFloat(getVal(d, "precioUnitario")) || 0;
+        const descVal = parseFloat(getVal(d, "descuento")) || 0;
+        const sub = parseFloat(getVal(d, "precioTotalSinImpuesto")) || (cant * precio - descVal);
+
+        detalles.push({
+          descripcion: desc,
+          cantidad: cant,
+          precioUnitario: precio,
+          descuento: descVal,
+          subtotal: sub,
+        });
+      }
+
+      // infoAdicional
+      const camposAdic = xmlDoc.getElementsByTagName("campoAdicional");
+      for (let i = 0; i < camposAdic.length; i++) {
+        const nom = camposAdic[i].getAttribute("nombre")?.toLowerCase() || "";
+        const val = camposAdic[i].textContent?.trim() || "";
+        if (nom.includes("email") || nom.includes("correo")) compradorEmail = val;
+        if (nom.includes("tel") || nom.includes("cel")) compradorTel = val;
+      }
+    } catch (e) {
+      console.warn("No se pudo parsear XML de factura, usando datos base:", e);
+    }
+  }
+
+  if (detalles.length === 0) {
+    detalles.push({
+      descripcion: "Calzado Artesanal de Cuero",
+      cantidad: 1,
+      precioUnitario: totalFinal > 0 ? totalFinal : 0,
+      descuento: 0,
+      subtotal: totalFinal > 0 ? totalFinal : 0,
+    });
+  }
+
+  return {
+    emisor: {
+      nombre: emisorNombre,
+      ruc: emisorRuc,
+      direccion: emisorDir,
+      obligadoContabilidad: obligado,
+      regimen: emisorRegimen,
+    },
+    comprobante: {
+      numero: numComprobante,
+      fecha,
+      claveAcceso,
+      formaPago,
+    },
+    comprador: {
+      nombre: compradorNombre,
+      cedula: compradorCedula,
+      direccion: compradorDir,
+      telefono: compradorTel,
+      email: compradorEmail,
+    },
+    detalles,
+    totales: {
+      subtotal15: totalIva > 0 ? subtotalSinImp : 0,
+      subtotal0: totalIva === 0 ? subtotalSinImp : 0,
+      descuento: totalDescuento,
+      iva15: totalIva,
+      total: totalFinal > 0 ? totalFinal : subtotalSinImp + totalIva,
+    },
+  };
 }
 
 export default function SriComponent() {
@@ -82,6 +253,16 @@ export default function SriComponent() {
   // Listado de Facturas
   const [facturas, setFacturas] = useState<FacturaSRI[]>([]);
   const [loadingFacturas, setLoadingFacturas] = useState(false);
+
+  // Estados de Previsualización y Compartición de Factura PDF
+  const [modalPreviewFactura, setModalPreviewFactura] = useState(false);
+  const [facturaSeleccionada, setFacturaSeleccionada] = useState<FacturaSRI | null>(null);
+  const [previewPdfData, setPreviewPdfData] = useState<FacturaPdfData | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [telefonoWhatsApp, setTelefonoWhatsApp] = useState("");
+  const [emailDestino, setEmailDestino] = useState("");
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [compartiendoWhatsApp, setCompartiendoWhatsApp] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -237,6 +418,96 @@ export default function SriComponent() {
       loadFacturas();
     } catch (err: any) {
       showToast("Error al consultar estado SRI: " + (err.message || "Error de conexión"), "error");
+    }
+  };
+
+  const handleAbrirPreviewFactura = (factura: FacturaSRI) => {
+    try {
+      const data = parsearFacturaXmlAFacturaPdfData(factura, config);
+      const doc = generarFacturaPdfDoc(data);
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+
+      setFacturaSeleccionada(factura);
+      setPreviewPdfData(data);
+      setPdfBlobUrl(url);
+      setTelefonoWhatsApp(data.comprador.telefono || "");
+      setEmailDestino(data.comprador.email || "");
+      setModalPreviewFactura(true);
+    } catch (e: any) {
+      showToast("Error al generar vista previa del comprobante: " + (e?.message || ""), "error");
+    }
+  };
+
+  const handleCerrarPreview = () => {
+    if (pdfBlobUrl) {
+      URL.revokeObjectURL(pdfBlobUrl);
+    }
+    setPdfBlobUrl(null);
+    setPreviewPdfData(null);
+    setFacturaSeleccionada(null);
+    setModalPreviewFactura(false);
+  };
+
+  const handleDescargarPdfPreview = () => {
+    if (!previewPdfData) return;
+    try {
+      const doc = generarFacturaPdfDoc(previewPdfData);
+      const num = previewPdfData.comprobante.numero || facturaSeleccionada?.numeroComprobante || "SRI";
+      doc.save(`Factura_${num}.pdf`);
+      showToast("Descarga iniciada exitosamente", "success");
+    } catch (e: any) {
+      showToast("Error al descargar PDF: " + (e?.message || ""), "error");
+    }
+  };
+
+  const handleCompartirWhatsAppPreview = async () => {
+    if (!previewPdfData) return;
+    setCompartiendoWhatsApp(true);
+    try {
+      const urlPublica = await generarUrlPublicaFactura(previewPdfData);
+      const mensaje = armarMensajeWhatsAppFactura(previewPdfData, urlPublica);
+      abrirWhatsAppUniversal(telefonoWhatsApp, mensaje);
+      showToast("WhatsApp abierto para enviar el comprobante", "success");
+    } catch (e: any) {
+      showToast("Error al compartir por WhatsApp: " + (e?.message || ""), "error");
+    } finally {
+      setCompartiendoWhatsApp(false);
+    }
+  };
+
+  const handleEnviarEmailSegundoPlano = async () => {
+    if (!previewPdfData) return;
+    const correo = emailDestino.trim();
+    if (!correo || !correo.includes("@")) {
+      showToast("Ingresa un correo electrónico válido para enviar el comprobante.", "warning");
+      return;
+    }
+
+    setEnviandoEmail(true);
+    try {
+      const urlPublica = await generarUrlPublicaFactura(previewPdfData);
+      // Enviar en segundo plano al backend
+      ApiService.post("/notificaciones/email-comprobante", {
+        destinatario: correo,
+        asunto: `Factura Electrónica N° ${previewPdfData.comprobante.numero} - ${previewPdfData.emisor.nombre}`,
+        tipo: "FACTURA",
+        detalles: {
+          numeroComprobante: previewPdfData.comprobante.numero,
+          claveAcceso: previewPdfData.comprobante.claveAcceso,
+          total: previewPdfData.totales.total,
+          clienteNombre: previewPdfData.comprador.nombre,
+          enlaceWeb: urlPublica,
+        },
+      }).catch((err) => {
+        console.warn("Fallo en envío de correo en segundo plano:", err);
+      });
+
+      showToast(`Comprobante enviado a ${correo} en segundo plano`, "success");
+    } catch (e: any) {
+      showToast("Error al despachar correo: " + (e?.message || ""), "error");
+    } finally {
+      setEnviandoEmail(false);
     }
   };
 
@@ -643,7 +914,15 @@ export default function SriComponent() {
                           {factura.estadoSri}
                         </span>
                       </td>
-                      <td className="p-4 text-right space-x-2">
+                      <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => handleAbrirPreviewFactura(factura)}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg inline-flex items-center gap-1 font-medium shadow-sm transition-all cursor-pointer"
+                          title="Previsualizar PDF oficial, descargar y reenviar por WhatsApp o Correo"
+                        >
+                          <Eye size={13} /> Ver PDF
+                        </button>
                         {factura.estadoSri !== "AUTORIZADO" && (
                           <button
                             onClick={() => handleConsultarEstado(factura.id)}
@@ -671,6 +950,188 @@ export default function SriComponent() {
             </table>
           </div>
         </div>
+
+      {/* Modal de Previsualización y Reenvío de Factura PDF */}
+      {modalPreviewFactura && previewPdfData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--card)] border border-[var(--border)] w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Cabecera del Modal */}
+            <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--muted)]/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
+                  <FileCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[var(--foreground)] flex items-center gap-2">
+                    Factura Electrónica #{previewPdfData.comprobante.numero}
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      {facturaSeleccionada?.estadoSri || 'AUTORIZADO'}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Fecha: {previewPdfData.comprobante.fecha} • Emisor: {previewPdfData.emisor.nombre}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCerrarPreview}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Cuerpo del Modal (Grid con Visor PDF y Panel de Reenvío) */}
+            <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Visor PDF (8 Cols en desktop) */}
+              <div className="lg:col-span-7 flex flex-col bg-slate-900/50 rounded-xl border border-[var(--border)] overflow-hidden">
+                <div className="px-4 py-2 bg-[var(--muted)]/40 border-b border-[var(--border)] flex items-center justify-between text-xs text-[var(--muted-foreground)] font-mono">
+                  <span>RIDE_Factura_{previewPdfData.comprobante.numero}.pdf</span>
+                  <span>{previewPdfData.detalles.length} ítem(s)</span>
+                </div>
+                {pdfBlobUrl ? (
+                  <iframe
+                    src={pdfBlobUrl}
+                    title="Previsualización de Factura"
+                    className="w-full h-[58vh] bg-white rounded-b-xl border-none"
+                  />
+                ) : (
+                  <div className="h-[58vh] flex items-center justify-center text-sm text-[var(--muted-foreground)]">
+                    Cargando previsualización del comprobante...
+                  </div>
+                )}
+              </div>
+
+              {/* Panel de Acciones y Reenvío (5 Cols en desktop) */}
+              <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
+                <div className="space-y-4">
+                  {/* Resumen del Cliente y Monto */}
+                  <div className="p-4 rounded-xl bg-[var(--muted)]/40 border border-[var(--border)] space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[var(--muted-foreground)]">Cliente Receptor:</span>
+                      <span className="font-bold text-[var(--foreground)] text-right truncate max-w-[180px]">
+                        {previewPdfData.comprador.nombre}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[var(--muted-foreground)]">C.I. / RUC:</span>
+                      <span className="font-mono font-medium text-[var(--foreground)]">
+                        {previewPdfData.comprador.cedula}
+                      </span>
+                    </div>
+                    {previewPdfData.comprobante.claveAcceso && (
+                      <div className="pt-1 border-t border-[var(--border)]">
+                        <span className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] block mb-0.5">
+                          Clave de Acceso SRI (49 dígitos):
+                        </span>
+                        <p className="font-mono text-[10px] text-[var(--muted-foreground)] break-all bg-[var(--card)] p-1.5 rounded border border-[var(--border)] select-all">
+                          {previewPdfData.comprobante.claveAcceso}
+                        </p>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-[var(--border)] flex justify-between items-center">
+                      <span className="text-xs font-semibold text-[var(--muted-foreground)]">Total Facturado:</span>
+                      <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                        ${previewPdfData.totales.total.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Acciones de Descarga Directa */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDescargarPdfPreview}
+                      className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <Download size={14} /> Descargar PDF
+                    </button>
+                    {facturaSeleccionada?.xmlUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleDescargarXml(facturaSeleccionada)}
+                        className="py-2.5 px-3 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] border border-[var(--border)] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <FileText size={14} /> XML Oficial
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sección Reenviar por WhatsApp */}
+                  <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-2">
+                    <label className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <MessageSquare size={14} /> Reenviar por WhatsApp
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Smartphone size={13} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
+                        <input
+                          type="text"
+                          value={telefonoWhatsApp}
+                          onChange={(e) => setTelefonoWhatsApp(e.target.value)}
+                          placeholder="0991234567"
+                          className="w-full pl-8 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCompartirWhatsAppPreview}
+                        disabled={compartiendoWhatsApp}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        <Send size={12} /> {compartiendoWhatsApp ? "Abriendo..." : "WhatsApp"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sección Reenviar por Correo Electrónico */}
+                  <div className="p-3.5 rounded-xl border border-cyan-500/20 bg-cyan-500/5 space-y-2">
+                    <label className="text-xs font-bold text-cyan-700 dark:text-cyan-400 flex items-center gap-1.5">
+                      <Mail size={14} /> Reenviar por Correo Electrónico
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Mail size={13} className="absolute left-3 top-2.5 text-[var(--muted-foreground)]" />
+                        <input
+                          type="email"
+                          value={emailDestino}
+                          onChange={(e) => setEmailDestino(e.target.value)}
+                          placeholder="cliente@correo.com"
+                          className="w-full pl-8 pr-3 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs font-mono text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleEnviarEmailSegundoPlano}
+                        disabled={enviandoEmail}
+                        className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        <Send size={12} /> {enviandoEmail ? "Enviando..." : "Enviar"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">
+                      El envío se procesa en segundo plano con la clave de acceso y enlace digital.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pie del Panel */}
+                <div className="pt-3 border-t border-[var(--border)] flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleCerrarPreview}
+                    className="px-4 py-2 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] text-xs font-medium rounded-xl transition-all"
+                  >
+                    Cerrar Visor
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       )}
     </div>
   );

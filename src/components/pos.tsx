@@ -6,6 +6,7 @@ import { useToast } from "./ui/toast";
 import { useUnsavedChanges } from "../utils/unsaved-changes";
 import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from "@/utils/text-formatters";
 import { generarFacturaPdfDoc, type FacturaPdfData } from '@/services/pdf-factura.service';
+import { formatearDescripcionFacturaSri } from '@/utils/sri-formatters';
 import {
   generarUrlPublicaFactura,
   generarUrlPublicaVentaPOS,
@@ -776,14 +777,25 @@ export default function PosComponent() {
         const totalFacturaSri = Number(totalVenta.toFixed(2));
         const nombreEmisorPos = negocioInfo?.sriRazonSocial?.trim() || negocioInfo?.nombre || "Calzado Cevallos";
 
-        // Agrupar modelos/series para la factura SRI
-        const grupoSriMap = new Map<string, { nombre: string; serie: string; cantidad: number; totalPrecio: number; productId: string }>();
+        // Agrupar modelos/series para la factura SRI con denominación genérica de calzado y curva de tallas
+        const grupoSriMap = new Map<string, { 
+          color: string;
+          serie: string; 
+          tallas: number[];
+          cantidad: number; 
+          totalPrecio: number; 
+          productId: string; 
+        }>();
+
         itemsVenta.forEach((item) => {
-          const key = `${(item.nombre || 'Calzado').toLowerCase()}_${(item.serieNombre || 'general').toLowerCase()}`;
+          const colorLimpio = (item.color || '').trim();
+          const serieLimpia = (item.serieNombre || '').trim();
+          const key = `${colorLimpio.toLowerCase()}_${serieLimpia.toLowerCase()}`;
           if (!grupoSriMap.has(key)) {
             grupoSriMap.set(key, {
-              nombre: item.nombre || 'Calzado de Cuero',
-              serie: item.serieNombre || '',
+              color: colorLimpio,
+              serie: serieLimpia,
+              tallas: [],
               cantidad: 0,
               totalPrecio: 0,
               productId: item.productId || 'CALZ-01',
@@ -794,20 +806,19 @@ export default function PosComponent() {
           const precioUnit = Number((item.precioUnitario * factorDescuento).toFixed(2));
           g.cantidad += cant;
           g.totalPrecio += cant * precioUnit;
+          if (item.tallaNumero && !g.tallas.includes(item.tallaNumero)) {
+            g.tallas.push(item.tallaNumero);
+          }
         });
 
         const detallesSri = Array.from(grupoSriMap.values()).map((g) => {
-          let descripcion = '';
-          if (g.cantidad === 12) {
-            descripcion = `1 Docena - ${g.nombre}`;
-          } else if (g.cantidad === 6) {
-            descripcion = `Media Docena - ${g.nombre}`;
-          } else {
-            descripcion = `${g.cantidad} ${g.cantidad === 1 ? 'Par' : 'Pares'} - ${g.nombre}`;
-          }
-          if (g.serie && g.serie.toLowerCase() !== 'general' && g.serie.toLowerCase() !== 'estándar') {
-            descripcion += ` (${g.serie})`;
-          }
+          const descripcion = formatearDescripcionFacturaSri({
+            cantidad: g.cantidad,
+            color: g.color,
+            serieNombre: g.serie,
+            tallas: g.tallas,
+            nombreGenerico: 'Zapato',
+          });
           const unitario = g.cantidad > 0 ? Number((g.totalPrecio / g.cantidad).toFixed(2)) : 0;
           return {
             codigoProducto: g.productId.slice(0, 8).toUpperCase(),

@@ -521,3 +521,36 @@ export async function generarUrlPublicaHistorial(data: any): Promise<string> {
   return guardarYObtenerToken('HISTORIAL', payload);
 }
 
+
+
+export function armarMensajeWhatsAppFactura(data: FacturaPdfData, urlComprobante?: string): string {
+  const emisorNombre = data.emisor.nombre || 'CALZADO DE CUERO';
+  const numFactura = data.comprobante.numero || 'S/N';
+
+  let msg = `🧾 *FACTURA ELECTRÓNICA — ${emisorNombre}*\n\n`;
+  msg += `🔢 *N° Comprobante:* ${numFactura}\n`;
+  msg += `📅 *Fecha:* ${data.comprobante.fecha || new Date().toLocaleDateString('es-EC')}\n`;
+  msg += `👤 *Cliente:* ${capitalizarNombreCompleto(data.comprador.nombre) || 'Consumidor Final'}\n`;
+  if (data.comprador.cedula && data.comprador.cedula !== '9999999999999' && data.comprador.cedula !== '9999999999') {
+    msg += `🆔 *C.I./RUC:* ${data.comprador.cedula}\n`;
+  }
+
+  if (data.detalles && data.detalles.length > 0) {
+    msg += `\n👞 *Detalle de Productos:*\n`;
+    data.detalles.forEach((item) => {
+      msg += `  • ${item.cantidad}x ${item.descripcion} — $${item.subtotal.toFixed(2)}\n`;
+    });
+  }
+
+  msg += `\n💰 *Total a Pagar:* $${data.totales.total.toFixed(2)}\n`;
+  if (data.comprobante.claveAcceso) {
+    msg += `🔑 *Clave de Acceso SRI:*\n\`${data.comprobante.claveAcceso}\`\n`;
+  }
+
+  if (urlComprobante) {
+    msg += `\n📄 *Ver y Descargar Factura en Línea:*\n${urlComprobante}\n`;
+  }
+
+  msg += `\n_¡Gracias por su compra y preferencia!_`;
+  return msg;
+}

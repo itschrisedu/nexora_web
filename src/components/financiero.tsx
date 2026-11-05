@@ -59,6 +59,7 @@ import {
 } from 'lucide-react';
 import { useToast } from './ui/toast';
 import { compartirFacturaPdf, generarFacturaPdfDoc } from '../services/pdf-factura.service';
+import { formatearDescripcionFacturaSri } from '../utils/sri-formatters';
 import {
   generarComprobanteAbonoPdfDoc,
   descargarComprobanteAbonoPdf,
@@ -2414,35 +2415,39 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       const lineas = c.saleNote?.lines;
 
       if (lineas && lineas.length > 0) {
-        // Agrupar líneas por nombre+serie dentro de la misma nota
-        const grupoMap = new Map<string, { nombre: string; serie: string; cantidad: number; totalPrecio: number; productId: string }>();
+        // Agrupar lineas por color+serie para denominacion generica tributaria (Zapato Color + Rango Tallas)
+        const grupoMap = new Map<string, { color: string; serie: string; tallas: string[]; cantidad: number; totalPrecio: number; productId: string }>();
 
         lineas.forEach((l: any) => {
-          const key = `${(l.nombre || 'Calzado').toLowerCase()}_${(l.serie || 'sin-serie').toLowerCase()}`;
+          const colorExt = l.color || (l.nombre?.match(/\(([^)]+)\)/)?.[1]) || '';
+          const serie = l.serie || '';
+          const key = ${colorExt.trim().toLowerCase()}_;
           if (!grupoMap.has(key)) {
             grupoMap.set(key, {
-              nombre: l.nombre || 'Calzado de Cuero',
-              serie: l.serie || '',
+              color: colorExt.trim(),
+              serie: serie.trim(),
+              tallas: [],
               cantidad: 0,
               totalPrecio: 0,
               productId: l.productId || 'CALZ-01',
             });
           }
           const g = grupoMap.get(key)!;
+          if (l.talla && !g.tallas.includes(String(l.talla).trim())) {
+            g.tallas.push(String(l.talla).trim());
+          }
           g.cantidad += Number(l.cantidad) || 1;
           g.totalPrecio += (Number(l.cantidad) || 1) * Number(l.precioUnitario || 0);
         });
 
         grupoMap.forEach((g) => {
-          let descripcion = '';
-          if (g.cantidad === 12) {
-            descripcion = `1 Docena - ${g.nombre}`;
-          } else if (g.cantidad === 6) {
-            descripcion = `Media Docena - ${g.nombre}`;
-          } else {
-            descripcion = `${g.cantidad} ${g.cantidad === 1 ? 'Par' : 'Pares'} - ${g.nombre}`;
-          }
-          if (g.serie) descripcion += ` (${g.serie})`;
+          const descripcion = formatearDescripcionFacturaSri({
+            cantidad: g.cantidad,
+            color: g.color,
+            serieNombre: g.serie,
+            tallas: g.tallas,
+            nombreGenerico: 'Zapato',
+          });
 
           const precioUnitarioGrupo = g.cantidad > 0 ? g.totalPrecio / g.cantidad : 0;
 
