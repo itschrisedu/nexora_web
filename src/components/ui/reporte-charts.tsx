@@ -609,7 +609,7 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
         </div>
       )}
 
-      <div className="flex flex-col items-center gap-5 pt-1">
+      <div className="flex flex-col sm:flex-row items-center sm:items-start justify-center gap-5 pt-1">
         {/* Anillo Donut SVG */}
         <div className="relative shrink-0" style={{ width: size, height: size }}>
           <svg width={size} height={size} className="transform -rotate-90 select-none">
@@ -657,8 +657,8 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
           </div>
         </div>
 
-        {/* Leyenda y Desglose debajo */}
-        <div className="w-full space-y-1.5">
+        {/* Leyenda y Desglose */}
+        <div className="w-full min-w-0 flex-1 space-y-1.5 overflow-hidden">
           {segments.map((seg, idx) => {
             const isHovered = hoveredIdx === idx;
             return (
@@ -672,24 +672,20 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
                     : 'bg-transparent border-transparent'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
-                      style={{ backgroundColor: seg.color }}
-                    />
-                    <span className="font-bold text-[var(--foreground)] truncate text-[11px]">
-                      {seg.label}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="font-mono font-black text-[11px] text-[var(--foreground)]">
-                      {seg.valor.toLocaleString('es-EC')}
-                    </span>
-                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-[var(--muted)]/60 text-[var(--muted-foreground)]">
-                      {seg.share}%
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
+                    style={{ backgroundColor: seg.color }}
+                  />
+                  <span className="font-bold text-[var(--foreground)] truncate text-[11px] min-w-0 flex-1">
+                    {seg.label}
+                  </span>
+                  <span className="font-mono font-black text-[11px] text-[var(--foreground)] shrink-0">
+                    {seg.valor.toLocaleString('es-EC')}
+                  </span>
+                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-[var(--muted)]/60 text-[var(--muted-foreground)] shrink-0">
+                    {seg.share}%
+                  </span>
                 </div>
                 {seg.subtexto && (
                   <div className="text-[10px] text-[var(--muted-foreground)] pl-5 truncate">
