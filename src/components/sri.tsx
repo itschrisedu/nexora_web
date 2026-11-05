@@ -950,6 +950,7 @@ export default function SriComponent() {
             </table>
           </div>
         </div>
+      )}
 
       {/* Modal de Previsualización y Reenvío de Factura PDF */}
       {modalPreviewFactura && previewPdfData && (
@@ -1131,7 +1132,6 @@ export default function SriComponent() {
             </div>
           </div>
         </div>
-      )}
       )}
     </div>
   );
