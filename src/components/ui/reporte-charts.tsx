@@ -553,7 +553,7 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
   subtitulo,
   valorCentro,
   etiquetaCentro,
-  size = 190,
+  size = 160,
   emptyMessage = 'Sin datos disponibles para graficar.',
 }) => {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
@@ -672,20 +672,24 @@ export const GraficoDonutCircular: React.FC<GraficoDonutCircularProps> = ({
                     : 'bg-transparent border-transparent'
                 }`}
               >
-                <div className="flex items-center gap-2 text-xs">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
-                    style={{ backgroundColor: seg.color }}
-                  />
-                  <span className="font-bold text-[var(--foreground)] truncate text-[11px] min-w-0 flex-1">
-                    {seg.label}
-                  </span>
-                  <span className="font-mono font-black text-[11px] text-[var(--foreground)] shrink-0">
-                    {seg.valor.toLocaleString('es-EC')}
-                  </span>
-                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-[var(--muted)]/60 text-[var(--muted-foreground)] shrink-0">
-                    {seg.share}%
-                  </span>
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
+                      style={{ backgroundColor: seg.color }}
+                    />
+                    <span className="font-bold text-[var(--foreground)] truncate text-xs" title={seg.label}>
+                      {seg.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="font-mono font-black text-xs text-[var(--foreground)]">
+                      {seg.valor.toLocaleString('es-EC')}
+                    </span>
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-[var(--muted)]/60 text-[var(--muted-foreground)] border border-[var(--border)]/40 min-w-[42px] text-center">
+                      {seg.share}%
+                    </span>
+                  </div>
                 </div>
                 {seg.subtexto && (
                   <div className="text-[10px] text-[var(--muted-foreground)] pl-5 truncate">
