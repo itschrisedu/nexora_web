@@ -11,9 +11,11 @@
  *   "1 Par - Zapato Blanco (T.39)"
  */
 
-export function formatearRangoTallasSerie(serieNombre?: string, tallasNumeros?: number[]): string {
+export function formatearRangoTallasSerie(serieNombre?: string, tallasNumeros?: (number | string)[]): string {
   if (tallasNumeros && tallasNumeros.length > 0) {
-    const validas = tallasNumeros.filter((n) => typeof n === 'number' && !isNaN(n) && n > 0);
+    const validas = tallasNumeros
+      .map((n) => (typeof n === 'number' ? n : parseInt(String(n).replace(/\D/g, ''), 10)))
+      .filter((n) => typeof n === 'number' && !isNaN(n) && n > 0);
     if (validas.length > 0) {
       const min = Math.min(...validas);
       const max = Math.max(...validas);
@@ -42,7 +44,7 @@ export function formatearDescripcionFacturaSri(opts: {
   cantidad: number;
   color?: string;
   serieNombre?: string;
-  tallas?: number[];
+  tallas?: (number | string)[];
   nombreGenerico?: string;
 }): string {
   const { cantidad, color, serieNombre, tallas, nombreGenerico = 'Zapato' } = opts;
@@ -60,24 +62,18 @@ export function formatearDescripcionFacturaSri(opts: {
     prefijoCantidad = `${cantidad} Pares`;
   }
 
-  // Limpiar color (quitar marcas o texto no relacionado si existiera)
-  let colorLimpio = (color || '').trim();
-  // Capitalizar color si es necesario
+  const baseNombre = (nombreGenerico || 'Zapato').trim();
+  const colorLimpio = (color || '').trim();
+  const rangoTallas = formatearRangoTallasSerie(serieNombre, tallas);
+
+  // Construir nombre: ej. "1 Docena - Zapato Negro / Blanco (38-43)"
+  let resultado = `${prefijoCantidad} - ${baseNombre}`;
   if (colorLimpio) {
-    colorLimpio = colorLimpio
-      .split(/(\s*[\/\-]\s*)/)
-      .map((part) => {
-        if (part.includes('/') || part.includes('-')) return part;
-        const p = part.trim();
-        return p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '';
-      })
-      .join('');
+    resultado += ` ${colorLimpio}`;
+  }
+  if (rangoTallas) {
+    resultado += ` (${rangoTallas})`;
   }
 
-  const colorTexto = colorLimpio ? ` ${colorLimpio}` : '';
-  const rango = formatearRangoTallasSerie(serieNombre, tallas);
-  const rangoTexto = rango ? ` (${rango})` : '';
-
-  return `${prefijoCantidad} - ${nombreGenerico}${colorTexto}${rangoTexto}`;
+  return resultado;
 }
-
