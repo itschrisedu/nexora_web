@@ -1835,6 +1835,42 @@ export default function ReportesComponent({
                     </div>
                   </div>
 
+                  {/* Gráficas Estadísticas de Sucursales */}
+                  {sucursalesReporteData.sucursales && sucursalesReporteData.sucursales.length > 0 && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Donut de Participación de Sucursales */}
+                      <GraficoDonutCircular
+                        items={sucursalesReporteData.sucursales.map((s: any, idx: number) => {
+                          const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
+                          return {
+                            label: s.nombre,
+                            valor: s.totalVentas || 0,
+                            color: paleta[idx % paleta.length],
+                            subtexto: `${s.totalPares} pares (${s.porcentajeEmpresa}%)`,
+                          };
+                        })}
+                        titulo="Aportación a Ventas de la Empresa"
+                        subtitulo="Participación porcentual de ingresos por punto de venta"
+                        valorCentro={`$${(sucursalesReporteData.totalesEmpresa?.ingresos || 0).toFixed(0)}`}
+                        etiquetaCentro="Total Red"
+                      />
+
+                      {/* Barras de Despacho de Pares por Sucursal */}
+                      <GraficoBarrasModerno
+                        items={sucursalesReporteData.sucursales.map((s: any, idx: number) => ({
+                          label: s.nombre,
+                          valor: s.totalPares || 0,
+                          valorFormateado: `${s.totalPares} pares`,
+                          subtexto: `Ticket prom: $${s.ticketPromedio?.toFixed(2) || '0.00'}`,
+                          color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'][idx % 5],
+                        }))}
+                        titulo="Volumen Físico de Pares por Local"
+                        subtitulo="Calzado comercializado en cada establecimiento"
+                        unidad="pares"
+                      />
+                    </div>
+                  )}
+
                   {/* Comparativa Comercial de Todas las Sucursales de la Empresa */}
                   {sucursalesReporteData.sucursales?.length > 1 && (
                     <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
@@ -3097,6 +3133,42 @@ export default function ReportesComponent({
                 </div>
               </div>
 
+              {/* Gráficas Estadísticas de Productividad de Vendedores */}
+              {reporteData?.rankingVendedores && reporteData.rankingVendedores.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Barras de Facturación por Trabajador */}
+                  <GraficoBarrasModerno
+                    items={reporteData.rankingVendedores.slice(0, 6).map((v: any, idx: number) => ({
+                      label: v.nombre,
+                      valor: v.ingresosFacturados || 0,
+                      valorFormateado: `$${(v.ingresosFacturados || 0).toFixed(2)}`,
+                      subtexto: `${v.paresVendidos} pares (${v.pedidosCount} pedidos)`,
+                      color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6'][idx % 6],
+                    }))}
+                    titulo="Facturación Individual por Trabajador"
+                    subtitulo="Monto total facturado por cada colaborador en el periodo"
+                    unidad="$"
+                  />
+
+                  {/* Donut de Cuota de Ventas en Pares */}
+                  <GraficoDonutCircular
+                    items={reporteData.rankingVendedores.slice(0, 5).map((v: any, idx: number) => {
+                      const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
+                      return {
+                        label: v.nombre,
+                        valor: v.paresVendidos || 0,
+                        color: paleta[idx % paleta.length],
+                        subtexto: `${v.paresVendidos} pares despachados`,
+                      };
+                    })}
+                    titulo="Participación en Volumen de Pares"
+                    subtitulo="Distribución porcentual de calzado comercializado por vendedor"
+                    valorCentro={`${kpis.totalParesVendidos || 0}`}
+                    etiquetaCentro="Pares Totales"
+                  />
+                </div>
+              )}
+
               {/* Tabla de Ranking y Productividad */}
               <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
@@ -3674,6 +3746,55 @@ export default function ReportesComponent({
                 </div>
               </div>
 
+              {/* Gráficas Estadísticas de Campañas */}
+              {campanasData?.campanas && campanasData.campanas.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Barras de Facturación por Campaña */}
+                  <GraficoBarrasModerno
+                    items={campanasData.campanas.slice(0, 5).map((c: any, idx: number) => ({
+                      label: c.titulo,
+                      valor: c.montoTotalGenerado || 0,
+                      valorFormateado: `$${(c.montoTotalGenerado || 0).toFixed(2)}`,
+                      subtexto: `${c.canjesUsados} canjes (${c.paresVendidos} pares)`,
+                      color: ['#8B5CF6', '#10B981', '#0EA5E9', '#F59E0B', '#EC4899'][idx % 5],
+                    }))}
+                    titulo="Facturación Generada por Campaña"
+                    subtitulo="Ingresos brutos atribuibles a cada cupón o descuento aplicado"
+                    unidad="$"
+                  />
+
+                  {/* Donut de Consumo de Cupos */}
+                  {(() => {
+                    const totalCanjes = campanasData.campanas.reduce((s: number, c: any) => s + (c.canjesUsados || 0), 0);
+                    const totalCupos = campanasData.campanas.reduce((s: number, c: any) => s + (c.maximoCanjes || 0), 0);
+                    const disponibles = Math.max(0, totalCupos - totalCanjes);
+
+                    return (
+                      <GraficoDonutCircular
+                        items={[
+                          {
+                            label: 'Canjes Redimidos',
+                            valor: totalCanjes,
+                            color: '#10B981',
+                            subtexto: `${totalCanjes} clientes beneficiados`,
+                          },
+                          {
+                            label: 'Cupos Disponibles',
+                            valor: disponibles,
+                            color: '#8B5CF6',
+                            subtexto: `${disponibles} canjes aún por redimir`,
+                          },
+                        ]}
+                        titulo="Eficiencia y Consumo de Cupos"
+                        subtitulo="Proporción de beneficios comerciales consumidos vs capacidad"
+                        valorCentro={totalCupos > 0 ? `${((totalCanjes / totalCupos) * 100).toFixed(0)}%` : '100%'}
+                        etiquetaCentro="Tasa de Uso"
+                      />
+                    );
+                  })()}
+                </div>
+              )}
+
               {/* Filtros de campañas */}
               <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
                 <div className="relative flex-1 w-full">
@@ -3916,49 +4037,32 @@ export default function ReportesComponent({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Desglose de Métodos de Pago en Cobranzas */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)] flex items-center justify-between">
-                    <span>Recaudación por Método de Pago / Abono</span>
-                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                      ${kpis.totalRecaudadoCobros.toFixed(2)} total
-                    </span>
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    {Object.entries(reporteData?.distribucionMetodosAbono || {}).length === 0 ? (
-                      <p className="text-xs text-[var(--muted-foreground)] p-4 text-center">
-                        No hay abonos registrados para los filtros seleccionados.
-                      </p>
-                    ) : (
-                      Object.entries(reporteData?.distribucionMetodosAbono || {}).map(([met, d]: [string, any]) => {
-                        const pct = kpis.totalRecaudadoCobros > 0 ? (d.monto / kpis.totalRecaudadoCobros) * 100 : 0;
-                        return (
-                          <div key={met} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
-                            <div className="flex justify-between items-center font-bold">
-                              <span>
-                                {met === 'EFECTIVO' && '💵 Efectivo'}
-                                {met === 'TRANSFERENCIA' && '🏦 Transferencia Bancaria'}
-                                {met === 'DEPOSITO' && '💳 Depósito'}
-                                {met === 'CHEQUE' && '📑 Cheque'}
-                                {met === 'DESCUENTO_COMERCIAL' && '🎁 Descuento / Rebaja Retención'}
-                              </span>
-                              <span>${d.monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
-                            </div>
-                            <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
-                              <div style={{ width: `${pct}%` }} className="bg-blue-600 h-full rounded-full" />
-                            </div>
-                            <div className="text-[10px] text-[var(--muted-foreground)]">
-                              {d.count} abonos recibidos
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
+                {/* Donut de Métodos de Abono y Cobro */}
+                <GraficoDonutCircular
+                  items={Object.entries(reporteData?.distribucionMetodosAbono || {}).map(([met, d]: [string, any], idx: number) => {
+                    const paleta = ['#10B981', '#0EA5E9', '#6366F1', '#F59E0B', '#EC4899'];
+                    const labelTexto =
+                      met === 'EFECTIVO' ? 'Efectivo en Caja'
+                      : met === 'TRANSFERENCIA' ? 'Transferencia Bancaria'
+                      : met === 'DEPOSITO' ? 'Depósito Bancario'
+                      : met === 'CHEQUE' ? 'Cheque / Documento'
+                      : met.replace('_', ' ');
+
+                    return {
+                      label: labelTexto,
+                      valor: d.monto || 0,
+                      color: paleta[idx % paleta.length],
+                      subtexto: `${d.count} abonos recibidos`,
+                    };
+                  })}
+                  titulo="Recaudación por Método de Abono"
+                  subtitulo="Flujo de liquidez cobrado en el periodo según la forma de pago"
+                  valorCentro={`$${kpis.totalRecaudadoCobros.toFixed(0)}`}
+                  etiquetaCentro="Total Cobrado"
+                />
 
                 {/* Resumen de Cartera e Índices Financieros */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
+                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs flex flex-col justify-between">
                   <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
                     Índices Financieros & Cartera de Clientes
                   </h3>
@@ -4278,6 +4382,22 @@ export default function ReportesComponent({
                     </div>
                   </div>
 
+                  {/* Gráfico de Curva Predictiva */}
+                  {Array.isArray(proyeccionMl.proyecciones) && proyeccionMl.proyecciones.length > 1 && (
+                    <GraficoCurvaTendencia
+                      datos={proyeccionMl.proyecciones.map((p: any) => ({
+                        label: p.diaLabel || p.fecha?.slice(5) || '',
+                        valor: Number(p.demandaEsperadaPares) || 0,
+                      }))}
+                      titulo="Curva de Demanda Proyectada (Próx. 30 Días)"
+                      subtitulo="Pares de calzado estimados por día según el modelo predictivo"
+                      colorPrimario="#9333EA"
+                      colorSecundario="#7C3AED"
+                      sufijo=" pares"
+                      altura={220}
+                    />
+                  )}
+
                   {/* Tabla de proyección diaria */}
                   <div className="border border-[var(--border)] rounded-2xl overflow-hidden">
                     <div className="p-3 bg-[var(--muted)]/40 text-xs font-extrabold text-[var(--foreground)] border-b border-[var(--border)]">
@@ -4412,6 +4532,51 @@ export default function ReportesComponent({
                         {proveedoresData.kpis?.totalDevoluciones || 0} pares con observación de proveedor
                       </span>
                     </div>
+                  </div>
+
+                  {/* Gráficos Estadísticos de Abastecimiento */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Barras: Compras por Proveedor */}
+                    {Array.isArray(proveedoresData.porProveedor) && proveedoresData.porProveedor.length > 0 && (
+                      <GraficoBarrasModerno
+                        datos={proveedoresData.porProveedor
+                          .sort((a: any, b: any) => (Number(b.totalComprado) || 0) - (Number(a.totalComprado) || 0))
+                          .slice(0, 8)
+                          .map((p: any) => ({
+                            label: p.nombre || 'Sin nombre',
+                            valor: Number(p.totalComprado) || 0,
+                          }))}
+                        titulo="Volumen de Compras por Proveedor"
+                        subtitulo="Monto total comprado a cada proveedor en el período"
+                        colorPrimario={businessConfig?.primaryColor || '#0EA5E9'}
+                        prefijo="$"
+                        orientacion="horizontal"
+                      />
+                    )}
+
+                    {/* Donut: Pagado vs Pendiente */}
+                    <GraficoDonutCircular
+                      datos={[
+                        {
+                          label: 'Pagado',
+                          valor: Math.max(0, (Number(proveedoresData.kpis?.totalComprado) || 0) - (Number(proveedoresData.kpis?.deudaTotal) || 0)),
+                          color: businessConfig?.primaryColor || '#0EA5E9',
+                        },
+                        {
+                          label: 'Deuda Pendiente',
+                          valor: Number(proveedoresData.kpis?.deudaTotal) || 0,
+                          color: '#F97316',
+                        },
+                        {
+                          label: 'Anticipos a Favor',
+                          valor: Number(proveedoresData.kpis?.anticiposTotal) || 0,
+                          color: '#6366F1',
+                        },
+                      ].filter(d => d.valor > 0)}
+                      titulo="Estado de Cuentas a Proveedores"
+                      subtitulo="Distribución del capital pagado, deuda y anticipos"
+                      prefijo="$"
+                    />
                   </div>
 
                   {/* Tabla de Proveedores */}

@@ -939,7 +939,67 @@ export function generarReporteCampanasPdf(data: ReporteCampanasData): jsPDF {
   doc.setTextColor(16, 185, 129);
   doc.text(`$${totalVentas.toFixed(2)}`, marginLeft + kpiW * 3 + kpiW / 2, y + 12, { align: 'center' });
 
-  y += 22;
+  y += 20;
+
+  // Gráficas vectoriales de efectividad de promociones
+  const halfWCamp = (contentWidth - 4) / 2;
+
+  const barCampanasItems = data.campanas.slice(0, 4).map((c, idx) => {
+    const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+    return {
+      label: c.titulo,
+      valor: c.montoTotalGenerado || 0,
+      valorFormateado: `$${(c.montoTotalGenerado || 0).toFixed(0)}`,
+      color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+      subtexto: `${c.canjesUsados} canjes (${c.paresVendidos} pares)`,
+    };
+  });
+
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft,
+    y,
+    halfWCamp,
+    30,
+    barCampanasItems.length > 0 ? barCampanasItems : [{ label: 'Sin campañas registradas', valor: 0, valorFormateado: '$0' }],
+    {
+      titulo: 'Ventas Asociadas por Campaña',
+      subtitulo: 'Ingresos generados por cada promoción comercial',
+      unidad: '$',
+    }
+  );
+
+  const totalCupos = data.campanas.reduce((s, c) => s + (c.maximoCanjes || 0), 0);
+  const cuposRestantes = Math.max(0, totalCupos - totalCanjes);
+  const pctCanjeado = totalCupos > 0 ? `${((totalCanjes / totalCupos) * 100).toFixed(0)}%` : '100%';
+
+  const donutCampanasItems = [
+    { label: 'Canjes Efectivos', valor: totalCanjes, color: [16, 185, 129] as [number, number, number] },
+    { label: 'Cupos Disponibles', valor: cuposRestantes, color: [14, 165, 233] as [number, number, number] },
+  ];
+
+  dibujarGraficoDonutPdf(
+    doc,
+    marginLeft + halfWCamp + 4,
+    y,
+    halfWCamp,
+    30,
+    donutCampanasItems,
+    {
+      titulo: 'Eficiencia y Consumo de Cupos',
+      subtitulo: 'Proporción de canjes aplicados',
+      valorCentro: pctCanjeado,
+      etiquetaCentro: 'Tasa Uso',
+    }
+  );
+
+  y += 34;
+
+  if (y > 175) {
+    dibujarPie(doc);
+    doc.addPage();
+    y = 14;
+  }
 
   // Tabla
   const colW = [8, 30, 60, 28, 22, 22, 22, 26, 26, 24];
@@ -1608,7 +1668,68 @@ export function generarReporteProductividadVendedoresPdf(data: ReporteProductivi
   doc.setTextColor(16, 185, 129);
   doc.text(`$${data.totalIngresosSucursal.toFixed(2)}`, marginLeft + kpiW * 2 + kpiW / 2, y + 12, { align: 'center' });
 
-  y += 22;
+  y += 20;
+
+  // Gráficas vectoriales de desempeño por colaborador
+  const halfWVen = (contentWidth - 4) / 2;
+
+  const barVenItems = data.vendedores.slice(0, 4).map((v, idx) => {
+    const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+    return {
+      label: v.nombre,
+      valor: v.ingresosFacturados || 0,
+      valorFormateado: `$${(v.ingresosFacturados || 0).toFixed(0)}`,
+      color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+      subtexto: `${v.paresVendidos} pares`,
+    };
+  });
+
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft,
+    y,
+    halfWVen,
+    32,
+    barVenItems.length > 0 ? barVenItems : [{ label: 'Sin colaboradores registrados', valor: 0, valorFormateado: '$0' }],
+    {
+      titulo: 'Facturación por Colaborador',
+      subtitulo: 'Ingresos generados por trabajador en el periodo',
+      unidad: '$',
+    }
+  );
+
+  const donutVenItems = data.vendedores.slice(0, 4).map((v, idx) => {
+    const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+    return {
+      label: v.nombre,
+      valor: v.paresVendidos || 0,
+      color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+      subtexto: `${v.paresVendidos} pares`,
+    };
+  });
+
+  dibujarGraficoDonutPdf(
+    doc,
+    marginLeft + halfWVen + 4,
+    y,
+    halfWVen,
+    32,
+    donutVenItems.length > 0 ? donutVenItems : [{ label: 'Personal', valor: 1, color: [14, 165, 233] }],
+    {
+      titulo: 'Participación en Volumen de Pares',
+      subtitulo: 'Cuota comercial de calzado comercializado',
+      valorCentro: `${data.totalParesSucursal}`,
+      etiquetaCentro: 'Pares Totales',
+    }
+  );
+
+  y += 36;
+
+  if (y > 210) {
+    dibujarPie(doc);
+    doc.addPage();
+    y = 14;
+  }
 
   // Tabla
   doc.setTextColor(15, 23, 42);
@@ -1717,7 +1838,81 @@ export function generarReporteFinanzasMetodosPdf(data: ReporteFinanzasData): jsP
   doc.setTextColor(15, 23, 42);
   doc.text(`$${data.totalIngresosVentas.toFixed(2)}`, marginLeft + kpiW * 2 + kpiW / 2, y + 12, { align: 'center' });
 
-  y += 22;
+  y += 20;
+
+  // Gráficas vectoriales de finanzas y recaudación
+  const halfWFin = (contentWidth - 4) / 2;
+
+  const metodosEntries = Object.entries(data.distribucionMetodosAbono || {});
+  const donutFinItems = metodosEntries.slice(0, 4).map(([metodoKey, val], idx) => {
+    const colPalette = [[16, 185, 129], [14, 165, 233], [99, 102, 241], [245, 158, 11]];
+    const labelTexto = metodoKey === 'EFECTIVO' ? 'Efectivo en Caja'
+      : metodoKey === 'TRANSFERENCIA' ? 'Transferencia Bancaria'
+      : metodoKey === 'DEPOSITO' ? 'Depósito Bancario'
+      : metodoKey.replace('_', ' ');
+
+    return {
+      label: labelTexto,
+      valor: val.monto || 0,
+      color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+      subtexto: `${val.count} abonos`,
+    };
+  });
+
+  dibujarGraficoDonutPdf(
+    doc,
+    marginLeft,
+    y,
+    halfWFin,
+    33,
+    donutFinItems.length > 0 ? donutFinItems : [{ label: 'Efectivo', valor: 1, color: [16, 185, 129] }],
+    {
+      titulo: 'Distribución por Método de Cobro',
+      subtitulo: 'Flujo de caja recaudado en el periodo',
+      valorCentro: `$${data.totalRecaudadoCobros.toFixed(0)}`,
+      etiquetaCentro: 'Recaudado',
+    }
+  );
+
+  const barFinItems = (data.recaudacionPorVendedor && data.recaudacionPorVendedor.length > 0)
+    ? data.recaudacionPorVendedor.slice(0, 4).map((v, idx) => {
+        const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+        return {
+          label: v.nombre,
+          valor: v.totalAbonos,
+          valorFormateado: `$${v.totalAbonos.toFixed(0)}`,
+          color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+          subtexto: `${v.count} cobros`,
+        };
+      })
+    : donutFinItems.map((d) => ({
+        label: d.label,
+        valor: d.valor,
+        valorFormateado: `$${d.valor.toFixed(0)}`,
+        color: d.color,
+      }));
+
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft + halfWFin + 4,
+    y,
+    halfWFin,
+    33,
+    barFinItems,
+    {
+      titulo: data.recaudacionPorVendedor ? 'Recaudación por Colaborador' : 'Monto Recaudado por Método',
+      subtitulo: 'Abonos y cobros gestionados',
+      unidad: '$',
+    }
+  );
+
+  y += 37;
+
+  if (y > 210) {
+    dibujarPie(doc);
+    doc.addPage();
+    y = 14;
+  }
 
   // Desglose Métodos
   doc.setTextColor(15, 23, 42);
@@ -1934,7 +2129,30 @@ export function generarReporteProyeccionMlPdf(data: ReporteMlData): jsPDF {
   doc.setTextColor(15, 23, 42);
   doc.text('30 Días Calendario', marginLeft + kpiW * 2 + kpiW / 2, y + 12, { align: 'center' });
 
-  y += 22;
+  y += 20;
+
+  // Gráfico Vectorial de Curva Predictiva de Demanda Diaria
+  if (ml.proyecciones && ml.proyecciones.length > 0) {
+    const mlPoints = ml.proyecciones.map((p: any) => ({
+      label: p.diaLabel || p.fecha.split('-').slice(1).join('/'),
+      valor: p.demandaEsperadaPares || 0,
+      valorFormateado: `${p.demandaEsperadaPares} pares`,
+    }));
+
+    y = dibujarGraficoCurvaPdf(doc, marginLeft, y, contentWidth, 34, mlPoints, {
+      titulo: 'Curva Predictiva de Demanda de Calzado (Próximos 30 Días)',
+      subtitulo: 'Estimación algorítmica de pares requeridos por día',
+      colorLinea: [147, 51, 234],
+      colorRelleno: [243, 232, 255],
+      unidad: 'pares',
+    });
+  }
+
+  if (y > 210) {
+    dibujarPie(doc);
+    doc.addPage();
+    y = 14;
+  }
 
   // Tabla Demanda Diaria
   doc.setTextColor(15, 23, 42);
@@ -2469,6 +2687,63 @@ export function generarReporteRendimientoSucursalesPdf(data: ReporteRendimientoS
   ];
   y = dibujarTarjetasKpi(doc, kpis, y);
 
+  // Gráficas vectoriales de rendimiento por sucursal
+  if (data.sucursales && data.sucursales.length > 0) {
+    const halfWSuc = (contentWidth - 4) / 2;
+
+    const donutSucItems = data.sucursales.map((s, idx) => {
+      const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+      return {
+        label: s.nombre,
+        valor: s.totalVentas || 0,
+        color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+        subtexto: `${s.totalPares} pares (${s.porcentajeEmpresa}%)`,
+      };
+    });
+
+    dibujarGraficoDonutPdf(
+      doc,
+      marginLeft,
+      y,
+      halfWSuc,
+      33,
+      donutSucItems,
+      {
+        titulo: 'Aportación a Ventas de Empresa',
+        subtitulo: 'Participación porcentual de cada local',
+        valorCentro: `$${(data.totalesEmpresa?.ingresos || data.totalesSucursalSeleccionada.ingresos).toFixed(0)}`,
+        etiquetaCentro: 'Facturación',
+      }
+    );
+
+    const barSucItems = data.sucursales.map((s, idx) => {
+      const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+      return {
+        label: s.nombre,
+        valor: s.totalPares || 0,
+        valorFormateado: `${s.totalPares} pares`,
+        color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+        subtexto: `Ticket: $${s.ticketPromedio.toFixed(0)}`,
+      };
+    });
+
+    dibujarGraficoBarrasPdf(
+      doc,
+      marginLeft + halfWSuc + 4,
+      y,
+      halfWSuc,
+      33,
+      barSucItems,
+      {
+        titulo: 'Volumen de Pares por Sucursal',
+        subtitulo: 'Despacho físico consolidado por tienda',
+        unidad: 'pares',
+      }
+    );
+
+    y += 37;
+  }
+
   // Sección 1: Comparativa de Sucursales de la Empresa
   if (data.sucursales && data.sucursales.length > 0) {
     doc.setTextColor(15, 23, 42);
@@ -2669,7 +2944,68 @@ export function generarReporteAbastecimientoPdf(data: ReporteAbastecimientoData)
     doc.text(k.sub, kx + 2.5, y + 12.5);
   });
 
-  y += kpiH + 6;
+  y += kpiH + 5;
+
+  // Gráficas vectoriales de abastecimiento y compras
+  const halfWAbast = (contentWidth - 4) / 2;
+
+  const barProvItems = (data.proveedores || []).slice(0, 4).map((p, idx) => {
+    const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+    return {
+      label: p.nombre,
+      valor: p.totalComprado || 0,
+      valorFormateado: `$${(p.totalComprado || 0).toFixed(0)}`,
+      color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+      subtexto: `${p.totalLotes} lotes (${p.totalPares} pares)`,
+    };
+  });
+
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft,
+    y,
+    halfWAbast,
+    33,
+    barProvItems.length > 0 ? barProvItems : [{ label: 'Sin compras en periodo', valor: 0, valorFormateado: '$0' }],
+    {
+      titulo: 'Compras por Proveedor / Taller',
+      subtitulo: 'Volumen monetario adquirido',
+      unidad: '$',
+    }
+  );
+
+  const totalCompradoVal = data.kpis.totalComprado || 0;
+  const deudaVal = data.kpis.deudaTotal || 0;
+  const pagadoVal = Math.max(0, totalCompradoVal - deudaVal);
+  const pctPagado = totalCompradoVal > 0 ? `${((pagadoVal / totalCompradoVal) * 100).toFixed(0)}%` : '100%';
+
+  const donutProvItems = [
+    { label: 'Compras Canceladas', valor: pagadoVal, color: [16, 185, 129] as [number, number, number] },
+    { label: 'Cuentas por Pagar', valor: deudaVal, color: [249, 115, 22] as [number, number, number] },
+  ];
+
+  dibujarGraficoDonutPdf(
+    doc,
+    marginLeft + halfWAbast + 4,
+    y,
+    halfWAbast,
+    33,
+    donutProvItems,
+    {
+      titulo: 'Estatus Financiero con Talleres',
+      subtitulo: 'Proporción cancelada vs saldo pendiente',
+      valorCentro: pctPagado,
+      etiquetaCentro: 'Liquidado',
+    }
+  );
+
+  y += 37;
+
+  if (y > 210) {
+    dibujarPie(doc);
+    doc.addPage();
+    y = 14;
+  }
 
   // Título de la tabla
   doc.setFont('helvetica', 'bold');
