@@ -653,6 +653,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
   // Modal Facturación SRI
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [tabFactura, setTabFactura] = useState<'CONFIGURAR' | 'PREVISUALIZAR'>('CONFIGURAR');
+  const [modoNombresFactura, setModoNombresFactura] = useState<'GENERICO' | 'COMERCIAL'>('GENERICO');
+
+  const cambiarModoNombresFactura = (modo: 'GENERICO' | 'COMERCIAL') => {
+    setModoNombresFactura(modo);
+    if (!facturaCliente) return;
+    const nuevosDetalles = facturaCliente.detalles.map((d: any) => ({
+      ...d,
+      descripcion: modo === 'COMERCIAL' ? (d.descComercial || d.descripcion) : (d.descGenerica || d.descripcion),
+    }));
+    setFacturaCliente({ ...facturaCliente, detalles: nuevosDetalles });
+  };
   const [facturaCliente, setFacturaCliente] = useState<{
     clientId: string;
     saleNoteId?: string;
@@ -2415,15 +2426,17 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
       const lineas = c.saleNote?.lines;
 
       if (lineas && lineas.length > 0) {
-        // Agrupar lineas por color+serie para denominacion generica tributaria (Zapato Color + Rango Tallas)
-        const grupoMap = new Map<string, { color: string; serie: string; tallas: string[]; cantidad: number; totalPrecio: number; productId: string }>();
+        // Agrupar líneas por modelo + color + serie para soportar tanto denominación genérica como comercial
+        const grupoMap = new Map<string, { modeloNombre: string; color: string; serie: string; tallas: string[]; cantidad: number; totalPrecio: number; productId: string }>();
 
         lineas.forEach((l: any) => {
+          const modeloExt = (l.modeloNombre || l.nombre || '').replace(/\s*\([^)]*\)/g, '').trim() || 'Calzado';
           const colorExt = l.color || (l.nombre?.match(/\(([^)]+)\)/)?.[1]) || '';
           const serie = l.serie || '';
-          const key = ${colorExt.trim().toLowerCase()}_;
+          const key = `${modeloExt.toLowerCase()}_${colorExt.trim().toLowerCase()}_${serie.trim().toLowerCase()}`;
           if (!grupoMap.has(key)) {
             grupoMap.set(key, {
+              modeloNombre: modeloExt,
               color: colorExt.trim(),
               serie: serie.trim(),
               tallas: [],
@@ -2441,7 +2454,7 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
         });
 
         grupoMap.forEach((g) => {
-          const descripcion = formatearDescripcionFacturaSri({
+          const descGenerica = formatearDescripcionFacturaSri({
             cantidad: g.cantidad,
             color: g.color,
             serieNombre: g.serie,
@@ -2449,11 +2462,21 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
             nombreGenerico: 'Zapato',
           });
 
+          const descComercial = formatearDescripcionFacturaSri({
+            cantidad: g.cantidad,
+            color: g.color,
+            serieNombre: g.serie,
+            tallas: g.tallas,
+            nombreGenerico: g.modeloNombre,
+          });
+
           const precioUnitarioGrupo = g.cantidad > 0 ? g.totalPrecio / g.cantidad : 0;
 
           agrupados.push({
             codigoProducto: g.productId.slice(0, 8).toUpperCase(),
-            descripcion,
+            descripcion: modoNombresFactura === 'COMERCIAL' ? descComercial : descGenerica,
+            descGenerica,
+            descComercial,
             cantidad: g.cantidad,
             precioUnitario: Number(precioUnitarioGrupo.toFixed(2)),
             descuento: 0,
@@ -6516,18 +6539,53 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                     </div>
                   </div>
 
-                  {/* 3. Detalle de Ítems Agrupados */}
+                  {/* 3. Detalle de Ítems Agrupados con Nombres Editables y Alternador Rápido */}
                   <div className="space-y-3">
-                    <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider block flex items-center gap-1.5">
-                      <FileText size={14} className="text-[#0F172A]" />
-                      <span>3. Detalle de Productos a Facturar</span>
-                    </span>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] pb-2">
+                      <span className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText size={14} className="text-[#0F172A]" />
+                        <span>3. Detalle de Productos a Facturar</span>
+                      </span>
+
+                      {/* Botones de Cambio Rápido de Formato */}
+                      <div className="flex items-center gap-1.5 bg-[var(--muted)]/50 p-1 rounded-xl border border-[var(--border)]">
+                        <span className="text-[10px] font-bold text-[var(--muted-foreground)] px-1.5 hidden sm:inline">
+                          Formato Nombres:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => cambiarModoNombresFactura('GENERICO')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                            modoNombresFactura === 'GENERICO'
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                          }`}
+                          title="Formato tributario oficial: 1 Docena - Zapato {Color} ({Tallas})"
+                        >
+                          <span>🛡️</span>
+                          <span>Zapato (SRI)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => cambiarModoNombresFactura('COMERCIAL')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                            modoNombresFactura === 'COMERCIAL'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                          }`}
+                          title="Formato comercial real: 1 Docena - {Modelo} {Color} ({Tallas})"
+                        >
+                          <span>👟</span>
+                          <span>Modelo Real</span>
+                        </button>
+                      </div>
+                    </div>
 
                     <div className="border border-[var(--border)] rounded-2xl overflow-hidden shadow-xs">
                       <table className="w-full text-xs text-left">
                         <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
                           <tr>
-                            <th className="px-4 py-2.5">Descripción</th>
+                            <th className="px-4 py-2.5">Descripción (Editable)</th>
                             <th className="px-4 py-2.5 text-center">Cant.</th>
                             <th className="px-4 py-2.5 text-right">P. Unit.</th>
                             <th className="px-4 py-2.5 text-center">IVA</th>
@@ -6535,23 +6593,51 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
-                          {facturaCliente.detalles.map((d, index) => {
+                          {facturaCliente.detalles.map((d: any, index: number) => {
                             const sub = d.cantidad * d.precioUnitario - (d.descuento || 0);
                             return (
-                              <tr key={index} className="hover:bg-[var(--muted)]/20">
-                                <td className="px-4 py-2.5 font-semibold text-[var(--foreground)]">
-                                  {d.descripcion}
+                              <tr key={index} className="hover:bg-[var(--muted)]/20 transition-colors">
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={d.descripcion}
+                                      onChange={(e) => {
+                                        const nuevosDetalles = [...facturaCliente.detalles];
+                                        nuevosDetalles[index] = { ...d, descripcion: e.target.value };
+                                        setFacturaCliente({ ...facturaCliente, detalles: nuevosDetalles });
+                                      }}
+                                      className="w-full px-2.5 py-1.5 text-xs font-semibold bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[#0F172A]"
+                                      placeholder="Descripción en la factura"
+                                    />
+                                    {/* Botón rápido individual para alternar entre genérico y modelo comercial */}
+                                    {d.descComercial && d.descGenerica && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nuevaDesc = d.descripcion === d.descGenerica ? d.descComercial : d.descGenerica;
+                                          const nuevosDetalles = [...facturaCliente.detalles];
+                                          nuevosDetalles[index] = { ...d, descripcion: nuevaDesc };
+                                          setFacturaCliente({ ...facturaCliente, detalles: nuevosDetalles });
+                                        }}
+                                        className="px-2 py-1.5 text-[10px] font-bold rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] border border-[var(--border)] shrink-0 transition-all cursor-pointer whitespace-nowrap"
+                                        title="Alternar este ítem entre Zapato y Modelo Real"
+                                      >
+                                        {d.descripcion === d.descGenerica ? '👟 Modelo' : '🛡️ Zapato'}
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-4 py-2.5 text-center font-bold">{d.cantidad}</td>
                                 <td className="px-4 py-2.5 text-right font-semibold">
                                   ${d.precioUnitario.toFixed(2)}
                                 </td>
                                 <td className="px-4 py-2.5 text-center">
-                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 rounded text-[9px] font-bold">
+                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-bold">
                                     {d.tarifaIva}%
                                   </span>
                                 </td>
-                                <td className="px-4 py-2.5 text-right font-black text-emerald-600">
+                                <td className="px-4 py-2.5 text-right font-black text-emerald-600 dark:text-emerald-400">
                                   ${sub.toFixed(2)}
                                 </td>
                               </tr>

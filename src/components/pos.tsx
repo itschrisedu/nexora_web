@@ -244,6 +244,7 @@ export default function PosComponent() {
 
   // Tipo de Comprobante & Datos de Cliente
   const [tipoComprobante, setTipoComprobante] = useState<"CONSUMIDOR_FINAL" | "FACTURA">("FACTURA");
+  const [formatoDescripcionSriPos, setFormatoDescripcionSriPos] = useState<"GENERICO" | "COMERCIAL">("GENERICO");
   const [clienteFactura, setClienteFactura] = useState({
     id: "",
     cedula: "",
@@ -777,8 +778,9 @@ export default function PosComponent() {
         const totalFacturaSri = Number(totalVenta.toFixed(2));
         const nombreEmisorPos = negocioInfo?.sriRazonSocial?.trim() || negocioInfo?.nombre || "Calzado Cevallos";
 
-        // Agrupar modelos/series para la factura SRI con denominación genérica de calzado y curva de tallas
+        // Agrupar modelos/series para la factura SRI con soporte de denominación genérica o comercial
         const grupoSriMap = new Map<string, { 
+          modeloNombre: string;
           color: string;
           serie: string; 
           tallas: number[];
@@ -788,11 +790,13 @@ export default function PosComponent() {
         }>();
 
         itemsVenta.forEach((item) => {
+          const modeloExt = (item.modeloNombre || item.nombre || '').replace(/\s*\([^)]*\)/g, '').trim() || 'Zapato';
           const colorLimpio = (item.color || '').trim();
           const serieLimpia = (item.serieNombre || '').trim();
-          const key = `${colorLimpio.toLowerCase()}_${serieLimpia.toLowerCase()}`;
+          const key = `${modeloExt.toLowerCase()}_${colorLimpio.toLowerCase()}_${serieLimpia.toLowerCase()}`;
           if (!grupoSriMap.has(key)) {
             grupoSriMap.set(key, {
+              modeloNombre: modeloExt,
               color: colorLimpio,
               serie: serieLimpia,
               tallas: [],
@@ -812,12 +816,13 @@ export default function PosComponent() {
         });
 
         const detallesSri = Array.from(grupoSriMap.values()).map((g) => {
+          const nombreGenerico = formatoDescripcionSriPos === 'COMERCIAL' ? g.modeloNombre : 'Zapato';
           const descripcion = formatearDescripcionFacturaSri({
             cantidad: g.cantidad,
             color: g.color,
             serieNombre: g.serie,
             tallas: g.tallas,
-            nombreGenerico: 'Zapato',
+            nombreGenerico,
           });
           const unitario = g.cantidad > 0 ? Number((g.totalPrecio / g.cantidad).toFixed(2)) : 0;
           return {
@@ -2265,6 +2270,39 @@ export default function PosComponent() {
                                 onChange={(e) => setClienteFactura((prev) => ({ ...prev, direccion: e.target.value }))}
                                 className="w-full px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-[var(--foreground)] text-xs focus:outline-none focus:border-emerald-500"
                               />
+                            </div>
+
+                            {/* Selector de Nomenclatura SRI en POS */}
+                            <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
+                                Formato en Factura:
+                              </span>
+                              <div className="flex items-center gap-1 bg-[var(--card)] p-0.5 rounded-lg border border-[var(--border)]">
+                                <button
+                                  type="button"
+                                  onClick={() => setFormatoDescripcionSriPos("GENERICO")}
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
+                                    formatoDescripcionSriPos === "GENERICO"
+                                      ? "bg-emerald-600 text-white shadow-2xs"
+                                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                                  }`}
+                                  title="Denominación genérica tributaria: 1 Docena - Zapato {Color} ({Tallas})"
+                                >
+                                  🛡️ Zapato
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setFormatoDescripcionSriPos("COMERCIAL")}
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
+                                    formatoDescripcionSriPos === "COMERCIAL"
+                                      ? "bg-blue-600 text-white shadow-2xs"
+                                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                                  }`}
+                                  title="Modelo real comercial: 1 Docena - {Modelo} {Color} ({Tallas})"
+                                >
+                                  👟 Modelo Real
+                                </button>
+                              </div>
                             </div>
                           </div>
                         )}
