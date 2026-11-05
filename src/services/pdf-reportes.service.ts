@@ -10,6 +10,7 @@ export interface NegocioInfo {
   ruc?: string;
   direccion?: string;
   telefono?: string;
+  primaryColor?: string;
 }
 
 export interface ClienteDeudor {
@@ -395,6 +396,338 @@ function dibujarTarjetasKpi(
   return yStart + cardH + 6;
 }
 
+// ── Helper Conversor Hex a RGB ──
+export function hexToRgb(hex?: string): [number, number, number] {
+  if (!hex) return [15, 23, 42];
+  const clean = hex.replace('#', '');
+  if (clean.length === 3) {
+    const r = parseInt(clean[0] + clean[0], 16) || 15;
+    const g = parseInt(clean[1] + clean[1], 16) || 23;
+    const b = parseInt(clean[2] + clean[2], 16) || 42;
+    return [r, g, b];
+  }
+  const r = parseInt(clean.substring(0, 2), 16) || 15;
+  const g = parseInt(clean.substring(2, 4), 16) || 23;
+  const b = parseInt(clean.substring(4, 6), 16) || 42;
+  return [r, g, b];
+}
+
+// ── Helper Gráfico Vectorial de Barras Modernas en PDF ──
+export function dibujarGraficoBarrasPdf(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  items: { label: string; valor: number; valorFormateado?: string; subtexto?: string; color?: [number, number, number] }[],
+  options?: {
+    titulo?: string;
+    subtitulo?: string;
+    unidad?: string;
+  }
+): number {
+  if (!items || items.length === 0) return y;
+
+  // Contenedor tarjeta moderna estilizada (Fondo blanco/slate suave con borde sutil)
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(x, y, width, height, 2.5, 2.5, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(x, y, width, height, 2.5, 2.5, 'S');
+
+  let curY = y + 5;
+
+  if (options?.titulo) {
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(options.titulo.toUpperCase(), x + 5, curY);
+
+    if (options?.subtitulo) {
+      curY += 3.5;
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(5.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(options.subtitulo, x + 5, curY);
+    }
+    curY += 4.5;
+  }
+
+  const maxVal = Math.max(...items.map((i) => i.valor), 1);
+  const totalVal = items.reduce((acc, i) => acc + i.valor, 0);
+  const availableH = (y + height - 3) - curY;
+  const rowH = Math.min(8.5, availableH / items.length);
+  const barMaxW = width * 0.40;
+
+  items.forEach((item, idx) => {
+    const rowY = curY + idx * rowH;
+    const color = item.color || [14, 165, 233];
+    const pct = Math.min(1, Math.max(0, item.valor / maxVal));
+    const share = totalVal > 0 ? (item.valor / totalVal) * 100 : 0;
+
+    // Viñeta de color
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.circle(x + 5, rowY + 2.5, 1.2, 'F');
+
+    // Etiqueta del ítem
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    const labelTexto = item.label.length > 25 ? item.label.substring(0, 23) + '...' : item.label;
+    doc.text(labelTexto, x + 8, rowY + 3.2);
+
+    // Barra de fondo (track grisáceo muy suave)
+    const barStartX = x + width - barMaxW - 25;
+    doc.setFillColor(226, 232, 240);
+    doc.roundedRect(barStartX, rowY + 1.2, barMaxW, 2.8, 1, 1, 'F');
+
+    // Barra de progreso redondeada
+    const barW = Math.max(1.8, barMaxW * pct);
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.roundedRect(barStartX, rowY + 1.2, barW, 2.8, 1, 1, 'F');
+
+    // Valor formateado a la derecha
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    const valText = item.valorFormateado || `${options?.unidad ? `${options.unidad} ` : ''}${item.valor.toFixed(item.valor % 1 === 0 ? 0 : 2)}`;
+    doc.text(valText, x + width - 4, rowY + 3.2, { align: 'right' });
+
+    // Porcentaje
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${share.toFixed(0)}%`, barStartX - 1.5, rowY + 3.2, { align: 'right' });
+  });
+
+  return y + height + 3.5;
+}
+
+// ── Helper Gráfico Vectorial de Curva y Área de Tendencia en PDF ──
+export function dibujarGraficoCurvaPdf(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  points: { label: string; valor: number; valorFormateado?: string }[],
+  options?: {
+    titulo?: string;
+    subtitulo?: string;
+    colorLinea?: [number, number, number];
+    colorRelleno?: [number, number, number];
+    unidad?: string;
+  }
+): number {
+  if (!points || points.length === 0) return y;
+
+  const colorLinea = options?.colorLinea || [14, 165, 233];
+  const colorRelleno = options?.colorRelleno || [224, 242, 254];
+
+  // Tarjeta contenedora
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(x, y, width, height, 2.5, 2.5, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(x, y, width, height, 2.5, 2.5, 'S');
+
+  let curY = y + 5;
+  if (options?.titulo) {
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(options.titulo.toUpperCase(), x + 5, curY);
+
+    if (options?.subtitulo) {
+      curY += 3.5;
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(5.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(options.subtitulo, x + 5, curY);
+    }
+    curY += 4.5;
+  }
+
+  const padX = 14;
+  const padBottom = 8;
+  const chartW = width - padX * 2;
+  const chartH = (y + height - padBottom) - curY;
+  const chartBottomY = curY + chartH;
+
+  const maxVal = Math.max(...points.map((p) => p.valor), 1);
+
+  // Líneas guía horizontales punteadas
+  doc.setDrawColor(226, 232, 240);
+  [0, 0.33, 0.66, 1].forEach((ratio) => {
+    const gy = chartBottomY - chartH * ratio;
+    doc.line(x + padX, gy, x + width - padX, gy);
+  });
+
+  // Coordenadas
+  const coords = points.map((p, i) => {
+    const px = points.length === 1
+      ? x + width / 2
+      : (x + padX) + (i / (points.length - 1)) * chartW;
+    const py = chartBottomY - (p.valor / maxVal) * chartH;
+    return { px, py, p };
+  });
+
+  // Área sombreada bajo la curva (trapecios de relleno con colorRelleno)
+  doc.setFillColor(colorRelleno[0], colorRelleno[1], colorRelleno[2]);
+  for (let i = 0; i < coords.length - 1; i++) {
+    const c1 = coords[i];
+    const c2 = coords[i + 1];
+    const trapW = c2.px - c1.px;
+    const steps = 6;
+    for (let s = 0; s < steps; s++) {
+      const stepX = c1.px + (trapW / steps) * s;
+      const stepW = trapW / steps + 0.1;
+      const t = s / steps;
+      const stepY = c1.py + (c2.py - c1.py) * t;
+      const stripH = chartBottomY - stepY;
+      if (stripH > 0) {
+        doc.rect(stepX, stepY, stepW, stripH, 'F');
+      }
+    }
+  }
+
+  // Trazo de la curva de tendencia
+  doc.setDrawColor(colorLinea[0], colorLinea[1], colorLinea[2]);
+  for (let i = 0; i < coords.length - 1; i++) {
+    const c1 = coords[i];
+    const c2 = coords[i + 1];
+    doc.line(c1.px, c1.py, c2.px, c2.py);
+    doc.line(c1.px, c1.py + 0.2, c2.px, c2.py + 0.2);
+  }
+
+  // Puntos vertex circulares
+  coords.forEach((c, idx) => {
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(colorLinea[0], colorLinea[1], colorLinea[2]);
+    doc.circle(c.px, c.py, 1.2, 'FD');
+
+    // Etiquetas del eje X
+    if (points.length <= 8 || idx % Math.ceil(points.length / 6) === 0 || idx === points.length - 1) {
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(c.p.label, c.px, chartBottomY + 4, { align: 'center' });
+    }
+  });
+
+  return y + height + 3.5;
+}
+
+// ── Helper Gráfico Circular / Donut Moderno en PDF ──
+export function dibujarGraficoDonutPdf(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  items: { label: string; valor: number; color?: [number, number, number]; subtexto?: string }[],
+  options?: {
+    titulo?: string;
+    subtitulo?: string;
+    valorCentro?: string;
+    etiquetaCentro?: string;
+  }
+): number {
+  if (!items || items.length === 0) return y;
+
+  // Contenedor tarjeta
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(x, y, width, height, 2.5, 2.5, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(x, y, width, height, 2.5, 2.5, 'S');
+
+  let curY = y + 5;
+  if (options?.titulo) {
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(options.titulo.toUpperCase(), x + 5, curY);
+
+    if (options?.subtitulo) {
+      curY += 3.5;
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(5.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(options.subtitulo, x + 5, curY);
+    }
+    curY += 4.5;
+  }
+
+  const total = items.reduce((acc, i) => acc + i.valor, 0);
+
+  // Lado izquierdo: Anillo de visualización centralizada
+  const donutCenterX = x + 22;
+  const donutCenterY = curY + (height - (curY - y)) / 2 - 1.5;
+  const outerR = 12;
+  const innerR = 7;
+
+  // Anillo de fondo gris suave
+  doc.setFillColor(226, 232, 240);
+  doc.circle(donutCenterX, donutCenterY, outerR, 'F');
+
+  // Sector visual principal
+  if (items.length > 0) {
+    const topItem = items[0];
+    const topColor = topItem.color || [14, 165, 233];
+    doc.setFillColor(topColor[0], topColor[1], topColor[2]);
+    doc.circle(donutCenterX, donutCenterY, outerR, 'F');
+  }
+
+  // Agujero blanco central (donut)
+  doc.setFillColor(255, 255, 255);
+  doc.circle(donutCenterX, donutCenterY, innerR, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.circle(donutCenterX, donutCenterY, innerR, 'S');
+
+  // Texto central dentro del donut
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  const valCentro = options?.valorCentro || (total > 0 ? `${total}` : '0');
+  doc.text(valCentro, donutCenterX, donutCenterY + 1.2, { align: 'center' });
+
+  // Lado derecho: Desglose porcentual
+  const legendX = x + 40;
+  const legendW = width - 44;
+  const availableH = y + height - curY - 2;
+  const rowH = Math.min(6.5, availableH / items.length);
+
+  items.forEach((item, idx) => {
+    const rowY = curY + idx * rowH;
+    const color = item.color || [14, 165, 233];
+    const pct = total > 0 ? (item.valor / total) * 100 : 0;
+
+    // Viñeta
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.circle(legendX + 2, rowY + 2.5, 1.2, 'F');
+
+    // Nombre
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(5.8);
+    doc.setFont('helvetica', 'bold');
+    const lbl = item.label.length > 22 ? item.label.substring(0, 20) + '...' : item.label;
+    doc.text(lbl, legendX + 5, rowY + 3.2);
+
+    // Barra de porcentaje mini
+    const barStartX = legendX + legendW - 26;
+    doc.setFillColor(226, 232, 240);
+    doc.roundedRect(barStartX, rowY + 1.2, 14, 2.4, 0.6, 0.6, 'F');
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.roundedRect(barStartX, rowY + 1.2, Math.max(1, 14 * (pct / 100)), 2.4, 0.6, 0.6, 'F');
+
+    // Porcentaje
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${pct.toFixed(0)}%`, legendX + legendW - 2, rowY + 3.2, { align: 'right' });
+  });
+
+  return y + height + 3.5;
+}
+
 // ══════════════════════════════════════════════════════════════
 // 1. REPORTE DE COBRANZAS — CLIENTES QUE DEBEN
 // ══════════════════════════════════════════════════════════════
@@ -436,7 +769,65 @@ export function generarReporteCobranzasPdf(data: ReporteCobranzasData): jsPDF {
   doc.setTextColor(16, 185, 129);
   doc.text(`$${data.totalRecaudado.toFixed(2)}`, marginLeft + kpiW * 2 + kpiW / 2, y + 14, { align: 'center' });
 
-  y += 24;
+  y += 22;
+
+  // Gráficas vectoriales de cartera y recaudación
+  const halfWCob = (contentWidth - 4) / 2;
+  const totalFlujo = data.totalRecaudado + data.totalCartera;
+  const pctRecuperado = totalFlujo > 0 ? ((data.totalRecaudado / totalFlujo) * 100).toFixed(0) : '0';
+
+  const donutCobItems = [
+    { label: 'Recaudado en Periodo', valor: data.totalRecaudado, color: [16, 185, 129] as [number, number, number] },
+    { label: 'Cartera Pendiente', valor: data.totalCartera, color: [239, 68, 68] as [number, number, number] },
+  ];
+
+  const niveles: Record<string, number> = {
+    'EXCELENTE': 0,
+    'BUENO': 0,
+    'REGULAR': 0,
+    'CRITICO': 0,
+  };
+
+  data.clientes.forEach((c) => {
+    const niv = (c.nivelCredito || '').toUpperCase();
+    if (niv.includes('EXCELENTE') || (c.scoreCrediticio && c.scoreCrediticio >= 80)) {
+      niveles['EXCELENTE'] += c.totalDeuda || 0;
+    } else if (niv.includes('BUENO') || (c.scoreCrediticio && c.scoreCrediticio >= 60)) {
+      niveles['BUENO'] += c.totalDeuda || 0;
+    } else if (niv.includes('REGULAR') || (c.scoreCrediticio && c.scoreCrediticio >= 40)) {
+      niveles['REGULAR'] += c.totalDeuda || 0;
+    } else {
+      niveles['CRITICO'] += c.totalDeuda || 0;
+    }
+  });
+
+  const barCobItems = [
+    { label: 'Excelente (Bajo Riesgo)', valor: niveles['EXCELENTE'], valorFormateado: `$${niveles['EXCELENTE'].toFixed(0)}`, color: [16, 185, 129] as [number, number, number] },
+    { label: 'Bueno (Riesgo Normal)', valor: niveles['BUENO'], valorFormateado: `$${niveles['BUENO'].toFixed(0)}`, color: [14, 165, 233] as [number, number, number] },
+    { label: 'Regular (En Observación)', valor: niveles['REGULAR'], valorFormateado: `$${niveles['REGULAR'].toFixed(0)}`, color: [245, 158, 11] as [number, number, number] },
+    { label: 'Crítico (Mora / Alto Riesgo)', valor: niveles['CRITICO'], valorFormateado: `$${niveles['CRITICO'].toFixed(0)}`, color: [239, 68, 68] as [number, number, number] },
+  ].filter(b => b.valor > 0 || data.clientes.length === 0);
+
+  dibujarGraficoDonutPdf(doc, marginLeft, y, halfWCob, 32, donutCobItems, {
+    titulo: 'Ratio Cartera vs Recaudación',
+    subtitulo: 'Liquidez cobrada vs saldo por cobrar',
+    valorCentro: `${pctRecuperado}%`,
+  });
+
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft + halfWCob + 4,
+    y,
+    halfWCob,
+    32,
+    barCobItems.length > 0 ? barCobItems : [{ label: 'Cartera Total', valor: data.totalCartera, valorFormateado: `$${data.totalCartera.toFixed(2)}`, color: [239, 68, 68] }],
+    {
+      titulo: 'Deuda por Nivel de Riesgo',
+      subtitulo: 'Distribución de cartera por scoring',
+    }
+  );
+
+  y += 36;
 
   // Tabla Deudores
   doc.setTextColor(15, 23, 42);
@@ -697,6 +1088,31 @@ export function generarReporteResumenEjecutivoPdf(data: ReporteResumenEjecutivoD
 
   y += 40;
 
+  // Gráfico Vectorial de Curva de Tendencia Temporal de Ventas
+  if (data.serieTemporal && data.serieTemporal.length > 0) {
+    const primaryRgb = hexToRgb(data.negocio.primaryColor || '#0EA5E9');
+    const curvePoints = data.serieTemporal.map((t) => ({
+      label: t.label,
+      valor: t.ingresos || 0,
+      valorFormateado: `$${(t.ingresos || 0).toFixed(0)}`,
+    }));
+
+    y = dibujarGraficoCurvaPdf(doc, marginLeft, y, contentWidth, 34, curvePoints, {
+      titulo: 'Curva de Evolución Temporal de Ingresos',
+      subtitulo: 'Comportamiento de la facturación en el periodo seleccionado',
+      colorLinea: primaryRgb,
+      colorRelleno: [224, 242, 254],
+      unidad: '$',
+    });
+  }
+
+  // Comprobar salto de página si es necesario antes de tablas
+  if (y > 200) {
+    dibujarPie(doc);
+    doc.addPage();
+    y = 14;
+  }
+
   // Top 5 Modelos
   if (data.topModelos && data.topModelos.length > 0) {
     doc.setTextColor(15, 23, 42);
@@ -896,7 +1312,72 @@ export function generarReporteModelosRotacionPdf(data: ReporteModelosData): jsPD
   doc.setTextColor(100, 116, 139);
   doc.text(`${res?.totalSinMovimiento || 0} modelos sin rotación`, marginLeft + kpiW * 3 + kpiW / 2, y + 16.5, { align: 'center' });
 
-  y += 26;
+  y += 24;
+
+  // Gráficos vectoriales de rotación y demanda
+  const halfWMod = (contentWidth - 4) / 2;
+
+  // 1. Barras de Top Modelos por Pares
+  const topModelosItems = data.topModelos.slice(0, 4).map((m, idx) => {
+    const colores = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+    return {
+      label: `${m.modelName} ${m.color ? `(${m.color})` : ''}`,
+      valor: m.pares,
+      valorFormateado: `${m.pares} pares`,
+      color: (colores[idx % colores.length] || [14, 165, 233]) as [number, number, number],
+      subtexto: `$${(m.ingresos || 0).toFixed(0)}`,
+    };
+  });
+
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft,
+    y,
+    halfWMod,
+    33,
+    topModelosItems.length > 0 ? topModelosItems : [{ label: 'Sin ventas', valor: 0, valorFormateado: '0 pares' }],
+    {
+      titulo: 'Top Modelos por Demanda',
+      subtitulo: 'Pares comercializados en el periodo',
+    }
+  );
+
+  // 2. Donut de Distribución de Rotación
+  const donutRotacionItems = [
+    { label: 'Rotación Alta', valor: res?.totalRotacionAlta || 0, color: [16, 185, 129] as [number, number, number] },
+    { label: 'Rotación Media', valor: res?.totalRotacionMedia || 0, color: [14, 165, 233] as [number, number, number] },
+    { label: 'Rotación Baja', valor: res?.totalRotacionBaja || 0, color: [245, 158, 11] as [number, number, number] },
+    { label: 'Sin Movimiento', valor: res?.totalSinMovimiento || 0, color: [225, 29, 72] as [number, number, number] },
+  ].filter((d) => d.valor > 0 || !res);
+
+  const totalProds = res?.totalProductos || catalogo.length || data.topModelos.length;
+  const pctActivos = totalProds > 0 && res?.totalConVentas
+    ? `${((res.totalConVentas / totalProds) * 100).toFixed(0)}%`
+    : '100%';
+
+  dibujarGraficoDonutPdf(
+    doc,
+    marginLeft + halfWMod + 4,
+    y,
+    halfWMod,
+    33,
+    donutRotacionItems.length > 0 ? donutRotacionItems : [{ label: 'Catálogo General', valor: 1, color: [14, 165, 233] }],
+    {
+      titulo: 'Distribución de Rotación',
+      subtitulo: 'Salud y dinamismo del catálogo',
+      valorCentro: pctActivos,
+      etiquetaCentro: 'Activos',
+    }
+  );
+
+  y += 37;
+
+  // Salto de página antes de tabla detallada si el espacio es reducido
+  if (y > 200) {
+    dibujarPie(doc);
+    doc.addPage();
+    y = 14;
+  }
 
   // Subtítulo y Filtro Activo
   doc.setTextColor(15, 23, 42);
@@ -1846,51 +2327,55 @@ export function generarReportePosPdf(data: ReportePosPdfData): jsPDF {
   ];
   y = dibujarTarjetasKpi(doc, kpis, y);
 
-  // Métodos de Pago
-  doc.setTextColor(15, 23, 42);
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'bold');
-  doc.text('DESGLOSE DE MÉTODOS DE PAGO EN CAJA', marginLeft, y);
-  y += 4.5;
+  // Gráficos Vectoriales del Punto de Venta (Métodos de Pago y Modelos Mostrador)
+  const halfWPos = (contentWidth - 4) / 2;
 
-  const metodos = [
-    { nombre: 'Efectivo', total: data.metricas.desgloseMetodosPago.efectivo.total, cant: data.metricas.desgloseMetodosPago.efectivo.cantidad },
-    { nombre: 'Tarjeta (Débito/Crédito)', total: data.metricas.desgloseMetodosPago.tarjeta.total, cant: data.metricas.desgloseMetodosPago.tarjeta.cantidad },
-    { nombre: 'Transferencia Bancaria', total: data.metricas.desgloseMetodosPago.transferencia.total, cant: data.metricas.desgloseMetodosPago.transferencia.cantidad },
-  ];
+  const donutMetodosItems = [
+    { label: 'Efectivo en Caja', valor: data.metricas.desgloseMetodosPago.efectivo.total, color: [16, 185, 129] as [number, number, number] },
+    { label: 'Tarjeta (Datafast/POS)', valor: data.metricas.desgloseMetodosPago.tarjeta.total, color: [14, 165, 233] as [number, number, number] },
+    { label: 'Transferencia Bancaria', valor: data.metricas.desgloseMetodosPago.transferencia.total, color: [99, 102, 241] as [number, number, number] },
+  ].filter(m => m.valor > 0 || data.metricas.totalRecaudado === 0);
 
-  const colWMet = [70, 45, 67];
-  doc.setFillColor(15, 23, 42);
-  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(6.5);
+  dibujarGraficoDonutPdf(
+    doc,
+    marginLeft,
+    y,
+    halfWPos,
+    34,
+    donutMetodosItems.length > 0 ? donutMetodosItems : [{ label: 'Efectivo', valor: 1, color: [16, 185, 129] }],
+    {
+      titulo: 'Distribución por Método de Cobro',
+      subtitulo: 'Participación porcentual en caja',
+      valorCentro: `$${data.metricas.totalRecaudado.toFixed(0)}`,
+      etiquetaCentro: 'Recaudado',
+    }
+  );
 
-  let xm = marginLeft + 2;
-  ['Método de Pago', 'Transacciones', 'Monto Total'].forEach((h, i) => {
-    doc.text(h, xm, y + 3.8);
-    xm += colWMet[i];
-  });
-  y += 5.5;
-
-  metodos.forEach((m, idx) => {
-    const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
-    doc.setFillColor(bg[0], bg[1], bg[2]);
-    doc.rect(marginLeft, y, contentWidth, 6, 'F');
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(6.5);
-
-    xm = marginLeft + 2;
-    doc.setFont('helvetica', 'bold');
-    doc.text(m.nombre, xm, y + 4.2); xm += colWMet[0];
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${m.cant} cobros`, xm, y + 4.2); xm += colWMet[1];
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(16, 185, 129);
-    doc.text(`$${m.total.toFixed(2)}`, xm, y + 4.2);
-    y += 6;
+  const topPosModelos = (data.metricas.topModelos || []).slice(0, 4).map((m, idx) => {
+    const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+    return {
+      label: `${m.nombre} ${m.color ? `(${m.color})` : ''}`,
+      valor: m.pares,
+      valorFormateado: `${m.pares} pares`,
+      color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
+      subtexto: `$${m.total.toFixed(0)}`,
+    };
   });
 
-  y += 6;
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft + halfWPos + 4,
+    y,
+    halfWPos,
+    34,
+    topPosModelos.length > 0 ? topPosModelos : [{ label: 'Sin ventas registradas', valor: 0, valorFormateado: '0 pares' }],
+    {
+      titulo: 'Modelos Más Vendidos en Mostrador',
+      subtitulo: 'Artículos con mayor despacho inmediato',
+    }
+  );
+
+  y += 38;
 
   // Listado de Transacciones Recientes POS
   doc.setTextColor(15, 23, 42);

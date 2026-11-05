@@ -68,6 +68,11 @@ import {
   ProveedorAbastecimientoReporte,
 } from '@/services/pdf-reportes.service';
 import { formatearNombreSerie } from '@/utils/text-formatters';
+import {
+  GraficoBarrasModerno,
+  GraficoCurvaTendencia,
+  GraficoDonutCircular,
+} from './ui/reporte-charts';
 import { jsPDF } from 'jspdf';
 
 type PeriodoTipo = 'HOY' | 'SEMANAL' | 'MENSUAL' | 'TRIMESTRAL' | 'ANUAL' | 'PERSONALIZADO';
@@ -495,6 +500,7 @@ export default function ReportesComponent({
     ruc: negocioInfo?.ruc || '1800000000001',
     direccion: negocioInfo?.direccion || 'Cevallos, Tungurahua, Ecuador',
     telefono: negocioInfo?.telefono || '',
+    primaryColor: negocioInfo?.primaryColor || '#0EA5E9',
   });
 
   // ══════════════════════════════════════════════════════════════
@@ -1310,127 +1316,81 @@ export default function ReportesComponent({
                 </div>
               </div>
 
-              {/* Gráfico de Evolución Temporal */}
-              <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-extrabold text-sm text-[var(--foreground)]">
-                      Evolución Temporal de Ventas e Ingresos
-                    </h3>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      Comportamiento diario de la facturación y volumen de pares de calzado en el periodo seleccionado
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold text-[var(--muted-foreground)] px-3 py-1 bg-[var(--muted)]/40 rounded-xl">
-                    {reporteData?.serieTemporal?.length || 0} puntos temporales
-                  </span>
-                </div>
-
-                {reporteData?.serieTemporal?.length === 0 ? (
-                  <div className="p-12 text-center text-xs text-[var(--muted-foreground)] italic">
-                    No hay movimientos registrados para el filtro seleccionado.
-                  </div>
-                ) : (
-                  <div className="space-y-3 pt-2">
-                    {/* Gráfico de barras visuales */}
-                    <div className="space-y-2">
-                      {reporteData?.serieTemporal?.map((item: any) => {
-                        const maxIngreso = Math.max(
-                          ...reporteData.serieTemporal.map((t: any) => t.ingresos || 0),
-                          100
-                        );
-                        const porcentaje = Math.min(100, Math.max(8, (item.ingresos / maxIngreso) * 100));
-
-                        return (
-                          <div key={item.fechaKey} className="flex items-center gap-3 text-xs">
-                            <span className="w-20 text-[11px] font-bold text-[var(--muted-foreground)] shrink-0">
-                              {item.label}
-                            </span>
-                            <div className="flex-1 bg-[var(--muted)]/40 h-8 rounded-xl overflow-hidden relative flex items-center p-1 border border-[var(--border)]/50">
-                              <div
-                                style={{ width: `${porcentaje}%` }}
-                                className="h-full bg-gradient-to-r from-[#0F172A] to-slate-700 dark:from-emerald-600 dark:to-emerald-500 rounded-lg transition-all duration-500 flex items-center justify-end pr-2 text-white font-black text-[10px]"
-                              >
-                                {item.ingresos > 0 && `$${item.ingresos.toFixed(0)}`}
-                              </div>
-                            </div>
-                            <span className="w-24 text-right font-black text-[11px] text-[var(--foreground)] shrink-0">
-                              ${item.ingresos.toFixed(2)}
-                            </span>
-                            <span className="w-16 text-right text-[10px] font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
-                              {item.pares} pares
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Gráfico de Evolución Temporal Profesional */}
+              <GraficoCurvaTendencia
+                puntos={
+                  reporteData?.serieTemporal?.map((t: any) => ({
+                    label: t.label,
+                    valor: t.ingresos || 0,
+                    valor2: t.pares || 0,
+                    valorFormateado: `$${(t.ingresos || 0).toFixed(2)}`,
+                    valor2Formateado: `${t.pares || 0} pares`,
+                  })) || []
+                }
+                titulo="Curva de Evolución Temporal de Ingresos & Volumen de Pares"
+                subtitulo="Comportamiento dinámico de la facturación y despacho físico en el periodo seleccionado"
+                primaryColor={negocioInfo?.primaryColor || '#0EA5E9'}
+                secondaryColor="#10B981"
+                serie1Nombre="Facturación ($)"
+                serie2Nombre="Pares Vendidos"
+                emptyMessage="No hay movimientos registrados para el filtro de fechas seleccionado."
+              />
 
               {/* Distribución por Canales y Formas de Pago */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Canales de Venta */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                    Ventas por Canal de Entrada
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    {[
-                      { key: 'MANUAL', label: '🏪 POS Mostrador / Venta Directa', data: reporteData?.distribucionCanales?.MANUAL },
-                      { key: 'WHATSAPP', label: '💬 Pedidos WhatsApp / Asesor', data: reporteData?.distribucionCanales?.WHATSAPP },
-                      { key: 'CATALOGO', label: '📱 Catálogo Digital Web', data: reporteData?.distribucionCanales?.CATALOGO },
-                    ].map((c) => {
-                      const monto = c.data?.monto || 0;
-                      const pares = c.data?.pares || 0;
-                      const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
-                      return (
-                        <div key={c.key} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
-                          <div className="flex justify-between items-center font-bold">
-                            <span>{c.label}</span>
-                            <span>${monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
-                          </div>
-                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
-                            <div style={{ width: `${pct}%` }} className="bg-emerald-600 h-full rounded-full" />
-                          </div>
-                          <div className="text-[10px] text-[var(--muted-foreground)]">
-                            {pares} pares vendidos en {c.data?.count || 0} pedidos
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <GraficoDonutCircular
+                  items={[
+                    {
+                      label: 'POS Mostrador / Directo',
+                      valor: reporteData?.distribucionCanales?.MANUAL?.monto || 0,
+                      color: '#0EA5E9',
+                      subtexto: `${reporteData?.distribucionCanales?.MANUAL?.pares || 0} pares (${reporteData?.distribucionCanales?.MANUAL?.count || 0} pedidos)`,
+                    },
+                    {
+                      label: 'Pedidos WhatsApp / Asesor',
+                      valor: reporteData?.distribucionCanales?.WHATSAPP?.monto || 0,
+                      color: '#10B981',
+                      subtexto: `${reporteData?.distribucionCanales?.WHATSAPP?.pares || 0} pares (${reporteData?.distribucionCanales?.WHATSAPP?.count || 0} pedidos)`,
+                    },
+                    {
+                      label: 'Catálogo Digital Web',
+                      valor: reporteData?.distribucionCanales?.CATALOGO?.monto || 0,
+                      color: '#6366F1',
+                      subtexto: `${reporteData?.distribucionCanales?.CATALOGO?.pares || 0} pares (${reporteData?.distribucionCanales?.CATALOGO?.count || 0} pedidos)`,
+                    },
+                  ]}
+                  titulo="Ventas por Canal de Entrada"
+                  subtitulo="Desglose de ingresos según el origen del pedido"
+                  valorCentro={kpis.totalIngresos > 0 ? `$${kpis.totalIngresos.toFixed(0)}` : '$0'}
+                  etiquetaCentro="Total Facturado"
+                />
 
                 {/* Formas de Pago */}
-                <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-3 shadow-xs">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                    Distribución Contado vs Crédito
-                  </h3>
-                  <div className="space-y-2 text-xs">
-                    {[
-                      { key: 'CONTADO', label: '💵 Ventas de Contado', data: reporteData?.distribucionFormasPago?.CONTADO, color: 'bg-emerald-600' },
-                      { key: 'CREDITO', label: '📑 Ventas a Crédito', data: reporteData?.distribucionFormasPago?.CREDITO, color: 'bg-blue-600' },
-                    ].map((f) => {
-                      const monto = f.data?.monto || 0;
-                      const pct = kpis.totalIngresos > 0 ? (monto / kpis.totalIngresos) * 100 : 0;
-                      return (
-                        <div key={f.key} className="p-3 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-1">
-                          <div className="flex justify-between items-center font-bold">
-                            <span>{f.label}</span>
-                            <span>${monto.toFixed(2)} ({pct.toFixed(0)}%)</span>
-                          </div>
-                          <div className="w-full bg-[var(--muted)] h-2 rounded-full overflow-hidden">
-                            <div style={{ width: `${pct}%` }} className={`${f.color} h-full rounded-full`} />
-                          </div>
-                          <div className="text-[10px] text-[var(--muted-foreground)]">
-                            {f.data?.count || 0} operaciones registradas
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <GraficoDonutCircular
+                  items={[
+                    {
+                      label: 'Ventas de Contado',
+                      valor: reporteData?.distribucionFormasPago?.CONTADO?.monto || 0,
+                      color: '#10B981',
+                      subtexto: `${reporteData?.distribucionFormasPago?.CONTADO?.count || 0} transacciones cobradas`,
+                    },
+                    {
+                      label: 'Ventas a Crédito',
+                      valor: reporteData?.distribucionFormasPago?.CREDITO?.monto || 0,
+                      color: '#3B82F6',
+                      subtexto: `${reporteData?.distribucionFormasPago?.CREDITO?.count || 0} notas con saldo diferido`,
+                    },
+                  ]}
+                  titulo="Distribución Contado vs Crédito"
+                  subtitulo="Estructura de cobro de las transacciones comerciales"
+                  valorCentro={
+                    kpis.totalIngresos > 0 && reporteData?.distribucionFormasPago?.CONTADO?.monto
+                      ? `${((reporteData.distribucionFormasPago.CONTADO.monto / kpis.totalIngresos) * 100).toFixed(0)}%`
+                      : '100%'
+                  }
+                  etiquetaCentro="Al Contado"
+                />
               </div>
             </div>
           )}
@@ -1559,105 +1519,52 @@ export default function ReportesComponent({
                     </div>
                   </div>
 
-                  {/* Desglose de Métodos de Pago en POS */}
-                  <div className="p-6 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-                    <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-                      <div>
-                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                          Desglose por Método de Recaudación en Caja
-                        </h4>
-                        <p className="text-[11px] text-[var(--muted-foreground)]">
-                          Ingresos desglosados en Efectivo, Tarjetas (Débito/Crédito) y Transferencias bancarias
-                        </p>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-xl">
-                        Total: ${posData.metricas?.totalRecaudado?.toFixed(2) || '0.00'}
-                      </span>
-                    </div>
+                  {/* Gráficas Estadísticas del Punto de Venta */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Donut de Métodos de Recaudación en Caja */}
+                    <GraficoDonutCircular
+                      items={[
+                        {
+                          label: 'Efectivo en Caja',
+                          valor: posData.metricas?.desgloseMetodosPago?.efectivo?.total || 0,
+                          color: '#10B981',
+                          subtexto: `${posData.metricas?.desgloseMetodosPago?.efectivo?.cantidad || 0} cobros realizados`,
+                        },
+                        {
+                          label: 'Tarjeta (Datafast / Voucher)',
+                          valor: posData.metricas?.desgloseMetodosPago?.tarjeta?.total || 0,
+                          color: '#0EA5E9',
+                          subtexto: `${posData.metricas?.desgloseMetodosPago?.tarjeta?.cantidad || 0} transacciones`,
+                        },
+                        {
+                          label: 'Transferencia Bancaria',
+                          valor: posData.metricas?.desgloseMetodosPago?.transferencia?.total || 0,
+                          color: '#8B5CF6',
+                          subtexto: `${posData.metricas?.desgloseMetodosPago?.transferencia?.cantidad || 0} comprobantes`,
+                        },
+                      ]}
+                      titulo="Distribución de Cobros en Caja"
+                      subtitulo="Participación de ingresos por método de recaudación directa"
+                      valorCentro={`$${(posData.metricas?.totalRecaudado || 0).toFixed(0)}`}
+                      etiquetaCentro="Total Caja"
+                    />
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Efectivo */}
-                      <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                            💵 Efectivo en Caja
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded-md">
-                            {posData.metricas?.desgloseMetodosPago?.efectivo?.cantidad || 0} pagos
-                          </span>
-                        </div>
-                        <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                          ${posData.metricas?.desgloseMetodosPago?.efectivo?.total?.toFixed(2) || '0.00'}
-                        </div>
-                        <div className="w-full bg-emerald-200/40 dark:bg-emerald-950/40 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            style={{
-                              width: `${
-                                posData.metricas?.totalRecaudado > 0
-                                  ? ((posData.metricas?.desgloseMetodosPago?.efectivo?.total || 0) / posData.metricas.totalRecaudado) * 100
-                                  : 0
-                              }%`,
-                            }}
-                            className="bg-emerald-600 h-full rounded-full"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Tarjeta */}
-                      <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
-                            <CreditCard size={14} />
-                            Tarjeta (Datafast / Voucher)
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-md">
-                            {posData.metricas?.desgloseMetodosPago?.tarjeta?.cantidad || 0} pagos
-                          </span>
-                        </div>
-                        <div className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">
-                          ${posData.metricas?.desgloseMetodosPago?.tarjeta?.total?.toFixed(2) || '0.00'}
-                        </div>
-                        <div className="w-full bg-blue-200/40 dark:bg-blue-950/40 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            style={{
-                              width: `${
-                                posData.metricas?.totalRecaudado > 0
-                                  ? ((posData.metricas?.desgloseMetodosPago?.tarjeta?.total || 0) / posData.metricas.totalRecaudado) * 100
-                                  : 0
-                              }%`,
-                            }}
-                            className="bg-blue-600 h-full rounded-full"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Transferencia */}
-                      <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
-                            🏦 Transferencia Bancaria
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-500/15 text-purple-700 dark:text-purple-300 rounded-md">
-                            {posData.metricas?.desgloseMetodosPago?.transferencia?.cantidad || 0} pagos
-                          </span>
-                        </div>
-                        <div className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
-                          ${posData.metricas?.desgloseMetodosPago?.transferencia?.total?.toFixed(2) || '0.00'}
-                        </div>
-                        <div className="w-full bg-purple-200/40 dark:bg-purple-950/40 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            style={{
-                              width: `${
-                                posData.metricas?.totalRecaudado > 0
-                                  ? ((posData.metricas?.desgloseMetodosPago?.transferencia?.total || 0) / posData.metricas.totalRecaudado) * 100
-                                  : 0
-                              }%`,
-                            }}
-                            className="bg-purple-600 h-full rounded-full"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    {/* Barras de Modelos Más Vendidos en Mostrador */}
+                    <GraficoBarrasModerno
+                      items={
+                        (posData.metricas?.topModelos || []).slice(0, 5).map((m: any, idx: number) => ({
+                          label: `${m.nombre} ${m.color ? `(${m.color})` : ''}`,
+                          valor: m.pares,
+                          valorFormateado: `${m.pares} pares`,
+                          subtexto: `$${(m.total || 0).toFixed(2)} recaudados`,
+                          color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'][idx % 5],
+                        }))
+                      }
+                      titulo="Top Calzado Vendido en Mostrador"
+                      subtitulo="Variantes con mayor rotación directa en tienda"
+                      unidad="pares"
+                      emptyMessage="No se registran modelos vendidos en este rango de fechas."
+                    />
                   </div>
 
                   {/* Tabla y Buscador de Ventas Realizadas en POS */}
@@ -2429,108 +2336,42 @@ export default function ReportesComponent({
                   </div>
                 </div>
 
-                {/* 1.2 FASE 8: Gráficas Comparativas (Barras Combinadas + Participación %) */}
+                {/* 1.2 FASE 8: Gráficas Comparativas (Barras Modernas + Donut de Participación %) */}
                 {modelosMargenData?.topModelosGrafica && modelosMargenData.topModelosGrafica.length > 0 && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {/* Gráfica de Barras Combinada: Volumen vs Margen % */}
-                    <div className="lg:col-span-2 p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
-                            <BarChart3 size={16} className="text-blue-500" />
-                            Modelos con Mayor Demanda y Margen de Ganancia Real
-                          </h4>
-                          <p className="text-[11px] text-[var(--muted-foreground)]">
-                            Comparativa de pares despachados y porcentaje de utilidad FIFO
-                          </p>
-                        </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600">
-                          Top Modelos
-                        </span>
-                      </div>
-
-                      <div className="space-y-3 pt-1">
-                        {modelosMargenData.topModelosGrafica.map((m: any, idx: number) => {
-                          const maxPares = Math.max(...modelosMargenData.topModelosGrafica.map((x: any) => x.paresVendidos), 1);
-                          const pctBar = Math.min(100, Math.max(10, (m.paresVendidos / maxPares) * 100));
-
-                          return (
-                            <div key={idx} className="space-y-1">
-                              <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="truncate max-w-[220px] text-[var(--foreground)]">
-                                  {m.nombre}
-                                </span>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-slate-500 text-[11px] font-bold">
-                                    {m.paresVendidos} pares
-                                  </span>
-                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
-                                    m.margenPorcentual >= 40
-                                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                                      : m.margenPorcentual >= 25
-                                      ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-                                      : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                  }`}>
-                                    {m.margenPorcentual}% margen
-                                  </span>
-                                  <span className="text-emerald-600 text-[11px] font-black min-w-[55px] text-right">
-                                    +${m.gananciaNeta.toFixed(0)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="w-full bg-[var(--muted)]/50 h-3 rounded-full overflow-hidden flex">
-                                <div
-                                  style={{ width: `${pctBar}%` }}
-                                  className="h-full bg-gradient-to-r from-blue-600 to-emerald-500 rounded-full transition-all duration-500"
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <div className="lg:col-span-2">
+                      <GraficoBarrasModerno
+                        items={modelosMargenData.topModelosGrafica.map((m: any, idx: number) => ({
+                          label: m.nombre,
+                          valor: m.paresVendidos,
+                          valorFormateado: `${m.paresVendidos} pares`,
+                          subtexto: `Margen: ${m.margenPorcentual}% • Utilidad: +$${m.gananciaNeta.toFixed(0)}`,
+                          color: ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899', '#8B5CF6'][idx % 6],
+                        }))}
+                        titulo="Modelos con Mayor Demanda y Margen Real"
+                        subtitulo="Comparativa de pares despachados y porcentaje de utilidad FIFO"
+                        unidad="pares"
+                      />
                     </div>
 
-                    {/* Gráfica Circular / Participación Porcentual */}
-                    <div className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-3xl space-y-4 shadow-xs flex flex-col justify-between">
-                      <div>
-                        <h4 className="font-extrabold text-sm text-[var(--foreground)] flex items-center gap-2">
-                          <Percent size={16} className="text-emerald-500" />
-                          Participación por Modelo
-                        </h4>
-                        <p className="text-[11px] text-[var(--muted-foreground)]">
-                          Distribución porcentual del volumen de pares comercializados
-                        </p>
-                      </div>
-
-                      <div className="space-y-2.5 my-auto py-2">
-                        {modelosMargenData.topModelosGrafica.slice(0, 5).map((m: any, idx: number) => {
-                          const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-indigo-500', 'bg-amber-500', 'bg-purple-500'];
-                          const color = colors[idx % colors.length];
-
-                          return (
-                            <div key={idx} className="p-2.5 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className={`w-3 h-3 rounded-full ${color} shrink-0`} />
-                                <span className="font-bold text-[var(--foreground)] truncate max-w-[150px]">
-                                  {m.nombre}
-                                </span>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <span className="font-black text-xs text-[var(--foreground)] block">
-                                  {m.porcentajeParticipacion}%
-                                </span>
-                                <span className="text-[10px] text-[var(--muted-foreground)]">
-                                  {m.paresVendidos} pares
-                                </span>
-                              </div>
-                            </div>
-                          );
+                    {/* Gráfica Circular / Participación Porcentual SVG */}
+                    <div>
+                      <GraficoDonutCircular
+                        items={modelosMargenData.topModelosGrafica.slice(0, 5).map((m: any, idx: number) => {
+                          const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
+                          return {
+                            label: m.nombre,
+                            valor: m.paresVendidos,
+                            color: paleta[idx % paleta.length],
+                            subtexto: `${m.paresVendidos} pares (${m.porcentajeParticipacion}%)`,
+                          };
                         })}
-                      </div>
-
-                      <div className="pt-2 border-t border-[var(--border)] text-center text-[11px] text-[var(--muted-foreground)]">
-                        Consolidado sobre un total de <strong className="text-[var(--foreground)]">{modelosMargenData.metricas.totalPares} pares</strong>
-                      </div>
+                        titulo="Participación por Modelo"
+                        subtitulo="Distribución porcentual del volumen de calzado comercializado"
+                        valorCentro={`${modelosMargenData.metricas?.totalPares || 0}`}
+                        etiquetaCentro="Pares Totales"
+                      />
                     </div>
                   </div>
                 )}
@@ -3456,6 +3297,109 @@ export default function ReportesComponent({
                   <p className="text-[10px] text-[var(--muted-foreground)]">Abonos y pagos ingresados efectivamente</p>
                 </div>
               </div>
+
+              {/* Gráficos Estadísticos de Cartera y Recuperación */}
+              {cobranzasData && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Donut de Recuperación vs Cartera */}
+                  <GraficoDonutCircular
+                    items={[
+                      {
+                        label: 'Recaudado Efectivo',
+                        valor: kpis.totalRecaudadoCobros || 0,
+                        color: '#10B981',
+                        subtexto: 'Abonos y cobros ingresados en el periodo',
+                      },
+                      {
+                        label: 'Cartera por Cobrar',
+                        valor: cobranzasData.totalCartera || 0,
+                        color: '#EF4444',
+                        subtexto: `${cobranzasData.totalClientes || 0} compradores con saldo pendiente`,
+                      },
+                    ]}
+                    titulo="Ratio de Recuperación de Liquidez"
+                    subtitulo="Comparativa entre abonos recaudados y saldo deudor activo"
+                    valorCentro={
+                      (kpis.totalRecaudadoCobros + (cobranzasData.totalCartera || 0)) > 0
+                        ? `${(
+                            (kpis.totalRecaudadoCobros /
+                              (kpis.totalRecaudadoCobros + (cobranzasData.totalCartera || 0))) *
+                            100
+                          ).toFixed(0)}%`
+                        : '100%'
+                    }
+                    etiquetaCentro="Recuperado"
+                  />
+
+                  {/* Barras de Exposición por Nivel de Riesgo Crediticio */}
+                  {(() => {
+                    const niveles: Record<string, { cant: number; deuda: number }> = {
+                      EXCELENTE: { cant: 0, deuda: 0 },
+                      BUENO: { cant: 0, deuda: 0 },
+                      REGULAR: { cant: 0, deuda: 0 },
+                      CRITICO: { cant: 0, deuda: 0 },
+                    };
+
+                    (cobranzasData.clientes || []).forEach((c: any) => {
+                      const niv = (c.nivelCredito || '').toUpperCase();
+                      if (niv.includes('EXCELENTE') || (c.scoreCrediticio && c.scoreCrediticio >= 80)) {
+                        niveles.EXCELENTE.cant += 1;
+                        niveles.EXCELENTE.deuda += c.totalDeuda || 0;
+                      } else if (niv.includes('BUENO') || (c.scoreCrediticio && c.scoreCrediticio >= 60)) {
+                        niveles.BUENO.cant += 1;
+                        niveles.BUENO.deuda += c.totalDeuda || 0;
+                      } else if (niv.includes('REGULAR') || (c.scoreCrediticio && c.scoreCrediticio >= 40)) {
+                        niveles.REGULAR.cant += 1;
+                        niveles.REGULAR.deuda += c.totalDeuda || 0;
+                      } else {
+                        niveles.CRITICO.cant += 1;
+                        niveles.CRITICO.deuda += c.totalDeuda || 0;
+                      }
+                    });
+
+                    const barItems = [
+                      {
+                        label: 'Excelente (Bajo Riesgo)',
+                        valor: niveles.EXCELENTE.deuda,
+                        valorFormateado: `$${niveles.EXCELENTE.deuda.toFixed(2)}`,
+                        subtexto: `${niveles.EXCELENTE.cant} clientes`,
+                        color: '#10B981',
+                      },
+                      {
+                        label: 'Bueno (Riesgo Normal)',
+                        valor: niveles.BUENO.deuda,
+                        valorFormateado: `$${niveles.BUENO.deuda.toFixed(2)}`,
+                        subtexto: `${niveles.BUENO.cant} clientes`,
+                        color: '#0EA5E9',
+                      },
+                      {
+                        label: 'Regular (En Observación)',
+                        valor: niveles.REGULAR.deuda,
+                        valorFormateado: `$${niveles.REGULAR.deuda.toFixed(2)}`,
+                        subtexto: `${niveles.REGULAR.cant} clientes`,
+                        color: '#F59E0B',
+                      },
+                      {
+                        label: 'Crítico (Mora / Alto Riesgo)',
+                        valor: niveles.CRITICO.deuda,
+                        valorFormateado: `$${niveles.CRITICO.deuda.toFixed(2)}`,
+                        subtexto: `${niveles.CRITICO.cant} clientes`,
+                        color: '#EF4444',
+                      },
+                    ].filter((b) => b.valor > 0 || (cobranzasData.clientes || []).length === 0);
+
+                    return (
+                      <GraficoBarrasModerno
+                        items={barItems}
+                        titulo="Exposición de Cartera por Nivel de Riesgo"
+                        subtitulo="Monto total adeudado según el scoring y comportamiento de pago"
+                        unidad="$"
+                        emptyMessage="Sin deudas pendientes registradas."
+                      />
+                    );
+                  })()}
+                </div>
+              )}
 
               {/* Filtros de búsqueda de deudores */}
               <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row items-center gap-3 shadow-xs">
