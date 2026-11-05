@@ -4,11 +4,11 @@
  * Evita facturar con nombres de marcas comerciales (como Adidas, Nike, Vanz) para proteger
  * a los comerciantes artesanales de calzado de cuero de Cevallos ante el SRI y auditorías tributarias.
  * Formato estándar:
- *   "{Cantidad/Docenas} - Zapato {Color} ({RangoDeTallas})"
+ *   "{Zapato/Modelo} - {Color} ({RangoDeTallas})"
  * Ejemplos:
- *   "1 Docena - Zapato Negro / Blanco (38-43)"
- *   "Media Docena - Zapato Café (34-39)"
- *   "1 Par - Zapato Blanco (T.39)"
+ *   "Zapato - Negro / Blanco (38-43)"
+ *   "Zapato - Café (34-39)"
+ *   "Zapato - Blanco (T.39)"
  */
 
 export function formatearRangoTallasSerie(serieNombre?: string, tallasNumeros?: (number | string)[]): string {
@@ -41,35 +41,22 @@ export function formatearRangoTallasSerie(serieNombre?: string, tallasNumeros?: 
 }
 
 export function formatearDescripcionFacturaSri(opts: {
-  cantidad: number;
+  cantidad?: number;
   color?: string;
   serieNombre?: string;
   tallas?: (number | string)[];
   nombreGenerico?: string;
 }): string {
-  const { cantidad, color, serieNombre, tallas, nombreGenerico = 'Zapato' } = opts;
-
-  let prefijoCantidad = '';
-  if (cantidad === 12) {
-    prefijoCantidad = '1 Docena';
-  } else if (cantidad === 6) {
-    prefijoCantidad = 'Media Docena';
-  } else if (cantidad > 12 && cantidad % 12 === 0) {
-    prefijoCantidad = `${cantidad / 12} Docenas`;
-  } else if (cantidad === 1) {
-    prefijoCantidad = '1 Par';
-  } else {
-    prefijoCantidad = `${cantidad} Pares`;
-  }
+  const { color, serieNombre, tallas, nombreGenerico = 'Zapato' } = opts;
 
   const baseNombre = (nombreGenerico || 'Zapato').trim();
   const colorLimpio = (color || '').trim();
   const rangoTallas = formatearRangoTallasSerie(serieNombre, tallas);
 
-  // Construir nombre: ej. "1 Docena - Zapato Negro / Blanco (38-43)"
-  let resultado = `${prefijoCantidad} - ${baseNombre}`;
+  // Construir descripción concisa: ej. "Zapato - Negro / Blanco (38-42)" o "Vanz Hylane - Negro / Blanco (38-42)"
+  let resultado = baseNombre;
   if (colorLimpio) {
-    resultado += ` ${colorLimpio}`;
+    resultado += ` - ${colorLimpio}`;
   }
   if (rangoTallas) {
     resultado += ` (${rangoTallas})`;

@@ -4859,52 +4859,55 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
 
         lineas.forEach((l: any) => {
+          const cat = catalogoProductos?.find((c: any) => c.id === l.productId || c.code === l.codigo || c.id === l.varianteId);
 
-          const modeloExt = (l.modeloNombre || l.nombre || '').replace(/\s*\([^)]*\)/g, '').trim() || 'Calzado';
+          // 1. Extracción robusta del modelo
+          let modeloExt = l.modeloNombre || l.modelName;
+          if (!modeloExt || modeloExt === 'Calzado' || modeloExt === 'Calzado de Cuero' || modeloExt === 'Calzado Mostrador POS') {
+            if (cat?.modelName) modeloExt = cat.modelName;
+            else if (cat?.model) modeloExt = cat.model;
+            else if (cat?.nombre) modeloExt = cat.nombre;
+            else if (l.nombre) {
+              const match = String(l.nombre).match(/^([^(]+)/);
+              modeloExt = match ? match[1].split(' - ')[0].trim() : l.nombre;
+            }
+          }
+          modeloExt = (modeloExt || 'Calzado').replace(/\s*\([^)]*\)/g, '').trim();
 
-          const colorExt = l.color || (l.nombre?.match(/\(([^)]+)\)/)?.[1]) || '';
+          // 2. Extracción robusta del color (Negro / Blanco, etc.)
+          let colorExt = (l.color || cat?.color || l.colorNombre || '').trim();
+          if (!colorExt && l.nombre) {
+            if (l.nombre.includes('(')) {
+              const match = String(l.nombre).match(/\(([^)]+)\)/);
+              if (match) colorExt = match[1].trim();
+            } else if (l.nombre.includes(' - ')) {
+              const parts = l.nombre.split(' - ');
+              if (parts.length > 1) colorExt = parts[1].trim();
+            }
+          }
 
-          const serie = l.serie || '';
+          // 3. Extracción de serie
+          const serie = (l.serie || cat?.serieNombre || '').trim();
 
-          const key = `${modeloExt.toLowerCase()}_${colorExt.trim().toLowerCase()}_${serie.trim().toLowerCase()}`;
-
+          const key = `${modeloExt.toLowerCase()}_${colorExt.toLowerCase()}_${serie.toLowerCase()}`;
           if (!grupoMap.has(key)) {
-
             grupoMap.set(key, {
-
               modeloNombre: modeloExt,
-
-              color: colorExt.trim(),
-
-              serie: serie.trim(),
-
+              color: colorExt,
+              serie,
               tallas: [],
-
               cantidad: 0,
-
               totalPrecio: 0,
-
               productId: l.productId || 'CALZ-01',
-
             });
-
           }
-
           const g = grupoMap.get(key)!;
-
           if (l.talla && !g.tallas.includes(String(l.talla).trim())) {
-
             g.tallas.push(String(l.talla).trim());
-
           }
-
           g.cantidad += Number(l.cantidad) || 1;
-
           g.totalPrecio += (Number(l.cantidad) || 1) * Number(l.precioUnitario || 0);
-
         });
-
-
 
         grupoMap.forEach((g) => {
 
@@ -13166,126 +13169,28 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
                       <table className="w-full text-xs text-left">
 
-                        <thead className="bg-[var(--muted)]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-
+                        <thead className="bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-wider">
                           <tr>
-
-                            <th className="px-4 py-2.5">Descripción (Editable)</th>
-
-                            <th className="px-4 py-2.5 text-center">Cant.</th>
-
-                            <th className="px-4 py-2.5 text-right">P. Unit.</th>
-
-                            <th className="px-4 py-2.5 text-center">IVA</th>
-
-                            <th className="px-4 py-2.5 text-right">Subtotal</th>
-
+                            <th className="py-2.5 px-3 text-center w-16">CANT.</th>
+                            <th className="py-2.5 px-4 text-left">DESCRIPCIÓN PRODUCTO</th>
+                            <th className="py-2.5 px-3 text-right w-24">P. UNIT.</th>
+                            <th className="py-2.5 px-3 text-center w-16">IVA</th>
+                            <th className="py-2.5 px-4 text-right w-24">SUBTOTAL</th>
                           </tr>
-
                         </thead>
-
-                        <tbody className="divide-y divide-[var(--border)]">
-
-                          {facturaCliente.detalles.map((d: any, index: number) => {
-
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {facturaCliente.detalles.map((d, idx) => {
                             const sub = d.cantidad * d.precioUnitario - (d.descuento || 0);
-
                             return (
-
-                              <tr key={index} className="hover:bg-[var(--muted)]/20 transition-colors">
-
-                                <td className="px-3 py-2">
-
-                                  <div className="flex items-center gap-1.5">
-
-                                    <input
-
-                                      type="text"
-
-                                      value={d.descripcion}
-
-                                      onChange={(e) => {
-
-                                        const nuevosDetalles = [...facturaCliente.detalles];
-
-                                        nuevosDetalles[index] = { ...d, descripcion: e.target.value };
-
-                                        setFacturaCliente({ ...facturaCliente, detalles: nuevosDetalles });
-
-                                      }}
-
-                                      className="w-full px-2.5 py-1.5 text-xs font-semibold bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[#0F172A]"
-
-                                      placeholder="Descripción en la factura"
-
-                                    />
-
-                                    {/* Botón rápido individual para alternar entre genérico y modelo comercial */}
-
-                                    {d.descComercial && d.descGenerica && (
-
-                                      <button
-
-                                        type="button"
-
-                                        onClick={() => {
-
-                                          const nuevaDesc = d.descripcion === d.descGenerica ? d.descComercial : d.descGenerica;
-
-                                          const nuevosDetalles = [...facturaCliente.detalles];
-
-                                          nuevosDetalles[index] = { ...d, descripcion: nuevaDesc };
-
-                                          setFacturaCliente({ ...facturaCliente, detalles: nuevosDetalles });
-
-                                        }}
-
-                                        className="px-2 py-1.5 text-[10px] font-bold rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] border border-[var(--border)] shrink-0 transition-all cursor-pointer whitespace-nowrap"
-
-                                        title="Alternar este ítem entre Zapato y Modelo Real"
-
-                                      >
-
-                                        {d.descripcion === d.descGenerica ? '👟 Modelo' : '🛡️ Zapato'}
-
-                                      </button>
-
-                                    )}
-
-                                  </div>
-
-                                </td>
-
-                                <td className="px-4 py-2.5 text-center font-bold">{d.cantidad}</td>
-
-                                <td className="px-4 py-2.5 text-right font-semibold">
-
-                                  ${d.precioUnitario.toFixed(2)}
-
-                                </td>
-
-                                <td className="px-4 py-2.5 text-center">
-
-                                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-bold">
-
-                                    {d.tarifaIva}%
-
-                                  </span>
-
-                                </td>
-
-                                <td className="px-4 py-2.5 text-right font-black text-emerald-600 dark:text-emerald-400">
-
-                                  ${sub.toFixed(2)}
-
-                                </td>
-
+                              <tr key={idx} className="hover:bg-slate-50/60">
+                                <td className="py-3 px-3 text-center font-bold text-slate-800">{d.cantidad}</td>
+                                <td className="py-3 px-4 font-semibold text-slate-900">{d.descripcion}</td>
+                                <td className="py-3 px-3 text-right text-slate-600 font-mono">${d.precioUnitario.toFixed(2)}</td>
+                                <td className="py-3 px-3 text-center text-slate-500 font-mono text-[11px]">{d.tarifaIva || 15}%</td>
+                                <td className="py-3 px-4 text-right font-black text-slate-900 font-mono">${sub.toFixed(2)}</td>
                               </tr>
-
                             );
-
                           })}
-
                         </tbody>
 
                       </table>

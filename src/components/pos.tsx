@@ -791,8 +791,17 @@ export default function PosComponent() {
         }>();
 
         itemsVenta.forEach((item) => {
-          const modeloExt = (item.nombre || '').replace(/\s*\([^)]*\)/g, '').trim() || 'Zapato';
-          const colorLimpio = (item.color || '').trim();
+          const modeloExt = (item.nombre || '').replace(/\s*\([^)]*\)/g, '').split(' - ')[0].trim() || 'Zapato';
+          let colorLimpio = (item.color || '').trim();
+          if (!colorLimpio && item.nombre) {
+            const matchParentesis = String(item.nombre).match(/\(([^)]+)\)/);
+            if (matchParentesis) {
+              colorLimpio = matchParentesis[1].trim();
+            } else if (item.nombre.includes(' - ')) {
+              const parts = item.nombre.split(' - ');
+              if (parts.length > 1) colorLimpio = parts[1].trim();
+            }
+          }
           const serieLimpia = (item.serieNombre || '').trim();
           const key = `${modeloExt.toLowerCase()}_${colorLimpio.toLowerCase()}_${serieLimpia.toLowerCase()}`;
           if (!grupoSriMap.has(key)) {

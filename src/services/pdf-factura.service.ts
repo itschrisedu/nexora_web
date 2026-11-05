@@ -205,8 +205,8 @@ export function generarFacturaPdfDoc(data: FacturaPdfData): jsPDF {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(255, 255, 255);
-  doc.text("DESCRIPCIÓN PRODUCTO", 16, y + 4.5);
-  doc.text("CANT.", pageWidth - 78, y + 4.5, { align: "center" });
+  doc.text("CANT.", 20, y + 4.5, { align: "center" });
+  doc.text("DESCRIPCIÓN PRODUCTO", 32, y + 4.5);
   doc.text("P. UNIT.", pageWidth - 58, y + 4.5, { align: "right" });
   doc.text("IVA", pageWidth - 42, y + 4.5, { align: "center" });
   doc.text("SUBTOTAL", pageWidth - 16, y + 4.5, { align: "right" });
@@ -226,8 +226,8 @@ export function generarFacturaPdfDoc(data: FacturaPdfData): jsPDF {
     doc.setDrawColor(241, 245, 249);
     doc.line(12, y + 6.5, pageWidth - 12, y + 6.5);
 
-    doc.text(d.descripcion, 16, y + 4.5);
-    doc.text(String(d.cantidad), pageWidth - 78, y + 4.5, { align: "center" });
+    doc.text(String(d.cantidad), 20, y + 4.5, { align: "center" });
+    doc.text(d.descripcion, 32, y + 4.5);
     doc.text(`$${d.precioUnitario.toFixed(2)}`, pageWidth - 58, y + 4.5, { align: "right" });
     doc.text(`${d.tarifaIva ?? 15}%`, pageWidth - 42, y + 4.5, { align: "center" });
     doc.text(`$${d.subtotal.toFixed(2)}`, pageWidth - 16, y + 4.5, { align: "right" });
