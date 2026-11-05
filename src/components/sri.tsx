@@ -22,7 +22,6 @@ import {
   Send,
   Mail,
   X,
-  Printer,
   Smartphone,
   Check,
 } from "lucide-react";
@@ -31,7 +30,6 @@ import { useToast } from "./ui/toast";
 import { generarFacturaPdfDoc, type FacturaPdfData } from "@/services/pdf-factura.service";
 import { generarUrlPublicaFactura, armarMensajeWhatsAppFactura } from "@/services/comprobante-url.service";
 import { abrirWhatsAppUniversal } from "@/utils/whatsapp";
-import { capitalizarNombreCompleto } from "@/utils/text-formatters";
 
 interface FacturaSRI {
   id: string;
