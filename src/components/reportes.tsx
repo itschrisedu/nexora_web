@@ -1080,7 +1080,7 @@ export default function ReportesComponent({
                     <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
                     {sucursales.map((s) => (
                       <option key={s.id} value={s.id}>
-                        📍 {capitalizarNombreCompleto(s.name || s.nombre)} {s.isMatriz ? '(Matriz)' : ''}
+                        📍 {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
                       </option>
                     ))}
                   </select>
@@ -1088,7 +1088,7 @@ export default function ReportesComponent({
                 </>
               ) : (
                 <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
-                  <span>📍 {capitalizarNombreCompleto(sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada')}</span>
+                  <span>📍 {sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada'}</span>
                   <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Sede Local</span>
                 </div>
               )}
