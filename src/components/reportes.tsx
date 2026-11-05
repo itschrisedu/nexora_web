@@ -4385,15 +4385,15 @@ export default function ReportesComponent({
                   {/* Gráfico de Curva Predictiva */}
                   {Array.isArray(proyeccionMl.proyecciones) && proyeccionMl.proyecciones.length > 1 && (
                     <GraficoCurvaTendencia
-                      datos={proyeccionMl.proyecciones.map((p: any) => ({
+                      puntos={proyeccionMl.proyecciones.map((p: any) => ({
                         label: p.diaLabel || p.fecha?.slice(5) || '',
                         valor: Number(p.demandaEsperadaPares) || 0,
                       }))}
                       titulo="Curva de Demanda Proyectada (Próx. 30 Días)"
                       subtitulo="Pares de calzado estimados por día según el modelo predictivo"
-                      colorPrimario="#9333EA"
-                      colorSecundario="#7C3AED"
-                      sufijo=" pares"
+                      primaryColor="#9333EA"
+                      secondaryColor="#7C3AED"
+                      serie1Nombre="Pares proyectados"
                       altura={220}
                     />
                   )}
@@ -4539,7 +4539,7 @@ export default function ReportesComponent({
                     {/* Barras: Compras por Proveedor */}
                     {Array.isArray(proveedoresData.porProveedor) && proveedoresData.porProveedor.length > 0 && (
                       <GraficoBarrasModerno
-                        datos={proveedoresData.porProveedor
+                        items={proveedoresData.porProveedor
                           .sort((a: any, b: any) => (Number(b.totalComprado) || 0) - (Number(a.totalComprado) || 0))
                           .slice(0, 8)
                           .map((p: any) => ({
@@ -4548,15 +4548,15 @@ export default function ReportesComponent({
                           }))}
                         titulo="Volumen de Compras por Proveedor"
                         subtitulo="Monto total comprado a cada proveedor en el período"
-                        colorPrimario={businessConfig?.primaryColor || '#0EA5E9'}
-                        prefijo="$"
+                        primaryColor={businessConfig?.primaryColor || '#0EA5E9'}
                         orientacion="horizontal"
+                        unidad="$"
                       />
                     )}
 
                     {/* Donut: Pagado vs Pendiente */}
                     <GraficoDonutCircular
-                      datos={[
+                      items={[
                         {
                           label: 'Pagado',
                           valor: Math.max(0, (Number(proveedoresData.kpis?.totalComprado) || 0) - (Number(proveedoresData.kpis?.deudaTotal) || 0)),
@@ -4575,7 +4575,6 @@ export default function ReportesComponent({
                       ].filter(d => d.valor > 0)}
                       titulo="Estado de Cuentas a Proveedores"
                       subtitulo="Distribución del capital pagado, deuda y anticipos"
-                      prefijo="$"
                     />
                   </div>
 
