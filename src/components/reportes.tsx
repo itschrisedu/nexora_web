@@ -67,7 +67,7 @@ import {
   VendedorReporte,
   ProveedorAbastecimientoReporte,
 } from '@/services/pdf-reportes.service';
-import { formatearNombreSerie } from '@/utils/text-formatters';
+import { formatearNombreSerie, capitalizarNombreCompleto } from '@/utils/text-formatters';
 import {
   GraficoBarrasModerno,
   GraficoCurvaTendencia,
@@ -1080,7 +1080,7 @@ export default function ReportesComponent({
                     <option value="TODAS">🏢 Todas las Sucursales (Consolidado)</option>
                     {sucursales.map((s) => (
                       <option key={s.id} value={s.id}>
-                        📍 {s.name || s.nombre} {s.isMatriz ? '(Matriz)' : ''}
+                        📍 {capitalizarNombreCompleto(s.name || s.nombre)} {s.isMatriz ? '(Matriz)' : ''}
                       </option>
                     ))}
                   </select>
@@ -1088,7 +1088,7 @@ export default function ReportesComponent({
                 </>
               ) : (
                 <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
-                  <span>📍 {sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada'}</span>
+                  <span>📍 {capitalizarNombreCompleto(sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.name || sucursales.find((s) => s.id === (sucursalSeleccionada || propActiveSucursalId || currentUser?.tenantId))?.nombre || 'Sucursal Asignada')}</span>
                   <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Sede Local</span>
                 </div>
               )}
@@ -1108,7 +1108,7 @@ export default function ReportesComponent({
             <div className="relative">
               {isVendedor ? (
                 <div className="w-full px-3.5 py-2 bg-[var(--muted)]/50 border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] flex items-center justify-between">
-                  <span>👤 {currentUser?.nombre || currentUser?.email || 'Mis Ventas'}</span>
+                  <span>👤 {currentUser?.nombre ? capitalizarNombreCompleto(currentUser.nombre) : (currentUser?.email || 'Mis Ventas')}</span>
                   <span className="text-[10px] font-semibold text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">Vendedor</span>
                 </div>
               ) : (
@@ -1121,7 +1121,7 @@ export default function ReportesComponent({
                     <option value="TODOS">Todos los Trabajadores</option>
                     {vendedores.map((v) => (
                       <option key={v.id} value={v.id}>
-                        👤 {v.nombre} ({v.rol.replace('ROL_', '')})
+                        👤 {capitalizarNombreCompleto(v.nombre)} ({v.rol.replace('ROL_', '')})
                       </option>
                     ))}
                   </select>
@@ -1562,7 +1562,7 @@ export default function ReportesComponent({
                                   {idx + 1}
                                 </span>
                                 <span className="font-bold text-[var(--foreground)] truncate max-w-[180px]">
-                                  {v.nombre || 'Vendedor'}
+                                  {capitalizarNombreCompleto(v.nombre || 'Vendedor')}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
@@ -3352,7 +3352,7 @@ export default function ReportesComponent({
                   {/* Barras de Facturación por Trabajador */}
                   <GraficoBarrasModerno
                     items={reporteData.rankingVendedores.slice(0, 6).map((v: any, idx: number) => ({
-                      label: v.nombre,
+                      label: capitalizarNombreCompleto(v.nombre),
                       valor: v.ingresosFacturados || 0,
                       valorFormateado: `$${(v.ingresosFacturados || 0).toFixed(2)}`,
                       subtexto: `${v.paresVendidos} pares (${v.pedidosCount} pedidos)`,
@@ -3368,7 +3368,7 @@ export default function ReportesComponent({
                     items={reporteData.rankingVendedores.slice(0, 5).map((v: any, idx: number) => {
                       const paleta = ['#0EA5E9', '#10B981', '#6366F1', '#F59E0B', '#EC4899'];
                       return {
-                        label: v.nombre,
+                        label: capitalizarNombreCompleto(v.nombre),
                         valor: v.paresVendidos || 0,
                         color: paleta[idx % paleta.length],
                         subtexto: `${v.paresVendidos} pares despachados`,
@@ -3453,7 +3453,7 @@ export default function ReportesComponent({
                                     #{index + 1}
                                   </span>
                                   <div>
-                                    <span className="font-extrabold text-xs text-[var(--foreground)] block">{v.nombre}</span>
+                                    <span className="font-extrabold text-xs text-[var(--foreground)] block">{capitalizarNombreCompleto(v.nombre)}</span>
                                     <span className="text-[10px] text-[var(--muted-foreground)]">{v.email || 'Sin correo'}</span>
                                   </div>
                                 </div>
@@ -4226,7 +4226,7 @@ export default function ReportesComponent({
                 <span className={`px-2.5 py-1 rounded-lg font-bold border ${
                   vendedorSeleccionado !== 'TODOS' ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
                 }`}>
-                  👤 {vendedorSeleccionado === 'TODOS' ? 'Todos los Trabajadores' : (vendedores.find(v => v.id === vendedorSeleccionado)?.nombre || 'Trabajador')}
+                  👤 {vendedorSeleccionado === 'TODOS' ? 'Todos los Trabajadores' : capitalizarNombreCompleto(vendedores.find(v => v.id === vendedorSeleccionado)?.nombre || 'Trabajador')}
                 </span>
                 <span className={`px-2.5 py-1 rounded-lg font-bold border ${
                   canalSeleccionado !== 'TODOS' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-[var(--muted)]/50 border-[var(--border)]'
@@ -4383,7 +4383,7 @@ export default function ReportesComponent({
                       return (
                         <div key={v.userId} className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="font-black text-xs text-[var(--foreground)] truncate">{v.nombre}</span>
+                            <span className="font-black text-xs text-[var(--foreground)] truncate">{capitalizarNombreCompleto(v.nombre)}</span>
                             <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-500/10 text-blue-600">
                               {v.rol?.replace('ROL_', '') || 'VENDEDOR'}
                             </span>

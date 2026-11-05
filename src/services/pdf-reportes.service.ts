@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatearNombreSerie } from '../utils/text-formatters';
+import { formatearNombreSerie, capitalizarNombreCompleto } from '../utils/text-formatters';
 
 // ══════════════════════════════════════════════════════════════
 // INTERFACES GLOBALES DE REPORTES
@@ -1391,7 +1391,7 @@ export function generarReporteResumenEjecutivoPdf(data: ReporteResumenEjecutivoD
       x = marginLeft + 1.5;
       doc.text(`${idx + 1}`, x, y + 4.5); x += colW[0];
       doc.setFont('helvetica', 'bold');
-      doc.text(v.nombre, x, y + 4.5); x += colW[1];
+      doc.text(capitalizarNombreCompleto(v.nombre), x, y + 4.5); x += colW[1];
       doc.setFont('helvetica', 'normal');
       doc.text(v.rol.replace('ROL_', ''), x, y + 4.5); x += colW[2];
       doc.text(`${v.paresVendidos} pares`, x, y + 4.5); x += colW[3];
@@ -1823,7 +1823,7 @@ export function generarReporteProductividadVendedoresPdf(data: ReporteProductivi
   const barVenItems = data.vendedores.slice(0, 4).map((v, idx) => {
     const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
     return {
-      label: v.nombre,
+      label: capitalizarNombreCompleto(v.nombre),
       valor: v.ingresosFacturados || 0,
       valorFormateado: `$${(v.ingresosFacturados || 0).toFixed(0)}`,
       color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
@@ -1848,7 +1848,7 @@ export function generarReporteProductividadVendedoresPdf(data: ReporteProductivi
   const donutVenItems = data.vendedores.slice(0, 4).map((v, idx) => {
     const colPalette = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
     return {
-      label: v.nombre,
+      label: capitalizarNombreCompleto(v.nombre),
       valor: v.paresVendidos || 0,
       color: (colPalette[idx % colPalette.length] || [14, 165, 233]) as [number, number, number],
       subtexto: `${v.paresVendidos} pares`,
@@ -1918,7 +1918,7 @@ export function generarReporteProductividadVendedoresPdf(data: ReporteProductivi
     x = marginLeft + 1.5;
     doc.text(`${idx + 1}`, x, y + 5); x += colW[0];
     doc.setFont('helvetica', 'bold');
-    doc.text(v.nombre, x, y + 5); x += colW[1];
+    doc.text(capitalizarNombreCompleto(v.nombre), x, y + 5); x += colW[1];
     doc.setFont('helvetica', 'normal');
     doc.text(v.rol.replace('ROL_', ''), x, y + 5); x += colW[2];
     doc.text(`${v.pedidosCount}`, x, y + 5); x += colW[3];
@@ -2709,7 +2709,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
 
   const vendedores = data.rankingVendedores || [];
   const barVenItems = vendedores.slice(0, 5).map((v, idx) => ({
-    label: v.nombre,
+    label: capitalizarNombreCompleto(v.nombre),
     valor: v.ingresosFacturados || 0,
     valorFormateado: `$${(v.ingresosFacturados || 0).toFixed(0)}`,
     color: paletaColores[idx % paletaColores.length],
@@ -2795,7 +2795,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
     tx = marginLeft + 1.5;
     doc.text(`${idx + 1}`, tx, y + 4.2); tx += colWVen[0];
     doc.setFont('helvetica', 'bold');
-    doc.text(v.nombre, tx, y + 4.2); tx += colWVen[1];
+    doc.text(capitalizarNombreCompleto(v.nombre), tx, y + 4.2); tx += colWVen[1];
     doc.setFont('helvetica', 'normal');
     doc.text(v.rol.replace('ROL_', ''), tx, y + 4.2); tx += colWVen[2];
     doc.text(`${v.pedidosCount || v.pedidos || 0} ped.`, tx, y + 4.2); tx += colWVen[3];
