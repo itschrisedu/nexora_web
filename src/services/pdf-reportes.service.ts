@@ -63,6 +63,9 @@ export interface ModeloReporte {
   pedidosCount?: number;
   stockActual?: number;
   imageUrl?: string;
+  margen?: number;
+  participacion?: number;
+  gananciaNeta?: number;
 }
 
 export interface VendedorReporte {
@@ -1449,7 +1452,7 @@ export function generarReporteModelosRotacionPdf(data: ReporteModelosData): jsPD
   // 1. Barras: Modelos con Mayor Demanda y Margen Real
   const modelosParaGraficar = data.topModelosGrafica && data.topModelosGrafica.length > 0
     ? data.topModelosGrafica
-    : data.topModelos.map((m, idx) => ({
+    : data.topModelos.map((m: any, idx: number) => ({
         nombre: `${m.modelName} ${m.color ? `(${m.color})` : ''}`,
         paresVendidos: m.pares,
         margenPorcentual: m.margen || 25,
