@@ -4548,7 +4548,7 @@ export default function ReportesComponent({
                           }))}
                         titulo="Volumen de Compras por Proveedor"
                         subtitulo="Monto total comprado a cada proveedor en el período"
-                        primaryColor={businessConfig?.primaryColor || '#0EA5E9'}
+                        primaryColor={negocioInfo?.primaryColor || '#0EA5E9'}
                         orientacion="horizontal"
                         unidad="$"
                       />
@@ -4560,7 +4560,7 @@ export default function ReportesComponent({
                         {
                           label: 'Pagado',
                           valor: Math.max(0, (Number(proveedoresData.kpis?.totalComprado) || 0) - (Number(proveedoresData.kpis?.deudaTotal) || 0)),
-                          color: businessConfig?.primaryColor || '#0EA5E9',
+                          color: negocioInfo?.primaryColor || '#0EA5E9',
                         },
                         {
                           label: 'Deuda Pendiente',
