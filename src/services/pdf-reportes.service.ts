@@ -240,6 +240,8 @@ export interface ReporteGeneralIntegralData {
   campanas?: CampanaReporte[];
   distribucionMetodos?: Record<string, { monto: number; count: number }>;
   proyeccionMl?: ProyeccionMlData;
+  distribucionCanales?: any;
+  distribucionFormasPago?: any;
 }
 
 export interface ReportePosPdfData {
@@ -2343,7 +2345,103 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
   doc.text(`Margen: ${(kpis.margenPorcentaje || 0).toFixed(1)}%`, marginLeft + w4 * 2 + w4 / 2, y + 20, { align: 'center' });
   doc.text(`Saldo Cartera: $${(kpis.saldoCarteraTotal || 0).toFixed(2)}`, marginLeft + w4 * 3 + w4 / 2, y + 20, { align: 'center' });
 
-  y += 30;
+  y += 28;
+
+  // Gráfica 1: Curva de Evolución Temporal de Ventas
+  if (data.serieTemporal && data.serieTemporal.length > 0) {
+    const primaryRgb = hexToRgb(data.negocio.primaryColor || '#0EA5E9');
+    const curvePoints = data.serieTemporal.map((t: any) => ({
+      label: t.label,
+      valor: t.ingresos || 0,
+      valorFormateado: `$${(t.ingresos || 0).toFixed(0)}`,
+    }));
+
+    y = dibujarGraficoCurvaPdf(doc, marginLeft, y, contentWidth, 30, curvePoints, {
+      titulo: 'Curva de Evolución Temporal de Ingresos',
+      subtitulo: 'Comportamiento de la facturación en el periodo seleccionado',
+      colorLinea: primaryRgb,
+      colorRelleno: [224, 242, 254],
+      unidad: '$',
+    });
+  }
+
+  // Gráfica 2 & 3: Modelos con Mayor Demanda & Participación por Modelo
+  if (data.topModelos && data.topModelos.length > 0) {
+    const halfW = (contentWidth - 4) / 2;
+    const paletaColores: [number, number, number][] = [
+      [14, 165, 233],
+      [16, 185, 129],
+      [99, 102, 241],
+      [245, 158, 11],
+      [236, 72, 153],
+    ];
+
+    const topBarras = data.topModelos.slice(0, 4).map((m, idx) => ({
+      label: `${m.modelName} ${m.color ? `(${m.color})` : ''}`,
+      valor: m.pares,
+      valorFormateado: `${m.pares} pares`,
+      color: paletaColores[idx % paletaColores.length],
+      subtexto: `$${(m.ingresos || 0).toFixed(0)}`,
+    }));
+
+    dibujarGraficoBarrasPdf(
+      doc,
+      marginLeft,
+      y,
+      halfW,
+      32,
+      topBarras,
+      {
+        titulo: 'Top Modelos por Demanda',
+        subtitulo: 'Pares comercializados en el periodo',
+        unidad: 'pares',
+      }
+    );
+
+    const donutModelos = data.topModelos.slice(0, 4).map((m, idx) => ({
+      label: `${m.modelName} ${m.color ? `(${m.color})` : ''}`,
+      valor: m.pares,
+      color: paletaColores[idx % paletaColores.length],
+    }));
+
+    const totalParesGen = kpis.totalParesVendidos || data.topModelos.reduce((a, b) => a + (b.pares || 0), 0);
+
+    dibujarGraficoDonutPdf(
+      doc,
+      marginLeft + halfW + 4,
+      y,
+      halfW,
+      32,
+      donutModelos,
+      {
+        titulo: 'Participación por Modelo',
+        subtitulo: 'Distribución porcentual del calzado',
+        valorCentro: `${totalParesGen}`,
+        etiquetaCentro: 'Pares',
+      }
+    );
+
+    y += 36;
+  }
+
+  // Comprobar si se requiere nueva página para tablas
+  if (y > 175) {
+    dibujarPie(doc, 'Página 1 de 3 — Resumen Ejecutivo & Demanda de Calzado');
+    doc.addPage();
+    y = 14;
+
+    // Encabezado Pág 2
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(marginLeft, y, contentWidth, 14, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INFORME GENERAL — CATÁLOGO & RENDIMIENTO DE EQUIPO', marginLeft + 6, y + 9);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Periodo: ${data.periodo}`, pageWidth - marginRight - 6, y + 9, { align: 'right' });
+    y += 20;
+  }
 
   // Sección: Modelos Top
   if (data.topModelos && data.topModelos.length > 0) {
@@ -2458,6 +2556,67 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
   doc.setFont('helvetica', 'normal');
   doc.text(`Periodo: ${data.periodo}`, pageWidth - marginRight - 6, y + 9, { align: 'right' });
   y += 20;
+
+  // Gráficas vectoriales de Cobranzas y Campañas (Idénticas al sistema)
+  const halfWCob = (contentWidth - 4) / 2;
+
+  if (data.cobranzas) {
+    const totalRec = kpis.totalRecaudadoCobros || 0;
+    const totalCart = data.cobranzas.totalCartera || 0;
+    const totalFlujo = totalRec + totalCart;
+    const pctRecup = totalFlujo > 0 ? `${((totalRec / totalFlujo) * 100).toFixed(0)}%` : '0%';
+
+    dibujarGraficoDonutPdf(
+      doc,
+      marginLeft,
+      y,
+      halfWCob,
+      30,
+      [
+        { label: 'Recaudado en Caja', valor: totalRec, color: [16, 185, 129] },
+        { label: 'Cartera Pendiente', valor: totalCart, color: [239, 68, 68] },
+      ],
+      {
+        titulo: 'Recuperación de Cartera',
+        subtitulo: 'Abonos cobrados vs saldo diferido',
+        valorCentro: pctRecup,
+        etiquetaCentro: 'Cobrado',
+      }
+    );
+  }
+
+  if (data.campanas && data.campanas.length > 0) {
+    const paletaC: [number, number, number][] = [
+      [147, 51, 234],
+      [59, 130, 246],
+      [16, 185, 129],
+      [245, 158, 11],
+    ];
+
+    const campBarras = data.campanas.slice(0, 4).map((c, idx) => ({
+      label: c.codigo || c.titulo,
+      valor: c.montoTotalGenerado || 0,
+      valorFormateado: `$${(c.montoTotalGenerado || 0).toFixed(0)}`,
+      color: paletaC[idx % paletaC.length],
+      subtexto: `${c.canjesUsados} canjes`,
+    }));
+
+    dibujarGraficoBarrasPdf(
+      doc,
+      marginLeft + halfWCob + 4,
+      y,
+      halfWCob,
+      30,
+      campBarras,
+      {
+        titulo: 'Efectividad de Campañas',
+        subtitulo: 'Ventas asociadas a cupones',
+        unidad: '$',
+      }
+    );
+  }
+
+  y += 34;
 
   // Sección: Cartera de Cobranzas
   if (data.cobranzas && data.cobranzas.clientes) {
@@ -2592,6 +2751,24 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.text(`${data.proyeccionMl.confianza || '89.4%'}`, marginLeft + 80, y + 10.5);
+
+    y += 18;
+
+    if (data.proyeccionMl.proyecciones && data.proyeccionMl.proyecciones.length > 1) {
+      const mlPoints = data.proyeccionMl.proyecciones.slice(0, 15).map((p: any) => ({
+        label: p.diaLabel || p.fecha?.slice(5) || '',
+        valor: Number(p.demandaEsperadaPares) || 0,
+        valorFormateado: `${p.demandaEsperadaPares}p`,
+      }));
+
+      y = dibujarGraficoCurvaPdf(doc, marginLeft, y, contentWidth, 26, mlPoints, {
+        titulo: 'Curva Predictiva de Demanda (Nexora ML)',
+        subtitulo: 'Inferencia de demanda esperada en pares para los próximos días',
+        colorLinea: [147, 51, 234],
+        colorRelleno: [243, 232, 255],
+        unidad: 'pares',
+      });
+    }
   }
 
   dibujarPie(doc, 'Página 2 de 2 — Consolidado Institucional');

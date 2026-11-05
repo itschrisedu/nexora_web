@@ -550,6 +550,8 @@ export default function ReportesComponent({
         } : undefined,
         campanas: campData?.campanas || [],
         distribucionMetodos: reporteData?.distribucionMetodosAbono || {},
+        distribucionCanales: reporteData?.distribucionCanales,
+        distribucionFormasPago: reporteData?.distribucionFormasPago,
         proyeccionMl: mlData || undefined,
       };
 
@@ -1425,7 +1427,9 @@ export default function ReportesComponent({
                     Volumen Promedio por Venta
                   </span>
                   <div className="text-xl font-black text-blue-600">
-                    {kpis.totalPedidos > 0 ? (kpis.totalPares / kpis.totalPedidos).toFixed(1) : '0.0'} pares
+                    {kpis.totalPedidos > 0 && (kpis.totalParesVendidos || 0) > 0
+                      ? ((kpis.totalParesVendidos || 0) / kpis.totalPedidos).toFixed(1)
+                      : '0.0'} pares
                   </div>
                   <span className="text-[10px] text-[var(--muted-foreground)] mt-0.5 block">
                     Pares promedio comercializados por pedido
