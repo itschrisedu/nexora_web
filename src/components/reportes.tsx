@@ -514,24 +514,33 @@ export default function ReportesComponent({
       let cobData = cobranzasData;
       let campData = campanasData;
       let mlData = proyeccionMl;
+      let pos = posData;
+      let suc = sucursalesReporteData;
+      let prov = proveedoresData;
+      let modMargen = modelosMargenData;
 
-      if (!cobData) {
-        try {
-          cobData = await ApiService.get('/reportes/cobranzas');
-          setCobranzasData(cobData);
-        } catch (e) {}
+      const baseParams = new URLSearchParams();
+      baseParams.append('periodo', periodo);
+      if (periodo === 'PERSONALIZADO') {
+        if (fechaDesde) baseParams.append('fechaDesde', fechaDesde);
+        if (fechaHasta) baseParams.append('fechaHasta', fechaHasta);
       }
-      if (!campData) {
-        try {
-          campData = await ApiService.get('/reportes/campanas');
-          setCampanasData(campData);
-        } catch (e) {}
+      if (sucursalSeleccionada && sucursalSeleccionada !== 'TODAS') {
+        baseParams.append('sucursalId', sucursalSeleccionada);
       }
-      if (!mlData) {
-        try {
-          mlData = await ApiService.get('/reportes/proyeccion-ml?horizonteDias=30');
-          setProyeccionMl(mlData);
-        } catch (e) {}
+      const qs = baseParams.toString();
+
+      const promises: Promise<any>[] = [];
+      if (!cobData) promises.push(ApiService.get(`/reportes/cobranzas?${qs}`).then(d => { cobData = d; setCobranzasData(d); }).catch(() => {}));
+      if (!campData) promises.push(ApiService.get(`/reportes/campanas?${qs}`).then(d => { campData = d; setCampanasData(d); }).catch(() => {}));
+      if (!mlData) promises.push(ApiService.get('/reportes/proyeccion-ml?horizonteDias=30').then(d => { mlData = d; setProyeccionMl(d); }).catch(() => {}));
+      if (!pos) promises.push(ApiService.get(`/reportes/pos?${qs}`).then(d => { pos = d; setPosData(d); }).catch(() => {}));
+      if (!suc) promises.push(ApiService.get(`/reportes/rendimiento-sucursales?${qs}`).then(d => { suc = d; setSucursalesReporteData(d); }).catch(() => {}));
+      if (!prov) promises.push(ApiService.get(`/reportes/abastecimiento-proveedores?${qs}`).then(d => { prov = d; setProveedoresData(d); }).catch(() => {}));
+      if (!modMargen) promises.push(ApiService.get(`/reportes/ventas-modelos-margen?${qs}`).then(d => { modMargen = d; setModelosMargenData(d); }).catch(() => {}));
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
       }
 
       const payload = {
@@ -543,6 +552,7 @@ export default function ReportesComponent({
         topModelos: reporteData?.topModelos || [],
         bajaRotacion: reporteData?.bajaRotacion || [],
         rankingVendedores: reporteData?.rankingVendedores || [],
+        modelosMargen: modMargen || undefined,
         cobranzas: cobData ? {
           totalCartera: cobData.totalCartera || 0,
           totalClientes: cobData.totalClientes || 0,
@@ -552,6 +562,9 @@ export default function ReportesComponent({
         distribucionMetodos: reporteData?.distribucionMetodosAbono || {},
         distribucionCanales: reporteData?.distribucionCanales,
         distribucionFormasPago: reporteData?.distribucionFormasPago,
+        posData: pos || undefined,
+        sucursalesData: suc || undefined,
+        proveedoresData: prov || undefined,
         proyeccionMl: mlData || undefined,
       };
 
