@@ -90,6 +90,7 @@ interface ItemVenta {
   tallaId: string;
   tallaNumero: number;
   nombre: string;
+  modeloNombre?: string;
   color: string;
   imageUrl?: string;
   cantidad: number;
@@ -790,7 +791,7 @@ export default function PosComponent() {
         }>();
 
         itemsVenta.forEach((item) => {
-          const modeloExt = (item.modeloNombre || item.nombre || '').replace(/\s*\([^)]*\)/g, '').trim() || 'Zapato';
+          const modeloExt = (item.nombre || '').replace(/\s*\([^)]*\)/g, '').trim() || 'Zapato';
           const colorLimpio = (item.color || '').trim();
           const serieLimpia = (item.serieNombre || '').trim();
           const key = `${modeloExt.toLowerCase()}_${colorLimpio.toLowerCase()}_${serieLimpia.toLowerCase()}`;
