@@ -77,6 +77,7 @@ export interface VendedorReporte {
   paresVendidos: number;
   ingresosFacturados: number;
   contribucionPorcentaje?: number;
+  pedidos?: number;
 }
 
 export interface MetodoPagoDistribucion {
@@ -2797,7 +2798,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
     doc.text(v.nombre, tx, y + 4.2); tx += colWVen[1];
     doc.setFont('helvetica', 'normal');
     doc.text(v.rol.replace('ROL_', ''), tx, y + 4.2); tx += colWVen[2];
-    doc.text(`${v.pedidos || 0} ped.`, tx, y + 4.2); tx += colWVen[3];
+    doc.text(`${v.pedidosCount || v.pedidos || 0} ped.`, tx, y + 4.2); tx += colWVen[3];
     doc.text(`${v.paresVendidos} pares`, tx, y + 4.2); tx += colWVen[4];
     doc.setTextColor(16, 185, 129);
     doc.setFont('helvetica', 'bold');
