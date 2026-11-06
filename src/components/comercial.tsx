@@ -3067,6 +3067,19 @@ export default function ComercialComponent({
           </p>
         </div>
 
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+          {/* Botón de Exportación de Pendientes de Entrega */}
+          <button
+            type="button"
+            onClick={handleExportarPendientesEntregaPdf}
+            disabled={exportandoPendientesPdf}
+            title="Descargar de inmediato el PDF de los pares que faltan entregar hoy"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+          >
+            {exportandoPendientesPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+            <span>Exportar Pendientes de Entrega</span>
+          </button>
+
         <button
           onClick={() => {
             setEditingOrderId(null);
@@ -3100,6 +3113,7 @@ export default function ComercialComponent({
             ) : null;
           })()}
         </button>
+        </div>
       </div>
 
       {/* Pestañas Dinámicas de Sucursal & Filtros de Estado */}
@@ -3185,68 +3199,27 @@ export default function ComercialComponent({
 
           return (
             <>
-              {/* Barra Superior: Acceso Rápido + Estados Canónicos del Flujo (Tesis) */}
-              <div className="flex flex-wrap items-center gap-3 w-full pt-0.5">
-                {/* 1. MÓDULO DE ACCESO RÁPIDO (Atajo operativo, no es un estado del ciclo) */}
-                <div className="flex items-center gap-1.5 p-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs">
-                  <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] px-2 tracking-wider hidden sm:inline">
-                    Acceso Rápido:
-                  </span>
-                  <button
-                    type="button"
-                    title="Atajo de acceso rápido para consultar todos los pedidos sin restricción de estado"
-                    onClick={() => setFiltroEstadoTesis('TODOS')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      filtroEstadoTesis === 'TODOS'
-                        ? 'bg-[#0F172A] text-white shadow-xs font-black ring-2 ring-slate-400/40'
-                        : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/50'
-                    }`}
-                  >
-                    <Layers size={13} className={filtroEstadoTesis === 'TODOS' ? 'text-amber-400' : 'text-slate-400'} />
-                    <span>Todos</span>
-                    <span className="text-[10px] opacity-80 font-mono font-normal">({pedidosDeSucursal.length})</span>
-                  </button>
+              {/* Barra Superior: Estados del Ciclo */}
+              <div className="flex flex-wrap items-center gap-1.5 w-full pt-0.5">
+                <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] px-1 tracking-wider hidden md:inline">
+                  Estados del Ciclo:
+                </span>
 
-                  {/* Filtro Rápido con un Clic: Solo Pedidos con Entrega Parcial */}
-                  <button
-                    type="button"
-                    title="Filtrar rápidamente pedidos que tienen pares pendientes de entrega"
-                    onClick={() => {
-                      setFiltroEstadoTesis('ENTREGADO');
-                      setSubFiltroEntrega('ENTREGADO_PARCIAL');
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      filtroEstadoTesis === 'ENTREGADO' && subFiltroEntrega === 'ENTREGADO_PARCIAL'
-                        ? 'bg-cyan-600 text-white shadow-xs font-black ring-2 ring-cyan-400/40'
-                        : 'text-cyan-700 dark:text-cyan-400 hover:bg-cyan-500/10'
-                    }`}
-                  >
-                    <Truck size={13} className="text-cyan-500" />
-                    <span>Solo Entregas Parciales</span>
-                    <span className="text-[10px] opacity-90 font-mono font-black">({countEntregaParcial})</span>
-                  </button>
-                </div>
-
-                {/* Botón de Exportación Directa de Pendientes de Entrega */}
+                {/* BOTÓN TODOS REUBICADO */}
                 <button
                   type="button"
-                  onClick={handleExportarPendientesEntregaPdf}
-                  disabled={exportandoPendientesPdf}
-                  title="Descargar de inmediato el PDF de los pares que faltan entregar hoy"
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30 rounded-2xl text-xs font-black transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                  title="Consultar todos los pedidos de la sucursal"
+                  onClick={() => setFiltroEstadoTesis('TODOS')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    filtroEstadoTesis === 'TODOS'
+                      ? 'bg-[#0F172A] text-white border-slate-900 shadow-xs font-black'
+                      : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
                 >
-                  {exportandoPendientesPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                  <span>Exportar Pendientes de Entrega</span>
+                  <Layers size={12} className={filtroEstadoTesis === 'TODOS' ? 'text-amber-400' : 'text-slate-400'} />
+                  <span>Todos</span>
+                  <span className="text-[10px] opacity-80 font-mono">({pedidosDeSucursal.length})</span>
                 </button>
-
-                {/* Separador Visual */}
-                <div className="h-6 w-px bg-[var(--border)] hidden lg:block" />
-
-                {/* 2. LOS 4 ESTADOS CANÓNICOS DEL CICLO (ALINEADOS A LA TESIS) */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] font-black uppercase text-[var(--muted-foreground)] px-1 tracking-wider hidden md:inline">
-                    Estados del Ciclo:
-                  </span>
 
                 {/* 1. ESTADO PENDIENTE */}
                 <button
@@ -3314,7 +3287,6 @@ export default function ComercialComponent({
                   <span className="text-[10px] opacity-80 font-mono">({countCancelado})</span>
                 </button>
               </div>
-            </div>
 
               {/* Sub-filtros Operativos Dinámicos para 'EN_PREPARACION' */}
               {filtroEstadoTesis === 'EN_PREPARACION' && (

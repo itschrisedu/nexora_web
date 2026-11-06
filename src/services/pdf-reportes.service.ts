@@ -3454,7 +3454,6 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
   y += 24;
 
   // Gráficos lado a lado: Top Inversión por Modelo & Distribución por Serie
-  const halfW = (contentWidth - 4) / 2;
   const graficosInv = inv.graficos || {};
 
   const topInversionItems = (graficosInv.topInversion || (data.topModelos || []).slice(0, 4).map((m: any) => ({
