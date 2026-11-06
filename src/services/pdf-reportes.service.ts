@@ -132,6 +132,8 @@ export interface ReporteResumenEjecutivoData {
   proveedoresData?: any;
   modelosMargen?: any;
   rotacionResumen?: any;
+  inventarioFifoData?: any;
+  entregasPedidosData?: any;
 }
 
 export interface ProductoRotacionCompleto {
@@ -256,6 +258,8 @@ export interface ReporteGeneralIntegralData {
   proveedoresData?: any;
   modelosMargen?: any;
   rotacionResumen?: any;
+  inventarioFifoData?: any;
+  entregasPedidosData?: any;
 }
 
 export interface ReportePosPdfData {
@@ -3969,5 +3973,398 @@ export function generarReporteAbastecimientoPdf(data: ReporteAbastecimientoData)
   }
 
   dibujarPie(doc, 'Reporte de Abastecimiento & Proveedores — Sistema Comercial');
+  return doc;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// REPORTE DE INVENTARIO CON VALORACIÓN FIFO
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface LoteFifoItemPdf {
+  codigo: string;
+  entryDate: string;
+  proveedorNombre: string;
+  cantidadRecibida: number;
+  cantidadDisponible: number;
+  unitCost: number;
+  pvp: number;
+  gananciaPar: number;
+  estado: string;
+}
+
+export interface ModeloInventarioFifoPdf {
+  nombre: string;
+  color: string;
+  serieNombre: string;
+  stockTotal: number;
+  pvp: number;
+  costoFifoActivo: number;
+  valorTotalFifo: number;
+  valorTotalPvp: number;
+  gananciaTotal: number;
+  margenPct: number;
+  estadoStock: string;
+  proveedorNombre?: string;
+  curvaTexto?: string;
+  lotes?: LoteFifoItemPdf[];
+}
+
+export interface ReporteInventarioFifoPdfData {
+  negocio: NegocioInfo;
+  periodo?: string;
+  fechaGeneracion?: string;
+  sucursalNombre?: string;
+  kpis: {
+    totalParesBodega: number;
+    valorTotalFifo: number;
+    valorTotalPvp: number;
+    gananciaEstimada: number;
+    margenEstimadoPct: number;
+    modelosAgotadosCount: number;
+    modelosStockBajoCount: number;
+    totalModelos: number;
+  };
+  modelos: ModeloInventarioFifoPdf[];
+}
+
+export function generarReporteInventarioFifoPdf(data: ReporteInventarioFifoPdfData): jsPDF {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const marginLeft = 14;
+  const contentWidth = 182;
+
+  let y = dibujarEncabezado(
+    doc,
+    data.negocio,
+    'REPORTE DE INVENTARIO & VALORACIÓN FIFO',
+    data.periodo || 'AL DÍA',
+    data.fechaGeneracion || new Date().toLocaleDateString('es-EC')
+  );
+
+  // Tarjetas KPI de cabecera
+  const kpiW = (contentWidth - 8) / 5;
+  const kpiH = 14;
+
+  const kpis = [
+    { label: 'PARES EN BODEGA', val: `${data.kpis.totalParesBodega} p`, sub: `${data.kpis.totalModelos} variantes`, color: [14, 165, 233] },
+    { label: 'VALOR FIFO', val: `$${data.kpis.valorTotalFifo.toFixed(2)}`, sub: 'Costo real de compra', color: [16, 185, 129] },
+    { label: 'VALOR EN VENTA', val: `$${data.kpis.valorTotalPvp.toFixed(2)}`, sub: 'Proyección mostrador', color: [99, 102, 241] },
+    { label: 'GANANCIA EST.', val: `$${data.kpis.gananciaEstimada.toFixed(2)}`, sub: `Margen ${data.kpis.margenEstimadoPct}%`, color: [5, 150, 105] },
+    { label: 'ESTADO DE STOCK', val: `${data.kpis.modelosAgotadosCount} agot.`, sub: `${data.kpis.modelosStockBajoCount} en mínimo`, color: [239, 68, 68] },
+  ];
+
+  kpis.forEach((k, idx) => {
+    const kx = marginLeft + idx * (kpiW + 2);
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(kx, y, kpiW, kpiH, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(100, 116, 139);
+    doc.text(k.label, kx + 2, y + 3.8);
+
+    doc.setFontSize(8);
+    doc.setTextColor(k.color[0], k.color[1], k.color[2]);
+    doc.text(k.val, kx + 2, y + 8);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(k.sub, kx + 2, y + 11.8);
+  });
+
+  y += kpiH + 5;
+
+  // Título de la tabla
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text('DETALLE DE EXISTENCIAS VALORADAS BAJO MÉTODO FIFO', marginLeft, y);
+  y += 3.5;
+
+  // Cabecera de la tabla
+  const colW = [8, 48, 24, 20, 16, 18, 16, 18, 14];
+  const headers = ['#', 'CALZADO / MODELO', 'COLOR', 'SERIE', 'STOCK', 'COSTO FIFO', 'PVP', 'VALOR FIFO', 'ESTADO'];
+
+  doc.setFillColor(15, 23, 42);
+  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6.5);
+
+  let x = marginLeft + 2;
+  headers.forEach((h, i) => {
+    doc.text(h, x, y + 3.8);
+    x += colW[i];
+  });
+  y += 5.5;
+
+  const modelos = data.modelos || [];
+  if (modelos.length === 0) {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(marginLeft, y, contentWidth, 8, 'F');
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'normal');
+    doc.text('No se encontraron registros de inventario para los criterios seleccionados.', marginLeft + 4, y + 5);
+    y += 8;
+  } else {
+    modelos.forEach((m, idx) => {
+      if (y > 270) {
+        dibujarPie(doc, 'Reporte de Inventario con Valoración FIFO — Sistema Comercial');
+        doc.addPage();
+        y = 15;
+        doc.setFillColor(15, 23, 42);
+        doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(6.5);
+        let xh = marginLeft + 2;
+        headers.forEach((h, i) => {
+          doc.text(h, xh, y + 3.8);
+          xh += colW[i];
+        });
+        y += 5.5;
+      }
+
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(6.5);
+
+      x = marginLeft + 2;
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${idx + 1}`, x, y + 3.8); x += colW[0];
+      doc.text(m.nombre.substring(0, 32), x, y + 3.8); x += colW[1];
+      doc.setFont('helvetica', 'normal');
+      doc.text(m.color.substring(0, 16), x, y + 3.8); x += colW[2];
+      doc.text(m.serieNombre.substring(0, 14), x, y + 3.8); x += colW[3];
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${m.stockTotal} p`, x, y + 3.8); x += colW[4];
+      doc.setFont('helvetica', 'normal');
+      doc.text(`$${m.costoFifoActivo.toFixed(2)}`, x, y + 3.8); x += colW[5];
+      doc.text(`$${m.pvp.toFixed(2)}`, x, y + 3.8); x += colW[6];
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(16, 185, 129);
+      doc.text(`$${m.valorTotalFifo.toFixed(2)}`, x, y + 3.8); x += colW[7];
+
+      // Estado stock
+      if (m.stockTotal === 0) {
+        doc.setTextColor(239, 68, 68);
+        doc.text('AGOTADO', x, y + 3.8);
+      } else if (m.stockTotal <= 2) {
+        doc.setTextColor(245, 158, 11);
+        doc.text('MÍNIMO', x, y + 3.8);
+      } else {
+        doc.setTextColor(16, 185, 129);
+        doc.text('ÓPTIMO', x, y + 3.8);
+      }
+
+      y += 5.5;
+
+      // Si tiene desglose de lotes activos, imprimir subfila compacta
+      if (m.lotes && m.lotes.length > 0) {
+        const lotesActivos = m.lotes.filter((l) => l.cantidadDisponible > 0);
+        if (lotesActivos.length > 0 && y <= 268) {
+          doc.setFillColor(241, 245, 249);
+          doc.rect(marginLeft + colW[0], y, contentWidth - colW[0], 4.2, 'F');
+          doc.setFontSize(5.5);
+          doc.setTextColor(100, 116, 139);
+          doc.setFont('helvetica', 'normal');
+
+          const textoLotes = lotesActivos
+            .map((l) => `${l.codigo}: ${l.cantidadDisponible} pares a $${l.unitCost.toFixed(2)} (${l.estado === 'ACTIVO' ? 'En consumo' : 'En reserva'})`)
+            .join(' | ');
+
+          doc.text(`Lotes FIFO vigentes: ${textoLotes.substring(0, 120)}`, marginLeft + colW[0] + 2, y + 3);
+          y += 4.5;
+        }
+      }
+    });
+  }
+
+  dibujarPie(doc, 'Reporte de Inventario con Valoración FIFO — Sistema Comercial');
+  return doc;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// REPORTE DE ENTREGAS Y PEDIDOS PENDIENTES
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface PedidoEntregaPendientePdf {
+  numeroPedido: string;
+  createdAt: string;
+  clienteNombre: string;
+  clienteTelefono: string;
+  calzadoResumen: string;
+  resumenPendientesTexto: string;
+  totalPares: number;
+  paresEntregados: number;
+  paresPendientes: number;
+  saldoPendiente: number;
+  estadoEntrega: string;
+}
+
+export interface ReporteEntregasPendientesPdfData {
+  negocio: NegocioInfo;
+  periodo?: string;
+  fechaGeneracion?: string;
+  sucursalNombre?: string;
+  kpis: {
+    totalPedidosPendientes: number;
+    totalParesPendientes: number;
+    totalPedidosEntregados: number;
+    totalParesEntregados: number;
+    saldoPendienteCobro: number;
+  };
+  pedidos: PedidoEntregaPendientePdf[];
+}
+
+export function generarReporteEntregasPendientesPdf(data: ReporteEntregasPendientesPdfData): jsPDF {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const marginLeft = 14;
+  const contentWidth = 182;
+
+  let y = dibujarEncabezado(
+    doc,
+    data.negocio,
+    'REPORTE DE ENTREGAS Y PEDIDOS PENDIENTES',
+    data.periodo || 'AL DÍA',
+    data.fechaGeneracion || new Date().toLocaleDateString('es-EC')
+  );
+
+  // Tarjetas KPI de cabecera
+  const kpiW = (contentWidth - 6) / 4;
+  const kpiH = 14;
+
+  const kpis = [
+    { label: 'PEDIDOS PENDIENTES', val: `${data.kpis.totalPedidosPendientes} pedidos`, sub: 'Con pares adeudados', color: [239, 68, 68] },
+    { label: 'PARES POR ENTREGAR', val: `${data.kpis.totalParesPendientes} pares`, sub: 'Pendientes de despacho', color: [245, 158, 11] },
+    { label: 'PEDIDOS COMPLETADOS', val: `${data.kpis.totalPedidosEntregados} pedidos`, sub: `${data.kpis.totalParesEntregados} pares despachados`, color: [16, 185, 129] },
+    { label: 'SALDO POR COBRAR', val: `$${data.kpis.saldoPendienteCobro.toFixed(2)}`, sub: 'Cobro contra entrega', color: [99, 102, 241] },
+  ];
+
+  kpis.forEach((k, idx) => {
+    const kx = marginLeft + idx * (kpiW + 2);
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(kx, y, kpiW, kpiH, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(100, 116, 139);
+    doc.text(k.label, kx + 2, y + 3.8);
+
+    doc.setFontSize(8.5);
+    doc.setTextColor(k.color[0], k.color[1], k.color[2]);
+    doc.text(k.val, kx + 2, y + 8);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(k.sub, kx + 2, y + 11.8);
+  });
+
+  y += kpiH + 5;
+
+  // Título de la tabla
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text('CONTROL DETALLADO DE PEDIDOS Y SALDOS PENDIENTES DE ENTREGA', marginLeft, y);
+  y += 3.5;
+
+  // Cabecera de la tabla
+  const colW = [20, 16, 36, 40, 36, 18, 16];
+  const headers = ['N° PEDIDO', 'FECHA', 'CLIENTE / CONTACTO', 'CALZADO SOLICITADO', 'PARES FALTANTES', 'PROGRESO', 'SALDO'];
+
+  doc.setFillColor(15, 23, 42);
+  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6.5);
+
+  let x = marginLeft + 2;
+  headers.forEach((h, i) => {
+    doc.text(h, x, y + 3.8);
+    x += colW[i];
+  });
+  y += 5.5;
+
+  const pedidos = data.pedidos || [];
+  if (pedidos.length === 0) {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(marginLeft, y, contentWidth, 8, 'F');
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'normal');
+    doc.text('No hay pedidos pendientes de entrega en este momento. ¡Todas las entregas están al día!', marginLeft + 4, y + 5);
+    y += 8;
+  } else {
+    pedidos.forEach((p, idx) => {
+      if (y > 270) {
+        dibujarPie(doc, 'Reporte de Entregas y Pedidos Pendientes — Sistema Comercial');
+        doc.addPage();
+        y = 15;
+        doc.setFillColor(15, 23, 42);
+        doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(6.5);
+        let xh = marginLeft + 2;
+        headers.forEach((h, i) => {
+          doc.text(h, xh, y + 3.8);
+          xh += colW[i];
+        });
+        y += 5.5;
+      }
+
+      const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+      doc.setFillColor(bg[0], bg[1], bg[2]);
+      doc.rect(marginLeft, y, contentWidth, 6.5, 'F');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(6.5);
+
+      x = marginLeft + 2;
+      doc.setFont('helvetica', 'bold');
+      doc.text(p.numeroPedido, x, y + 4.2); x += colW[0];
+
+      doc.setFont('helvetica', 'normal');
+      const fechaFmt = p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-EC') : '-';
+      doc.text(fechaFmt, x, y + 4.2); x += colW[1];
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(p.clienteNombre.substring(0, 22), x, y + 3.2);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(p.clienteTelefono ? `Tel: ${p.clienteTelefono}` : 'Sin teléfono', x, y + 5.5);
+      x += colW[2];
+
+      doc.setFontSize(6.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text(p.calzadoResumen.substring(0, 26), x, y + 4.2); x += colW[3];
+
+      // Pares que faltan (destacado en rojo/ámbar)
+      doc.setFont('helvetica', 'bold');
+      if (p.paresPendientes > 0) {
+        doc.setTextColor(220, 38, 38);
+        doc.text(p.resumenPendientesTexto.substring(0, 24), x, y + 4.2);
+      } else {
+        doc.setTextColor(16, 185, 129);
+        doc.text('Completo (0 pares)', x, y + 4.2);
+      }
+      x += colW[4];
+
+      // Progreso
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
+      doc.text(`${p.paresEntregados}/${p.totalPares} p`, x, y + 4.2); x += colW[5];
+
+      // Saldo pendiente
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(p.saldoPendiente > 0 ? 220 : 16, p.saldoPendiente > 0 ? 38 : 185, p.saldoPendiente > 0 ? 38 : 129);
+      doc.text(`$${p.saldoPendiente.toFixed(2)}`, x, y + 4.2);
+
+      y += 6.5;
+    });
+  }
+
+  dibujarPie(doc, 'Reporte de Entregas y Pedidos Pendientes — Sistema Comercial');
   return doc;
 }

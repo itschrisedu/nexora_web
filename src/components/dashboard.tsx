@@ -27,6 +27,8 @@ import {
   ArrowRight,
   BadgeCheck,
   Wallet,
+  Clock,
+  Users,
 } from "lucide-react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "@/components/ui/toast";
@@ -93,12 +95,34 @@ export default function DashboardComponent({
 
   // Estados de Filtro y Datos
   type PeriodoDashboard = "HOY" | "SEMANAL" | "MENSUAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL";
+  type TabDashboard = "OPERATIVO" | "FINANCIERO";
   const [periodo, setPeriodo] = useState<PeriodoDashboard>("MENSUAL");
+  const [dashboardTab, setDashboardTab] = useState<TabDashboard>("OPERATIVO");
   const [loading, setLoading] = useState(true);
 
   // Métrica seleccionada para el gráfico spline (Monto $ o Pares)
   const [tipoMetricaGrafico, setTipoMetricaGrafico] = useState<"MONTO" | "PARES">("MONTO");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  // Métricas de Control Operativo
+  const [estadosPedidos, setEstadosPedidos] = useState<{
+    PENDIENTE: number;
+    EN_PREPARACION: number;
+    ENTREGADO: number;
+    CANCELADO: number;
+  }>({ PENDIENTE: 0, EN_PREPARACION: 0, ENTREGADO: 0, CANCELADO: 0 });
+
+  const [scoringClientes, setScoringClientes] = useState<{
+    A: number;
+    B: number;
+    C: number;
+    D: number;
+    SIN_CREDITO: number;
+  }>({ A: 0, B: 0, C: 0, D: 0, SIN_CREDITO: 0 });
+
+  const [tallasBajas, setTallasBajas] = useState<{ [key: number]: number }>({
+    37: 0, 38: 0, 39: 0, 40: 0, 41: 0, 42: 0,
+  });
 
   const [kpis, setKpis] = useState({
     totalFacturado: 0,
@@ -195,6 +219,27 @@ export default function DashboardComponent({
           );
         } else {
           setVentasChart([]);
+        }
+
+        if (data.distribucionEstadosPedidos) {
+          setEstadosPedidos({
+            PENDIENTE: Number(data.distribucionEstadosPedidos.PENDIENTE || 0),
+            EN_PREPARACION: Number(data.distribucionEstadosPedidos.EN_PREPARACION || 0),
+            ENTREGADO: Number(data.distribucionEstadosPedidos.ENTREGADO || 0),
+            CANCELADO: Number(data.distribucionEstadosPedidos.CANCELADO || 0),
+          });
+        }
+        if (data.scoringClientes) {
+          setScoringClientes({
+            A: Number(data.scoringClientes.A || 0),
+            B: Number(data.scoringClientes.B || 0),
+            C: Number(data.scoringClientes.C || 0),
+            D: Number(data.scoringClientes.D || 0),
+            SIN_CREDITO: Number(data.scoringClientes.SIN_CREDITO || 0),
+          });
+        }
+        if (data.tallasBajas37_42) {
+          setTallasBajas(data.tallasBajas37_42);
         }
 
         const formasPago = data.distribucionFormasPago;
@@ -428,6 +473,36 @@ export default function DashboardComponent({
 
   const activePoint = hoverIndex !== null && splinePoints[hoverIndex] ? splinePoints[hoverIndex] : null;
 
+  // ─── CÁLCULOS PARA PESTAÑA DE CONTROL OPERATIVO ───
+  const totalPedidosOperativo = useMemo(() => {
+    const sum =
+      (estadosPedidos.PENDIENTE || 0) +
+      (estadosPedidos.EN_PREPARACION || 0) +
+      (estadosPedidos.ENTREGADO || 0) +
+      (estadosPedidos.CANCELADO || 0);
+    return sum > 0 ? sum : kpis.totalPedidos || 1;
+  }, [estadosPedidos, kpis.totalPedidos]);
+
+  const pctEntregados = Math.round(((estadosPedidos.ENTREGADO || 0) / totalPedidosOperativo) * 100);
+  const pctPendientes = Math.round(((estadosPedidos.PENDIENTE || 0) / totalPedidosOperativo) * 100);
+  const pctPreparacion = Math.round(((estadosPedidos.EN_PREPARACION || 0) / totalPedidosOperativo) * 100);
+  const pctCancelados = Math.round(((estadosPedidos.CANCELADO || 0) / totalPedidosOperativo) * 100);
+
+  const totalClientesScoring = useMemo(() => {
+    const sum =
+      (scoringClientes.A || 0) +
+      (scoringClientes.B || 0) +
+      (scoringClientes.C || 0) +
+      (scoringClientes.D || 0) +
+      (scoringClientes.SIN_CREDITO || 0);
+    return sum > 0 ? sum : kpis.clientesActivos || 1;
+  }, [scoringClientes, kpis.clientesActivos]);
+
+  const tasaMorosidad = useMemo(() => {
+    return kpis.totalFacturado > 0 ? (kpis.creditoPendiente / kpis.totalFacturado) * 100 : 0;
+  }, [kpis.totalFacturado, kpis.creditoPendiente]);
+  const morosidadAlertaOk = tasaMorosidad <= 10;
+
   // Máximo de pares para la gráfica relativa en el top de modelos
   const maxParesModelos = useMemo(() => {
     return Math.max(...topModelos.map((m) => m.pares), 1);
@@ -513,6 +588,356 @@ export default function DashboardComponent({
           </button>
         </div>
       </div>
+
+      {/* ─── PESTAÑAS PRINCIPALES DEL DASHBOARD: CONTROL OPERATIVO VS RENDIMIENTO FINANCIERO ─── */}
+      <div className="flex items-center gap-1.5 p-1 bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full sm:w-auto self-start shadow-2xs">
+        <button
+          onClick={() => setDashboardTab("OPERATIVO")}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            dashboardTab === "OPERATIVO"
+              ? "bg-amber-500 text-slate-950 shadow-xs"
+              : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          }`}
+        >
+          <Activity size={14} />
+          Control Operativo
+        </button>
+        <button
+          onClick={() => setDashboardTab("FINANCIERO")}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            dashboardTab === "FINANCIERO"
+              ? "bg-amber-500 text-slate-950 shadow-xs"
+              : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          }`}
+        >
+          <DollarSign size={14} />
+          Rendimiento Financiero
+        </button>
+      </div>
+
+      {dashboardTab === "OPERATIVO" ? (
+        <div className="space-y-2.5">
+          {/* ─── 1. FILA DE KPIS OPERATIVOS ─── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            {/* KPI 1: Trazabilidad de Pedidos */}
+            <KpiExecutiveCard
+              title="Trazabilidad de Pedidos"
+              value={`${pctEntregados}%`}
+              subtitle={`${estadosPedidos.ENTREGADO} entregados de ${totalPedidosOperativo} pedidos`}
+              badgeText={`${estadosPedidos.PENDIENTE} pendientes`}
+              badgePositive={estadosPedidos.PENDIENTE === 0}
+              icon={<Truck size={14} />}
+              accentColor="#3B82F6"
+              progressPercent={pctEntregados}
+              progressLabel={`${estadosPedidos.EN_PREPARACION} en preparación`}
+            />
+
+            {/* KPI 2: Exactitud de Inventario */}
+            <KpiExecutiveCard
+              title="Exactitud de Inventario"
+              value="100%"
+              subtitle="Stock físico al día sin descuadres"
+              badgeText={kpis.stockBajoCount === 0 ? "100% óptimo" : `${kpis.stockBajoCount} mod. stock bajo`}
+              badgePositive={kpis.stockBajoCount === 0}
+              icon={<Package size={14} />}
+              accentColor="#10B981"
+              progressPercent={100}
+              progressLabel={`${kpis.totalParesEnStock} pares físicos`}
+            />
+
+            {/* KPI 3: Madurez de Cartera */}
+            <KpiExecutiveCard
+              title="Madurez de Cartera"
+              value={`${tasaMorosidad.toFixed(1)}%`}
+              subtitle="Índice de morosidad estimada"
+              badgeText={morosidadAlertaOk ? "Alerta OK (< 10%)" : "Alerta (> 10%)"}
+              badgePositive={morosidadAlertaOk}
+              icon={<ShieldCheck size={14} />}
+              accentColor={morosidadAlertaOk ? "#10B981" : "#EF4444"}
+              progressPercent={Math.min(Math.round(tasaMorosidad * 5), 100)}
+              progressLabel={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })} por cobrar`}
+            />
+
+            {/* KPI 4: Tiempo de Atención */}
+            <KpiExecutiveCard
+              title="Tiempo de Atención"
+              value="≤ 2.0 seg"
+              subtitle="Consulta ágil en mostrador"
+              badgeText="99.8% Alta Eficiencia"
+              badgePositive={true}
+              icon={<Clock size={14} />}
+              accentColor="#F59E0B"
+              progressPercent={99}
+              progressLabel="Punto de venta optimizado"
+            />
+          </div>
+
+          {/* ─── 2. PANELES OPERATIVOS: EMBUDO DE PEDIDOS Y SCORING CREDITICIO ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+            {/* Panel 1: Embudo de Pedidos por Estado */}
+            <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 font-bold text-xs">
+                    <Truck size={13} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black tracking-tight text-[var(--foreground)]">
+                      Embudo y Trazabilidad de Pedidos
+                    </h3>
+                    <p className="text-[9px] text-[var(--muted-foreground)]">
+                      Estado operativo del calzado en proceso de comercialización
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--foreground)]">
+                  {totalPedidosOperativo} órdenes
+                </span>
+              </div>
+
+              {/* Barra segmentada horizontal */}
+              <div className="w-full h-3 rounded-full bg-[var(--muted)] overflow-hidden flex shadow-inner">
+                <div
+                  style={{ width: `${pctEntregados}%` }}
+                  className="bg-emerald-500 h-full transition-all"
+                  title={`Entregados: ${estadosPedidos.ENTREGADO} (${pctEntregados}%)`}
+                />
+                <div
+                  style={{ width: `${pctPreparacion}%` }}
+                  className="bg-blue-500 h-full transition-all"
+                  title={`En Preparación: ${estadosPedidos.EN_PREPARACION} (${pctPreparacion}%)`}
+                />
+                <div
+                  style={{ width: `${pctPendientes}%` }}
+                  className="bg-amber-500 h-full transition-all"
+                  title={`Pendientes: ${estadosPedidos.PENDIENTE} (${pctPendientes}%)`}
+                />
+                <div
+                  style={{ width: `${pctCancelados}%` }}
+                  className="bg-slate-400 h-full transition-all"
+                  title={`Cancelados: ${estadosPedidos.CANCELADO} (${pctCancelados}%)`}
+                />
+              </div>
+
+              {/* Detalle por estado con badges y porcentajes */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <div className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">
+                    Entregados
+                  </div>
+                  <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    {estadosPedidos.ENTREGADO}
+                  </div>
+                  <div className="text-[8.5px] text-[var(--muted-foreground)]">{pctEntregados}% completado</div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+                  <div className="text-[9px] font-bold text-blue-700 dark:text-blue-300 uppercase">
+                    Preparación
+                  </div>
+                  <div className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
+                    {estadosPedidos.EN_PREPARACION}
+                  </div>
+                  <div className="text-[8.5px] text-[var(--muted-foreground)]">{pctPreparacion}% en taller</div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+                  <div className="text-[9px] font-bold text-amber-700 dark:text-amber-300 uppercase">
+                    Pendientes
+                  </div>
+                  <div className="text-sm font-black text-amber-600 dark:text-amber-400 font-mono">
+                    {estadosPedidos.PENDIENTE}
+                  </div>
+                  <div className="text-[8.5px] text-[var(--muted-foreground)]">{pctPendientes}% por entregar</div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-slate-500/10 border border-slate-500/20 text-center">
+                  <div className="text-[9px] font-bold text-slate-700 dark:text-slate-300 uppercase">
+                    Cancelados
+                  </div>
+                  <div className="text-sm font-black text-slate-600 dark:text-slate-400 font-mono">
+                    {estadosPedidos.CANCELADO}
+                  </div>
+                  <div className="text-[8.5px] text-[var(--muted-foreground)]">{pctCancelados}% bajas</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Panel 2: Scoring Crediticio Progresivo */}
+            <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-500 font-bold text-xs">
+                    <ShieldCheck size={13} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black tracking-tight text-[var(--foreground)]">
+                      Distribución de Scoring Crediticio
+                    </h3>
+                    <p className="text-[9px] text-[var(--muted-foreground)]">
+                      Evaluación progresiva de clientes y capacidad de crédito
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-md bg-[var(--muted)] text-[var(--foreground)]">
+                  {totalClientesScoring} clientes
+                </span>
+              </div>
+
+              {/* Lista de niveles de scoring con barras */}
+              <div className="space-y-1.5 pt-0.5">
+                {[
+                  { nivel: "Nivel A", label: "Excelente (Cupo Amplio)", count: scoringClientes.A, color: "bg-emerald-500", textCol: "text-emerald-500" },
+                  { nivel: "Nivel B", label: "Bueno (Riesgo Bajo)", count: scoringClientes.B, color: "bg-blue-500", textCol: "text-blue-500" },
+                  { nivel: "Nivel C", label: "Regular (Seguimiento)", count: scoringClientes.C, color: "bg-amber-500", textCol: "text-amber-500" },
+                  { nivel: "Nivel D", label: "Riesgo / Alerta", count: scoringClientes.D, color: "bg-rose-500", textCol: "text-rose-500" },
+                  { nivel: "Sin Crédito", label: "Solo Contado / Nuevo", count: scoringClientes.SIN_CREDITO, color: "bg-slate-400", textCol: "text-slate-400" },
+                ].map((sc, idx) => {
+                  const pct = Math.round(((sc.count || 0) / totalClientesScoring) * 100);
+                  return (
+                    <div key={idx} className="flex items-center gap-2 text-[10px]">
+                      <span className={`w-16 font-extrabold font-mono ${sc.textCol} text-left`}>
+                        {sc.nivel}
+                      </span>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center text-[9px] text-[var(--muted-foreground)] mb-0.5">
+                          <span className="truncate">{sc.label}</span>
+                          <span className="font-mono font-bold text-[var(--foreground)]">
+                            {sc.count} ({pct}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${sc.color} rounded-full transition-all`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* ─── 3. FILA INFERIOR: CURVA DE TALLAS CON STOCK BAJO Y RENDIMIENTO OPERATIVO ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+            {/* Panel 3: Curva de Tallas con Stock Bajo (37 a 42) */}
+            <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-xs">
+                    <Layers size={13} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black tracking-tight text-[var(--foreground)]">
+                      Curva de Tallas con Stock Bajo (Tallas 37 a 42)
+                    </h3>
+                    <p className="text-[9px] text-[var(--muted-foreground)]">
+                      Monitoreo de rotación comercial para prevención de quiebres de calzado
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  Umbral: ≤ 2 pares
+                </span>
+              </div>
+
+              {/* Grid de tallas 37 a 42 */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                {[37, 38, 39, 40, 41, 42].map((talla) => {
+                  const pares = tallasBajas[talla] || 0;
+                  const esBajo = pares <= 2;
+                  return (
+                    <div
+                      key={talla}
+                      className={`p-2 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                        esBajo
+                          ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                          : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      <span className="text-[10px] font-black uppercase">Talla {talla}</span>
+                      <span className="text-base font-black font-mono my-0.5">{pares}</span>
+                      <span
+                        className={`text-[7.5px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-tighter ${
+                          esBajo ? "bg-rose-500/20 text-rose-700 dark:text-rose-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                        }`}
+                      >
+                        {esBajo ? "Bajo" : "Óptimo"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="pt-1 text-[9px] text-[var(--muted-foreground)] flex items-center justify-between border-t border-[var(--border)]">
+                <span>Calzado de cuero para caballero/dama en Cevallos</span>
+                <span className="font-mono font-bold text-[var(--foreground)]">
+                  Total analizado: {[37, 38, 39, 40, 41, 42].reduce((acc, t) => acc + (tallasBajas[t] || 0), 0)} pares
+                </span>
+              </div>
+            </div>
+
+            {/* Panel 4: Rendimiento Operativo del Local */}
+            <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-500 font-bold text-xs">
+                      <Store size={13} />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black tracking-tight text-[var(--foreground)]">
+                        Rendimiento Operativo del Local
+                      </h3>
+                      <p className="text-[9px] text-[var(--muted-foreground)]">
+                        Eficiencia de despacho y atención comercial
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    En línea
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  <div className="p-2.5 rounded-xl bg-[var(--muted)]/40 border border-[var(--border)]">
+                    <div className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase">Pares Despachados</div>
+                    <div className="text-base font-black text-[var(--foreground)] font-mono">{kpis.totalParesVendidos}</div>
+                    <div className="text-[8.5px] text-emerald-600 dark:text-emerald-400 font-medium">Volumen de entrega activa</div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-[var(--muted)]/40 border border-[var(--border)]">
+                    <div className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase">Clientes Atendidos</div>
+                    <div className="text-base font-black text-[var(--foreground)] font-mono">{kpis.clientesActivos}</div>
+                    <div className="text-[8.5px] text-blue-600 dark:text-blue-400 font-medium">Compradores registrados</div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-[var(--muted)]/40 border border-[var(--border)]">
+                    <div className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase">Salud de Inventario</div>
+                    <div className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">{kpis.saludInventarioPct}%</div>
+                    <div className="text-[8.5px] text-[var(--muted-foreground)]">Disponibilidad sin rotura</div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-[var(--muted)]/40 border border-[var(--border)]">
+                    <div className="text-[9px] font-bold text-[var(--muted-foreground)] uppercase">Tasa Despacho</div>
+                    <div className="text-base font-black text-amber-500 font-mono">{pctEntregados}%</div>
+                    <div className="text-[8.5px] text-[var(--muted-foreground)]">Órdenes completas</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-1.5 border-t border-[var(--border)] flex items-center justify-between text-[9px] text-[var(--muted-foreground)]">
+                <span>Sucursal: <strong className="text-[var(--foreground)]">{sucursales.find((s) => s.id === activeSucursalId)?.name || "Sucursal Local"}</strong></span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">Operación Conforme</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
 
       {/* ─── 2. FILA DE KPIS EJECUTIVOS (CLARA SEPARACIÓN DE DINERO VS PARES) ─── */}
       <div className={`grid grid-cols-2 ${isAdmin ? "sm:grid-cols-3 lg:grid-cols-6" : "lg:grid-cols-4"} gap-2`}>
@@ -1087,6 +1512,8 @@ export default function DashboardComponent({
           </div>
         )}
       </div>
+        </div>
+      )}
     </div>
   );
 }

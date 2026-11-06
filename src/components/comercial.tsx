@@ -50,6 +50,7 @@ import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 import ImageLightboxModal from './ui/image-lightbox-modal';
 import NuevoClienteModal from './ui/nuevo-cliente-modal';
+import { generarReporteEntregasPendientesPdf, ReporteEntregasPendientesPdfData } from '../services/pdf-reportes.service';
 
 interface ComercialProps {
   online: boolean;
@@ -289,6 +290,53 @@ export default function ComercialComponent({
   const [showDropdownCliente, setShowDropdownCliente] = useState(false);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<any | null>(null);
   const [showNuevoClienteModal, setShowNuevoClienteModal] = useState(false);
+  const [exportandoPendientesPdf, setExportandoPendientesPdf] = useState(false);
+
+  const handleExportarPendientesEntregaPdf = async () => {
+    setExportandoPendientesPdf(true);
+    try {
+      const sucParam = selectedSucursalPedidoId && selectedSucursalPedidoId !== 'TODAS'
+        ? `&sucursalId=${selectedSucursalPedidoId}`
+        : '';
+      const data = await ApiService.get(`/reportes/entregas-pedidos?estadoVista=PENDIENTES${sucParam}`);
+      if (!data || !data.pedidos || data.pedidos.length === 0) {
+        showToast('No existen pedidos con entregas pendientes por despachar.', 'info');
+        return;
+      }
+      const rawNegocio = await ApiService.get('/configuracion/negocio').catch(() => null);
+      const payload: ReporteEntregasPendientesPdfData = {
+        negocio: {
+          nombre: rawNegocio?.nombre || 'CALZADO COMERCIAL',
+          ruc: rawNegocio?.ruc || '1800000000001',
+          direccion: rawNegocio?.direccion || 'Cevallos, Ecuador',
+          telefono: rawNegocio?.telefono || '',
+          primaryColor: rawNegocio?.primaryColor || '#0EA5E9',
+        },
+        fechaGeneracion: new Date().toLocaleDateString('es-EC'),
+        kpis: data.kpis,
+        pedidos: data.pedidos.map((p: any) => ({
+          numeroPedido: p.numeroPedido,
+          createdAt: p.createdAt,
+          clienteNombre: p.cliente?.nombre || 'Cliente',
+          clienteTelefono: p.cliente?.telefono || '',
+          calzadoResumen: p.calzadoResumen,
+          resumenPendientesTexto: p.resumenPendientesTexto,
+          totalPares: p.totalPares,
+          paresEntregados: p.paresEntregados,
+          paresPendientes: p.paresPendientes,
+          saldoPendiente: p.saldoPendiente,
+          estadoEntrega: p.estadoEntrega,
+        })),
+      };
+      const doc = generarReporteEntregasPendientesPdf(payload);
+      doc.save(`pendientes-entrega-${new Date().toISOString().split('T')[0]}.pdf`);
+      showToast('Reporte de pendientes de entrega exportado exitosamente.', 'success');
+    } catch (err: any) {
+      showToast('Error al exportar pendientes de entrega: ' + err?.message, 'error');
+    } finally {
+      setExportandoPendientesPdf(false);
+    }
+  };
 
   // Alerta de pedido duplicado por cliente (Fase 2B)
   const [alertaPedidoDuplicado, setAlertaPedidoDuplicado] = useState<{
@@ -3158,7 +3206,38 @@ export default function ComercialComponent({
                     <span>Todos</span>
                     <span className="text-[10px] opacity-80 font-mono font-normal">({pedidosDeSucursal.length})</span>
                   </button>
+
+                  {/* Filtro Rápido con un Clic: Solo Pedidos con Entrega Parcial */}
+                  <button
+                    type="button"
+                    title="Filtrar rápidamente pedidos que tienen pares pendientes de entrega"
+                    onClick={() => {
+                      setFiltroEstadoTesis('ENTREGADO');
+                      setSubFiltroEntrega('ENTREGADO_PARCIAL');
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      filtroEstadoTesis === 'ENTREGADO' && subFiltroEntrega === 'ENTREGADO_PARCIAL'
+                        ? 'bg-cyan-600 text-white shadow-xs font-black ring-2 ring-cyan-400/40'
+                        : 'text-cyan-700 dark:text-cyan-400 hover:bg-cyan-500/10'
+                    }`}
+                  >
+                    <Truck size={13} className="text-cyan-500" />
+                    <span>Solo Entregas Parciales</span>
+                    <span className="text-[10px] opacity-90 font-mono font-black">({countEntregaParcial})</span>
+                  </button>
                 </div>
+
+                {/* Botón de Exportación Directa de Pendientes de Entrega */}
+                <button
+                  type="button"
+                  onClick={handleExportarPendientesEntregaPdf}
+                  disabled={exportandoPendientesPdf}
+                  title="Descargar de inmediato el PDF de los pares que faltan entregar hoy"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30 rounded-2xl text-xs font-black transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                >
+                  {exportandoPendientesPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                  <span>Exportar Pendientes de Entrega</span>
+                </button>
 
                 {/* Separador Visual */}
                 <div className="h-6 w-px bg-[var(--border)] hidden lg:block" />
