@@ -943,13 +943,16 @@ export default function DashboardComponent({
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
                       {[37, 38, 39, 40, 41, 42].map((talla) => {
                         const pares = tallasBajas[talla] || 0;
-                        const esBajo = pares <= 2;
+                        const esAgotado = pares === 0;
+                        const esBajo = pares > 0 && pares <= 2;
                         return (
                           <div
                             key={talla}
                             className={`p-2 rounded-xl border flex flex-col items-center justify-center transition-all ${
-                              esBajo
+                              esAgotado
                                 ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                                : esBajo
+                                ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
                                 : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                             }`}
                           >
@@ -957,10 +960,14 @@ export default function DashboardComponent({
                             <span className="text-base font-black font-mono my-0.5">{pares}</span>
                             <span
                               className={`text-[7.5px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-tighter ${
-                                esBajo ? "bg-rose-500/20 text-rose-700 dark:text-rose-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                esAgotado
+                                  ? "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                                  : esBajo
+                                  ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                                  : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                               }`}
                             >
-                              {esBajo ? "Bajo" : "Óptimo"}
+                              {esAgotado ? "Agotado" : esBajo ? "Bajo" : "Óptimo"}
                             </span>
                           </div>
                         );
@@ -979,13 +986,16 @@ export default function DashboardComponent({
                   }`}>
                     {tallasSerie.map((t) => {
                       const pares = t.paresTotal || 0;
-                      const esBajo = pares <= 2 || t.modelosBajos > 0;
+                      const esAgotado = pares === 0;
+                      const esBajo = pares > 0 && pares <= 2;
                       return (
                         <div
                           key={t.numero}
                           className={`p-2 rounded-xl border flex flex-col items-center justify-center transition-all ${
-                            esBajo
+                            esAgotado
                               ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                              : esBajo
+                              ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
                               : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                           }`}
                         >
@@ -993,10 +1003,14 @@ export default function DashboardComponent({
                           <span className="text-sm sm:text-base font-black font-mono my-0.5">{pares}</span>
                           <span
                             className={`text-[7.5px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-tighter ${
-                              esBajo ? "bg-rose-500/20 text-rose-700 dark:text-rose-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                              esAgotado
+                                ? "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                                : esBajo
+                                ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                                : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                             }`}
                           >
-                            {esBajo ? "Bajo" : "Óptimo"}
+                            {esAgotado ? "Agotado" : esBajo ? "Bajo" : "Óptimo"}
                           </span>
                         </div>
                       );
