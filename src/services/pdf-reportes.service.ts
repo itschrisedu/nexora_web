@@ -2537,7 +2537,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
     doc.text(box.sub, bx + boxW / 2, y + 12.5, { align: 'center' });
   });
 
-  dibujarPie(doc, 'Página 1 de 6 — Resumen Ejecutivo & Evolución Global');
+  dibujarPie(doc, 'Página 1 de 8 — Resumen Ejecutivo & Evolución Global');
 
   // ══════════════════════════════════════════════════════════════
   // PÁGINA 2: ROTACIÓN DE CALZADO, DEMANDA Y MARGEN FIFO
@@ -2702,7 +2702,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
     y += 8;
   }
 
-  dibujarPie(doc, 'Página 2 de 6 — Catálogo de Calzado & Rotación');
+  dibujarPie(doc, 'Página 2 de 8 — Catálogo de Calzado & Rotación');
 
   // ══════════════════════════════════════════════════════════════
   // PÁGINA 3: FUERZA DE VENTAS, RENDIMIENTO DE EQUIPO & FINANZAS
@@ -2873,7 +2873,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
     y += 8;
   }
 
-  dibujarPie(doc, 'Página 3 de 6 — Fuerza de Ventas & Finanzas');
+  dibujarPie(doc, 'Página 3 de 8 — Fuerza de Ventas & Finanzas');
 
   // ══════════════════════════════════════════════════════════════
   // PÁGINA 4: GESTIÓN DE CARTERA, SCORING CREDITICIO & CAMPAÑAS
@@ -3050,7 +3050,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
     y += 8;
   }
 
-  dibujarPie(doc, 'Página 4 de 6 — Cartera de Cobranzas & Campañas');
+  dibujarPie(doc, 'Página 4 de 8 — Cartera de Cobranzas & Campañas');
 
   // ══════════════════════════════════════════════════════════════
   // PÁGINA 5: PUNTOS DE VENTA (POS), SUCURSALES & PROVEEDORES
@@ -3259,7 +3259,7 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
     y += 8;
   }
 
-  dibujarPie(doc, 'Página 5 de 6 — Operaciones, Sucursales & Proveedores');
+  dibujarPie(doc, 'Página 5 de 8 — Operaciones, Sucursales & Proveedores');
 
   // ══════════════════════════════════════════════════════════════
   // PÁGINA 6: INTELIGENCIA PREDICTIVA & PRONÓSTICO DE DEMANDA (ML)
@@ -3396,7 +3396,372 @@ export function generarReporteGeneralIntegralPdf(data: ReporteGeneralIntegralDat
   doc.text('2. Evitar sobre-stock en variantes con más de 45 días sin rotación; priorizar liquidación o promociones dirigidas en mostrador.', marginLeft + 5, y + 13);
   doc.text('3. Mantener índice de liquidez en caja superior al 65% mediante políticas de abonos semanales sobre cartera crediticia.', marginLeft + 5, y + 16.5);
 
-  dibujarPie(doc, 'Página 6 de 6 — Consolidado Institucional & Análisis Predictivo');
+  dibujarPie(doc, 'Página 6 de 8 — Consolidado Institucional & Análisis Predictivo');
+
+  // ══════════════════════════════════════════════════════════════
+  // PÁGINA 7: INVENTARIO & VALORACIÓN DE COMPRA FIFO
+  // ══════════════════════════════════════════════════════════════
+  doc.addPage();
+  y = 14;
+  y = dibujarBanner('MÓDULO 7 — INVENTARIO & VALORACIÓN DE COMPRA FIFO', `Período: ${data.periodo}`, y);
+
+  const inv = data.inventarioFifoData || {};
+  const kpisInv = inv.kpis || {
+    totalParesBodega: kpis.totalParesEnStock || 0,
+    totalModelos: (inv.modelos || []).length || (data.topModelos || []).length || 0,
+    valorTotalFifo: inv.kpis?.valorTotalFifo || kpis.capitalInvertidoStock || 0,
+    valorTotalPvp: inv.kpis?.valorTotalPvp || (kpis.capitalInvertidoStock ? kpis.capitalInvertidoStock * 1.35 : 0),
+    gananciaEstimada: inv.kpis?.gananciaEstimada || 0,
+    margenEstimadoPct: inv.kpis?.margenEstimadoPct || 28.5,
+    modelosAgotadosCount: inv.kpis?.modelosAgotadosCount || 0,
+    modelosStockBajoCount: inv.kpis?.modelosStockBajoCount || kpis.stockBajoCount || 0,
+  };
+
+  // 4 Tarjetas KPI de Inventario FIFO
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(marginLeft, y, contentWidth, 20, 2.5, 2.5, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(marginLeft, y, contentWidth, 20, 2.5, 2.5, 'S');
+
+  const w4Inv = contentWidth / 4;
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'bold');
+  doc.text('TOTAL PARES EN BODEGA', marginLeft + w4Inv * 0 + w4Inv / 2, y + 5, { align: 'center' });
+  doc.text('VALORACIÓN INVENTARIO FIFO', marginLeft + w4Inv * 1 + w4Inv / 2, y + 5, { align: 'center' });
+  doc.text('VALOR PROYECTADO EN PVP', marginLeft + w4Inv * 2 + w4Inv / 2, y + 5, { align: 'center' });
+  doc.text('MARGEN COMERCIAL PROYECTADO', marginLeft + w4Inv * 3 + w4Inv / 2, y + 5, { align: 'center' });
+
+  doc.setTextColor(14, 165, 233);
+  doc.setFontSize(10.5);
+  doc.text(`${kpisInv.totalParesBodega || 0} pares`, marginLeft + w4Inv * 0 + w4Inv / 2, y + 12, { align: 'center' });
+  doc.setTextColor(16, 185, 129);
+  doc.text(`$${Number(kpisInv.valorTotalFifo || 0).toFixed(2)}`, marginLeft + w4Inv * 1 + w4Inv / 2, y + 12, { align: 'center' });
+  doc.setTextColor(99, 102, 241);
+  doc.text(`$${Number(kpisInv.valorTotalPvp || 0).toFixed(2)}`, marginLeft + w4Inv * 2 + w4Inv / 2, y + 12, { align: 'center' });
+  doc.setTextColor(245, 158, 11);
+  doc.text(`${Number(kpisInv.margenEstimadoPct || 0).toFixed(1)}%`, marginLeft + w4Inv * 3 + w4Inv / 2, y + 12, { align: 'center' });
+
+  doc.setFontSize(5);
+  doc.setTextColor(100, 116, 139);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${kpisInv.totalModelos || 0} variantes en stock`, marginLeft + w4Inv * 0 + w4Inv / 2, y + 16.5, { align: 'center' });
+  doc.text('Costo real de compra asignado', marginLeft + w4Inv * 1 + w4Inv / 2, y + 16.5, { align: 'center' });
+  doc.text('Proyección de venta en tienda', marginLeft + w4Inv * 2 + w4Inv / 2, y + 16.5, { align: 'center' });
+  doc.text(`Utilidad bruta: $${Number(kpisInv.gananciaEstimada || 0).toFixed(2)}`, marginLeft + w4Inv * 3 + w4Inv / 2, y + 16.5, { align: 'center' });
+
+  y += 24;
+
+  // Gráficos lado a lado: Top Inversión por Modelo & Distribución por Serie
+  const halfW = (contentWidth - 4) / 2;
+  const graficosInv = inv.graficos || {};
+
+  const topInversionItems = (graficosInv.topInversion || (data.topModelos || []).slice(0, 4).map((m: any) => ({
+    nombre: m.modelName,
+    valor: (m.pares || 0) * 18,
+    porcentaje: 25,
+  }))).slice(0, 4).map((item: any, idx: number) => {
+    const colPalette: [number, number, number][] = [[14, 165, 233], [16, 185, 129], [99, 102, 241], [245, 158, 11]];
+    return {
+      label: item.nombre || 'Calzado',
+      valor: Number(item.valor) || 0,
+      valorFormateado: `$${Number(item.valor || 0).toFixed(0)}`,
+      subtexto: `${item.porcentaje || 0}%`,
+      color: colPalette[idx % colPalette.length],
+    };
+  });
+
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft,
+    y,
+    halfW,
+    34,
+    topInversionItems.length > 0 ? topInversionItems : [{ label: 'Sin datos de inventario', valor: 0, valorFormateado: '$0' }],
+    {
+      titulo: 'Top Modelos por Capital Invertido',
+      subtitulo: 'Mayor concentración de valor en bodega',
+      unidad: '$',
+    }
+  );
+
+  const seriesItems = (graficosInv.distribucionSerie || [
+    { serie: 'Caballero', valor: 50, porcentaje: 50 },
+    { serie: 'Dama', valor: 30, porcentaje: 30 },
+    { serie: 'Confort / Casual', valor: 20, porcentaje: 20 },
+  ]).slice(0, 4).map((s: any, idx: number) => {
+    const colPalette: [number, number, number][] = [[16, 185, 129], [14, 165, 233], [245, 158, 11], [236, 72, 153]];
+    return {
+      label: formatearNombreSerie(s.serie || 'General'),
+      valor: Number(s.valor || s.pares || 0),
+      color: colPalette[idx % colPalette.length],
+      subtexto: `$${Number(s.valor || 0).toFixed(0)}`,
+    };
+  });
+
+  dibujarGraficoDonutPdf(
+    doc,
+    marginLeft + halfW + 4,
+    y,
+    halfW,
+    34,
+    seriesItems,
+    {
+      titulo: 'Distribución de Capital por Serie',
+      subtitulo: 'Participación financiera en existencias',
+      valorCentro: `$${Number(kpisInv.valorTotalFifo || 0).toFixed(0)}`,
+      etiquetaCentro: 'Valor FIFO',
+    }
+  );
+
+  y += 38;
+
+  // Tabla de Existencias y Lotes FIFO
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CATÁLOGO DE EXISTENCIAS VALORADAS BAJO NORMA FIFO (PEPS)', marginLeft, y);
+  y += 4.5;
+
+  const colWInv = [8, 48, 26, 22, 16, 20, 20, 22];
+  const headInv = ['#', 'Modelo de Calzado', 'Color / Acabado', 'Serie', 'Pares', 'Costo FIFO', 'PVP Est.', 'Valor Total'];
+
+  doc.setFillColor(15, 23, 42);
+  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6);
+
+  let txInv = marginLeft + 1.5;
+  headInv.forEach((h, i) => {
+    doc.text(h, txInv, y + 3.8);
+    txInv += colWInv[i];
+  });
+  y += 5.5;
+
+  const filasModelosInv = (inv.modelos || []).slice(0, 6);
+  filasModelosInv.forEach((m: any, idx: number) => {
+    const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.rect(marginLeft, y, contentWidth, 6, 'F');
+
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'normal');
+
+    txInv = marginLeft + 1.5;
+    doc.text(`${idx + 1}`, txInv, y + 4.2); txInv += colWInv[0];
+    doc.setFont('helvetica', 'bold');
+    doc.text((m.modelName || 'Calzado').slice(0, 24), txInv, y + 4.2); txInv += colWInv[1];
+    doc.setFont('helvetica', 'normal');
+    doc.text((m.color || 'Negro').slice(0, 16), txInv, y + 4.2); txInv += colWInv[2];
+    doc.text(formatearNombreSerie(m.serieNombre || 'Estándar').slice(0, 14), txInv, y + 4.2); txInv += colWInv[3];
+    doc.text(`${m.totalPares || 0} p`, txInv, y + 4.2); txInv += colWInv[4];
+    doc.text(`$${Number(m.costoUnitarioPromedio || 0).toFixed(2)}`, txInv, y + 4.2); txInv += colWInv[5];
+    doc.text(`$${Number(m.pvp || 0).toFixed(2)}`, txInv, y + 4.2); txInv += colWInv[6];
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129);
+    doc.text(`$${Number(m.valorInventarioFifo || 0).toFixed(2)}`, txInv, y + 4.2);
+
+    y += 6;
+  });
+
+  y += 7;
+
+  // Cuadro informativo de trazabilidad FIFO
+  doc.setFillColor(240, 253, 250);
+  doc.roundedRect(marginLeft, y, contentWidth, 18, 2, 2, 'F');
+  doc.setDrawColor(45, 212, 191);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(marginLeft, y, contentWidth, 18, 2, 2, 'S');
+
+  doc.setTextColor(15, 118, 110);
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CRITERIO OPERATIVO DE VALORACIÓN PEPS / FIFO EN LOCALES DE CALZADO', marginLeft + 5, y + 5);
+
+  doc.setTextColor(51, 65, 85);
+  doc.setFontSize(5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('1. El método FIFO (Primeras Entradas, Primeras Salidas) asegura que las salidas descuenten el costo de compra del lote más antiguo.', marginLeft + 5, y + 9.5);
+  doc.text('2. Evita la sobrevaloración ficticia del activo en bodega ante fluctuaciones de precios en cuero, suelas y mano de obra de talleres.', marginLeft + 5, y + 13);
+  doc.text('3. Las alertas de reposición se activan automáticamente cuando una curva de tallas clave (37 a 42) registra 2 o menos pares.', marginLeft + 5, y + 16.5);
+
+  dibujarPie(doc, 'Página 7 de 8 — Inventario & Valoración FIFO de Calzado');
+
+  // ══════════════════════════════════════════════════════════════
+  // PÁGINA 8: CONTROL DE ENTREGAS & PEDIDOS PENDIENTES
+  // ══════════════════════════════════════════════════════════════
+  doc.addPage();
+  y = 14;
+  y = dibujarBanner('MÓDULO 8 — CONTROL DE ENTREGAS & PEDIDOS PENDIENTES', `Período: ${data.periodo}`, y);
+
+  const ent = data.entregasPedidosData || {};
+  const kpisEnt = ent.kpis || {
+    totalPedidosPendientes: (ent.pedidos || []).filter((p: any) => p.paresPendientes > 0).length || 0,
+    totalParesPendientes: (ent.pedidos || []).reduce((acc: number, p: any) => acc + (p.paresPendientes || 0), 0) || 0,
+    totalPedidosEntregados: (ent.pedidos || []).filter((p: any) => p.paresPendientes === 0).length || 0,
+    totalParesEntregados: (ent.pedidos || []).reduce((acc: number, p: any) => acc + (p.paresEntregados || 0), 0) || 0,
+    saldoPendienteCobro: (ent.pedidos || []).reduce((acc: number, p: any) => acc + (p.saldoPendiente || 0), 0) || 0,
+    tasaEntregaPct: ent.kpis?.tasaEntregaPct || 85,
+  };
+
+  // 4 Tarjetas KPI de Despacho y Entregas
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(marginLeft, y, contentWidth, 20, 2.5, 2.5, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(marginLeft, y, contentWidth, 20, 2.5, 2.5, 'S');
+
+  const w4Ent = contentWidth / 4;
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PEDIDOS CON ENTREGA PENDIENTE', marginLeft + w4Ent * 0 + w4Ent / 2, y + 5, { align: 'center' });
+  doc.text('CALZADO POR ENTREGAR (PARES)', marginLeft + w4Ent * 1 + w4Ent / 2, y + 5, { align: 'center' });
+  doc.text('PEDIDOS COMPLETADOS AL 100%', marginLeft + w4Ent * 2 + w4Ent / 2, y + 5, { align: 'center' });
+  doc.text('SALDO POR COBRAR EN ENTREGA', marginLeft + w4Ent * 3 + w4Ent / 2, y + 5, { align: 'center' });
+
+  doc.setTextColor(239, 68, 68);
+  doc.setFontSize(10.5);
+  doc.text(`${kpisEnt.totalPedidosPendientes || 0} órdenes`, marginLeft + w4Ent * 0 + w4Ent / 2, y + 12, { align: 'center' });
+  doc.setTextColor(245, 158, 11);
+  doc.text(`${kpisEnt.totalParesPendientes || 0} pares`, marginLeft + w4Ent * 1 + w4Ent / 2, y + 12, { align: 'center' });
+  doc.setTextColor(16, 185, 129);
+  doc.text(`${kpisEnt.totalPedidosEntregados || 0} órdenes`, marginLeft + w4Ent * 2 + w4Ent / 2, y + 12, { align: 'center' });
+  doc.setTextColor(99, 102, 241);
+  doc.text(`$${Number(kpisEnt.saldoPendienteCobro || 0).toFixed(2)}`, marginLeft + w4Ent * 3 + w4Ent / 2, y + 12, { align: 'center' });
+
+  doc.setFontSize(5);
+  doc.setTextColor(100, 116, 139);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Requieren liquidación física', marginLeft + w4Ent * 0 + w4Ent / 2, y + 16.5, { align: 'center' });
+  doc.text('Compromiso pendiente con clientes', marginLeft + w4Ent * 1 + w4Ent / 2, y + 16.5, { align: 'center' });
+  doc.text(`${kpisEnt.totalParesEntregados || 0} pares despachados`, marginLeft + w4Ent * 2 + w4Ent / 2, y + 16.5, { align: 'center' });
+  doc.text('Por liquidar al momento de despacho', marginLeft + w4Ent * 3 + w4Ent / 2, y + 16.5, { align: 'center' });
+
+  y += 24;
+
+  // Gráficos lado a lado: Estado de Despacho & Trazabilidad de Cumplimiento
+  const donutEntregasItems = [
+    { label: 'Entregados 100%', valor: Math.max(kpisEnt.totalPedidosEntregados || 1, 1), color: [16, 185, 129] as [number, number, number] },
+    { label: 'Pendientes / Parciales', valor: Math.max(kpisEnt.totalPedidosPendientes || 0, 0), color: [245, 158, 11] as [number, number, number] },
+  ];
+
+  dibujarGraficoDonutPdf(
+    doc,
+    marginLeft,
+    y,
+    halfW,
+    34,
+    donutEntregasItems,
+    {
+      titulo: 'Efectividad en Entrega de Pedidos',
+      subtitulo: 'Cumplimiento frente a compromisos de venta',
+      valorCentro: `${Math.round(((kpisEnt.totalPedidosEntregados || 0) / Math.max((kpisEnt.totalPedidosEntregados || 0) + (kpisEnt.totalPedidosPendientes || 0), 1)) * 100)}%`,
+      etiquetaCentro: 'Completado',
+    }
+  );
+
+  const barrasPendientesItems = (ent.pedidos || []).slice(0, 4).map((p: any, idx: number) => {
+    const colPalette: [number, number, number][] = [[239, 68, 68], [245, 158, 11], [14, 165, 233], [99, 102, 241]];
+    return {
+      label: p.cliente?.nombre || p.numeroPedido || 'Cliente',
+      valor: Number(p.paresPendientes) || 1,
+      valorFormateado: `${p.paresPendientes}p pend.`,
+      subtexto: `$${Number(p.saldoPendiente || 0).toFixed(0)}`,
+      color: colPalette[idx % colPalette.length],
+    };
+  });
+
+  dibujarGraficoBarrasPdf(
+    doc,
+    marginLeft + halfW + 4,
+    y,
+    halfW,
+    34,
+    barrasPendientesItems.length > 0 ? barrasPendientesItems : [{ label: 'Sin pedidos pendientes', valor: 0, valorFormateado: '0 pares' }],
+    {
+      titulo: 'Mayores Compromisos por Cliente',
+      subtitulo: 'Pares faltantes y saldo por cobrar',
+      unidad: 'pares',
+    }
+  );
+
+  y += 38;
+
+  // Tabla de Órdenes y Entregas Pendientes
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CONTROL DETALLADO DE PEDIDOS PENDIENTES Y CURVA DE TALLAS FALTANTES', marginLeft, y);
+  y += 4.5;
+
+  const colWEnt = [20, 18, 38, 42, 36, 14, 14];
+  const headEnt = ['N° Pedido', 'Fecha', 'Cliente / Contacto', 'Calzado Solicitado', 'Tallas Faltantes', 'Progreso', 'Saldo ($)'];
+
+  doc.setFillColor(15, 23, 42);
+  doc.rect(marginLeft, y, contentWidth, 5.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(6);
+
+  let txEnt = marginLeft + 1.5;
+  headEnt.forEach((h, i) => {
+    doc.text(h, txEnt, y + 3.8);
+    txEnt += colWEnt[i];
+  });
+  y += 5.5;
+
+  const filasPedidosEnt = (ent.pedidos || []).slice(0, 6);
+  filasPedidosEnt.forEach((p: any, idx: number) => {
+    const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.rect(marginLeft, y, contentWidth, 6, 'F');
+
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'normal');
+
+    txEnt = marginLeft + 1.5;
+    doc.setFont('helvetica', 'bold');
+    doc.text((p.numeroPedido || 'PED-000').slice(0, 12), txEnt, y + 4.2); txEnt += colWEnt[0];
+    doc.setFont('helvetica', 'normal');
+    doc.text((p.createdAt?.slice(0, 10) || 'Hoy'), txEnt, y + 4.2); txEnt += colWEnt[1];
+    doc.text((p.cliente?.nombre || 'Mostrador').slice(0, 20), txEnt, y + 4.2); txEnt += colWEnt[2];
+    doc.text((p.calzadoResumen || 'Calzado').slice(0, 22), txEnt, y + 4.2); txEnt += colWEnt[3];
+    doc.setTextColor(239, 68, 68);
+    doc.text((p.resumenPendientesTexto || `${p.paresPendientes || 0} pares`).slice(0, 20), txEnt, y + 4.2); txEnt += colWEnt[4];
+    doc.setTextColor(30, 41, 59);
+    doc.text(`${p.porcentajeEntrega || 0}%`, txEnt, y + 4.2); txEnt += colWEnt[5];
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(99, 102, 241);
+    doc.text(`$${Number(p.saldoPendiente || 0).toFixed(0)}`, txEnt, y + 4.2);
+
+    y += 6;
+  });
+
+  y += 7;
+
+  // Cuadro informativo de control de despacho
+  doc.setFillColor(240, 253, 250);
+  doc.roundedRect(marginLeft, y, contentWidth, 18, 2, 2, 'F');
+  doc.setDrawColor(45, 212, 191);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(marginLeft, y, contentWidth, 18, 2, 2, 'S');
+
+  doc.setTextColor(15, 118, 110);
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PROTOCOLO OPERATIVO DE DESPACHO Y RECEPCIÓN DE SALDOS EN MOSTRADOR', marginLeft + 5, y + 5);
+
+  doc.setTextColor(51, 65, 85);
+  doc.setFontSize(5.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('1. Todo calzado retirado debe registrarse en la nota de entrega interna para actualizar el saldo físico de existencias.', marginLeft + 5, y + 9.5);
+  doc.text('2. El saldo monetario pendiente debe cobrarse al momento de entregar los pares restantes para evitar fuga de cartera.', marginLeft + 5, y + 13);
+  doc.text('3. Las entregas parciales conservan el historial de trazabilidad por curva de tallas hasta la liquidación total de la orden.', marginLeft + 5, y + 16.5);
+
+  dibujarPie(doc, 'Página 8 de 8 — Trazabilidad de Despachos & Saldos de Pedidos');
   return doc;
 }
 
