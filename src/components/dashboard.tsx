@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { ApiService } from "@/services/api.service";
 import { useToast } from "@/components/ui/toast";
+import { formatearNombreSerie } from "@/utils/text-formatters";
 
 interface DashboardProps {
   online: boolean;
@@ -127,6 +128,23 @@ export default function DashboardComponent({
   const [tallasBajas, setTallasBajas] = useState<{ [key: number]: number }>({
     37: 0, 38: 0, 39: 0, 40: 0, 41: 0, 42: 0,
   });
+
+  // Series de calzado y curvas dinámicas
+  const [curvaSeries, setCurvaSeries] = useState<{
+    [serieKey: string]: {
+      serieId: string;
+      serieNombre: string;
+      totalModelos: number;
+      totalPares: number;
+      tallas: {
+        tallaId?: string;
+        numero: number;
+        paresTotal: number;
+        modelosBajos: number;
+      }[];
+    };
+  }>({});
+  const [serieActivaCurva, setSerieActivaCurva] = useState<string>("ADULTO");
 
   const [kpis, setKpis] = useState({
     totalFacturado: 0,
@@ -252,6 +270,13 @@ export default function DashboardComponent({
         }
         if (data.tallasBajas37_42) {
           setTallasBajas(data.tallasBajas37_42);
+        }
+        if (data.curvaTallasPorSerie && typeof data.curvaTallasPorSerie === "object") {
+          setCurvaSeries(data.curvaTallasPorSerie);
+          const keys = Object.keys(data.curvaTallasPorSerie);
+          if (keys.length > 0 && !data.curvaTallasPorSerie[serieActivaCurva]) {
+            setSerieActivaCurva(data.curvaTallasPorSerie["ADULTO"] ? "ADULTO" : keys[0]);
+          }
         }
 
         const formasPago = data.distribucionFormasPago;
@@ -388,6 +413,10 @@ export default function DashboardComponent({
           totalPedidos: 0,
           clientesActivos: 0,
           creditoPendiente: 0,
+          saldoCarteraVencida: 0,
+          saldoCarteraVigente: 0,
+          tasaMorosidadReal: 0,
+          porcentajeCarteraVigente: 100,
           capitalInvertidoStock: 0,
           totalParesEnStock: 0,
           valorComercialStock: 0,
@@ -881,59 +910,141 @@ export default function DashboardComponent({
 
           {/* ─── 3. FILA INFERIOR: CURVA DE TALLAS CON STOCK BAJO Y RENDIMIENTO OPERATIVO ─── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
-            {/* Panel 3: Curva de Tallas con Stock Bajo (37 a 42) */}
+            {/* Panel 3: Curva de Tallas con Stock Bajo por Serie de Calzado */}
             <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 border-b border-[var(--border)] pb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-xs">
+                  <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold text-xs shrink-0">
                     <Layers size={13} />
                   </div>
                   <div>
                     <h3 className="text-xs font-black tracking-tight text-[var(--foreground)]">
-                      Curva de Tallas con Stock Bajo (Tallas 37 a 42)
+                      Curva de Tallas por Serie ({formatearNombreSerie(serieActivaCurva)})
                     </h3>
                     <p className="text-[9px] text-[var(--muted-foreground)]">
-                      Monitoreo de rotación comercial para prevención de quiebres de calzado
+                      Monitoreo de rotación y stock crítico por serie de calzado
                     </p>
                   </div>
                 </div>
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                  Umbral: ≤ 2 pares
-                </span>
+                <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap">
+                    Umbral: ≤ 2 pares
+                  </span>
+                </div>
               </div>
 
-              {/* Grid de tallas 37 a 42 */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
-                {[37, 38, 39, 40, 41, 42].map((talla) => {
-                  const pares = tallasBajas[talla] || 0;
-                  const esBajo = pares <= 2;
-                  return (
-                    <div
-                      key={talla}
-                      className={`p-2 rounded-xl border flex flex-col items-center justify-center transition-all ${
-                        esBajo
-                          ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
-                          : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                      }`}
-                    >
-                      <span className="text-[10px] font-black uppercase">Talla {talla}</span>
-                      <span className="text-base font-black font-mono my-0.5">{pares}</span>
-                      <span
-                        className={`text-[7.5px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-tighter ${
-                          esBajo ? "bg-rose-500/20 text-rose-700 dark:text-rose-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+              {/* Selector interactivo de Series de Calzado (Píldoras) */}
+              {Object.keys(curvaSeries).length > 0 && (
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
+                  {Object.keys(curvaSeries).map((serieKey) => {
+                    const isSelected = serieKey === serieActivaCurva;
+                    const sData = curvaSeries[serieKey];
+                    return (
+                      <button
+                        key={serieKey}
+                        type="button"
+                        onClick={() => setSerieActivaCurva(serieKey)}
+                        className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                          isSelected
+                            ? "bg-amber-500 text-slate-950 border-amber-500 shadow-xs"
+                            : "bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                         }`}
                       >
-                        {esBajo ? "Bajo" : "Óptimo"}
-                      </span>
+                        <span>{formatearNombreSerie(serieKey)}</span>
+                        <span
+                          className={`text-[8.5px] px-1 py-0.2 rounded-md font-mono ${
+                            isSelected
+                              ? "bg-slate-950/20 text-slate-950"
+                              : "bg-[var(--muted)] text-[var(--muted-foreground)]"
+                          }`}
+                        >
+                          {sData?.totalPares || 0} p.
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Grid de tallas dinámicas para la serie seleccionada */}
+              {(() => {
+                const serieData = curvaSeries[serieActivaCurva];
+                const tallasSerie = serieData?.tallas || [];
+
+                // Fallback a tallas 37-42 si aún no cargan las series dinámicas
+                if (tallasSerie.length === 0) {
+                  return (
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                      {[37, 38, 39, 40, 41, 42].map((talla) => {
+                        const pares = tallasBajas[talla] || 0;
+                        const esBajo = pares <= 2;
+                        return (
+                          <div
+                            key={talla}
+                            className={`p-2 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                              esBajo
+                                ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                                : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                            }`}
+                          >
+                            <span className="text-[10px] font-black uppercase">Talla {talla}</span>
+                            <span className="text-base font-black font-mono my-0.5">{pares}</span>
+                            <span
+                              className={`text-[7.5px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-tighter ${
+                                esBajo ? "bg-rose-500/20 text-rose-700 dark:text-rose-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                              }`}
+                            >
+                              {esBajo ? "Bajo" : "Óptimo"}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
-                })}
-              </div>
+                }
+
+                return (
+                  <div className={`grid gap-1.5 pt-1 ${
+                    tallasSerie.length <= 6
+                      ? "grid-cols-3 sm:grid-cols-6"
+                      : tallasSerie.length <= 8
+                      ? "grid-cols-4 sm:grid-cols-8"
+                      : "grid-cols-4 sm:grid-cols-6 md:grid-cols-10"
+                  }`}>
+                    {tallasSerie.map((t) => {
+                      const pares = t.paresTotal || 0;
+                      const esBajo = pares <= 2 || t.modelosBajos > 0;
+                      return (
+                        <div
+                          key={t.numero}
+                          className={`p-2 rounded-xl border flex flex-col items-center justify-center transition-all ${
+                            esBajo
+                              ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                              : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                          }`}
+                        >
+                          <span className="text-[9.5px] font-black uppercase">T{t.numero}</span>
+                          <span className="text-sm sm:text-base font-black font-mono my-0.5">{pares}</span>
+                          <span
+                            className={`text-[7.5px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-tighter ${
+                              esBajo ? "bg-rose-500/20 text-rose-700 dark:text-rose-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                            }`}
+                          >
+                            {esBajo ? "Bajo" : "Óptimo"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               <div className="pt-1 text-[9px] text-[var(--muted-foreground)] flex items-center justify-between border-t border-[var(--border)]">
-                <span>Calzado de cuero para caballero/dama en Cevallos</span>
+                <span>
+                  Serie: <strong className="text-[var(--foreground)]">{formatearNombreSerie(serieActivaCurva)}</strong> ({curvaSeries[serieActivaCurva]?.totalModelos || 0} modelos)
+                </span>
                 <span className="font-mono font-bold text-[var(--foreground)]">
-                  Total analizado: {[37, 38, 39, 40, 41, 42].reduce((acc, t) => acc + (tallasBajas[t] || 0), 0)} pares
+                  Total en serie: {curvaSeries[serieActivaCurva]?.totalPares ?? [37, 38, 39, 40, 41, 42].reduce((acc, t) => acc + (tallasBajas[t] || 0), 0)} pares
                 </span>
               </div>
             </div>
