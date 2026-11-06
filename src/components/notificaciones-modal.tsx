@@ -1267,7 +1267,7 @@ export default function NotificacionesModal({
                     }}
                     className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    <span>Ver en Auditoría Completa</span>
+                    <span>Ver en Bitácora Completa</span>
                     <ChevronRight size={13} />
                   </button>
                 )}

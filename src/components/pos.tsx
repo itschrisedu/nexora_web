@@ -1334,7 +1334,7 @@ export default function PosComponent() {
                 )}
               </div>
               <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                Venta directa en mostrador, arqueo de turno y auditoría analítica de transacciones comerciales.
+                Venta directa en mostrador, arqueo de turno y seguimiento analítico de transacciones comerciales.
               </p>
             </div>
           </div>

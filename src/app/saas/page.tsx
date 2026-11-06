@@ -171,7 +171,7 @@ export default function SaasLandingPage() {
         "Scoring crediticio progresivo",
         "Control de cartera vencida y acuerdos de pago",
         "Gestión multi-sucursal con traspasos internos",
-        "Auditoría con trazabilidad de inicios de sesión",
+        "Bitácora con trazabilidad de inicios de sesión",
       ],
     },
     {
@@ -196,7 +196,7 @@ export default function SaasLandingPage() {
       ],
       notIncluded: [
         "Sucursales y usuarios ilimitados",
-        "Auditoría forense especializada con geolocalización",
+        "Bitácora de seguridad con geolocalización",
       ],
     },
     {
@@ -212,7 +212,7 @@ export default function SaasLandingPage() {
         "Sucursales y puntos de venta ilimitados",
         "Usuarios y perfiles de acceso ilimitados",
         "Módulo completo de scoring crediticio y cobranza avanzada",
-        "Auditoría completa con registro de accesos y trazabilidad",
+        "Bitácora completa con registro de accesos y trazabilidad",
         "Control de producción por series, lotes y docenas",
         "Consolidación comercial global y reportes ejecutivos",
         "Personalización visual y subdominio propio para el catálogo",
@@ -255,7 +255,7 @@ export default function SaasLandingPage() {
       tag: "Logística Comercial",
     },
     {
-      title: "Auditoría & Trazabilidad Operativa",
+      title: "Bitácora & Trazabilidad Operativa",
       desc: "Registro cronológico de cada transacción, ajuste de inventario e inicio de sesión. Controla con precisión qué usuario realizó cada acción en el sistema.",
       icon: <ShieldCheck className="w-6 h-6 text-emerald-600" />,
       tag: "Seguridad y Control",

@@ -4266,7 +4266,7 @@ export default function SuperAdminComponent({ online }: { online: boolean }) {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-[var(--foreground)]">Vista Previa del Reporte de Suscripciones</h3>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">Documento oficial generado en formato A4 para auditoría e impresión</p>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">Documento oficial generado en formato A4 para respaldo e impresión</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

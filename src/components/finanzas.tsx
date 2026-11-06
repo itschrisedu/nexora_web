@@ -833,7 +833,7 @@ export default function FinanzasComponent({ online, activeSucursalId = 'TODAS', 
             }`}
           >
             <Truck size={14} />
-            <span>Auditoría de Envíos & Fletes ({pedidosFletes.length})</span>
+            <span>Control de Envíos & Fletes ({pedidosFletes.length})</span>
           </button>
 
           {activeSucursalId === 'TODAS' && sucursales.length > 1 && (

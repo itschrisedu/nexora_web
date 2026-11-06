@@ -2432,7 +2432,7 @@ export default function PersonalizacionComponent({ online }: PersonalizacionProp
                       </p>
                       <ul className="text-[10px] text-[var(--muted-foreground)] space-y-1">
                         <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Sucursales & Usuarios Ilimitados</li>
-                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Auditoría Completa de Inicios de Sesión</li>
+                        <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Registro Completo de Inicios de Sesión</li>
                         <li className="flex items-center gap-1.5"><Check size={11} className="text-emerald-500 shrink-0" /> Soporte Dedicado y Capacitación Continua</li>
                       </ul>
                     </div>

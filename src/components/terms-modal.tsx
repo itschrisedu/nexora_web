@@ -181,7 +181,7 @@ export default function TermsModal({
                   <li><strong>Identificación comercial:</strong> Nombres completos, razón social, número de cédula o RUC, teléfono, dirección y correo electrónico.</li>
                   <li><strong>Actividad transaccional:</strong> Registro de calzado adquirido, curvas de tallas solicitadas, comprobantes de entrega internos y estados de despacho.</li>
                   <li><strong>Información de cartera y pagos:</strong> Historial de abonos comerciales, saldos adeudados, fechas de vencimiento y puntaje crediticio progresivo.</li>
-                  <li><strong>Metadatos de seguridad:</strong> Dirección IP, fecha/hora de transacciones, agente de navegación y bitácoras de auditoría de modificaciones.</li>
+                  <li><strong>Metadatos de seguridad:</strong> Dirección IP, fecha/hora de transacciones, agente de navegación y bitácoras de registro de modificaciones.</li>
                 </ul>
               </div>
 

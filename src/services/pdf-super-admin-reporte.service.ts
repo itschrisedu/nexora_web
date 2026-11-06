@@ -80,7 +80,7 @@ export function generarReporteSuscripcionesPdfDoc(data: SuperAdminReportData): j
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184); // Slate 400
-  doc.text('Panel de Control Super Admin · Auditoría de Ingresos y Estado de Locales Comerciales', marginX + 6, y + 18);
+  doc.text('Panel de Control Super Admin · Control de Ingresos y Estado de Locales Comerciales', marginX + 6, y + 18);
 
   const fechaEmision = new Date().toLocaleDateString('es-EC', {
     year: 'numeric',

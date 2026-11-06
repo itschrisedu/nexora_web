@@ -111,7 +111,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'usuarios',        label: 'Sucursales y Equipo',   icon: <Building2 size={18} /> },
 
   { id: 'sri',             label: 'Facturación SRI',       icon: <FileText size={18} /> },
-  { id: 'auditoria',       label: 'Auditoría',             icon: <ShieldCheck size={18} /> },
+  { id: 'auditoria',       label: 'Bitácora de Actividad', icon: <ShieldCheck size={18} /> },
   { id: 'ubicaciones',     label: 'Rastreo GPS',           icon: <MapPin size={18} /> },
   { id: 'super-admin',     label: 'Gestión de Empresas',   icon: <Building2 size={18} /> },
 ];
@@ -1924,7 +1924,7 @@ function MainApp() {
               <div className="p-8 text-center bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-md mx-auto space-y-3">
                 <ShieldAlert size={36} className="mx-auto text-amber-500" />
                 <h3 className="font-extrabold text-base text-[var(--foreground)]">Acceso Restringido</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">El módulo de auditoría es de uso exclusivo para perfiles administrativos.</p>
+                <p className="text-xs text-[var(--muted-foreground)]">El módulo de bitácora y trazabilidad es de uso exclusivo para perfiles administrativos.</p>
               </div>
             )
           )}
@@ -1972,7 +1972,7 @@ function MainApp() {
               style={vistaActual === 'auditoria' ? { color: 'var(--primary)' } : {}}
             >
               <ShieldAlert size={19} />
-              <span className="text-[10px] mt-1 font-medium">Auditoría</span>
+              <span className="text-[10px] mt-1 font-medium">Bitácora</span>
             </button>
 
             <button

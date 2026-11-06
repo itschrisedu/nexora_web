@@ -1824,7 +1824,7 @@ export default function ReportesComponent({
                       Reporte de Punto de Venta & Caja Mostrador
                     </h3>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      Auditoría de ventas directas por par, recaudación en efectivo, tarjetas y transferencias por sucursal
+                      Registro y control de ventas directas por par, recaudación en efectivo, tarjetas y transferencias por sucursal
                     </p>
                   </div>
                 </div>

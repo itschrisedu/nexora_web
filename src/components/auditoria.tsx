@@ -564,7 +564,7 @@ export default function AuditoriaComponent() {
             </div>
             <div>
               <h2 className="text-lg font-black text-[var(--foreground)] tracking-tight">
-                Bitácora de Auditoría & Control de Actividades
+                Bitácora de Actividades & Trazabilidad
               </h2>
               <p className="text-xs text-[var(--muted-foreground)]">
                 Registro cronológico y transparente de todas las operaciones realizadas en el sistema (cobros, ventas, inventario y pedidos).
@@ -675,7 +675,7 @@ export default function AuditoriaComponent() {
             </div>
             <div>
               <h3 className="font-extrabold text-xs text-[var(--foreground)] uppercase tracking-wider">
-                Filtros de Auditoría & Trazabilidad de Empleados
+                Filtros de Trazabilidad & Registro de Empleados
               </h3>
               <p className="text-[11px] text-[var(--muted-foreground)]">
                 Consulta las acciones realizadas por cada colaborador en un rango de fechas determinado
@@ -878,7 +878,7 @@ export default function AuditoriaComponent() {
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-[var(--muted-foreground)] space-y-1">
                     <ShieldCheck size={28} className="mx-auto text-slate-400 opacity-50 mb-1" />
-                    <p className="font-medium text-xs">No se encontraron registros de auditoría{segmentoActivo !== "TODOS" ? ` en ${segmentoActivo.toLowerCase()}` : ""}.</p>
+                    <p className="font-medium text-xs">No se encontraron registros de actividad{segmentoActivo !== "TODOS" ? ` en ${segmentoActivo.toLowerCase()}` : ""}.</p>
                   </td>
                 </tr>
               ) : (
