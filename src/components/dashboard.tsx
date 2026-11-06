@@ -113,12 +113,16 @@ export default function DashboardComponent({
   }>({ PENDIENTE: 0, EN_PREPARACION: 0, ENTREGADO: 0, CANCELADO: 0 });
 
   const [scoringClientes, setScoringClientes] = useState<{
-    A: number;
-    B: number;
-    C: number;
-    D: number;
     SIN_CREDITO: number;
-  }>({ A: 0, B: 0, C: 0, D: 0, SIN_CREDITO: 0 });
+    NIVEL_1: number;
+    NIVEL_2: number;
+    NIVEL_3: number;
+    NIVEL_4: number;
+    A?: number;
+    B?: number;
+    C?: number;
+    D?: number;
+  }>({ SIN_CREDITO: 0, NIVEL_1: 0, NIVEL_2: 0, NIVEL_3: 0, NIVEL_4: 0 });
 
   const [tallasBajas, setTallasBajas] = useState<{ [key: number]: number }>({
     37: 0, 38: 0, 39: 0, 40: 0, 41: 0, 42: 0,
@@ -130,6 +134,10 @@ export default function DashboardComponent({
     totalPedidos: 0,
     clientesActivos: 0,
     creditoPendiente: 0,
+    saldoCarteraVencida: 0,
+    saldoCarteraVigente: 0,
+    tasaMorosidadReal: 0,
+    porcentajeCarteraVigente: 100,
     capitalInvertidoStock: 0,
     totalParesEnStock: 0,
     valorComercialStock: 0,
@@ -200,6 +208,10 @@ export default function DashboardComponent({
             kpisBackend.clientesConDeudaCount ?? (Number(kpisBackend.saldoCarteraTotal || 0) > 0 ? 1 : 0)
           ),
           creditoPendiente: Number(kpisBackend.saldoCarteraTotal || 0),
+          saldoCarteraVencida: Number(kpisBackend.saldoCarteraVencida || 0),
+          saldoCarteraVigente: Number(kpisBackend.saldoCarteraVigente || 0),
+          tasaMorosidadReal: Number(kpisBackend.tasaMorosidadReal ?? 0),
+          porcentajeCarteraVigente: Number(kpisBackend.porcentajeCarteraVigente ?? 100),
           capitalInvertidoStock: Number(kpisBackend.capitalInvertidoStock || 0),
           totalParesEnStock: Number(kpisBackend.totalParesEnStock || 0),
           valorComercialStock: Number(kpisBackend.valorComercialStock || 0),
@@ -231,11 +243,11 @@ export default function DashboardComponent({
         }
         if (data.scoringClientes) {
           setScoringClientes({
-            A: Number(data.scoringClientes.A || 0),
-            B: Number(data.scoringClientes.B || 0),
-            C: Number(data.scoringClientes.C || 0),
-            D: Number(data.scoringClientes.D || 0),
             SIN_CREDITO: Number(data.scoringClientes.SIN_CREDITO || 0),
+            NIVEL_1: Number(data.scoringClientes.NIVEL_1 ?? data.scoringClientes.D ?? 0),
+            NIVEL_2: Number(data.scoringClientes.NIVEL_2 ?? data.scoringClientes.C ?? 0),
+            NIVEL_3: Number(data.scoringClientes.NIVEL_3 ?? data.scoringClientes.B ?? 0),
+            NIVEL_4: Number(data.scoringClientes.NIVEL_4 ?? data.scoringClientes.A ?? 0),
           });
         }
         if (data.tallasBajas37_42) {
@@ -490,18 +502,18 @@ export default function DashboardComponent({
 
   const totalClientesScoring = useMemo(() => {
     const sum =
-      (scoringClientes.A || 0) +
-      (scoringClientes.B || 0) +
-      (scoringClientes.C || 0) +
-      (scoringClientes.D || 0) +
-      (scoringClientes.SIN_CREDITO || 0);
+      (scoringClientes.SIN_CREDITO || 0) +
+      (scoringClientes.NIVEL_1 || 0) +
+      (scoringClientes.NIVEL_2 || 0) +
+      (scoringClientes.NIVEL_3 || 0) +
+      (scoringClientes.NIVEL_4 || 0);
     return sum > 0 ? sum : kpis.clientesActivos || 1;
   }, [scoringClientes, kpis.clientesActivos]);
 
   const tasaMorosidad = useMemo(() => {
-    return kpis.totalFacturado > 0 ? (kpis.creditoPendiente / kpis.totalFacturado) * 100 : 0;
-  }, [kpis.totalFacturado, kpis.creditoPendiente]);
-  const morosidadAlertaOk = tasaMorosidad <= 10;
+    return kpis.tasaMorosidadReal;
+  }, [kpis.tasaMorosidadReal]);
+  const morosidadAlertaOk = tasaMorosidad <= 5;
 
   // Máximo de pares para la gráfica relativa en el top de modelos
   const maxParesModelos = useMemo(() => {
@@ -648,14 +660,40 @@ export default function DashboardComponent({
             {/* KPI 3: Madurez de Cartera */}
             <KpiExecutiveCard
               title="Madurez de Cartera"
-              value={`${tasaMorosidad.toFixed(1)}%`}
-              subtitle="Índice de morosidad estimada"
-              badgeText={morosidadAlertaOk ? "Alerta OK (< 10%)" : "Alerta (> 10%)"}
-              badgePositive={morosidadAlertaOk}
+              value={
+                kpis.creditoPendiente === 0
+                  ? "Sin Deuda"
+                  : kpis.tasaMorosidadReal > 0
+                  ? `${kpis.tasaMorosidadReal.toFixed(1)}% Mora`
+                  : `${kpis.porcentajeCarteraVigente.toFixed(0)}% Al Día`
+              }
+              subtitle={
+                kpis.creditoPendiente === 0
+                  ? "Sin cuentas pendientes por cobrar"
+                  : kpis.tasaMorosidadReal > 0
+                  ? `$${kpis.saldoCarteraVencida.toLocaleString("es-EC", { minimumFractionDigits: 2 })} en mora vencida`
+                  : "100% de la cartera dentro de plazo vigente"
+              }
+              badgeText={
+                kpis.creditoPendiente === 0
+                  ? "Al día"
+                  : kpis.tasaMorosidadReal === 0
+                  ? "Sana (0% mora)"
+                  : `${kpis.tasaMorosidadReal.toFixed(1)}% mora`
+              }
+              badgePositive={kpis.tasaMorosidadReal <= 5}
               icon={<ShieldCheck size={14} />}
-              accentColor={morosidadAlertaOk ? "#10B981" : "#EF4444"}
-              progressPercent={Math.min(Math.round(tasaMorosidad * 5), 100)}
-              progressLabel={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })} por cobrar`}
+              accentColor={kpis.tasaMorosidadReal <= 5 ? "#10B981" : "#EF4444"}
+              progressPercent={
+                kpis.creditoPendiente === 0
+                  ? 100
+                  : Math.round(kpis.porcentajeCarteraVigente)
+              }
+              progressLabel={
+                kpis.creditoPendiente === 0
+                  ? "Cartera sin deuda"
+                  : `$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })} por cobrar`
+              }
             />
           </div>
 
@@ -771,19 +809,53 @@ export default function DashboardComponent({
                 </span>
               </div>
 
-              {/* Lista de niveles de scoring con barras */}
+              {/* Cuadrícula visual de niveles de crédito (idéntica a la configuración del sistema) */}
+              <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                <div className="px-2.5 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--background)] flex items-center justify-between shadow-2xs">
+                  <span className="text-[10px] font-bold text-[var(--foreground)]">Sin Crédito</span>
+                  <span className="text-[10px] font-black font-mono text-[var(--muted-foreground)]">
+                    {scoringClientes.SIN_CREDITO || 0}
+                  </span>
+                </div>
+                <div className="px-2.5 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--background)] flex items-center justify-between shadow-2xs">
+                  <span className="text-[10px] font-bold text-[var(--foreground)]">Nivel 1</span>
+                  <span className="text-[10px] font-black font-mono text-blue-600 dark:text-blue-400">
+                    {scoringClientes.NIVEL_1 || 0}
+                  </span>
+                </div>
+                <div className="px-2.5 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--background)] flex items-center justify-between shadow-2xs">
+                  <span className="text-[10px] font-bold text-[var(--foreground)]">Nivel 2</span>
+                  <span className="text-[10px] font-black font-mono text-emerald-600 dark:text-emerald-400">
+                    {scoringClientes.NIVEL_2 || 0}
+                  </span>
+                </div>
+                <div className="px-2.5 py-1.5 rounded-xl border border-purple-600 bg-purple-600 text-white flex items-center justify-between shadow-xs">
+                  <span className="text-[10px] font-bold">Nivel 3</span>
+                  <span className="text-[10px] font-black font-mono text-white">
+                    {scoringClientes.NIVEL_3 || 0}
+                  </span>
+                </div>
+                <div className="col-span-2 px-3 py-1.5 rounded-xl border border-amber-300/80 dark:border-amber-700/50 bg-amber-50/70 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300 flex items-center justify-between shadow-2xs">
+                  <span className="text-[10px] font-bold">Nivel 4 (Oro / VIP)</span>
+                  <span className="text-[10px] font-black font-mono">
+                    {scoringClientes.NIVEL_4 || 0} clientes
+                  </span>
+                </div>
+              </div>
+
+              {/* Lista analítica con barras de distribución progresiva */}
               <div className="space-y-1.5 pt-0.5">
                 {[
-                  { nivel: "Nivel A", label: "Excelente (Cupo Amplio)", count: scoringClientes.A, color: "bg-emerald-500", textCol: "text-emerald-500" },
-                  { nivel: "Nivel B", label: "Bueno (Riesgo Bajo)", count: scoringClientes.B, color: "bg-blue-500", textCol: "text-blue-500" },
-                  { nivel: "Nivel C", label: "Regular (Seguimiento)", count: scoringClientes.C, color: "bg-amber-500", textCol: "text-amber-500" },
-                  { nivel: "Nivel D", label: "Riesgo / Alerta", count: scoringClientes.D, color: "bg-rose-500", textCol: "text-rose-500" },
-                  { nivel: "Sin Crédito", label: "Solo Contado / Nuevo", count: scoringClientes.SIN_CREDITO, color: "bg-slate-400", textCol: "text-slate-400" },
+                  { nivel: "Sin Crédito", label: "Clientes Nuevos / Contado", count: scoringClientes.SIN_CREDITO, color: "bg-slate-400", textCol: "text-slate-500" },
+                  { nivel: "Nivel 1", label: "Crédito Inicial", count: scoringClientes.NIVEL_1, color: "bg-blue-500", textCol: "text-blue-500" },
+                  { nivel: "Nivel 2", label: "Crédito Regular", count: scoringClientes.NIVEL_2, color: "bg-emerald-500", textCol: "text-emerald-500" },
+                  { nivel: "Nivel 3", label: "Crédito Preferente", count: scoringClientes.NIVEL_3, color: "bg-purple-600", textCol: "text-purple-600 dark:text-purple-400" },
+                  { nivel: "Nivel 4 (Oro / VIP)", label: "Clientes VIP / Cupo Amplio", count: scoringClientes.NIVEL_4, color: "bg-amber-500", textCol: "text-amber-600 dark:text-amber-400" },
                 ].map((sc, idx) => {
                   const pct = Math.round(((sc.count || 0) / totalClientesScoring) * 100);
                   return (
                     <div key={idx} className="flex items-center gap-2 text-[10px]">
-                      <span className={`w-16 font-extrabold font-mono ${sc.textCol} text-left`}>
+                      <span className={`w-28 font-bold font-mono ${sc.textCol} text-left truncate`}>
                         {sc.nivel}
                       </span>
                       <div className="flex-1">
