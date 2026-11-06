@@ -838,40 +838,6 @@ export default function DashboardComponent({
                 </span>
               </div>
 
-              {/* Cuadrícula visual de niveles de crédito (idéntica a la configuración del sistema) */}
-              <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                <div className="px-2.5 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--background)] flex items-center justify-between shadow-2xs">
-                  <span className="text-[10px] font-bold text-[var(--foreground)]">Sin Crédito</span>
-                  <span className="text-[10px] font-black font-mono text-[var(--muted-foreground)]">
-                    {scoringClientes.SIN_CREDITO || 0}
-                  </span>
-                </div>
-                <div className="px-2.5 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--background)] flex items-center justify-between shadow-2xs">
-                  <span className="text-[10px] font-bold text-[var(--foreground)]">Nivel 1</span>
-                  <span className="text-[10px] font-black font-mono text-blue-600 dark:text-blue-400">
-                    {scoringClientes.NIVEL_1 || 0}
-                  </span>
-                </div>
-                <div className="px-2.5 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--background)] flex items-center justify-between shadow-2xs">
-                  <span className="text-[10px] font-bold text-[var(--foreground)]">Nivel 2</span>
-                  <span className="text-[10px] font-black font-mono text-emerald-600 dark:text-emerald-400">
-                    {scoringClientes.NIVEL_2 || 0}
-                  </span>
-                </div>
-                <div className="px-2.5 py-1.5 rounded-xl border border-purple-600 bg-purple-600 text-white flex items-center justify-between shadow-xs">
-                  <span className="text-[10px] font-bold">Nivel 3</span>
-                  <span className="text-[10px] font-black font-mono text-white">
-                    {scoringClientes.NIVEL_3 || 0}
-                  </span>
-                </div>
-                <div className="col-span-2 px-3 py-1.5 rounded-xl border border-amber-300/80 dark:border-amber-700/50 bg-amber-50/70 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300 flex items-center justify-between shadow-2xs">
-                  <span className="text-[10px] font-bold">Nivel 4 (Oro / VIP)</span>
-                  <span className="text-[10px] font-black font-mono">
-                    {scoringClientes.NIVEL_4 || 0} clientes
-                  </span>
-                </div>
-              </div>
-
               {/* Lista analítica con barras de distribución progresiva */}
               <div className="space-y-1.5 pt-0.5">
                 {[
