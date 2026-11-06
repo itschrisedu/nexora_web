@@ -618,31 +618,31 @@ export default function DashboardComponent({
       {dashboardTab === "OPERATIVO" ? (
         <div className="space-y-2.5">
           {/* ─── 1. FILA DE KPIS OPERATIVOS ─── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            {/* KPI 1: Trazabilidad de Pedidos */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {/* KPI 1: Disponibilidad de Inventario en Bodega */}
             <KpiExecutiveCard
-              title="Trazabilidad de Pedidos"
-              value={`${pctEntregados}%`}
-              subtitle={`${estadosPedidos.ENTREGADO} entregados de ${totalPedidosOperativo} pedidos`}
-              badgeText={`${estadosPedidos.PENDIENTE} pendientes`}
-              badgePositive={estadosPedidos.PENDIENTE === 0}
-              icon={<Truck size={14} />}
-              accentColor="#3B82F6"
-              progressPercent={pctEntregados}
-              progressLabel={`${estadosPedidos.EN_PREPARACION} en preparación`}
-            />
-
-            {/* KPI 2: Exactitud de Inventario */}
-            <KpiExecutiveCard
-              title="Exactitud de Inventario"
-              value="100%"
-              subtitle="Stock físico al día sin descuadres"
-              badgeText={kpis.stockBajoCount === 0 ? "100% óptimo" : `${kpis.stockBajoCount} mod. stock bajo`}
+              title="Inventario en Bodega"
+              value={`$${(kpis.capitalInvertidoStock || 0).toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
+              subtitle={`${kpis.totalParesEnStock} pares físicos en bodega`}
+              badgeText={kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} mod. stock bajo` : "100% óptimo"}
               badgePositive={kpis.stockBajoCount === 0}
               icon={<Package size={14} />}
-              accentColor="#10B981"
-              progressPercent={100}
-              progressLabel={`${kpis.totalParesEnStock} pares físicos`}
+              accentColor="#F97316"
+              progressPercent={kpis.saludInventarioPct}
+              progressLabel={`${kpis.saludInventarioPct}% disponible`}
+            />
+
+            {/* KPI 2: Cartera por Cobrar */}
+            <KpiExecutiveCard
+              title="Cartera por Cobrar"
+              value={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
+              subtitle={`${kpis.clientesActivos} clientes con crédito activo`}
+              badgeText={kpis.creditoPendiente > 0 ? `${pctCartera}% exp. crédito` : "Cartera al día"}
+              badgePositive={kpis.creditoPendiente === 0}
+              icon={<CreditCard size={14} />}
+              accentColor="#EAB308"
+              progressPercent={pctCartera}
+              progressLabel="Cobranzas activas"
             />
 
             {/* KPI 3: Madurez de Cartera */}
@@ -656,19 +656,6 @@ export default function DashboardComponent({
               accentColor={morosidadAlertaOk ? "#10B981" : "#EF4444"}
               progressPercent={Math.min(Math.round(tasaMorosidad * 5), 100)}
               progressLabel={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })} por cobrar`}
-            />
-
-            {/* KPI 4: Tiempo de Atención */}
-            <KpiExecutiveCard
-              title="Tiempo de Atención"
-              value="≤ 2.0 seg"
-              subtitle="Consulta ágil en mostrador"
-              badgeText="99.8% Alta Eficiencia"
-              badgePositive={true}
-              icon={<Clock size={14} />}
-              accentColor="#F59E0B"
-              progressPercent={99}
-              progressLabel="Punto de venta optimizado"
             />
           </div>
 
@@ -940,7 +927,7 @@ export default function DashboardComponent({
         <div className="space-y-2.5">
 
       {/* ─── 2. FILA DE KPIS EJECUTIVOS (CLARA SEPARACIÓN DE DINERO VS PARES) ─── */}
-      <div className={`grid grid-cols-2 ${isAdmin ? "sm:grid-cols-3 lg:grid-cols-6" : "lg:grid-cols-4"} gap-2`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-2"} gap-2`}>
         {/* KPI 1: Ventas / Ingresos [DINERO] */}
         <KpiExecutiveCard
           title={isVendedor ? "Mis Ventas" : isGlobalAdmin && activeSucursalId === "TODAS" ? "Ventas Totales" : "Ventas de Sucursal"}
@@ -967,33 +954,7 @@ export default function DashboardComponent({
           progressLabel={`Meta: ${metaPares} pares`}
         />
 
-        {/* KPI 3: Disponibilidad de Inventario [DINERO EN BODEGA + PARES EN SUBTÍTULO] */}
-        <KpiExecutiveCard
-          title="Inventario en Bodega"
-          value={`$${(kpis.capitalInvertidoStock || 0).toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`${kpis.totalParesEnStock} pares físicos en bodega`}
-          badgeText={kpis.stockBajoCount > 0 ? `${kpis.stockBajoCount} mod. stock bajo` : "100% óptimo"}
-          badgePositive={kpis.stockBajoCount === 0}
-          icon={<Package size={14} />}
-          accentColor="#F97316"
-          progressPercent={kpis.saludInventarioPct}
-          progressLabel={`${kpis.saludInventarioPct}% disponible`}
-        />
-
-        {/* KPI 4: Cartera por Cobrar [DINERO] */}
-        <KpiExecutiveCard
-          title="Cartera por Cobrar"
-          value={`$${kpis.creditoPendiente.toLocaleString("es-EC", { minimumFractionDigits: 2 })}`}
-          subtitle={`${kpis.clientesActivos} clientes con crédito activo`}
-          badgeText={kpis.creditoPendiente > 0 ? `${pctCartera}% exp. crédito` : "Cartera al día"}
-          badgePositive={kpis.creditoPendiente === 0}
-          icon={<CreditCard size={14} />}
-          accentColor="#EAB308"
-          progressPercent={pctCartera}
-          progressLabel="Cobranzas activas"
-        />
-
-        {/* KPI 5: Caja / Bancos [DINERO REAL EN BD O FLUJO NETO - SÓLO ADMINS] */}
+        {/* KPI 3: Caja / Bancos [DINERO REAL EN BD O FLUJO NETO - SÓLO ADMINS] */}
         {isAdmin && (
           <KpiExecutiveCard
             title="Caja / Bancos"
@@ -1008,7 +969,7 @@ export default function DashboardComponent({
           />
         )}
 
-        {/* KPI 6: Utilidad Neta Real [DINERO & MARGEN - SÓLO ADMINS] */}
+        {/* KPI 4: Utilidad Neta Real [DINERO & MARGEN - SÓLO ADMINS] */}
         {isAdmin && (
           <KpiExecutiveCard
             title="Utilidad Neta Real"
