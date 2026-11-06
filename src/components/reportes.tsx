@@ -47,6 +47,9 @@ import {
   Boxes,
   Truck,
   Phone,
+  PieChart,
+  Activity,
+  Clock,
 } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 import { useToast } from '@/components/ui/toast';
