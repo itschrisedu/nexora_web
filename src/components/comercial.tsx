@@ -45,7 +45,7 @@ import { useToast } from './ui/toast';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { generarUrlPublicaPedidoCliente } from '../services/comprobante-url.service';
 import { descargarPedidoClientePdf, PedidoClientePdfData } from '../services/pdf-factura.service';
-import { getCurvaDocena, calcularCurvaParaTallas, detectarMejorCurvaSegunStock, evaluarDisponibilidadMedias } from '../utils/curvas';
+import { calcularCurvaParaTallas, calcularCurvaParaTallasNum, detectarMejorCurvaSegunStock, evaluarDisponibilidadMedias } from '../utils/curvas';
 import { capitalizarNombreCompleto, formatearNombreSerie, normalizarParaBusqueda } from '@/utils/text-formatters';
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 import ImageLightboxModal from './ui/image-lightbox-modal';
@@ -5718,12 +5718,15 @@ export default function ComercialComponent({
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_A');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const tallasDelGrupo = lineasPedido
+                                          .filter(item => matchThisGroup(item))
+                                          .map(item => ({ id: item.tallaId, tallaId: item.tallaId, numero: Number(item.numeroTalla) }));
+                                        const curva = calcularCurvaParaTallas(primerItem.serieNombre || '', tallasDelGrupo, 'MEDIA_A');
                                         const nuevasLineas = lineasPedido.map(item => {
                                           if (matchThisGroup(item)) {
+                                            const key = item.tallaId || `t-${item.numeroTalla}`;
                                             const num = Number(item.numeroTalla);
-                                            const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                            const qty = curva[key] ?? curva[num] ?? 0;
                                             return { ...item, cantidad: item.cantidad + qty };
                                           }
                                           return item;
@@ -5737,12 +5740,15 @@ export default function ComercialComponent({
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_B');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const tallasDelGrupo = lineasPedido
+                                          .filter(item => matchThisGroup(item))
+                                          .map(item => ({ id: item.tallaId, tallaId: item.tallaId, numero: Number(item.numeroTalla) }));
+                                        const curva = calcularCurvaParaTallas(primerItem.serieNombre || '', tallasDelGrupo, 'MEDIA_B');
                                         const nuevasLineas = lineasPedido.map(item => {
                                           if (matchThisGroup(item)) {
+                                            const key = item.tallaId || `t-${item.numeroTalla}`;
                                             const num = Number(item.numeroTalla);
-                                            const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                            const qty = curva[key] ?? curva[num] ?? 0;
                                             return { ...item, cantidad: item.cantidad + qty };
                                           }
                                           return item;
@@ -5756,13 +5762,16 @@ export default function ComercialComponent({
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_A');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const tallasDelGrupo = lineasPedido
+                                          .filter(item => matchThisGroup(item))
+                                          .map(item => ({ id: item.tallaId, tallaId: item.tallaId, numero: Number(item.numeroTalla) }));
+                                        const curva = calcularCurvaParaTallas(primerItem.serieNombre || '', tallasDelGrupo, 'MEDIA_A');
                                         const nuevasLineas = lineasPedido
                                           .map(item => {
                                             if (matchThisGroup(item)) {
+                                              const key = item.tallaId || `t-${item.numeroTalla}`;
                                               const num = Number(item.numeroTalla);
-                                              const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                              const qty = curva[key] ?? curva[num] ?? 0;
                                               return { ...item, cantidad: Math.max(0, item.cantidad - qty) };
                                             }
                                             return item;
@@ -5777,13 +5786,16 @@ export default function ComercialComponent({
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const curva = getCurvaDocena(primerItem.serieNombre || '', 'MEDIA_B');
-                                        const hasCurva = Object.keys(curva).length > 0;
+                                        const tallasDelGrupo = lineasPedido
+                                          .filter(item => matchThisGroup(item))
+                                          .map(item => ({ id: item.tallaId, tallaId: item.tallaId, numero: Number(item.numeroTalla) }));
+                                        const curva = calcularCurvaParaTallas(primerItem.serieNombre || '', tallasDelGrupo, 'MEDIA_B');
                                         const nuevasLineas = lineasPedido
                                           .map(item => {
                                             if (matchThisGroup(item)) {
+                                              const key = item.tallaId || `t-${item.numeroTalla}`;
                                               const num = Number(item.numeroTalla);
-                                              const qty = hasCurva ? (curva[num] ?? 0) : 1;
+                                              const qty = curva[key] ?? curva[num] ?? 0;
                                               return { ...item, cantidad: Math.max(0, item.cantidad - qty) };
                                             }
                                             return item;
@@ -7617,7 +7629,8 @@ export default function ComercialComponent({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const curva = getCurvaDocena(g.serieNombre || '', 'MEDIA_A');
+                                    const tallasArr = sortedTallas.map((l) => Number(l.talla?.numero ?? l.tallaNumero));
+                                    const curva = calcularCurvaParaTallasNum(g.serieNombre || '', tallasArr, 'MEDIA_A');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const nextMap = { ...entregaItemsMap };
                                     sortedTallas.forEach((l) => {
@@ -7638,7 +7651,8 @@ export default function ComercialComponent({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const curva = getCurvaDocena(g.serieNombre || '', 'MEDIA_B');
+                                    const tallasArr = sortedTallas.map((l) => Number(l.talla?.numero ?? l.tallaNumero));
+                                    const curva = calcularCurvaParaTallasNum(g.serieNombre || '', tallasArr, 'MEDIA_B');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const nextMap = { ...entregaItemsMap };
                                     sortedTallas.forEach((l) => {
@@ -7659,7 +7673,8 @@ export default function ComercialComponent({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const curva = getCurvaDocena(g.serieNombre || '', 'MEDIA_A');
+                                    const tallasArr = sortedTallas.map((l) => Number(l.talla?.numero ?? l.tallaNumero));
+                                    const curva = calcularCurvaParaTallasNum(g.serieNombre || '', tallasArr, 'MEDIA_A');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const nextMap = { ...entregaItemsMap };
                                     sortedTallas.forEach((l) => {
@@ -7677,7 +7692,8 @@ export default function ComercialComponent({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const curva = getCurvaDocena(g.serieNombre || '', 'MEDIA_B');
+                                    const tallasArr = sortedTallas.map((l) => Number(l.talla?.numero ?? l.tallaNumero));
+                                    const curva = calcularCurvaParaTallasNum(g.serieNombre || '', tallasArr, 'MEDIA_B');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const nextMap = { ...entregaItemsMap };
                                     sortedTallas.forEach((l) => {

@@ -92,6 +92,42 @@ export const calcularCurvaParaTallas = (
   // Coincide con la curva predefinida si el modelo tiene exactamente las mismas tallas de esa curva
   const curvaKeys = Object.keys(curvaPredefinida).map(Number);
   const tallasNums = tallasOrdenadas.map((t) => Number(t.numero ?? t.nombre));
+
+  // Caso especial prioritario: Si las tallas del modelo son exactamente 38 a 42 (estándar Cevallos 5 tallas)
+  // Garantiza que NUNCA se inyecte la talla 43 aunque el nombre de la serie contenga "43"
+  if (tallasNums.length === 5 && tallasNums[0] === 38 && tallasNums[4] === 42) {
+    const curva38_42: Record<number, number> =
+      tipo === 'DOCENA'
+        ? { 38: 2, 39: 3, 40: 3, 41: 2, 42: 2 }
+        : tipo === 'MEDIA_A'
+        ? { 38: 1, 39: 2, 40: 1, 41: 1, 42: 1 }
+        : { 38: 1, 39: 1, 40: 2, 41: 1, 42: 1 };
+
+    tallasOrdenadas.forEach((t) => {
+      const num = Number(t.numero ?? t.nombre);
+      const key = t.tallaId || t.id || `t-${num}`;
+      result[key] = curva38_42[num] !== undefined ? curva38_42[num] : 0;
+    });
+    return result;
+  }
+
+  // Caso especial prioritario: Dama estándar 35 a 39 (5 tallas)
+  if (tallasNums.length === 5 && tallasNums[0] === 35 && tallasNums[4] === 39) {
+    const curva35_39: Record<number, number> =
+      tipo === 'DOCENA'
+        ? { 35: 2, 36: 3, 37: 3, 38: 2, 39: 2 }
+        : tipo === 'MEDIA_A'
+        ? { 35: 1, 36: 2, 37: 1, 38: 1, 39: 1 }
+        : { 35: 1, 36: 1, 37: 2, 38: 1, 39: 1 };
+
+    tallasOrdenadas.forEach((t) => {
+      const num = Number(t.numero ?? t.nombre);
+      const key = t.tallaId || t.id || `t-${num}`;
+      result[key] = curva35_39[num] !== undefined ? curva35_39[num] : 0;
+    });
+    return result;
+  }
+
   const coincideCurva =
     curvaKeys.length > 0 &&
     tallasNums.length === curvaKeys.length &&
@@ -148,6 +184,27 @@ export const calcularCurvaParaTallas = (
     sobrante--;
   }
 
+  return result;
+};
+
+/**
+ * Versión simplificada que acepta un arreglo de números de tallas
+ * y devuelve Record<number, number> para uso directo con talla numérica.
+ */
+export const calcularCurvaParaTallasNum = (
+  serieName: string,
+  tallasNums: number[],
+  tipo: TipoCurva
+): Record<number, number> => {
+  if (!tallasNums || tallasNums.length === 0) return {};
+  const tallasObj = tallasNums.map((n) => ({ numero: n, id: `t-${n}` }));
+  const raw = calcularCurvaParaTallas(serieName, tallasObj, tipo);
+  const result: Record<number, number> = {};
+  for (const [key, val] of Object.entries(raw)) {
+    // Las keys son "t-38", "t-39", etc. o tallaIds
+    const num = key.startsWith('t-') ? Number(key.slice(2)) : Number(key);
+    if (!isNaN(num)) result[num] = val;
+  }
   return result;
 };
 

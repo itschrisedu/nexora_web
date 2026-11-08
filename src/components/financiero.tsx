@@ -164,7 +164,7 @@ import { descargarReporteDeudoresPdf } from '../services/pdf-deudores.service';
 
 import { abrirWhatsAppUniversal } from '../utils/whatsapp';
 
-import { getCurvaDocena } from '../utils/curvas';
+import { calcularCurvaParaTallasNum } from '../utils/curvas';
 
 
 
@@ -4558,13 +4558,12 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
   const handleAjustarMediaDocenaDevolucion = (productId: string, serieNombre: string, tipo: 'MEDIA_A' | 'MEDIA_B', delta: 1 | -1) => {
 
-    const curva = getCurvaDocena(serieNombre || '', tipo);
+    setLineasDevolucion((prev) => {
+      const tallasDelProducto = prev.filter((l) => l.productId === productId).map((l) => Number(l.numeroTalla));
+      const curva = calcularCurvaParaTallasNum(serieNombre || '', tallasDelProducto, tipo);
+      const hasCurva = Object.keys(curva).length > 0;
 
-    const hasCurva = Object.keys(curva).length > 0;
-
-    setLineasDevolucion((prev) =>
-
-      prev.map((l) => {
+      return prev.map((l) => {
 
         if (l.productId === productId) {
 
@@ -4580,9 +4579,9 @@ export default function FinancieroComponent({ online, activeSucursalId, sucursal
 
         return l;
 
-      })
+      });
 
-    );
+    });
 
   };
 

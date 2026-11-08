@@ -60,7 +60,7 @@ import { useToast } from './ui/toast';
 import { descargarOrdenCompraPdf, obtenerOrdenCompraPdfBlobUrl, compartirOrdenCompraPdf, OrdenCompraPdfData, limpiarObservacionesOrden } from '../services/pdf-factura.service';
 import { getClienteReputacion } from '../utils/cliente-reputacion';
 import { validarRuc } from '../utils/ecuador-validators';
-import { getCurvaDocena, TipoCurva } from '../utils/curvas';
+import { calcularCurvaParaTallas, calcularCurvaParaTallasNum, TipoCurva } from '../utils/curvas';
 import {
   formatearNombres,
   formatearApellidos,
@@ -1065,8 +1065,6 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const distribucionPreview = useMemo(() => {
     if (!productoSeleccionado) return [];
     const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
-    const curvaMap = getCurvaDocena(serieNombreActiva, subtipoCurva);
-    const hasCurva = Object.keys(curvaMap).length > 0;
     const factorCurvas = cantidadCurvas || 1;
 
     if (prodTallas.length > 0) {
@@ -1076,14 +1074,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         return numA - numB;
       });
 
+      const curvaMap = calcularCurvaParaTallas(serieNombreActiva, sortedTallas, subtipoCurva);
+
       return sortedTallas.map((t: any) => {
         const num = Number(t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre) || 0;
-        let qty = 0;
-        if (hasCurva) {
-          qty = (curvaMap[num] || 0) * factorCurvas;
-        } else {
-          qty = (subtipoCurva === 'DOCENA' ? 2 : 1) * factorCurvas;
-        }
+        const key = t.id || t.tallaId || `t-${num}`;
+        const baseQty = curvaMap[key] ?? curvaMap[num] ?? (subtipoCurva === 'DOCENA' ? 2 : 1);
+        const qty = baseQty * factorCurvas;
         return {
           tallaId: t.id || t.tallaId || '',
           talla: num || (t.numero ?? t.sizeNumber ?? t.talla ?? t.nombre),
@@ -1715,8 +1712,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         diferencia: 0,
       }));
     } else {
-      const curvaDoc = getCurvaDocena(serieName, 'DOCENA');
-      const tallasFromCurva = Object.keys(curvaDoc).length > 0 ? Object.keys(curvaDoc).map(Number) : [38, 39, 40, 41, 42];
+      const fallbackTallas = [38, 39, 40, 41, 42];
+      const curvaDoc = calcularCurvaParaTallasNum(serieName, fallbackTallas, 'DOCENA');
+      const tallasFromCurva = Object.keys(curvaDoc).length > 0 ? Object.keys(curvaDoc).map(Number) : fallbackTallas;
       tallasInit = tallasFromCurva.map((t) => ({
         tallaId: String(t),
         sizeNumber: t,
@@ -3184,7 +3182,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const curva = getCurvaDocena(m.serieNombre || '', 'MEDIA_A');
+                                      const tallasArr = m.tallas.map((t) => Number(t.sizeNumber));
+                                      const curva = calcularCurvaParaTallasNum(m.serieNombre || '', tallasArr, 'MEDIA_A');
                                       const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
@@ -3201,7 +3200,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const curva = getCurvaDocena(m.serieNombre || '', 'MEDIA_B');
+                                      const tallasArr = m.tallas.map((t) => Number(t.sizeNumber));
+                                      const curva = calcularCurvaParaTallasNum(m.serieNombre || '', tallasArr, 'MEDIA_B');
                                       const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
@@ -3218,7 +3218,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const curva = getCurvaDocena(m.serieNombre || '', 'MEDIA_A');
+                                      const tallasArr = m.tallas.map((t) => Number(t.sizeNumber));
+                                      const curva = calcularCurvaParaTallasNum(m.serieNombre || '', tallasArr, 'MEDIA_A');
                                       const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
@@ -3235,7 +3236,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const curva = getCurvaDocena(m.serieNombre || '', 'MEDIA_B');
+                                      const tallasArr = m.tallas.map((t) => Number(t.sizeNumber));
+                                      const curva = calcularCurvaParaTallasNum(m.serieNombre || '', tallasArr, 'MEDIA_B');
                                       const hasCurva = Object.keys(curva).length > 0;
                                       const updated = [...entryModelos];
                                       updated[mIdx].tallas.forEach((t) => {
@@ -4085,7 +4087,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const serieName = (line as any).serieNombre || (line as any).product?.serie?.nombre || '';
-                                    const curva = getCurvaDocena(serieName, 'MEDIA_A');
+                                    const tallasArr = (line.tallasDesglose || []).map((t: any) => Number(t.talla));
+                                    const curva = calcularCurvaParaTallasNum(serieName, tallasArr, 'MEDIA_A');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const newTallas = (line.tallasDesglose || []).map(t => {
                                       const qty = hasCurva ? (curva[Number(t.talla)] || 0) : 0;
@@ -4112,7 +4115,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const serieName = (line as any).serieNombre || (line as any).product?.serie?.nombre || '';
-                                    const curva = getCurvaDocena(serieName, 'MEDIA_B');
+                                    const tallasArr = (line.tallasDesglose || []).map((t: any) => Number(t.talla));
+                                    const curva = calcularCurvaParaTallasNum(serieName, tallasArr, 'MEDIA_B');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const newTallas = (line.tallasDesglose || []).map(t => {
                                       const qty = hasCurva ? (curva[Number(t.talla)] || 0) : 0;
@@ -4139,7 +4143,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const serieName = (line as any).serieNombre || (line as any).product?.serie?.nombre || '';
-                                    const curva = getCurvaDocena(serieName, 'MEDIA_A');
+                                    const tallasArr = (line.tallasDesglose || []).map((t: any) => Number(t.talla));
+                                    const curva = calcularCurvaParaTallasNum(serieName, tallasArr, 'MEDIA_A');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const newTallas = (line.tallasDesglose || []).map(t => {
                                       const qty = hasCurva ? (curva[Number(t.talla)] || 0) : 0;
@@ -4166,7 +4171,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const serieName = (line as any).serieNombre || (line as any).product?.serie?.nombre || '';
-                                    const curva = getCurvaDocena(serieName, 'MEDIA_B');
+                                    const tallasArr = (line.tallasDesglose || []).map((t: any) => Number(t.talla));
+                                    const curva = calcularCurvaParaTallasNum(serieName, tallasArr, 'MEDIA_B');
                                     const hasCurva = Object.keys(curva).length > 0;
                                     const newTallas = (line.tallasDesglose || []).map(t => {
                                       const qty = hasCurva ? (curva[Number(t.talla)] || 0) : 0;
@@ -6964,7 +6970,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const curva = getCurvaDocena(m.serie || '', 'MEDIA_A');
+                                      const tallasArr = m.tallas.map((t) => Number(t.numeroTalla));
+                                      const curva = calcularCurvaParaTallasNum(m.serie || '', tallasArr, 'MEDIA_A');
                                       const hasCurva = Object.keys(curva).length > 0;
                                       setDevLines((prev) =>
                                         prev.map((l, i) => {
@@ -6984,7 +6991,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const curva = getCurvaDocena(m.serie || '', 'MEDIA_B');
+                                      const tallasArr = m.tallas.map((t) => Number(t.numeroTalla));
+                                      const curva = calcularCurvaParaTallasNum(m.serie || '', tallasArr, 'MEDIA_B');
                                       const hasCurva = Object.keys(curva).length > 0;
                                       setDevLines((prev) =>
                                         prev.map((l, i) => {
@@ -7004,7 +7012,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const curva = getCurvaDocena(m.serie || '', 'MEDIA_A');
+                                      const tallasArr = m.tallas.map((t) => Number(t.numeroTalla));
+                                      const curva = calcularCurvaParaTallasNum(m.serie || '', tallasArr, 'MEDIA_A');
                                       const hasCurva = Object.keys(curva).length > 0;
                                       setDevLines((prev) =>
                                         prev.map((l, i) => {
@@ -7024,7 +7033,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const curva = getCurvaDocena(m.serie || '', 'MEDIA_B');
+                                      const tallasArr = m.tallas.map((t) => Number(t.numeroTalla));
+                                      const curva = calcularCurvaParaTallasNum(m.serie || '', tallasArr, 'MEDIA_B');
                                       const hasCurva = Object.keys(curva).length > 0;
                                       setDevLines((prev) =>
                                         prev.map((l, i) => {
