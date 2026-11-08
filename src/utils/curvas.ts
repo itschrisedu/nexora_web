@@ -128,6 +128,20 @@ export const calcularCurvaParaTallas = (
     return result;
   }
 
+  // Caso especial prioritario: Si la serie del modelo tiene exactamente 6 tallas
+  // Toda serie de 6 tallas (niño pequeño 21-26, niño 27-32, escolar, dama o adulto 6 tallas)
+  // tiene exactamente 1 par por talla para media docena (6 pares) y 2 pares por talla para docena (12 pares).
+  // No requiere Serie A ni Serie B porque nunca descuadra.
+  if (tallasOrdenadas.length === 6) {
+    const factor = tipo === 'DOCENA' ? 2 : 1;
+    tallasOrdenadas.forEach((t) => {
+      const num = Number(t.numero ?? t.nombre);
+      const key = t.tallaId || t.id || `t-${num}`;
+      result[key] = factor;
+    });
+    return result;
+  }
+
   const coincideCurva =
     curvaKeys.length > 0 &&
     tallasNums.length === curvaKeys.length &&
@@ -138,17 +152,6 @@ export const calcularCurvaParaTallas = (
       const num = Number(t.numero ?? t.nombre);
       const key = t.tallaId || t.id || `t-${num}`;
       result[key] = curvaPredefinida[num] !== undefined ? curvaPredefinida[num] : 0;
-    });
-    return result;
-  }
-
-  // Si la serie del modelo tiene 6 tallas exactas sin curva especial (1 par por talla = 6 pares = media docena natural)
-  if (tallasOrdenadas.length === 6) {
-    const factor = tipo === 'DOCENA' ? 2 : 1;
-    tallasOrdenadas.forEach((t) => {
-      const num = Number(t.numero ?? t.nombre);
-      const key = t.tallaId || t.id || `t-${num}`;
-      result[key] = factor;
     });
     return result;
   }
@@ -209,7 +212,18 @@ export const calcularCurvaParaTallasNum = (
 };
 
 /**
+ * Determina si una lista o conjunto de tallas corresponde a una curva uniforme de 6 tallas.
+ * En toda serie de 6 tallas, 1 par por talla completa exactamente los 6 pares de la media docena.
+ * En estos casos no se necesita Serie A ni Serie B, sino un único botón directo de Media Docena.
+ */
+export const esCurvaUniforme6Tallas = (tallas: Array<any> | number[] | undefined | null): boolean => {
+  if (!tallas || !Array.isArray(tallas)) return false;
+  return tallas.length === 6;
+};
+
+/**
  * Evalúa con precisión el stock físico real para Media Docena A vs Media Docena B.
+ * Si la serie es de 6 tallas exactas, evalúa la disponibilidad de la media docena uniforme (1 par c/u).
  * Permite advertir al usuario cuando una serie ya no tiene stock y sugerir la que queda.
  */
 export const evaluarDisponibilidadMedias = (
@@ -222,7 +236,11 @@ export const evaluarDisponibilidadMedias = (
   maxMediasB: number;
   recomendacion: 'AMBAS' | 'SOLO_A' | 'SOLO_B' | 'NINGUNA';
   mensajeAdvertencia?: string;
+  esUniforme6: boolean;
+  maxMediasUniformes: number;
 } => {
+  const esUniforme6 = tallas ? tallas.length === 6 : false;
+
   if (!tallas || tallas.length === 0) {
     return {
       mediaADisponible: false,
@@ -231,6 +249,8 @@ export const evaluarDisponibilidadMedias = (
       maxMediasB: 0,
       recomendacion: 'NINGUNA',
       mensajeAdvertencia: 'No hay tallas configuradas en este modelo.',
+      esUniforme6,
+      maxMediasUniformes: 0,
     };
   }
 
@@ -264,7 +284,14 @@ export const evaluarDisponibilidadMedias = (
   let recomendacion: 'AMBAS' | 'SOLO_A' | 'SOLO_B' | 'NINGUNA' = 'AMBAS';
   let mensajeAdvertencia: string | undefined = undefined;
 
-  if (mediaADisponible && mediaBDisponible) {
+  if (esUniforme6) {
+    if (finalMaxA > 0) {
+      recomendacion = 'AMBAS';
+    } else {
+      recomendacion = 'NINGUNA';
+      mensajeAdvertencia = '⚠️ Stock insuficiente para completar una media docena (1 par por cada una de las 6 tallas).';
+    }
+  } else if (mediaADisponible && mediaBDisponible) {
     recomendacion = 'AMBAS';
   } else if (!mediaADisponible && mediaBDisponible) {
     recomendacion = 'SOLO_B';
@@ -284,6 +311,8 @@ export const evaluarDisponibilidadMedias = (
     maxMediasB: finalMaxB,
     recomendacion,
     mensajeAdvertencia,
+    esUniforme6,
+    maxMediasUniformes: finalMaxA,
   };
 };
 
