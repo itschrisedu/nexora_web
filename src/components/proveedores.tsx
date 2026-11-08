@@ -185,7 +185,7 @@ interface EntradaMercancia {
   supplierOrder?: { numero: number };
 }
 
-// FunciÃ³n auxiliar para obtener la URL de imagen limpia
+// Función auxiliar para obtener la URL de imagen limpia
 function obtenerFotoProducto(prod: any): string {
   if (!prod) return '';
   return (
@@ -200,7 +200,7 @@ function obtenerFotoProducto(prod: any): string {
   );
 }
 
-// FunciÃ³n auxiliar para obtener el nombre limpio de la serie de un producto
+// Función auxiliar para obtener el nombre limpio de la serie de un producto
 function obtenerSerieProducto(prod: any): string {
   if (!prod) return '';
   if (prod.serieNombre && typeof prod.serieNombre === 'string') return prod.serieNombre.trim();
@@ -216,7 +216,7 @@ function obtenerSerieProducto(prod: any): string {
   return '';
 }
 
-// CÃ¡lculo del ratio de curva de una talla
+// Cálculo del ratio de curva de una talla
 function getCurvaRatio(talla: any, tallas: any[] = []): number {
   if (talla.ratio && talla.ratio > 0) return talla.ratio;
   if (talla.cantidadSerie && talla.cantidadSerie > 0) return talla.cantidadSerie;
@@ -227,14 +227,14 @@ function getCurvaRatio(talla: any, tallas: any[] = []): number {
 
 // Formateo de docenas para etiquetas comerciales
 function getDocenaLabel(pares: number): string {
-  if (pares === 6) return 'Â½ Docena';
+  if (pares === 6) return '½ Docena';
   if (pares === 12) return '1 Docena';
   if (pares > 0 && pares % 12 === 0) return `${pares / 12} Docenas`;
   if (pares > 0 && pares % 6 === 0) return `${(pares / 12).toFixed(1)} Docenas`;
   return `${(pares / 12).toFixed(1)} Doc.`;
 }
 
-// ConsolidaciÃ³n de lÃ­neas con distribuciÃ³n exacta de tallas
+// Consolidación de líneas con distribución exacta de tallas
 function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos: any[] = []) {
   const map = new Map<string, {
     productId: string;
@@ -265,7 +265,7 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
       (l as any).fotoUrl ||
       '';
 
-    // 1. Si el usuario editÃ³ manualmente las tallas en memoria durante la sesiÃ³n activa:
+    // 1. Si el usuario editó manualmente las tallas en memoria durante la sesión activa:
     let tallasOverride = (l as any)._tallasOverride as Array<{ talla: string | number; cantidad: number }> | undefined;
 
     // 2. Si no hay override en memoria, verificar si la curva viene persistida en observacionLinea:
@@ -395,7 +395,7 @@ function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos:
         codigo: l.producto?.codigo || prodCat?.codigo || prodCat?.code || '',
         color: l.producto?.color || prodCat?.color || '',
         imageUrl: foto,
-        serie: l.producto?.serie || prodCat?.serie?.name || 'Serie EstÃ¡ndar',
+        serie: l.producto?.serie || prodCat?.serie?.name || 'Serie Estándar',
         cantidadPedida: l.cantidadPedida,
         precioCosto: Number(l.precioCosto),
         subtotal: subtotal,
@@ -429,7 +429,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [showConstanciaModal, setShowConstanciaModal] = useState(false);
   const [selectedConstancia, setSelectedConstancia] = useState<any | null>(null);
 
-  // Form: DevoluciÃ³n a Proveedor
+  // Form: Devolución a Proveedor
   const [devSupplierId, setDevSupplierId] = useState('');
   const [devClienteDevolucionId, setDevClienteDevolucionId] = useState('');
   const [devMotivo, setDevMotivo] = useState('');
@@ -467,7 +467,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
   const [saving, setSaving] = useState(false);
 
-  // Modal de confirmaciÃ³n UI (reemplaza confirm nativo)
+  // Modal de confirmación UI (reemplaza confirm nativo)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -483,11 +483,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     onConfirm: () => {},
   });
 
-  // Filtros de Ã³rdenes por estado (Borrador/Pendiente por pedir por defecto)
+  // Filtros de órdenes por estado (Borrador/Pendiente por pedir por defecto)
   const [searchQuery, setSearchQuery] = useState('');
   const [filtroEstadoOrden, setFiltroEstadoOrden] = useState<string>('BORRADOR');
 
-  // Control de acordeones desplegables para numeraciÃ³n
+  // Control de acordeones desplegables para numeración
   const [modelosExpandidos, setModelosExpandidos] = useState<Record<string, boolean>>({});
 
   const toggleExpandModelo = (key: string) => {
@@ -553,7 +553,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   );
   const [deudaAnteriorNotas, setDeudaAnteriorNotas] = useState('');
 
-  // Proveedores Globales de la Empresa (para adopciÃ³n inter-sucursales)
+  // Proveedores Globales de la Empresa (para adopción inter-sucursales)
   const [globalSuppliers, setGlobalSuppliers] = useState<any[]>([]);
   const [loadingGlobalSuppliers, setLoadingGlobalSuppliers] = useState(false);
 
@@ -565,7 +565,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         setGlobalSuppliers(res);
       }
     } catch (e) {
-      console.warn('Error cargando catÃ¡logo global de proveedores:', e);
+      console.warn('Error cargando catálogo global de proveedores:', e);
     } finally {
       setLoadingGlobalSuppliers(false);
     }
@@ -643,7 +643,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     _tallasOverride?: any;
   }>>([]);
 
-  // Form: RecepciÃ³n de MercancÃ­a
+  // Form: Recepción de Mercancía
   const [entrySupplierId, setEntrySupplierId] = useState('');
   const [entryOrderId, setEntryOrderId] = useState('');
   const [entryEntregadoPor, setEntryEntregadoPor] = useState('');
@@ -651,12 +651,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     if (typeof window !== 'undefined') {
       try {
         const u = JSON.parse(localStorage.getItem('user') || '{}');
-        return u?.nombre || u?.name || 'Bodega / RecepciÃ³n';
+        return u?.nombre || u?.name || 'Bodega / Recepción';
       } catch {
-        return 'Bodega / RecepciÃ³n';
+        return 'Bodega / Recepción';
       }
     }
-    return 'Bodega / RecepciÃ³n';
+    return 'Bodega / Recepción';
   });
   const [entryObservaciones, setEntryObservaciones] = useState('');
   const [entryModelos, setEntryModelos] = useState<Array<{
@@ -869,19 +869,19 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     }
 
     if (!contacto.trim()) {
-      showToast('El nÃºmero de telÃ©fono / WhatsApp es obligatorio.', 'error');
+      showToast('El número de teléfono / WhatsApp es obligatorio.', 'error');
       return;
     }
 
     if (ruc && !validarRuc(ruc)) {
-      showToast('El RUC o CÃ©dula ingresado no es vÃ¡lido (debe tener 10 o 13 dÃ­gitos numÃ©ricos).', 'error');
+      showToast('El RUC o Cédula ingresado no es válido (debe tener 10 o 13 dígitos numéricos).', 'error');
       return;
     }
 
     if (email) {
       const emailVal = validarEmailEstricto(email);
       if (!emailVal.valido) {
-        showToast(emailVal.mensaje || 'El correo electrÃ³nico no es vÃ¡lido.', 'error');
+        showToast(emailVal.mensaje || 'El correo electrónico no es válido.', 'error');
         return;
       }
     }
@@ -947,14 +947,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     e.preventDefault();
     if (!editingSupplier) return;
     if (!editRazonSocial.trim()) {
-      showToast('La RazÃ³n Social o Nombre es obligatoria.', 'error');
+      showToast('La Razón Social o Nombre es obligatoria.', 'error');
       return;
     }
 
     if (editEmail && editEmail.trim() !== '') {
       const emailVal = validarEmailEstricto(editEmail);
       if (!emailVal.valido) {
-        showToast(emailVal.mensaje || 'El correo electrÃ³nico no es vÃ¡lido.', 'error');
+        showToast(emailVal.mensaje || 'El correo electrónico no es válido.', 'error');
         return;
       }
     }
@@ -1055,13 +1055,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     );
   }, [productoSeleccionado]);
 
-  // CÃ¡lculo de pares totales de la orden
+  // Cálculo de pares totales de la orden
   const paresCalculados = useMemo(() => {
     const base = subtipoCurva === 'DOCENA' ? 12 : 6;
     return (cantidadCurvas || 1) * base;
   }, [subtipoCurva, cantidadCurvas]);
 
-  // PrevisualizaciÃ³n y distribuciÃ³n exacta de tallas segÃºn curva de calzado (Media A, Media B, Docena)
+  // Previsualización y distribución exacta de tallas según curva de calzado (Media A, Media B, Docena)
   const distribucionPreview = useMemo(() => {
     if (!productoSeleccionado) return [];
     const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
@@ -1089,7 +1089,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       });
     }
 
-    // Tallas estándar de respaldo si no están cargadas en BD
+    // Tallas est�ndar de respaldo si no est�n cargadas en BD
     const tallasFallback = serieNombreActiva.toUpperCase().includes('JUVENIL')
       ? [34, 35, 36, 37, 38]
       : [38, 39, 40, 41, 42];
@@ -1136,7 +1136,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         color: productoSeleccionado.color || '',
         imageUrl: foto,
         fotoUrl: foto,
-        serie: productoSeleccionado.serie?.name || productoSeleccionado.serieNombre || 'Serie EstÃ¡ndar',
+        serie: productoSeleccionado.serie?.name || productoSeleccionado.serieNombre || 'Serie Estándar',
         tallas: productoSeleccionado.tallas,
       },
       _tallasOverride: distribucionPreview,
@@ -1226,7 +1226,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         })),
       });
 
-      showToast('Borrador de orden guardado. Se acumularÃ¡ hasta que decidas enviarla al proveedor.', 'success');
+      showToast('Borrador de orden guardado. Se acumulará hasta que decidas enviarla al proveedor.', 'success');
       setShowOrderModal(false);
       setOrderSupplierId('');
       setOrderObservaciones('');
@@ -1279,7 +1279,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         };
       });
 
-      // AÃ±adir marca de ajuste manual si no la tiene para proteger la orden de auto-acumulaciones
+      // Añadir marca de ajuste manual si no la tiene para proteger la orden de auto-acumulaciones
       let obsOrden = (selectedOrder.observaciones || '').trim();
       if (!obsOrden.includes('[AJUSTE_MANUAL]')) {
         obsOrden = obsOrden ? `[AJUSTE_MANUAL] ${obsOrden}` : '[AJUSTE_MANUAL]';
@@ -1290,7 +1290,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         lines: lineasAGuardar,
       });
 
-      showToast('Orden actualizada y guardada con Ã©xito.', 'success');
+      showToast('Orden actualizada y guardada con éxito.', 'success');
       setEditingOrder(false);
       await handleVerDetalleOrden(selectedOrder.id);
       await loadData();
@@ -1301,9 +1301,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     }
   };
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // FASE 5.2 â€” Handlers para ConsolidaciÃ³n de Demanda
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ������������������������������������������������������������������������������������
+  // FASE 5.2 � Handlers para Consolidación de Demanda
+  // ������������������������������������������������������������������������������������
   const handleAbrirConsolidarDemanda = async () => {
     setLoadingDemanda(true);
     setShowConsolidarDemandaModal(true);
@@ -1419,7 +1419,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           ? tallasValidas.map((t) => `T${t.talla} (${t.cantidad})`).join(' | ')
           : undefined;
 
-        // Limpieza de privacidad estricta en la lÃ­nea
+        // Limpieza de privacidad estricta en la línea
         const obsFab = limpiarObservacionesOrden(l.observacionLinea);
 
         return {
@@ -1444,12 +1444,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     };
   };
 
-  // BotÃ³n EXPLÃCITO para ENVIAR la orden y despachar por WhatsApp al proveedor
+  // Botón EXPLÍCITO para ENVIAR la orden y despachar por WhatsApp al proveedor
   const handleEnviarYGenerarPDF = async (orderId: string) => {
     setSaving(true);
     try {
       await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/confirmar`, {});
-      showToast('Â¡Orden enviada al proveedor exitosamente! Abriendo WhatsApp...', 'success');
+      showToast('¡Orden enviada al proveedor exitosamente! Abriendo WhatsApp...', 'success');
 
       const order = await ApiService.get(`/proveedores/ordenes-compra/${orderId}`);
       if (order) {
@@ -1471,7 +1471,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     setSaving(true);
     try {
       const res = await ApiService.post('/proveedores/auto-despacho/ejecutar-manual', {});
-      showToast(res.message || 'Despacho automÃ¡tico ejecutado con Ã©xito.', 'success');
+      showToast(res.message || 'Despacho automático ejecutado con éxito.', 'success');
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Error al ejecutar el despacho.', 'error');
@@ -1512,10 +1512,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     let telefono = order.supplier?.contacto;
     if (!telefono) {
       telefono = window.prompt(
-        `El proveedor "${order.supplier?.razonSocial || order.supplier?.nombre || 'Proveedor'}" no tiene telÃ©fono registrado en Contacto.\n\nIngrese el nÃºmero de WhatsApp para enviar el pedido (ej: 0991234567):`
+        `El proveedor "${order.supplier?.razonSocial || order.supplier?.nombre || 'Proveedor'}" no tiene teléfono registrado en Contacto.\n\nIngrese el número de WhatsApp para enviar el pedido (ej: 0991234567):`
       );
       if (!telefono) {
-        showToast('No se ingresÃ³ nÃºmero de telÃ©fono. Puede previsualizar o descargar el PDF.', 'info');
+        showToast('No se ingresó número de teléfono. Puede previsualizar o descargar el PDF.', 'info');
         await handlePrevisualizarPDFOrden(order.id);
         return;
       }
@@ -1542,8 +1542,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     setConfirmModal({
       isOpen: true,
       title: 'Cancelar Orden de Compra',
-      message: 'Â¿EstÃ¡ seguro de que desea cancelar esta orden de compra a proveedor? Esta acciÃ³n no se puede deshacer.',
-      confirmText: 'SÃ­, Cancelar Orden',
+      message: '¿Está seguro de que desea cancelar esta orden de compra a proveedor? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, Cancelar Orden',
       cancelText: 'Volver',
       danger: true,
       onConfirm: async () => {
@@ -1568,11 +1568,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       isOpen: true,
       title: 'Cancelar y Marcar "Ya No Se Vende"',
       message:
-        'Â¿EstÃ¡ seguro de CANCELAR esta orden y marcar que los calzados YA NO SE VENDEN?\n\n' +
-        'â€¢ La orden de compra quedarÃ¡ CANCELADA.\n' +
-        'â€¢ El sistema NO volverÃ¡ a generar Ã³rdenes automÃ¡ticas para estos modelos aunque se queden sin stock.\n' +
-        'â€¢ Siempre podrÃ¡s volver a realizar un pedido manualmente si lo requieres en el futuro.',
-      confirmText: 'SÃ­, Cancelar y Bloquear',
+        '¿Está seguro de CANCELAR esta orden y marcar que los calzados YA NO SE VENDEN?\n\n' +
+        '⬢ La orden de compra quedará CANCELADA.\n' +
+        '⬢ El sistema NO volverá a generar órdenes automáticas para estos modelos aunque se queden sin stock.\n' +
+        '⬢ Siempre podrás volver a realizar un pedido manualmente si lo requieres en el futuro.',
+      confirmText: 'Sí, Cancelar y Bloquear',
       cancelText: 'Volver',
       danger: true,
       onConfirm: async () => {
@@ -1580,7 +1580,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         setSaving(true);
         try {
           await ApiService.patch(`/proveedores/ordenes-compra/${orderId}/cancelar-y-desactivar-reorden`, {});
-          showToast('Orden cancelada y reorden automÃ¡tica desactivada (Producto marcado como "Ya no se vende").', 'success');
+          showToast('Orden cancelada y reorden automática desactivada (Producto marcado como "Ya no se vende").', 'success');
           setShowOrderDetailModal(false);
           loadData();
         } catch (err: any) {
@@ -1594,7 +1594,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
   const handleIrARecepcionDesdeOrden = (order: OrdenCompra) => {
     if (order.tenantId && miLocalId && order.tenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
-      showToast('Solo la sucursal propietaria de esta orden puede realizar la recepciÃ³n en bodega.', 'warning');
+      showToast('Solo la sucursal propietaria de esta orden puede realizar la recepción en bodega.', 'warning');
       return;
     }
     setShowOrderDetailModal(false);
@@ -1652,7 +1652,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               codigo: c.codigo,
               color: c.color,
               fotoUrl: foto,
-              serieNombre: c.serie || 'Serie EstÃ¡ndar',
+              serieNombre: c.serie || 'Serie Estándar',
               precioCosto: c.precioCosto,
               observacionLinea: c.observacionLinea || '',
               tallas: tallasArr,
@@ -1666,7 +1666,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           showToast(`Orden OC-${String(order.numero).padStart(4, '0')} vinculada. Se cargaron ${modelosData.length} modelos con sus tallas.`, 'info');
         } else {
           setEntryModelos([]);
-          showToast('La orden seleccionada no contiene lÃ­neas de productos.', 'warning');
+          showToast('La orden seleccionada no contiene líneas de productos.', 'warning');
         }
       }
     } catch (e) {
@@ -1677,7 +1677,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
   const handleAddEntryModeloExtra = () => {
     if (!productoSeleccionado) {
-      showToast('Seleccione un modelo para agregar a la recepciÃ³n.', 'error');
+      showToast('Seleccione un modelo para agregar a la recepción.', 'error');
       return;
     }
     const foto = obtenerFotoProducto(productoSeleccionado);
@@ -1744,7 +1744,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
     setProductoSeleccionado(null);
     setBusquedaModelo('');
-    showToast('Modelo adicional agregado a la recepciÃ³n.', 'success');
+    showToast('Modelo adicional agregado a la recepción.', 'success');
   };
 
   const handleUpdateTallaQty = (modeloIdx: number, tallaIdx: number, val: number) => {
@@ -1767,7 +1767,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     }
 
     if (entryModelos.length === 0) {
-      showToast('Agregue al menos un modelo a la recepciÃ³n.', 'error');
+      showToast('Agregue al menos un modelo a la recepción.', 'error');
       return;
     }
 
@@ -1821,22 +1821,22 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
       showToast(
         hayFaltantes
-          ? 'MercancÃ­a ingresada con faltantes. La orden queda en Ã“rdenes Parciales hasta completarse todo el pedido.'
-          : 'RecepciÃ³n completada exitosamente. Stock fÃ­sico y saldo por pagar actualizados al instante.',
+          ? 'Mercancía ingresada con faltantes. La orden queda en �rdenes Parciales hasta completarse todo el pedido.'
+          : 'Recepción completada exitosamente. Stock físico y saldo por pagar actualizados al instante.',
         'success'
       );
       const uLogged = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
       setEntrySupplierId('');
       setEntryOrderId('');
       setEntryEntregadoPor('');
-      setEntryRecibidoPor(uLogged?.nombre || uLogged?.name || 'Bodega / RecepciÃ³n');
+      setEntryRecibidoPor(uLogged?.nombre || uLogged?.name || 'Bodega / Recepción');
       setEntryObservaciones('');
       setEntryModelos([]);
 
-      // Recarga inmediata de proveedores, Ã³rdenes y saldos por pagar
+      // Recarga inmediata de proveedores, órdenes y saldos por pagar
       await loadData();
 
-      // Cambiar de inmediato a la pestaÃ±a de Proveedores y Deudas para ver el saldo actualizado en vivo
+      // Cambiar de inmediato a la pestaña de Proveedores y Deudas para ver el saldo actualizado en vivo
       setActiveTab('proveedores');
 
       if (typeof window !== 'undefined') {
@@ -1844,7 +1844,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         window.dispatchEvent(new CustomEvent('dashboard_refresh'));
       }
     } catch (err: any) {
-      showToast(err.message || 'Error al registrar la recepciÃ³n.', 'error');
+      showToast(err.message || 'Error al registrar la recepción.', 'error');
     } finally {
       setSaving(false);
     }
@@ -1879,7 +1879,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     e.preventDefault();
     const montoNum = parseFloat(String(montoPago).replace(',', '.'));
     if (isNaN(montoNum) || montoNum <= 0) {
-      showToast('Ingrese un monto vÃ¡lido mayor a $0.00.', 'error');
+      showToast('Ingrese un monto válido mayor a $0.00.', 'error');
       return;
     }
 
@@ -1923,14 +1923,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     const prov = proveedores.find((pr) => pr.id === p.supplierId);
     const saldo = prov?.saldoPendiente ?? 0;
 
-    const mensaje = `*COMPROBANTE DE PAGO A PROVEEDOR*\n\nEstimado/a *${p.supplier?.nombre || 'Proveedor'}*,\n\nLe confirmamos que se ha registrado un pago a su favor:\n\nðŸ’µ *Monto:* $${Number(p.monto).toFixed(2)}\nðŸ’³ *MÃ©todo:* ${p.metodo}${p.banco ? ` (${p.banco})` : ''}\nðŸ“„ *Comprobante / Ref:* ${p.comprobante || 'N/A'}\nðŸ“… *Fecha:* ${new Date(p.createdAt).toLocaleDateString('es-EC')}\n${p.notas ? `ðŸ“ *Concepto:* ${p.notas}\n` : ''}\nðŸ’¼ *Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Comprobante emitido automÃ¡ticamente._`;
+    const mensaje = `*COMPROBANTE DE PAGO A PROVEEDOR*\n\nEstimado/a *${p.supplier?.nombre || 'Proveedor'}*,\n\nLe confirmamos que se ha registrado un pago a su favor:\n\n�x� *Monto:* $${Number(p.monto).toFixed(2)}\n�x� *Método:* ${p.metodo}${p.banco ? ` (${p.banco})` : ''}\n�x *Comprobante / Ref:* ${p.comprobante || 'N/A'}\n�x& *Fecha:* ${new Date(p.createdAt).toLocaleDateString('es-EC')}\n${p.notas ? `�x� *Concepto:* ${p.notas}\n` : ''}\n�x� *Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Comprobante emitido automáticamente._`;
 
     abrirWhatsAppUniversal(numLimpio, mensaje);
   };
 
   const handleEnviarEstadoCuentaProveedorWhatsApp = (cuentaData: any) => {
     if (!cuentaData?.supplier) {
-      showToast('No hay informaciÃ³n disponible del proveedor.', 'warning');
+      showToast('No hay información disponible del proveedor.', 'warning');
       return;
     }
     const sup = cuentaData.supplier;
@@ -1943,7 +1943,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     }
 
     if (!numLimpio) {
-      showToast('El proveedor no tiene telÃ©fono / WhatsApp registrado.', 'warning');
+      showToast('El proveedor no tiene teléfono / WhatsApp registrado.', 'warning');
       return;
     }
 
@@ -1955,18 +1955,18 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     const saldoPendiente = Number(resumen.saldoPendiente || 0);
     const saldoAFavor = Number(resumen.saldoAFavor || 0);
     const userStored = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
-    const bName = userStored?.tenant?.name || 'AdministraciÃ³n Central';
+    const bName = userStored?.tenant?.name || 'Administración Central';
 
     let estadoSaldoStr = '';
     if (saldoPendiente > 0.01) {
-      estadoSaldoStr = `ðŸ”´ *SALDO PENDIENTE POR PAGAR: $${saldoPendiente.toFixed(2)}*`;
+      estadoSaldoStr = `�x� *SALDO PENDIENTE POR PAGAR: $${saldoPendiente.toFixed(2)}*`;
     } else if (saldoAFavor > 0.01) {
-      estadoSaldoStr = `ðŸŸ¢ *ADELANTO DISPONIBLE A FAVOR: $${saldoAFavor.toFixed(2)}*`;
+      estadoSaldoStr = `�xx� *ADELANTO DISPONIBLE A FAVOR: $${saldoAFavor.toFixed(2)}*`;
     } else {
-      estadoSaldoStr = `âœ… *CUENTA AL DÃA ($0.00)*`;
+      estadoSaldoStr = `�S& *CUENTA AL DÍA ($0.00)*`;
     }
 
-    const mensaje = `ðŸ“‹ *ESTADO DE CUENTA â€” PROVEEDOR*\n\nEstimado/a *${sup.razonSocial || sup.nombre || 'Proveedor'}* (RUC: ${sup.ruc || 'N/A'}),\n\nLe compartimos el extracto de balance comercial y de pagos con corte a *${hoyLegible}*:\n\nðŸ“¦ *Total Facturado:* $${totalFacturado.toFixed(2)} (${resumen.totalEntregas || 0} entregas)\nðŸ’µ *Total Pagado:* $${totalPagado.toFixed(2)} (${resumen.totalPagos || 0} pagos)\nðŸ”„ *Cruzado con MercaderÃ­a:* $${cruzado.toFixed(2)}\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n${estadoSaldoStr}\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n_Emitido por ${bName}_`;
+    const mensaje = `�x9 *ESTADO DE CUENTA � PROVEEDOR*\n\nEstimado/a *${sup.razonSocial || sup.nombre || 'Proveedor'}* (RUC: ${sup.ruc || 'N/A'}),\n\nLe compartimos el extracto de balance comercial y de pagos con corte a *${hoyLegible}*:\n\n�x� *Total Facturado:* $${totalFacturado.toFixed(2)} (${resumen.totalEntregas || 0} entregas)\n�x� *Total Pagado:* $${totalPagado.toFixed(2)} (${resumen.totalPagos || 0} pagos)\n�x *Cruzado con Mercadería:* $${cruzado.toFixed(2)}\n\n������������������������������������������\n${estadoSaldoStr}\n������������������������������������������\n\n_Emitido por ${bName}_`;
 
     abrirWhatsAppUniversal(numLimpio, mensaje);
   };
@@ -1974,7 +1974,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const handleAbrirDevolucionProveedor = (item?: any) => {
     if (item) {
       setDevClienteDevolucionId(item.id || '');
-      setDevMotivo(item.motivo || 'DevoluciÃ³n de calzado defectuoso / garantÃ­a');
+      setDevMotivo(item.motivo || 'Devolución de calzado defectuoso / garantía');
       
       const firstLineWithSupplier = item.lines?.find((l: any) => l.supplierId);
       const targetSuppId = firstLineWithSupplier?.supplierId || (proveedores.length > 0 ? proveedores[0].id : '');
@@ -2014,11 +2014,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const handleGuardarDevolucionProveedor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!devSupplierId) {
-      showToast('Seleccione el proveedor al que devolverÃ¡ la mercaderÃ­a.', 'error');
+      showToast('Seleccione el proveedor al que devolverá la mercadería.', 'error');
       return;
     }
     if (devLines.length === 0) {
-      showToast('Agregue al menos un modelo a la devoluciÃ³n.', 'error');
+      showToast('Agregue al menos un modelo a la devolución.', 'error');
       return;
     }
 
@@ -2026,7 +2026,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     try {
       const res: any = await ApiService.post('/devoluciones/proveedor', {
         supplierId: devSupplierId,
-        motivo: devMotivo || 'DevoluciÃ³n de calzado por falla / garantÃ­a de fÃ¡brica',
+        motivo: devMotivo || 'Devolución de calzado por falla / garantía de fábrica',
         entregadoPor: devEntregadoPor || undefined,
         recibidoPor: devRecibidoPor || undefined,
         clienteDevolucionId: devClienteDevolucionId || undefined,
@@ -2038,7 +2038,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         })),
       });
 
-      showToast(`DevoluciÃ³n registrada con Ã©xito (#${res.resumenFinanciero?.numeroCodigo || 'DEV'}). Se descontÃ³ $${Number(res.deudaDescontada || 0).toFixed(2)} de la deuda con el proveedor.`, 'success');
+      showToast(`Devolución registrada con éxito (#${res.resumenFinanciero?.numeroCodigo || 'DEV'}). Se descontó $${Number(res.deudaDescontada || 0).toFixed(2)} de la deuda con el proveedor.`, 'success');
       setShowDevolucionModal(false);
       await loadData();
       if (typeof window !== 'undefined') {
@@ -2046,7 +2046,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         window.dispatchEvent(new CustomEvent('dashboard_refresh'));
       }
     } catch (err: any) {
-      showToast(err.message || 'Error al registrar la devoluciÃ³n al proveedor.', 'error');
+      showToast(err.message || 'Error al registrar la devolución al proveedor.', 'error');
     } finally {
       setSaving(false);
     }
@@ -2065,7 +2065,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const handleGuardarManualDefectuoso = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualProd) {
-      showToast('Seleccione un producto del catÃ¡logo.', 'error');
+      showToast('Seleccione un producto del catálogo.', 'error');
       return;
     }
     if (!manualTallaId) {
@@ -2080,7 +2080,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     setSaving(true);
     try {
       await ApiService.post('/devoluciones/mercaderia-por-devolver/manual', {
-        motivo: manualMotivo || 'Calzado defectuoso registrado en bodega para devoluciÃ³n',
+        motivo: manualMotivo || 'Calzado defectuoso registrado en bodega para devolución',
         lines: [
           {
             productId: manualProd.id,
@@ -2091,11 +2091,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         ],
       });
 
-      showToast('Calzado defectuoso agregado a la bandeja de mercaderÃ­a por devolver.', 'success');
+      showToast('Calzado defectuoso agregado a la bandeja de mercadería por devolver.', 'success');
       setShowManualDefectuosoModal(false);
       await loadData();
     } catch (err: any) {
-      showToast(err.message || 'Error al registrar la mercaderÃ­a defectuosa.', 'error');
+      showToast(err.message || 'Error al registrar la mercadería defectuosa.', 'error');
     } finally {
       setSaving(false);
     }
@@ -2114,10 +2114,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     const saldo = prov?.saldoPendiente ?? 0;
 
     let itemsDetalle = (dev.lines || [])
-      .map((l: any) => `â€¢ *${l.modelName || 'Calzado'}* (${l.color || 'EstÃ¡ndar'}) Talla *${l.numeroTalla || '38'}*: ${l.cantidad} par(es) Ã— $${Number(l.precioCosto || 0).toFixed(2)} = $${Number(l.subtotal || 0).toFixed(2)}`)
+      .map((l: any) => `⬢ *${l.modelName || 'Calzado'}* (${l.color || 'Estándar'}) Talla *${l.numeroTalla || '38'}*: ${l.cantidad} par(es) � $${Number(l.precioCosto || 0).toFixed(2)} = $${Number(l.subtotal || 0).toFixed(2)}`)
       .join('\n');
 
-    const mensaje = `*CONSTANCIA DE DEVOLUCIÃ“N DE CALZADO (GARANTÃA / FALLA)*\n\nEstimado/a *${dev.supplier?.razonSocial || 'Proveedor'}*,\n\nLe notificamos formalmente la devoluciÃ³n de mercaderÃ­a por defecto / garantÃ­a:\n\nðŸ“„ *Comprobante NÂ°:* ${dev.numeroCodigo || 'DEV-0001'}\nðŸ“… *Fecha:* ${new Date(dev.createdAt).toLocaleDateString('es-EC')}\nðŸ“ *Motivo:* ${dev.motivo || 'Falla de fÃ¡brica / defecto de fabricaciÃ³n'}\n\nðŸ‘Ÿ *DETALLE DE MERCADERÃA DEVUELTA:*\n${itemsDetalle}\n\nðŸ“¦ *Total Pares Devueltos:* ${dev.totalPares || (dev.lines || []).reduce((acc: number, l: any) => acc + l.cantidad, 0)} pares\nðŸ’µ *Monto Total Devuelto:* $${Number(dev.totalDevuelto || 0).toFixed(2)}\nðŸ“‰ *Descontado de Deuda / Saldo:* -$${Number(dev.deudaDescontada || dev.totalDevuelto || 0).toFixed(2)}\nðŸ’¼ *Nuevo Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Constancia comercial emitida por sistema NEXORA._`;
+    const mensaje = `*CONSTANCIA DE DEVOLUCI�N DE CALZADO (GARANTÍA / FALLA)*\n\nEstimado/a *${dev.supplier?.razonSocial || 'Proveedor'}*,\n\nLe notificamos formalmente la devolución de mercadería por defecto / garantía:\n\n�x *Comprobante N°:* ${dev.numeroCodigo || 'DEV-0001'}\n�x& *Fecha:* ${new Date(dev.createdAt).toLocaleDateString('es-EC')}\n�x� *Motivo:* ${dev.motivo || 'Falla de fábrica / defecto de fabricación'}\n\n�xx *DETALLE DE MERCADERÍA DEVUELTA:*\n${itemsDetalle}\n\n�x� *Total Pares Devueltos:* ${dev.totalPares || (dev.lines || []).reduce((acc: number, l: any) => acc + l.cantidad, 0)} pares\n�x� *Monto Total Devuelto:* $${Number(dev.totalDevuelto || 0).toFixed(2)}\n�x0 *Descontado de Deuda / Saldo:* -$${Number(dev.deudaDescontada || dev.totalDevuelto || 0).toFixed(2)}\n�x� *Nuevo Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Constancia comercial emitida por sistema NEXORA._`;
 
     abrirWhatsAppUniversal(numLimpio, mensaje);
   };
@@ -2165,7 +2165,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     });
   }, [ordenes, activeSucursalId, miLocalId, userRole, sucursales]);
 
-  // PestaÃ±as de Ã“rdenes
+  // Pestañas de �rdenes
   const ordenesFiltradas = useMemo(() => {
     return ordenesDeSucursal.filter((o) => {
       let matchEstado = true;
@@ -2190,7 +2190,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
   return (
     <div className="space-y-6">
-      {/* â•â•â•â•â•â• HEADER SUPERIOR & KPIs â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"� HEADER SUPERIOR & KPIs �"��"��"��"��"��"� */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold tracking-tight flex items-center gap-2.5">
@@ -2198,7 +2198,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             Proveedores & Cuentas por Pagar
           </h2>
           <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-            Ã“rdenes de compra acumulativas por docenas, verificaciÃ³n de recepciones y estados de cuenta
+            �rdenes de compra acumulativas por docenas, verificación de recepciones y estados de cuenta
           </p>
         </div>
 
@@ -2270,7 +2270,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           <div className="text-xl font-black text-[var(--foreground)] font-mono">
             ${metrics.totalCompras.toFixed(2)}
           </div>
-          <p className="text-[10px] text-[var(--muted-foreground)]">MercancÃ­a recibida en bodega</p>
+          <p className="text-[10px] text-[var(--muted-foreground)]">Mercancía recibida en bodega</p>
         </div>
 
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 space-y-1.5 shadow-sm">
@@ -2279,21 +2279,21 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             <Clock size={14} className="text-amber-500" />
           </div>
           <div className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">
-            {metrics.ordenesActivas} <span className="text-xs font-normal text-[var(--muted-foreground)]">Ã³rdenes</span>
+            {metrics.ordenesActivas} <span className="text-xs font-normal text-[var(--muted-foreground)]">órdenes</span>
           </div>
-          <p className="text-[10px] text-[var(--muted-foreground)]">AcumulÃ¡ndose o en trÃ¡nsito</p>
+          <p className="text-[10px] text-[var(--muted-foreground)]">Acumulándose o en tránsito</p>
         </div>
       </div>
 
-      {/* â•â•â•â•â•â• TABS PRINCIPALES & BUSCADOR â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"� TABS PRINCIPALES & BUSCADOR �"��"��"��"��"��"� */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-2">
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {([
             ['proveedores', 'Proveedores & Deudas', Truck, 0],
-            ['ordenes', 'Ã“rdenes de Compra', FileText, 0],
-            ['ingreso', 'RecepciÃ³n de MercancÃ­a', PackageCheck, 0],
+            ['ordenes', '�rdenes de Compra', FileText, 0],
+            ['ingreso', 'Recepción de Mercancía', PackageCheck, 0],
             ['pagos', 'Historial de Pagos', DollarSign, 0],
-            ['devoluciones', 'Devoluciones & GarantÃ­as', RotateCcw, pendientesDevolucion.length],
+            ['devoluciones', 'Devoluciones & Garantías', RotateCcw, pendientesDevolucion.length],
           ] as const).map(([id, label, Icon, badge]) => (
             <button
               key={id}
@@ -2319,7 +2319,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] pointer-events-none" />
           <input
             type="text"
-            placeholder={activeTab === 'ordenes' ? 'Buscar NÂ° orden, modelo...' : 'Buscar proveedor, RUC...'}
+            placeholder={activeTab === 'ordenes' ? 'Buscar N° orden, modelo...' : 'Buscar proveedor, RUC...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10 transition-all shadow-2xs"
@@ -2330,13 +2330,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       {loading && (
         <div className="flex flex-col items-center justify-center p-16 text-[var(--muted-foreground)]">
           <Loader2 className="animate-spin text-[#0F172A] dark:text-amber-400 mb-2" size={32} />
-          <span className="text-xs">Cargando informaciÃ³n...</span>
+          <span className="text-xs">Cargando información...</span>
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          PESTAÃ‘A 1: PROVEEDORES & DEUDAS
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          PESTA�A 1: PROVEEDORES & DEUDAS
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {!loading && activeTab === 'proveedores' && (
         proveedoresFiltrados.length === 0 ? (
           <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
@@ -2384,7 +2384,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           ? `Debe $${deuda.toFixed(2)}`
                           : tieneSaldoAFavor
                             ? `Adelanto a Favor: $${saldoAFavor.toFixed(2)}`
-                            : 'Al DÃ­a $0.00'}
+                            : 'Al Día $0.00'}
                       </span>
                     </div>
 
@@ -2421,7 +2421,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       </div>
                       {cruzado > 0 && (
                         <div className="col-span-2 pt-1.5 border-t border-[var(--border)] flex items-center justify-between text-[11px]">
-                          <span className="text-[10px] text-[var(--muted-foreground)]">Cruzado con MercancÃ­a:</span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">Cruzado con Mercancía:</span>
                           <span className="font-bold text-indigo-600 dark:text-indigo-400 font-mono">${cruzado.toFixed(2)}</span>
                         </div>
                       )}
@@ -2470,26 +2470,26 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         )
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          PESTAÃ‘A 2: Ã“RDENES DE COMPRA (PestaÃ±as Ordenadas)
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          PESTA�A 2: �RDENES DE COMPRA (Pestañas Ordenadas)
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {!loading && activeTab === 'ordenes' && (
         <div className="space-y-4">
           {/* Banner explicativo: Pendientes por Pedir vs Enviadas (Despacho diario a las 08:00 AM) */}
           <div className="p-4 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-transparent border border-blue-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
             <div className="flex items-start gap-3">
-              <span className="text-2xl shrink-0 mt-0.5">ðŸšš</span>
+              <span className="text-2xl shrink-0 mt-0.5">�xaa</span>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm text-[var(--foreground)]">
-                    Despacho AutomÃ¡tico Diario a Proveedores (08:00 AM)
+                    Despacho Automático Diario a Proveedores (08:00 AM)
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30">
-                    Programado 1 vez al dÃ­a
+                    Programado 1 vez al día
                   </span>
                 </div>
                 <p className="text-xs text-[var(--muted-foreground)] mt-1 leading-relaxed">
-                  Las Ã³rdenes generadas por ventas sin stock se acumulan en <strong className="text-[var(--foreground)]">"â³ Pendientes por Pedir"</strong>. Cada maÃ±ana a las <strong className="text-blue-600 dark:text-blue-400">08:00 AM</strong> se envÃ­an automÃ¡ticamente al fabricante. Puedes revisarlas, reasignar proveedor, cancelarlas, presionar <strong className="text-emerald-600">"Enviar"</strong> individualmente o despachar todo en lote.
+                  Las órdenes generadas por ventas sin stock se acumulan en <strong className="text-[var(--foreground)]">"⏳ Pendientes por Pedir"</strong>. Cada mañana a las <strong className="text-blue-600 dark:text-blue-400">08:00 AM</strong> se envían automáticamente al fabricante. Puedes revisarlas, reasignar proveedor, cancelarlas, presionar <strong className="text-emerald-600">"Enviar"</strong> individualmente o despachar todo en lote.
                 </p>
               </div>
             </div>
@@ -2498,7 +2498,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 onClick={handleEjecutarAutoDespachoManual}
                 disabled={saving}
                 className="shrink-0 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-                title="Despachar todas las Ã³rdenes pendientes por pedir ahora mismo sin esperar a las 08:00 AM"
+                title="Despachar todas las órdenes pendientes por pedir ahora mismo sin esperar a las 08:00 AM"
               >
                 <Send size={13} />
                 <span>Despachar Todo Ahora</span>
@@ -2514,16 +2514,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             </button>
           </div>
 
-          {/* Barra de Filtros: SeparaciÃ³n clara de Pendientes por Pedir y Enviadas */}
+          {/* Barra de Filtros: Separación clara de Pendientes por Pedir y Enviadas */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {[
-              { key: 'BORRADOR', label: 'â³ Pendientes por Pedir', count: ordenesDeSucursal.filter((o) => o.estado === 'BORRADOR').length },
-              { key: 'PENDIENTE', label: 'ðŸ“¤ En TrÃ¡nsito (Esperando Entrega)', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE').length },
-              { key: 'ENVIADAS_HISTORIAL', label: 'ðŸšš Historial de Enviadas', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL' || o.estado === 'RECIBIDA').length },
-              { key: 'RECIBIDA_PARCIAL', label: 'ðŸ“¦ Parciales (Con Faltantes)', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
-              { key: 'RECIBIDA', label: 'âœ… Recibidas en Bodega', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA').length },
-              { key: 'CANCELADA', label: 'ðŸš« Canceladas', count: ordenesDeSucursal.filter((o) => o.estado === 'CANCELADA').length },
-              { key: 'TODOS', label: 'ðŸ“‹ Todas las Ã“rdenes', count: ordenesDeSucursal.length },
+              { key: 'BORRADOR', label: '⏳ Pendientes por Pedir', count: ordenesDeSucursal.filter((o) => o.estado === 'BORRADOR').length },
+              { key: 'PENDIENTE', label: '�x� En Tránsito (Esperando Entrega)', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE').length },
+              { key: 'ENVIADAS_HISTORIAL', label: '�xaa Historial de Enviadas', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL' || o.estado === 'RECIBIDA').length },
+              { key: 'RECIBIDA_PARCIAL', label: '�x� Parciales (Con Faltantes)', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
+              { key: 'RECIBIDA', label: '�S& Recibidas en Bodega', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA').length },
+              { key: 'CANCELADA', label: '�xa� Canceladas', count: ordenesDeSucursal.filter((o) => o.estado === 'CANCELADA').length },
+              { key: 'TODOS', label: '�x9 Todas las �rdenes', count: ordenesDeSucursal.length },
             ].map((st) => (
               <button
                 key={st.key}
@@ -2549,12 +2549,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           {ordenesFiltradas.length === 0 ? (
             <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl">
               {filtroEstadoOrden === 'BORRADOR'
-                ? 'No hay Ã³rdenes pendientes por pedir acumuladas para hoy.'
+                ? 'No hay órdenes pendientes por pedir acumuladas para hoy.'
                 : filtroEstadoOrden === 'PENDIENTE'
-                ? 'No hay Ã³rdenes enviadas en trÃ¡nsito hacia los proveedores.'
+                ? 'No hay órdenes enviadas en tránsito hacia los proveedores.'
                 : filtroEstadoOrden === 'ENVIADAS_HISTORIAL'
-                ? 'No hay historial de Ã³rdenes enviadas a proveedores.'
-                : `No hay Ã³rdenes de compra en esta pestaÃ±a (${filtroEstadoOrden}).`}
+                ? 'No hay historial de órdenes enviadas a proveedores.'
+                : `No hay órdenes de compra en esta pestaña (${filtroEstadoOrden}).`}
             </div>
           ) : (
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
@@ -2562,13 +2562,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 <table className="w-full text-xs text-left min-w-[780px]">
                   <thead className="bg-[var(--muted)]/50 border-b border-[var(--border)] text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
                     <tr>
-                      <th className="px-5 py-3.5">NÂ° Orden</th>
+                      <th className="px-5 py-3.5">N° Orden</th>
                       <th className="px-4 py-3.5">Proveedor</th>
                       <th className="px-4 py-3.5 text-center">Sucursal</th>
                       <th className="px-4 py-3.5">Modelo / Curva</th>
                       <th className="px-4 py-3.5 text-center">Estado</th>
                       <th className="px-4 py-3.5 text-right">Monto Total</th>
-                      <th className="px-4 py-3.5 text-right">Fecha / RecepciÃ³n</th>
+                      <th className="px-4 py-3.5 text-right">Fecha / Recepción</th>
                       <th className="px-5 py-3.5 text-center">Acciones</th>
                     </tr>
                   </thead>
@@ -2607,7 +2607,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 </span>
                                 <span className="text-[10px] text-[var(--muted-foreground)]">
                                   {totalPares} pares ({ (totalPares / 12).toFixed(1) } doc.)
-                                  {lineasConsolidadas.length > 1 && ` â€¢ +${lineasConsolidadas.length - 1} modelo(s) mÃ¡s`}
+                                  {lineasConsolidadas.length > 1 && ` ⬢ +${lineasConsolidadas.length - 1} modelo(s) más`}
                                 </span>
                               </div>
                             </div>
@@ -2631,8 +2631,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 {o.estado === 'BORRADOR' ? 'Pendiente por Pedir' : o.estado === 'PENDIENTE' ? 'Enviada al Proveedor' : o.estado === 'RECIBIDA_PARCIAL' ? 'Recibida Parcial' : o.estado === 'RECIBIDA' ? 'Recibida en Bodega' : o.estado === 'CANCELADA' ? 'Cancelada' : o.estado}
                               </span>
                               {o.observaciones?.includes('[AJUSTE_MANUAL]') && (
-                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20 text-[9px] font-bold" title="Orden fijada manualmente segÃºn presupuesto del local">
-                                  <span>ðŸ”’ Ajuste Manual</span>
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20 text-[9px] font-bold" title="Orden fijada manualmente según presupuesto del local">
+                                  <span>�x Ajuste Manual</span>
                                 </span>
                               )}
                             </div>
@@ -2643,21 +2643,21 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           <td className="px-4 py-3.5 text-right text-[11px] text-[var(--muted-foreground)]">
                             {o.estado === 'RECIBIDA' || o.estado === 'RECIBIDA_PARCIAL' ? (
                               <div className="flex flex-col items-end">
-                                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1" title="Fecha de Ingreso de MercancÃ­a a Bodega">
-                                  <span>ðŸ“¥</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1" title="Fecha de Ingreso de Mercancía a Bodega">
+                                  <span>�x�</span>
                                   {new Date((o as any).entry?.fechaIngreso || (o as any).entry?.createdAt || o.updatedAt || o.createdAt).toLocaleDateString('es-EC')}
                                 </span>
-                                <span className="text-[10px] text-[var(--muted-foreground)]" title="Fecha en que se realizÃ³ el pedido">
+                                <span className="text-[10px] text-[var(--muted-foreground)]" title="Fecha en que se realizó el pedido">
                                   Pedido: {new Date(o.createdAt).toLocaleDateString('es-EC')}
                                 </span>
                               </div>
                             ) : o.estado === 'PENDIENTE' ? (
                               <div className="flex flex-col items-end">
-                                <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1" title="Fecha de EnvÃ­o al Proveedor">
-                                  <span>ðŸ“¤</span>
+                                <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1" title="Fecha de Envío al Proveedor">
+                                  <span>�x�</span>
                                   {new Date(o.updatedAt || o.createdAt).toLocaleDateString('es-EC')}
                                 </span>
-                                <span className="text-[10px] text-[var(--muted-foreground)]" title="Fecha en que se realizÃ³ el pedido">
+                                <span className="text-[10px] text-[var(--muted-foreground)]" title="Fecha en que se realizó el pedido">
                                   Pedido: {new Date(o.createdAt).toLocaleDateString('es-EC')}
                                 </span>
                               </div>
@@ -2695,7 +2695,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 o.tenantId && miLocalId && o.tenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN' ? (
                                   <span
                                     className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-not-allowed opacity-75"
-                                    title="Solo la sucursal propietaria de esta orden puede realizar la recepciÃ³n de mercaderÃ­a"
+                                    title="Solo la sucursal propietaria de esta orden puede realizar la recepción de mercadería"
                                   >
                                     <Lock size={11} /> Otra sucursal
                                   </span>
@@ -2703,7 +2703,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   <button
                                     onClick={() => handleIrARecepcionDesdeOrden(o)}
                                     className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg transition-all text-xs font-bold shadow-2xs cursor-pointer"
-                                    title="Recibir MercancÃ­a en Bodega"
+                                    title="Recibir Mercancía en Bodega"
                                   >
                                     <PackageCheck size={13} />
                                     <span>Recibir</span>
@@ -2713,7 +2713,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               {o.estado === 'RECIBIDA' && (
                                 <span
                                   className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-xs font-bold opacity-80 cursor-default"
-                                  title="MercancÃ­a 100% recibida e ingresada en bodega"
+                                  title="Mercancía 100% recibida e ingresada en bodega"
                                 >
                                   <CheckCircle size={11} className="text-emerald-500" />
                                   <span>Recibido</span>
@@ -2730,7 +2730,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 <button
                                   onClick={() => handleCancelarYBloquearReorden(o.id)}
                                   className="p-1.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-600 rounded-lg transition-colors border border-rose-500/20 cursor-pointer"
-                                  title="ðŸš« Cancelar y No Volver a Generar AutomÃ¡ticamente (Producto ya no se vende)"
+                                  title="�xa� Cancelar y No Volver a Generar Automáticamente (Producto ya no se vende)"
                                 >
                                   <Ban size={13} />
                                 </button>
@@ -2748,9 +2748,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          PESTAÃ‘A 3: RECEPCIÃ“N DE MERCANCÃA EN BODEGA
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          PESTA�A 3: RECEPCI�N DE MERCANCÍA EN BODEGA
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {!loading && activeTab === 'ingreso' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-5">
@@ -2758,7 +2758,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               <div>
                 <h4 className="font-extrabold text-sm flex items-center gap-2">
                   <Package className="text-[#0F172A] dark:text-amber-400" size={18} />
-                  <span>RecepciÃ³n y VerificaciÃ³n de MercancÃ­a</span>
+                  <span>Recepción y Verificación de Mercancía</span>
                 </h4>
                 <p className="text-[11px] text-[var(--muted-foreground)]">
                   Carga la orden de compra y despliega las tallas de cada modelo para registrar los pares que ingresan
@@ -2793,7 +2793,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                    Vincular Orden de Compra (Carga AutomÃ¡tica)
+                    Vincular Orden de Compra (Carga Automática)
                   </label>
                   <select
                     value={entryOrderId}
@@ -2805,7 +2805,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       .filter((o) => (entrySupplierId ? o.supplierId === entrySupplierId : true) && (o.estado === 'PENDIENTE' || o.estado === 'BORRADOR' || o.estado === 'RECIBIDA_PARCIAL'))
                       .map((o) => {
                         const prov = proveedores.find((p) => p.id === o.supplierId);
-                        const provLabel = prov ? ` â€¢ ${prov.razonSocial || prov.nombre}` : '';
+                        const provLabel = prov ? ` ⬢ ${prov.razonSocial || prov.nombre}` : '';
                         return (
                           <option key={o.id} value={o.id}>
                             OC-{String(o.numero).padStart(4, '0')}{provLabel} (${Number(o.total).toFixed(2)}) [{o.estado === 'PENDIENTE' ? 'ENVIADA' : o.estado}]
@@ -2816,7 +2816,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               </div>
 
-              {/* Trazabilidad: QuiÃ©n entrega y QuiÃ©n recibe en bodega */}
+              {/* Trazabilidad: Quién entrega y Quién recibe en bodega */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
@@ -2848,11 +2848,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Observaciones Generales de la Entrega / GuÃ­a de RemisiÃ³n
+                  Observaciones Generales de la Entrega / Guía de Remisión
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. GuÃ­a NÂ° 001-928. Bultos revisados en recepciÃ³n."
+                  placeholder="Ej. Guía N° 001-928. Bultos revisados en recepción."
                   value={entryObservaciones}
                   onChange={(e) => setEntryObservaciones(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-[#0F172A]"
@@ -2862,7 +2862,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               {/* Buscador de modelos extra */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-                  Â¿Entregaron modelos adicionales fuera de la orden?
+                  ¿Entregaron modelos adicionales fuera de la orden?
                 </span>
 
                 {productoSeleccionado ? (
@@ -2872,12 +2872,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-10 h-10 object-cover rounded-lg border" />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center font-bold">ðŸ‘Ÿ</div>
+                        <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center font-bold">�xx</div>
                       )}
                       <div>
                         <span className="font-bold text-xs block">{productoSeleccionado.nombre || productoSeleccionado.name}</span>
                         <span className="text-[10px] text-[var(--muted-foreground)]">
-                          {productoSeleccionado.marca} â€¢ {productoSeleccionado.color} ({productoSeleccionado.codigo})
+                          {productoSeleccionado.marca} ⬢ {productoSeleccionado.color} ({productoSeleccionado.codigo})
                         </span>
                       </div>
                     </div>
@@ -2888,7 +2888,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         onClick={handleAddEntryModeloExtra}
                         className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 cursor-pointer"
                       >
-                        + Agregar a RecepciÃ³n
+                        + Agregar a Recepción
                       </button>
                       <button
                         type="button"
@@ -2903,7 +2903,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Buscar modelo adicional con foto (nombre, cÃ³digo, color)..."
+                      placeholder="Buscar modelo adicional con foto (nombre, código, color)..."
                       value={busquedaModelo}
                       onChange={(e) => {
                         setBusquedaModelo(e.target.value);
@@ -2941,7 +2941,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 )}
                                 <div>
                                   <span className="font-bold block">{p.nombre || p.name}</span>
-                                  <span className="text-[10px] text-[var(--muted-foreground)]">{p.marca} â€¢ {p.color}</span>
+                                  <span className="text-[10px] text-[var(--muted-foreground)]">{p.marca} ⬢ {p.color}</span>
                                 </div>
                               </div>
                             </button>
@@ -2952,7 +2952,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 )}
               </div>
 
-              {/* Barra Resumen y Acciones Globales de RecepciÃ³n */}
+              {/* Barra Resumen y Acciones Globales de Recepción */}
               {entryModelos.length > 0 && (() => {
                 const totalParesIngresados = entryModelos.reduce(
                   (sum, m) => sum + m.tallas.reduce((s, t) => s + (t.cantidadIngresada || 0), 0),
@@ -2980,15 +2980,15 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         <div>
                           {difGlobal === 0 ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                              âœ“ Pedido Completo (100%)
+                              �S Pedido Completo (100%)
                             </span>
                           ) : difGlobal < 0 ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
-                              âš ï¸ Faltante: {Math.abs(difGlobal)} pares
+                              �a�️ Faltante: {Math.abs(difGlobal)} pares
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
-                              â„¹ï¸ Excedente: +{difGlobal} pares extras
+                              ��️ Excedente: +{difGlobal} pares extras
                             </span>
                           )}
                         </div>
@@ -3030,19 +3030,19 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             })),
                           }));
                           setEntryModelos(updated);
-                          showToast('Contadores reiniciados a 0 para conteo fÃ­sico.', 'info');
+                          showToast('Contadores reiniciados a 0 para conteo físico.', 'info');
                         }}
                         className="px-2.5 py-1.5 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-xs font-bold transition-all cursor-pointer"
                         title="Poner todos los pares recibidos en 0 para contar uno por uno"
                       >
-                        <span>â†º Poner en 0</span>
+                        <span>� � Poner en 0</span>
                       </button>
                     </div>
                   </div>
                 );
               })()}
 
-              {/* Lista de Modelos en RecepciÃ³n con Componente Estandarizado */}
+              {/* Lista de Modelos en Recepción con Componente Estandarizado */}
               <div className="space-y-3 pt-2">
                 <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">
                   Modelos a Recepcionar ({entryModelos.length})
@@ -3072,9 +3072,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               </h4>
                               <p className="text-[11px] text-[var(--muted-foreground)]">
                                 <span className="font-semibold">{m.marca}</span>
-                                {m.color && <span> â€¢ {m.color}</span>}
+                                {m.color && <span> ⬢ {m.color}</span>}
                                 {m.serieNombre && (
-                                  <span> Â· <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {formatearNombreSerie(m.serieNombre)}</span></span>
+                                  <span> · <span className="text-emerald-600 dark:text-emerald-400 font-bold">Serie: {formatearNombreSerie(m.serieNombre)}</span></span>
                                 )}
                                 {m.codigo && <span className="ml-1 opacity-70">({m.codigo})</span>}
                               </p>
@@ -3084,7 +3084,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               <div className="flex items-center gap-2">
                                 {totalParesModelo === totalParesEsperadosModelo ? (
                                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                    âœ“ Completo ({totalParesModelo} pares)
+                                    �S Completo ({totalParesModelo} pares)
                                   </span>
                                 ) : totalParesModelo < totalParesEsperadosModelo ? (
                                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
@@ -3140,7 +3140,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                           className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
                                           title={`Restar 1 par T${t.sizeNumber}`}
                                         >
-                                          âˆ’
+                                          ��
                                         </button>
                                         <input
                                           type="number"
@@ -3179,7 +3179,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   })}
                                 </div>
 
-                                {/* Acciones RÃ¡pidas Masivas */}
+                                {/* Acciones Rápidas Masivas */}
                                 <div className="flex flex-wrap items-center gap-2 pt-0.5">
                                   {esCurvaUniforme6Tallas(m.tallas) ? (
                                     <>
@@ -3217,7 +3217,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        âˆ’ Media Docena (âˆ’6 pares)
+                                        �� Media Docena (��6 pares)
                                       </button>
                                     </>
                                   ) : (
@@ -3238,7 +3238,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        + Â½ Doc A
+                                        + ½ Doc A
                                       </button>
                                       <button
                                         type="button"
@@ -3256,7 +3256,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        + Â½ Doc B
+                                        + ½ Doc B
                                       </button>
                                       <button
                                         type="button"
@@ -3274,7 +3274,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        âˆ’ Â½ Doc A
+                                        �� ½ Doc A
                                       </button>
                                       <button
                                         type="button"
@@ -3292,7 +3292,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        âˆ’ Â½ Doc B
+                                        �� ½ Doc B
                                       </button>
                                     </>
                                   )}
@@ -3310,7 +3310,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       title="Ajustar cantidades exactamente a lo pedido en la orden para este modelo"
                                     >
-                                      âœ“ Recibir Pedido Exacto
+                                      �S Recibir Pedido Exacto
                                     </button>
                                   )}
                                   <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
@@ -3320,7 +3320,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               </div>
                             </div>
 
-                            {/* Derecha: Resumen de Pares, Costo y Subtotal + BotÃ³n Eliminar */}
+                            {/* Derecha: Resumen de Pares, Costo y Subtotal + Botón Eliminar */}
                             <div className="flex items-center gap-4 shrink-0 self-end sm:self-center">
                               <div className="text-right">
                                 <span className="font-extrabold text-xs text-[var(--foreground)] block">
@@ -3338,18 +3338,18 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 type="button"
                                 onClick={() => handleRemoveEntryModelo(mIdx)}
                                 className="w-7 h-7 rounded-full flex items-center justify-center text-rose-500 hover:text-white hover:bg-rose-500 transition-all border border-rose-500/30 cursor-pointer shadow-2xs shrink-0"
-                                title="Quitar modelo de recepciÃ³n"
+                                title="Quitar modelo de recepción"
                               >
                                 <X size={15} />
                               </button>
                             </div>
                           </div>
 
-                          {/* ObservaciÃ³n especÃ­fica por modelo */}
+                          {/* Observación específica por modelo */}
                           <div className="pt-2 border-t border-[var(--border)]/40">
                             <input
                               type="text"
-                              placeholder="ObservaciÃ³n especÃ­fica de este modelo (ej. faltÃ³ 1 par talla 36, caja daÃ±ada, etc.)"
+                              placeholder="Observación específica de este modelo (ej. faltó 1 par talla 36, caja dañada, etc.)"
                               value={m.observacionLinea || ''}
                               onChange={(e) => {
                                 const updated = [...entryModelos];
@@ -3382,7 +3382,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   {saving ? (
                     <><Loader2 size={14} className="animate-spin" /><span>Guardando...</span></>
                   ) : (
-                    <><CheckCircle size={14} className="text-emerald-400" /><span>Confirmar RecepciÃ³n & Actualizar Stock</span></>
+                    <><CheckCircle size={14} className="text-emerald-400" /><span>Confirmar Recepción & Actualizar Stock</span></>
                   )}
                 </button>
               </div>
@@ -3396,7 +3396,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 <span>Control de Entrada a Bodega</span>
               </h5>
               <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                Al recepcionar la mercancÃ­a, el sistema incrementa automÃ¡ticamente el inventario fÃ­sico por modelo y talla.
+                Al recepcionar la mercancía, el sistema incrementa automáticamente el inventario físico por modelo y talla.
               </p>
               <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
                 Si la orden tiene faltantes, queda en estado <strong>RECIBIDA PARCIAL</strong> para controlar lo pendiente por entregar.
@@ -3406,15 +3406,15 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          PESTAÃ‘A 4: HISTORIAL DE PAGOS
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          PESTA�A 4: HISTORIAL DE PAGOS
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {!loading && activeTab === 'pagos' && (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm space-y-4 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h3 className="font-extrabold text-sm flex items-center gap-2 text-[var(--foreground)]">
               <DollarSign size={16} className="text-emerald-500" />
-              <span>BitÃ¡cora de Pagos & Abonos a Proveedores</span>
+              <span>Bitácora de Pagos & Abonos a Proveedores</span>
             </h3>
             <button
               type="button"
@@ -3428,7 +3428,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
           {pagos.length === 0 ? (
             <div className="p-16 text-center text-[var(--muted-foreground)]">
-              No hay pagos registrados aÃºn en el sistema.
+              No hay pagos registrados aún en el sistema.
             </div>
           ) : (
             <div className="overflow-x-auto scrollbar-thin -mx-5">
@@ -3438,7 +3438,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     <th className="px-5 py-3">Fecha</th>
                     <th className="px-4 py-3">Proveedor</th>
                     <th className="px-4 py-3 text-center">Sucursal</th>
-                    <th className="px-4 py-3">MÃ©todo</th>
+                    <th className="px-4 py-3">Método</th>
                     <th className="px-4 py-3">Banco / Comprobante</th>
                     <th className="px-4 py-3">Notas / Concepto</th>
                     <th className="px-4 py-3 text-right">Monto Pagado</th>
@@ -3494,20 +3494,20 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          PESTAÃ‘A 5: DEVOLUCIONES & GARANTÃAS A PROVEEDORES
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          PESTA�A 5: DEVOLUCIONES & GARANTÍAS A PROVEEDORES
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {!loading && activeTab === 'devoluciones' && (
         <div className="space-y-6">
-          {/* Header de la secciÃ³n */}
+          {/* Header de la sección */}
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="font-extrabold text-sm flex items-center gap-2">
                 <RotateCcw size={18} className="text-rose-500" />
-                <span>MercaderÃ­a por Devolver & GarantÃ­as a Fabricantes</span>
+                <span>Mercadería por Devolver & Garantías a Fabricantes</span>
               </h3>
               <p className="text-xs text-[var(--muted-foreground)]">
-                Control de calzado defectuoso, generaciÃ³n manual de constancias y descuento automÃ¡tico de cuentas por pagar.
+                Control de calzado defectuoso, generación manual de constancias y descuento automático de cuentas por pagar.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -3523,18 +3523,18 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 className="px-4 py-2 bg-[#0F172A] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm border border-slate-700 cursor-pointer"
               >
                 <RotateCcw size={14} className="text-amber-400" />
-                <span>Nueva DevoluciÃ³n a Proveedor</span>
+                <span>Nueva Devolución a Proveedor</span>
               </button>
             </div>
           </div>
 
-          {/* 1. BANDEJA DE MERCADERÃA PENDIENTE POR DEVOLVER */}
+          {/* 1. BANDEJA DE MERCADERÍA PENDIENTE POR DEVOLVER */}
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm p-5 space-y-4">
             <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
               <div className="flex items-center gap-2">
                 <ShieldAlert size={16} className="text-amber-500" />
                 <h4 className="font-extrabold text-xs uppercase tracking-wider text-[var(--foreground)]">
-                  Bandeja de Calzado Pendiente de Entrega al Proveedor ({pendientesDevolucion.length} Ã­tems)
+                  Bandeja de Calzado Pendiente de Entrega al Proveedor ({pendientesDevolucion.length} ítems)
                 </h4>
               </div>
               <span className="text-[11px] text-[var(--muted-foreground)]">
@@ -3545,8 +3545,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             {pendientesDevolucion.length === 0 ? (
               <div className="p-10 text-center text-[var(--muted-foreground)] space-y-1">
                 <CheckCircle2 size={32} className="mx-auto text-emerald-500 opacity-60 mb-2" />
-                <p className="font-bold text-xs text-[var(--foreground)]">No hay mercaderÃ­a pendiente por devolver al proveedor</p>
-                <p className="text-[11px]">Cuando un cliente devuelva calzado con falla o registres mercaderÃ­a defectuosa en bodega, aparecerÃ¡ aquÃ­ lista para devolver al fabricante.</p>
+                <p className="font-bold text-xs text-[var(--foreground)]">No hay mercadería pendiente por devolver al proveedor</p>
+                <p className="text-[11px]">Cuando un cliente devuelva calzado con falla o registres mercadería defectuosa en bodega, aparecerá aquí lista para devolver al fabricante.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -3556,7 +3556,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   const firstLine = item.lines?.[0] || {};
                   const foto = firstLine.imageUrl || firstLine.fotoUrl || '';
                   const modelName = firstLine.modelName || item.motivo || 'Calzado con Defecto';
-                  const color = firstLine.color || 'COLOR ESTÃNDAR';
+                  const color = firstLine.color || 'COLOR ESTÁNDAR';
                   const serie = firstLine.serie || 'ADULTO';
                   const precioUnit = Number(firstLine.costPrice || firstLine.precioCosto || firstLine.precioUnitario || 10);
 
@@ -3577,7 +3577,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         </div>
 
                         <div className="flex-1 min-w-0 space-y-2">
-                          {/* TÃ­tulo y SubtÃ­tulo */}
+                          {/* Título y Subtítulo */}
                           <div>
                             <div className="flex items-center gap-2">
                               <h4 className="font-extrabold text-sm text-[var(--foreground)] leading-tight uppercase tracking-tight">
@@ -3589,13 +3589,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--muted-foreground)] mt-0.5">
                               <span>{color}</span>
-                              <span>Â·</span>
+                              <span>·</span>
                               <span className="text-emerald-700 dark:text-emerald-400 font-bold">
                                 Serie: {formatearNombreSerie(serie)}
                               </span>
                               {firstLine.supplierNombre && (
                                 <>
-                                  <span>Â·</span>
+                                  <span>·</span>
                                   <span className="text-amber-700 dark:text-amber-400 font-semibold">
                                     Fabricante: {firstLine.supplierNombre}
                                   </span>
@@ -3621,16 +3621,16 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             ))}
                           </div>
 
-                          {/* ObservaciÃ³n / Motivo */}
+                          {/* Observación / Motivo */}
                           <div className="text-xs text-[var(--muted-foreground)] flex items-center gap-1">
-                            <span className="font-bold text-slate-500 dark:text-slate-400">ðŸ“ Motivo:</span>
-                            <span className="italic">{item.motivo || 'GarantÃ­a / Falla de fÃ¡brica'}</span>
+                            <span className="font-bold text-slate-500 dark:text-slate-400">�x� Motivo:</span>
+                            <span className="italic">{item.motivo || 'Garantía / Falla de fábrica'}</span>
                             <span className="text-[10px] text-slate-400 ml-2 font-mono">({new Date(item.createdAt).toLocaleDateString('es-EC')})</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Resumen Derecho con AcciÃ³n */}
+                      {/* Resumen Derecho con Acción */}
                       <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
                         <div className="text-right">
                           <div className="text-xs font-bold text-[var(--foreground)]">
@@ -3659,7 +3659,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             )}
           </div>
 
-          {/* 2. HISTORIAL DE CONSTANCIAS DE DEVOLUCIÃ“N */}
+          {/* 2. HISTORIAL DE CONSTANCIAS DE DEVOLUCI�N */}
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm space-y-4 p-5">
             <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
               <div className="flex items-center gap-2">
@@ -3675,7 +3675,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
             {devolucionesProveedor.length === 0 ? (
               <div className="p-12 text-center text-[var(--muted-foreground)]">
-                No hay devoluciones a proveedores procesadas aÃºn.
+                No hay devoluciones a proveedores procesadas aún.
               </div>
             ) : (
               <div className="overflow-x-auto scrollbar-thin -mx-5">
@@ -3732,9 +3732,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          MODAL: DETALLE DE ORDEN (Con BotÃ³n Enviar ExplÃ­cito)
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          MODAL: DETALLE DE ORDEN (Con Botón Enviar Explícito)
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showOrderDetailModal && selectedOrder && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -3779,14 +3779,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                     }`}>
                       {selectedOrder.estado === 'BORRADOR' 
-                        ? (selectedOrder.observaciones?.includes('[AJUSTE_MANUAL]') ? 'Borrador Fijado' : 'Borrador (AcumulÃ¡ndose)') 
+                        ? (selectedOrder.observaciones?.includes('[AJUSTE_MANUAL]') ? 'Borrador Fijado' : 'Borrador (Acumulándose)') 
                         : selectedOrder.estado === 'PENDIENTE' 
                         ? 'Enviada al Proveedor' 
                         : selectedOrder.estado}
                     </span>
                     {selectedOrder.observaciones?.includes('[AJUSTE_MANUAL]') && (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1" title="Esta orden fue ajustada manualmente segÃºn tu presupuesto y estÃ¡ protegida contra alteraciones automÃ¡ticas">
-                        <span>ðŸ”’</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1" title="Esta orden fue ajustada manualmente según tu presupuesto y está protegida contra alteraciones automáticas">
+                        <span>�x</span>
                         <span>Ajustada Manualmente</span>
                       </span>
                     )}
@@ -3797,7 +3797,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               </div>
 
-              {/* BotÃ³n Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => {
                   setShowOrderDetailModal(false);
@@ -3833,7 +3833,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <div className="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                        ðŸ‘¤
+                        �x�
                       </div>
                       <div>
                         <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">
@@ -3851,7 +3851,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     </div>
                     {refCode && (
                       <span className="px-2.5 py-1 bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/25 rounded-xl font-mono text-xs font-black">
-                        ðŸ“¦ Ref Pedido: {refCode}
+                        �x� Ref Pedido: {refCode}
                       </span>
                     )}
                   </div>
@@ -3859,7 +3859,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               })()}
               <div className="bg-[var(--muted)]/30 border border-[var(--border)] rounded-2xl p-4 space-y-1.5">
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                  Observaciones / TÃ©rminos de Entrega
+                  Observaciones / Términos de Entrega
                 </label>
                 {editingOrder ? (
                   <textarea
@@ -3883,7 +3883,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 )}
               </div>
 
-              {/* Lista de Modelos Consolidados con AcordeÃ³n Desplegable de NumeraciÃ³n */}
+              {/* Lista de Modelos Consolidados con Acordeón Desplegable de Numeración */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
@@ -3895,7 +3895,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       className="flex items-center gap-1 text-xs font-bold text-[#0F172A] dark:text-amber-400 hover:opacity-80"
                     >
                       <Edit3 size={13} />
-                      <span>{editingOrder ? 'Finalizar EdiciÃ³n' : 'Modificar Orden (Pares / Docenas)'}</span>
+                      <span>{editingOrder ? 'Finalizar Edición' : 'Modificar Orden (Pares / Docenas)'}</span>
                     </button>
                   )}
                 </div>
@@ -3933,9 +3933,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 )}
                               </div>
                               <div className="flex gap-2 text-[10px] text-[var(--muted-foreground)]">
-                                <span>CÃ³d: {line.codigo}</span>
-                                {line.color && <span>â€¢ Color: {line.color}</span>}
-                                {line.serie && <span>â€¢ Serie: {formatearNombreSerie(line.serie)}</span>}
+                                <span>Cód: {line.codigo}</span>
+                                {line.color && <span>⬢ Color: {line.color}</span>}
+                                {line.serie && <span>⬢ Serie: {formatearNombreSerie(line.serie)}</span>}
                               </div>
                               {line.observacionLinea && (() => {
                                 const obs = line.observacionLinea;
@@ -3967,7 +3967,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   if (detalle) {
                                     detalle = detalle
                                       .replace(/\b1\s+pares\b/gi, '1 par')
-                                      .replace(/^faltante:?\s*/i, 'DÃ©ficit pedido: ')
+                                      .replace(/^faltante:?\s*/i, 'Déficit pedido: ')
                                       .replace(/\+\s*12\s*stock/i, '+ 12 pares p/ stock')
                                       .replace(/\+\s*12\s*pares\s*stock/i, '+ 12 pares p/ stock');
                                   }
@@ -3976,7 +3976,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                       {fullClientName && (
                                         <span className="px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-2xs">
-                                          <span>ðŸ‘¤</span>
+                                          <span>�x�</span>
                                           <span className="text-blue-500/80 font-normal">Cliente:</span>
                                           <span className="font-extrabold">{fullClientName}</span>
                                           {foundClient && (
@@ -3988,14 +3988,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       )}
                                       {refCode && (
                                         <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1 font-mono shadow-2xs">
-                                          <span>ðŸ“¦</span>
+                                          <span>�x�</span>
                                           <span className="text-purple-500/80 font-normal">Pedido:</span>
                                           <span className="font-extrabold">{refCode}</span>
                                         </span>
                                       )}
                                       {detalle && (
                                         <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-2xs">
-                                          <span>âš¡</span>
+                                          <span>�a�</span>
                                           <span>{detalle}</span>
                                         </span>
                                       )}
@@ -4009,7 +4009,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 return (
                                   <div className="mt-1.5">
                                     <p className="text-[10px] text-amber-600 dark:text-amber-400 italic">
-                                      â€¢ ObservaciÃ³n: {obsLimpia}
+                                      ⬢ Observación: {obsLimpia}
                                     </p>
                                   </div>
                                 );
@@ -4041,7 +4041,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             ) : (
                               <div className="text-right">
                                 <span className="text-[10px] text-[var(--muted-foreground)] block">
-                                  {line.cantidadPedida} pares ({docenas} doc.) Ã— ${Number(line.precioCosto).toFixed(2)}
+                                  {line.cantidadPedida} pares ({docenas} doc.) � ${Number(line.precioCosto).toFixed(2)}
                                 </span>
                                 <span className="font-extrabold text-[#0F172A] dark:text-amber-400 font-mono text-sm">
                                   ${(line.cantidadPedida * line.precioCosto).toFixed(2)}
@@ -4055,11 +4055,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           </div>
                         </div>
 
-                        {/* Despliegue de Chips de NumeraciÃ³n â€” con +/- por talla en ediciÃ³n */}
+                        {/* Despliegue de Chips de Numeración � con +/- por talla en edición */}
                         {isExpanded && (
                           <div className="px-4 py-3 bg-[var(--muted)]/20 border-t border-[var(--border)]">
                             <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1 block mb-2">
-                              {editingOrder ? 'Ajustar NumeraciÃ³n por Talla:' : 'NumeraciÃ³n Solicitada:'}
+                              {editingOrder ? 'Ajustar Numeración por Talla:' : 'Numeración Solicitada:'}
                             </span>
                             <div className="flex flex-wrap items-center gap-2">
                               {line.tallasDesglose?.map((td, tIdx) => (
@@ -4091,7 +4091,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors"
                                         title={`Quitar 1 par T${td.talla}`}
                                       >
-                                        âˆ’
+                                        ��
                                       </button>
                                       <span className="w-7 text-center text-xs font-bold font-mono text-[var(--foreground)]">
                                         {td.cantidad}
@@ -4183,7 +4183,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                      − Media Docena (−6 pares)
+                                       Media Docena (6 pares)
                                     </button>
                                   </>
                                 ) : (
@@ -4214,7 +4214,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                      + ½ Doc A
+                                      + � Doc A
                                     </button>
                                     <button
                                       type="button"
@@ -4242,7 +4242,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                      + ½ Doc B
+                                      + � Doc B
                                     </button>
                                     <button
                                       type="button"
@@ -4270,7 +4270,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                      − ½ Doc A
+                                       � Doc A
                                     </button>
                                     <button
                                       type="button"
@@ -4298,7 +4298,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                      − ½ Doc B
+                                       � Doc B
                                     </button>
                                   </>
                                 )}
@@ -4308,12 +4308,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               </div>
                             )}
 
-                            {/* ObservaciÃ³n para proveedor (editable al modificar la orden) */}
+                            {/* Observación para proveedor (editable al modificar la orden) */}
                             <div className="mt-2.5 pt-2 border-t border-[var(--border)]/40" onClick={(e) => e.stopPropagation()}>
                               {editingOrder ? (
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 shrink-0">
-                                    ðŸ“ ObservaciÃ³n para proveedor:
+                                    �x� Observación para proveedor:
                                   </span>
                                   <input
                                     type="text"
@@ -4336,7 +4336,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   if (!obsLimpia) return null;
                                   return (
                                     <div className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                                      <span className="font-bold">ðŸ“ ObservaciÃ³n proveedor:</span>
+                                      <span className="font-bold">�x� Observación proveedor:</span>
                                       <span className="italic font-medium">{obsLimpia}</span>
                                     </div>
                                   );
@@ -4350,7 +4350,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   })}
                 </div>
 
-                {/* SecciÃ³n Agregar Otro Modelo a esta Orden (Fase 2) */}
+                {/* Sección Agregar Otro Modelo a esta Orden (Fase 2) */}
                 {(selectedOrder.estado === 'BORRADOR' || selectedOrder.estado === 'PENDIENTE') && (
                   <div className="pt-2">
                     {!addingModelToDetail ? (
@@ -4395,7 +4395,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
                               <input
                                 type="text"
-                                placeholder="Escribe para buscar modelo (ej. MocasÃ­n, BotÃ­n, Negro)..."
+                                placeholder="Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."
                                 value={busquedaModelo}
                                 onChange={(e) => {
                                   setBusquedaModelo(e.target.value);
@@ -4455,13 +4455,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                               // eslint-disable-next-line @next/next/no-img-element
                                               <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
                                             ) : (
-                                              <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">ðŸ‘Ÿ</div>
+                                              <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">�xx</div>
                                             )}
                                             <div>
                                               <span className="font-bold block">{p.nombre || p.name}</span>
                                               <span className="text-[10px] text-[var(--muted-foreground)]">
-                                                {p.marca} â€¢ {p.color} ({p.codigo})
-                                                {serieName && ` â€¢ Serie: ${formatearNombreSerie(serieName)}`}
+                                                {p.marca} ⬢ {p.color} ({p.codigo})
+                                                {serieName && ` ⬢ Serie: ${formatearNombreSerie(serieName)}`}
                                               </span>
                                             </div>
                                           </div>
@@ -4480,7 +4480,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           </div>
                         )}
 
-                        {/* ConfiguraciÃ³n de Curva Exacta cuando hay producto seleccionado */}
+                        {/* Configuración de Curva Exacta cuando hay producto seleccionado */}
                         {productoSeleccionado && (
                           <div className="p-3 bg-[var(--card)] rounded-xl border border-[var(--border)] space-y-3">
                             <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
@@ -4489,14 +4489,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-10 h-10 object-cover rounded-xl border border-[var(--border)]" />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-xl bg-[var(--muted)] flex items-center justify-center text-base">ðŸ‘Ÿ</div>
+                                  <div className="w-10 h-10 rounded-xl bg-[var(--muted)] flex items-center justify-center text-base">�xx</div>
                                 )}
                                 <div>
                                   <span className="font-black text-xs uppercase block text-[var(--foreground)]">
                                     {productoSeleccionado.nombre || productoSeleccionado.name}
                                   </span>
                                   <span className="text-[10px] text-[var(--muted-foreground)]">
-                                    {productoSeleccionado.color} â€¢ <span className="text-emerald-600 font-bold">Serie: {formatearNombreSerie(serieNombreActiva)}</span>
+                                    {productoSeleccionado.color} ⬢ <span className="text-emerald-600 font-bold">Serie: {formatearNombreSerie(serieNombreActiva)}</span>
                                   </span>
                                 </div>
                               </div>
@@ -4524,7 +4524,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
                                   }`}
                                 >
-                                  Â½ Media A (6 pares)
+                                  ½ Media A (6 pares)
                                 </button>
                                 <button
                                   type="button"
@@ -4535,7 +4535,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
                                   }`}
                                 >
-                                  Â½ Media B (6 pares)
+                                  ½ Media B (6 pares)
                                 </button>
                                 <button
                                   type="button"
@@ -4553,7 +4553,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                             <div className="flex flex-wrap items-center gap-3">
                               <span className="text-xs font-bold text-[var(--foreground)]">
-                                {subtipoCurva === 'DOCENA' ? 'Â¿CuÃ¡ntas docenas?:' : 'Â¿CuÃ¡ntas medias docenas?:'}
+                                {subtipoCurva === 'DOCENA' ? '¿Cuántas docenas?:' : '¿Cuántas medias docenas?:'}
                               </span>
                               <div className="flex items-center gap-1">
                                 <button
@@ -4583,11 +4583,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               </span>
                             </div>
 
-                            {/* PrevisualizaciÃ³n idÃ©ntica de la distribuciÃ³n de curva */}
+                            {/* Previsualización idéntica de la distribución de curva */}
                             <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
                               <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                                  DISTRIBUCIÃ“N DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
+                                  DISTRIBUCI�N DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
                                 </span>
                                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
                                   Serie: {distribucionPreview.map((d: any) => `${d.cantidad}/${d.talla}`).join(', ')}
@@ -4627,7 +4627,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 />
                               </div>
 
-                              {/* ObservaciÃ³n por Modelo Opcional */}
+                              {/* Observación por Modelo Opcional */}
                               <div>
                                 {!mostrarObsModeloOrden && !observacionItemInput ? (
                                   <button
@@ -4635,13 +4635,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     onClick={() => setMostrarObsModeloOrden(true)}
                                     className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
                                   >
-                                    <span>+ Agregar observaciÃ³n a este modelo (opcional)</span>
+                                    <span>+ Agregar observación a este modelo (opcional)</span>
                                   </button>
                                 ) : (
                                   <div className="space-y-1 animate-in fade-in duration-150">
                                     <div className="flex justify-between items-center">
                                       <label className="block text-[10px] font-bold text-[var(--muted-foreground)]">
-                                        ObservaciÃ³n EspecÃ­fica del Modelo (Opcional)
+                                        Observación Específica del Modelo (Opcional)
                                       </label>
                                       <button
                                         type="button"
@@ -4651,7 +4651,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
                                       >
-                                        Quitar observaciÃ³n
+                                        Quitar observación
                                       </button>
                                     </div>
                                     <input
@@ -4698,7 +4698,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <ArrowLeft size={14} />
-                  <span>Volver a Ã“rdenes</span>
+                  <span>Volver a �rdenes</span>
                 </button>
 
                 {(selectedOrder.estado === 'BORRADOR' || selectedOrder.estado === 'PENDIENTE') && !editingOrder && (
@@ -4716,7 +4716,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       onClick={() => handleCancelarYBloquearReorden(selectedOrder.id)}
                       disabled={saving}
                       className="px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white border border-rose-500/30 text-rose-600 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Cancelar orden y desactivar reorden automÃ¡tica de estos productos (ya no se venden)"
+                      title="Cancelar orden y desactivar reorden automática de estos productos (ya no se venden)"
                     >
                       <Ban size={14} className="shrink-0" />
                       <span>Descontinuar (No volver a generar)</span>
@@ -4726,7 +4726,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {/* BotÃ³n Previsualizar PDF */}
+                {/* Botón Previsualizar PDF */}
                 <button
                   onClick={() => handlePrevisualizarPDFOrden(selectedOrder.id)}
                   className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
@@ -4736,7 +4736,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <span>Previsualizar PDF</span>
                 </button>
 
-                {/* BotÃ³n Descargar PDF */}
+                {/* Botón Descargar PDF */}
                 <button
                   onClick={() => handleDescargarPDFOrden(selectedOrder.id)}
                   className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
@@ -4746,7 +4746,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <span>Guardar PDF</span>
                 </button>
 
-                {/* BotÃ³n Enviar PDF por WhatsApp */}
+                {/* Botón Enviar PDF por WhatsApp */}
                 <button
                   onClick={() => handleEnviarOrdenWhatsApp(selectedOrder)}
                   className="px-3.5 py-2.5 bg-emerald-500/15 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -4756,7 +4756,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <span>Enviar PDF</span>
                 </button>
 
-                {/* AcciÃ³n Principal */}
+                {/* Acción Principal */}
                 {editingOrder ? (
                   <button
                     onClick={handleGuardarEdicionOrden}
@@ -4784,12 +4784,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm cursor-pointer"
                   >
                     <PackageCheck size={14} />
-                    <span>Recibir MercancÃ­a en Bodega</span>
+                    <span>Recibir Mercancía en Bodega</span>
                   </button>
                 ) : selectedOrder.estado === 'RECIBIDA' ? (
                   <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs">
                     <CheckCircle size={14} className="text-emerald-500" />
-                    <span>MercancÃ­a 100% Recibida e Ingresada a Bodega</span>
+                    <span>Mercancía 100% Recibida e Ingresada a Bodega</span>
                   </div>
                 ) : null}
               </div>
@@ -4798,9 +4798,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
           MODAL: ESTADO DE CUENTA MASTER-DETAIL
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showCuentaModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -4815,10 +4815,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
-                    Estado de Cuenta â€” {cuentaCorrienteData?.supplier?.razonSocial || cuentaCorrienteData?.supplier?.nombre || 'Proveedor'}
+                    Estado de Cuenta � {cuentaCorrienteData?.supplier?.razonSocial || cuentaCorrienteData?.supplier?.nombre || 'Proveedor'}
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    RUC: {cuentaCorrienteData?.supplier?.ruc} â€¢ HistÃ³rico de compras, entregas y pagos
+                    RUC: {cuentaCorrienteData?.supplier?.ruc} ⬢ Histórico de compras, entregas y pagos
                   </p>
                 </div>
               </div>
@@ -4835,7 +4835,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </button>
               )}
 
-              {/* BotÃ³n Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => setShowCuentaModal(false)}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -4851,7 +4851,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 <span className="text-xs">Cargando balance...</span>
               </div>
             ) : cuentaCorrienteData ? (() => {
-              /* â”€â”€ Calcular desglose detallado de adelantos vs pagos contra deuda â”€â”€ */
+              /* ���� Calcular desglose detallado de adelantos vs pagos contra deuda ���� */
               const resumen = cuentaCorrienteData.resumen;
               const movs = cuentaCorrienteData.movimientos || [];
               const totalFacturado = resumen.totalFacturado || 0;
@@ -4861,11 +4861,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               const saldoAFavor = resumen.saldoAFavor || 0;
               const saldoPendiente = resumen.saldoPendiente || 0;
 
-              /* Desglose: cuÃ¡nto del total pagado cubriÃ³ deuda vs cuÃ¡nto es adelanto puro */
+              /* Desglose: cuánto del total pagado cubrió deuda vs cuánto es adelanto puro */
               const pagadoQueCobrioDeuda = Math.min(totalPagado, totalFacturado - totalDevoluciones);
               const adelantoPuro = Math.max(0, totalPagado - Math.max(0, totalFacturado - totalDevoluciones));
 
-              /* Running balance: ordenar cronolÃ³gicamente ASC y calcular saldo acumulado */
+              /* Running balance: ordenar cronológicamente ASC y calcular saldo acumulado */
               const movsOrdenadosAsc = [...movs].sort((a: any, b: any) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
               let saldoAcumulado = 0;
               const runningBalanceMap = new Map<string, number>();
@@ -4921,7 +4921,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               return (
               <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1 min-h-0 text-xs">
-                {/* â”€â”€ PANEL RESUMEN GENERAL (4 tarjetas) â”€â”€ */}
+                {/* ���� PANEL RESUMEN GENERAL (4 tarjetas) ���� */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 space-y-1">
                     <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Total Facturado</span>
@@ -4980,7 +4980,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </div>
                 </div>
 
-                {/* â”€â”€ DESGLOSE DETALLADO: Adelantos vs Abonos a Deuda â”€â”€ */}
+                {/* ���� DESGLOSE DETALLADO: Adelantos vs Abonos a Deuda ���� */}
                 {(totalPagado > 0 || totalDevoluciones > 0) && (
                   <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 dark:from-slate-800/40 dark:to-blue-900/20 border border-[var(--border)] rounded-2xl p-4 space-y-3">
                     <h4 className="font-extrabold text-[11px] uppercase tracking-wider text-[var(--foreground)] flex items-center gap-2">
@@ -5071,7 +5071,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </div>
                 )}
 
-                {/* â”€â”€ TITULO LINEA DE TIEMPO â”€â”€ */}
+                {/* ���� TITULO LINEA DE TIEMPO ���� */}
                 <div className="flex justify-between items-center">
                   <h4 className="font-extrabold text-sm flex items-center gap-2 text-[var(--foreground)]">
                     <History size={16} />
@@ -5086,7 +5086,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </button>
                 </div>
 
-                {/* â”€â”€ MOVIMIENTOS CON SALDO ACUMULADO â”€â”€ */}
+                {/* ���� MOVIMIENTOS CON SALDO ACUMULADO ���� */}
                 <div className="space-y-3">
                   {movs.length === 0 ? (
                     <p className="text-center text-[var(--muted-foreground)] py-8">No hay movimientos registrados para este proveedor.</p>
@@ -5211,7 +5211,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     : 'text-blue-600'
                                 }`}
                               >
-                                {isPago || isDevolucion ? `âˆ’ ${Number(mov.monto).toFixed(2)}` : `+ ${Number(mov.monto).toFixed(2)}`}
+                                {isPago || isDevolucion ? `�� ${Number(mov.monto).toFixed(2)}` : `+ ${Number(mov.monto).toFixed(2)}`}
                               </div>
                               {mov.metodo && (
                                 <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
@@ -5231,7 +5231,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               )}
                               {isDevolucion && (
                                 <span className="px-1.5 py-0.5 bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded text-[9px] font-bold border border-rose-500/20 inline-block mt-0.5">
-                                  DEVOLUCIÃ“N
+                                  DEVOLUCI�N
                                 </span>
                               )}
 
@@ -5298,15 +5298,15 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             </div>
                           </div>
 
-                          {/* Desglose Expandible de ArtÃ­culos Recibidos o Devueltos */}
+                          {/* Desglose Expandible de Artículos Recibidos o Devueltos */}
                           {isExpanded && (
                             <div className="mt-3.5 pt-3 border-t border-[var(--border)] space-y-2.5">
                               <div className="flex items-center justify-between">
                                 <span className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
-                                  ðŸ“¦ DETALLE DE ARTÃCULOS {isDevolucion ? 'DEVUELTOS' : 'RECIBIDOS'} â€” {mov.numeroCodigo || mov.titulo}
+                                  �x� DETALLE DE ARTÍCULOS {isDevolucion ? 'DEVUELTOS' : 'RECIBIDOS'} � {mov.numeroCodigo || mov.titulo}
                                 </span>
                                 <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
-                                  {lineas.length} {lineas.length === 1 ? 'Ã­tem' : 'Ã­tems'} ({mov.detalles?.totalPares || 0} pares)
+                                  {lineas.length} {lineas.length === 1 ? 'ítem' : 'ítems'} ({mov.detalles?.totalPares || 0} pares)
                                 </span>
                               </div>
 
@@ -5339,7 +5339,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                               />
                                             ) : (
                                               <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-base shrink-0">
-                                                ðŸ‘Ÿ
+                                                �xx
                                               </div>
                                             )}
                                             <div>
@@ -5377,7 +5377,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 </div>
                               ) : (
                                 <p className="text-[11px] text-[var(--muted-foreground)] italic text-center py-2">
-                                  No hay detalle de artÃ­culos registrado para este movimiento.
+                                  No hay detalle de artículos registrado para este movimiento.
                                 </p>
                               )}
                             </div>
@@ -5416,9 +5416,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
           MODAL: REGISTRAR PAGO A PROVEEDOR
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showPaymentModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -5433,11 +5433,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Registrar Pago a Proveedor</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Abono o liquidaciÃ³n de compra con comprobante</p>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Abono o liquidación de compra con comprobante</p>
                 </div>
               </div>
 
-              {/* BotÃ³n Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => setShowPaymentModal(false)}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -5462,7 +5462,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <option value="">-- Seleccionar Proveedor --</option>
                   {proveedores.map((pr) => (
                     <option key={pr.id} value={pr.id}>
-                      {pr.razonSocial || pr.nombre} (RUC: {pr.ruc}) {pr.saldoPendiente && pr.saldoPendiente > 0 ? `â€¢ Debe $${pr.saldoPendiente.toFixed(2)}` : 'â€¢ Al DÃ­a'}
+                      {pr.razonSocial || pr.nombre} (RUC: {pr.ruc}) {pr.saldoPendiente && pr.saldoPendiente > 0 ? `⬢ Debe $${pr.saldoPendiente.toFixed(2)}` : '⬢ Al Día'}
                     </option>
                   ))}
                 </select>
@@ -5493,7 +5493,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  MÃ©todo de Pago / Anticipo *
+                  Método de Pago / Anticipo *
                 </label>
                 <select
                   value={metodoPago}
@@ -5508,9 +5508,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500"
                 >
                   <option value="TRANSFERENCIA">Transferencia Bancaria</option>
-                  <option value="DEPOSITO">DepÃ³sito Bancario</option>
+                  <option value="DEPOSITO">Depósito Bancario</option>
                   <option value="EFECTIVO">Efectivo</option>
-                  {/* <option value="CHEQUE">Cheque</option> -- Oculto temporalmente para presentaciÃ³n de tesis */}
+                  {/* <option value="CHEQUE">Cheque</option> -- Oculto temporalmente para presentación de tesis */}
                 </select>
               </div>
 
@@ -5531,11 +5531,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                      NÂ° Comprobante / Referencia
+                      N° Comprobante / Referencia
                     </label>
                     <input
                       type="text"
-                      placeholder={metodoPago === 'CHEQUE' ? 'Ej. NÂ° Cheque 00482' : 'Ej. TRANS-98234 o DepÃ³sito'}
+                      placeholder={metodoPago === 'CHEQUE' ? 'Ej. N° Cheque 00482' : 'Ej. TRANS-98234 o Depósito'}
                       value={comprobantePago}
                       onChange={(e) => setComprobantePago(e.target.value)}
                       className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
@@ -5550,7 +5550,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="LiquidaciÃ³n de factura NÂ° 124, abono quincenal..."
+                  placeholder="Liquidación de factura N° 124, abono quincenal..."
                   value={notasPago}
                   onChange={(e) => setNotasPago(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
@@ -5584,9 +5584,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
           MODAL: EMITIR NUEVA ORDEN (Borrador con Curva Exacta)
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showOrderModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -5601,11 +5601,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Emitir Orden de Compra a Proveedor</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Borrador acumulativo con cÃ¡lculo de curva y numeraciÃ³n</p>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Borrador acumulativo con cálculo de curva y numeración</p>
                 </div>
               </div>
 
-              {/* BotÃ³n Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => setShowOrderModal(false)}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -5643,12 +5643,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </label>
                   <div className="px-3 py-2 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-xs text-[var(--muted-foreground)] font-semibold flex items-center gap-2">
                     <Clock size={14} className="text-amber-500" />
-                    <span>Borrador (Acumulativo durante el dÃ­a)</span>
+                    <span>Borrador (Acumulativo durante el día)</span>
                   </div>
                 </div>
               </div>
 
-              {/* ObservaciÃ³n General Opcional (Toggle compacto para ahorrar espacio) */}
+              {/* Observación General Opcional (Toggle compacto para ahorrar espacio) */}
               <div>
                 {!mostrarObsGeneralOrden && !orderObservaciones ? (
                   <button
@@ -5656,7 +5656,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     onClick={() => setMostrarObsGeneralOrden(true)}
                     className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
                   >
-                    <span>+ Agregar observaciÃ³n general de la orden (opcional)</span>
+                    <span>+ Agregar observación general de la orden (opcional)</span>
                   </button>
                 ) : (
                   <div className="space-y-1.5 animate-in fade-in duration-150">
@@ -5672,7 +5672,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         }}
                         className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
                       >
-                        Quitar observaciÃ³n
+                        Quitar observación
                       </button>
                     </div>
                     <input
@@ -5688,13 +5688,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               {/* Selector de Modelos con Curva Exacta */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-3">
-                {/* Header con TÃ­tulo a la izquierda y Botones de Series a la derecha */}
+                {/* Header con Título a la izquierda y Botones de Series a la derecha */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
                     Modelo / Producto * (Buscar por Nombre o Color)
                   </label>
 
-                  {/* Botones / PÃ­ldoras de Series DinÃ¡micas */}
+                  {/* Botones / Píldoras de Series Dinámicas */}
                   {(() => {
                     const seriesUnicas = Array.from(
                       new Set(
@@ -5756,14 +5756,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-12 h-12 object-cover rounded-lg border shrink-0" />
                       ) : (
-                        <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-lg shrink-0">ðŸ‘Ÿ</div>
+                        <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-lg shrink-0">�xx</div>
                       )}
                       <div>
                         <div className="font-extrabold text-sm text-[var(--foreground)]">
-                          {productoSeleccionado.nombre || productoSeleccionado.name} â€” {productoSeleccionado.color}
+                          {productoSeleccionado.nombre || productoSeleccionado.name} � {productoSeleccionado.color}
                         </div>
                         <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                          Marca: {productoSeleccionado.marca} â€¢ CÃ³d: {productoSeleccionado.codigo} â€¢ Serie: {formatearNombreSerie(obtenerSerieProducto(productoSeleccionado))}
+                          Marca: {productoSeleccionado.marca} ⬢ Cód: {productoSeleccionado.codigo} ⬢ Serie: {formatearNombreSerie(obtenerSerieProducto(productoSeleccionado))}
                         </div>
                       </div>
                     </div>
@@ -5782,8 +5782,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       type="text"
                       placeholder={
                         serieFiltroOrden !== 'TODAS'
-                          ? `Serie ${serieFiltroOrden} seleccionada: escribe el modelo (ej. MocasÃ­n, BotÃ­n)...`
-                          : "Escribe para buscar modelo (ej. MocasÃ­n, BotÃ­n, Negro)..."
+                          ? `Serie ${serieFiltroOrden} seleccionada: escribe el modelo (ej. Mocasín, Botín)...`
+                          : "Escribe para buscar modelo (ej. Mocasín, Botín, Negro)..."
                       }
                       value={busquedaModelo}
                       onChange={(e) => {
@@ -5857,13 +5857,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       // eslint-disable-next-line @next/next/no-img-element
                                       <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
                                     ) : (
-                                      <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">ðŸ‘Ÿ</div>
+                                      <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">�xx</div>
                                     )}
                                     <div>
                                       <span className="font-bold block">{p.nombre || p.name}</span>
                                       <span className="text-[10px] text-[var(--muted-foreground)]">
-                                        {p.marca} â€¢ {p.color} ({p.codigo})
-                                        {serieName && ` â€¢ Serie: ${formatearNombreSerie(serieName)}`}
+                                        {p.marca} ⬢ {p.color} ({p.codigo})
+                                        {serieName && ` ⬢ Serie: ${formatearNombreSerie(serieName)}`}
                                       </span>
                                     </div>
                                   </div>
@@ -5882,7 +5882,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </div>
                 )}
 
-                {/* ConfiguraciÃ³n de Curva Exacta */}
+                {/* Configuración de Curva Exacta */}
                 {productoSeleccionado && (
                   <div className="p-3 bg-[var(--card)] rounded-xl border border-[var(--border)] space-y-3">
                     <div>
@@ -5897,7 +5897,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
                           }`}
                         >
-                          Â½ Media A (6 pares: 38/1, 39/2, 40/1, 41/1, 42/1)
+                          ½ Media A (6 pares: 38/1, 39/2, 40/1, 41/1, 42/1)
                         </button>
                         <button
                           type="button"
@@ -5908,7 +5908,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
                           }`}
                         >
-                          Â½ Media B (6 pares: 38/1, 39/1, 40/2, 41/1, 42/1)
+                          ½ Media B (6 pares: 38/1, 39/1, 40/2, 41/1, 42/1)
                         </button>
                         <button
                           type="button"
@@ -5926,7 +5926,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-xs font-bold text-[var(--foreground)]">
-                        {subtipoCurva === 'DOCENA' ? 'Â¿CuÃ¡ntas docenas?:' : 'Â¿CuÃ¡ntas medias docenas?:'}
+                        {subtipoCurva === 'DOCENA' ? '¿Cuántas docenas?:' : '¿Cuántas medias docenas?:'}
                       </span>
                       <div className="flex items-center gap-1">
                         <button
@@ -5956,11 +5956,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       </span>
                     </div>
 
-                    {/* PrevisualizaciÃ³n idÃ©ntica de la distribuciÃ³n de curva */}
+                    {/* Previsualización idéntica de la distribución de curva */}
                     <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                          DISTRIBUCIÃ“N DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
+                          DISTRIBUCI�N DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
                         </span>
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
                           Serie: {distribucionPreview.map((d: any) => `${d.cantidad}/${d.talla}`).join(', ')}
@@ -6000,7 +6000,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         />
                       </div>
 
-                      {/* ObservaciÃ³n por Modelo Opcional (Toggle compacto para ahorrar espacio) */}
+                      {/* Observación por Modelo Opcional (Toggle compacto para ahorrar espacio) */}
                       <div>
                         {!mostrarObsModeloOrden && !observacionItemInput ? (
                           <button
@@ -6008,13 +6008,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             onClick={() => setMostrarObsModeloOrden(true)}
                             className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
                           >
-                            <span>+ Agregar observaciÃ³n a este modelo (opcional)</span>
+                            <span>+ Agregar observación a este modelo (opcional)</span>
                           </button>
                         ) : (
                           <div className="space-y-1 animate-in fade-in duration-150">
                             <div className="flex justify-between items-center">
                               <label className="block text-[10px] font-bold text-[var(--muted-foreground)]">
-                                ObservaciÃ³n EspecÃ­fica del Modelo (Opcional)
+                                Observación Específica del Modelo (Opcional)
                               </label>
                               <button
                                 type="button"
@@ -6024,7 +6024,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 }}
                                 className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
                               >
-                                Quitar observaciÃ³n
+                                Quitar observación
                               </button>
                             </div>
                             <input
@@ -6059,7 +6059,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                 {orderLines.length === 0 ? (
                   <p className="text-center text-[var(--muted-foreground)] py-4 bg-[var(--muted)]/20 rounded-xl">
-                    AÃºn no has agregado ningÃºn modelo a la orden.
+                    Aún no has agregado ningún modelo a la orden.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -6083,8 +6083,8 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             <div>
                               <span className="font-bold text-xs block">{line.producto?.nombre}</span>
                               <span className="text-[10px] text-[var(--muted-foreground)]">
-                                {line.cantidadPedida} pares ({docenas} doc.) Ã— ${line.precioCosto.toFixed(2)}
-                                {line.observacionLinea && ` â€¢ Nota: ${line.observacionLinea}`}
+                                {line.cantidadPedida} pares ({docenas} doc.) � ${line.precioCosto.toFixed(2)}
+                                {line.observacionLinea && ` ⬢ Nota: ${line.observacionLinea}`}
                               </span>
                             </div>
                           </div>
@@ -6142,9 +6142,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
           MODAL: REGISTRAR NUEVO PROVEEDOR
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showSupplierModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6163,7 +6163,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
               </div>
 
-              {/* BotÃ³n Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => { setShowSupplierModal(false); resetSupplierForm(); }}
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
@@ -6201,7 +6201,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           </div>
                           <div className="text-[10.5px] text-[var(--muted-foreground)] font-mono flex items-center gap-2 mt-0.5">
                             <span>RUC: {prov.ruc || 'Sin RUC'}</span>
-                            {prov.contacto && <span>â€¢ Tel: {prov.contacto}</span>}
+                            {prov.contacto && <span>⬢ Tel: {prov.contacto}</span>}
                           </div>
                         </div>
                         <button
@@ -6220,11 +6220,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  RUC del Proveedor / CÃ©dula
+                  RUC del Proveedor / Cédula
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. 1792348574001 (10 o 13 dÃ­gitos)"
+                  placeholder="Ej. 1792348574001 (10 o 13 dígitos)"
                   value={ruc}
                   onChange={(e) => setRuc(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
@@ -6252,7 +6252,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <input
                     type="text"
                     required
-                    placeholder="Ej. PÃ©rez GÃ³mez"
+                    placeholder="Ej. Pérez Gómez"
                     value={provApellidos}
                     onChange={(e) => setProvApellidos(formatearApellidos(e.target.value))}
                     className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
@@ -6266,19 +6266,19 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Calzados Artesanales Cevallos (Dejar vacÃ­o si es persona natural)"
+                  placeholder="Ej. Calzados Artesanales Cevallos (Dejar vacío si es persona natural)"
                   value={nombreComercial}
                   onChange={(e) => setNombreComercial(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                 />
                 <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-                  Si no se ingresa, se usarÃ¡n los nombres y apellidos como razÃ³n social.
+                  Si no se ingresa, se usarán los nombres y apellidos como razón social.
                 </p>
               </div>
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  TelÃ©fono / WhatsApp de Contacto *
+                  Teléfono / WhatsApp de Contacto *
                 </label>
                 <input
                   type="text"
@@ -6292,7 +6292,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Correo ElectrÃ³nico (Opcional)
+                  Correo Electrónico (Opcional)
                 </label>
                 <input
                   type="email"
@@ -6305,7 +6305,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  DirecciÃ³n del Proveedor (Opcional)
+                  Dirección del Proveedor (Opcional)
                 </label>
                 <input
                   type="text"
@@ -6317,7 +6317,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 />
               </div>
 
-              {/* SecciÃ³n Opcional: Saldo Anterior / Deuda Previa al crear proveedor */}
+              {/* Sección Opcional: Saldo Anterior / Deuda Previa al crear proveedor */}
               <div className="pt-2 border-t border-[var(--border)]">
                 <div className="bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 space-y-3">
                   <div className="flex items-center justify-between">
@@ -6330,7 +6330,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       />
                       <span className="flex items-center gap-1.5">
                         <DollarSign size={14} className="text-amber-600" />
-                        Â¿Tiene saldo o deuda anterior pendiente con este proveedor?
+                        ¿Tiene saldo o deuda anterior pendiente con este proveedor?
                       </span>
                     </label>
                     <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 rounded-full border border-amber-500/20">
@@ -6368,7 +6368,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                       <div>
                         <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
-                          Concepto / EspecificaciÃ³n del Saldo <span className="text-red-500">*</span>
+                          Concepto / Especificación del Saldo <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -6383,7 +6383,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             'Saldo anterior pendiente',
                             'Arrastre de libreta anterior',
                             'Entrega previa sin liquidar',
-                            'Cheque / pagarÃ© comercial',
+                            'Cheque / pagaré comercial',
                           ].map((sug) => (
                             <button
                               key={sug}
@@ -6424,11 +6424,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                       <div>
                         <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
-                          ObservaciÃ³n / Respaldo (Opcional)
+                          Observación / Respaldo (Opcional)
                         </label>
                         <input
                           type="text"
-                          placeholder="Ej. AnotaciÃ³n en nota de entrega #104"
+                          placeholder="Ej. Anotación en nota de entrega #104"
                           value={deudaAnteriorNotas}
                           onChange={(e) => setDeudaAnteriorNotas(e.target.value)}
                           className="w-full px-3 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
@@ -6436,7 +6436,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       </div>
 
                       <p className="text-[10px] text-amber-800 dark:text-amber-300/80 leading-tight">
-                        ðŸ’¡ Al registrar al proveedor, este saldo se ingresarÃ¡ automÃ¡ticamente a su <strong>Cuenta Corriente y Cuentas por Pagar</strong> para control y abonos.
+                        �x� Al registrar al proveedor, este saldo se ingresará automáticamente a su <strong>Cuenta Corriente y Cuentas por Pagar</strong> para control y abonos.
                       </p>
                     </div>
                   )}
@@ -6473,9 +6473,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
           MODAL: EDITAR PROVEEDOR
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showEditSupplierModal && editingSupplier && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6520,12 +6520,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  RazÃ³n Social / Nombre Comercial *
+                  Razón Social / Nombre Comercial *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej. CurtidurÃ­a & Cueros del Ecuador S.A."
+                  placeholder="Ej. Curtiduría & Cueros del Ecuador S.A."
                   value={editRazonSocial}
                   onChange={(e) => setEditRazonSocial(e.target.value)}
                   className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs focus:outline-none focus:border-emerald-500 font-bold"
@@ -6534,7 +6534,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  TelÃ©fono / WhatsApp de Contacto
+                  Teléfono / WhatsApp de Contacto
                 </label>
                 <input
                   type="text"
@@ -6547,7 +6547,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  Correo ElectrÃ³nico
+                  Correo Electrónico
                 </label>
                 <input
                   type="email"
@@ -6560,7 +6560,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               <div>
                 <label className="block text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
-                  DirecciÃ³n del Proveedor
+                  Dirección del Proveedor
                 </label>
                 <input
                   type="text"
@@ -6572,7 +6572,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 />
               </div>
 
-              {/* SecciÃ³n Opcional: Registrar Saldo Anterior / Deuda Adicional al editar proveedor */}
+              {/* Sección Opcional: Registrar Saldo Anterior / Deuda Adicional al editar proveedor */}
               <div className="pt-2 border-t border-[var(--border)]">
                 <div className="bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 space-y-3">
                   <div className="flex items-center justify-between">
@@ -6585,7 +6585,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       />
                       <span className="flex items-center gap-1.5">
                         <DollarSign size={14} className="text-amber-600" />
-                        Â¿Deseas ingresar un saldo o deuda anterior pendiente?
+                        ¿Deseas ingresar un saldo o deuda anterior pendiente?
                       </span>
                     </label>
                     <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 rounded-full border border-amber-500/20">
@@ -6623,7 +6623,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                       <div>
                         <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
-                          Concepto / EspecificaciÃ³n del Saldo <span className="text-red-500">*</span>
+                          Concepto / Especificación del Saldo <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -6638,7 +6638,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             'Saldo anterior pendiente',
                             'Arrastre de libreta anterior',
                             'Entrega previa sin liquidar',
-                            'Cheque / pagarÃ© comercial',
+                            'Cheque / pagaré comercial',
                           ].map((sug) => (
                             <button
                               key={sug}
@@ -6679,11 +6679,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                       <div>
                         <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1">
-                          ObservaciÃ³n / Respaldo (Opcional)
+                          Observación / Respaldo (Opcional)
                         </label>
                         <input
                           type="text"
-                          placeholder="Ej. AnotaciÃ³n en nota de entrega #104"
+                          placeholder="Ej. Anotación en nota de entrega #104"
                           value={deudaAnteriorNotas}
                           onChange={(e) => setDeudaAnteriorNotas(e.target.value)}
                           className="w-full px-3 py-1.5 bg-[var(--card)] border border-amber-500/30 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-600"
@@ -6691,7 +6691,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       </div>
 
                       <p className="text-[10px] text-amber-800 dark:text-amber-300/80 leading-tight">
-                        ðŸ’¡ Este saldo se sumarÃ¡ a la <strong>Cuenta Corriente y Cuentas por Pagar</strong> del proveedor para su control y abonos.
+                        �x� Este saldo se sumará a la <strong>Cuenta Corriente y Cuentas por Pagar</strong> del proveedor para su control y abonos.
                       </p>
                     </div>
                   )}
@@ -6728,9 +6728,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
           MODAL: PREVISUALIZADOR DE PDF DE ORDEN
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showPdfPreviewModal && pdfPreviewUrl && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6751,7 +6751,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     </span>
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Proveedor: <strong className="text-white">{pdfPreviewData?.proveedor.nombre}</strong> â€¢ Sin datos de clientes en el documento
+                    Proveedor: <strong className="text-white">{pdfPreviewData?.proveedor.nombre}</strong> ⬢ Sin datos de clientes en el documento
                   </p>
                 </div>
               </div>
@@ -6770,7 +6770,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 )}
               </div>
 
-              {/* BotÃ³n Cerrar (X) Anclado en la Esquina Superior Derecha */}
+              {/* Botón Cerrar (X) Anclado en la Esquina Superior Derecha */}
               <button
                 onClick={() => {
                   setShowPdfPreviewModal(false);
@@ -6822,9 +6822,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          MODAL: REGISTRAR DEVOLUCIÃ“N AL PROVEEDOR
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          MODAL: REGISTRAR DEVOLUCI�N AL PROVEEDOR
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showDevolucionModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6839,13 +6839,13 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2 tracking-tight truncate">
-                    <span>Registrar DevoluciÃ³n al Fabricante</span>
+                    <span>Registrar Devolución al Fabricante</span>
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                      GarantÃ­a / Falla
+                      Garantía / Falla
                     </span>
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Descuenta automÃ¡ticamente de la deuda del proveedor y genera el comprobante DEV
+                    Descuenta automáticamente de la deuda del proveedor y genera el comprobante DEV
                   </p>
                 </div>
               </div>
@@ -6874,7 +6874,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <option value="">-- Seleccione un proveedor --</option>
                   {proveedores.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.razonSocial || p.nombre} (RUC: {p.ruc}) â€¢ Deuda Actual: ${Number(p.saldoPendiente || 0).toFixed(2)}
+                      {p.razonSocial || p.nombre} (RUC: {p.ruc}) ⬢ Deuda Actual: ${Number(p.saldoPendiente || 0).toFixed(2)}
                     </option>
                   ))}
                 </select>
@@ -6883,11 +6883,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               {/* Motivo */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">
-                  Motivo de la DevoluciÃ³n *
+                  Motivo de la Devolución *
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej: Calzado despegado de fÃ¡brica, cuero rasgado en talÃ³n, producto con defecto..."
+                  placeholder="Ej: Calzado despegado de fábrica, cuero rasgado en talón, producto con defecto..."
                   value={devMotivo}
                   onChange={(e) => setDevMotivo(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-hidden"
@@ -6895,7 +6895,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 />
               </div>
 
-              {/* Trazabilidad: QuiÃ©n entrega y QuiÃ©n recibe en el proveedor */}
+              {/* Trazabilidad: Quién entrega y Quién recibe en el proveedor */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5 flex items-center gap-1">
@@ -6941,15 +6941,15 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 {devLines.length === 0 ? (
                   <div className="p-6 border-2 border-dashed border-[var(--border)] rounded-2xl text-center">
                     <ShieldAlert size={28} className="mx-auto text-amber-500 mb-2 opacity-60" />
-                    <p className="text-xs font-bold text-[var(--foreground)]">No hay modelos seleccionados para devoluciÃ³n</p>
+                    <p className="text-xs font-bold text-[var(--foreground)]">No hay modelos seleccionados para devolución</p>
                     <p className="text-[11px] text-[var(--muted-foreground)] mt-1">
-                      Puede seleccionar Ã­tems directamente desde la pestaÃ±a de "Devoluciones & GarantÃ­as" o ingresar calzado defectuoso manualmente.
+                      Puede seleccionar ítems directamente desde la pestaña de "Devoluciones & Garantías" o ingresar calzado defectuoso manualmente.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                     {(() => {
-                      // Agrupar devLines por modelo para mostrar el componente estÃ¡ndar
+                      // Agrupar devLines por modelo para mostrar el componente estándar
                       const gruposMap = new Map<string, {
                         productId: string;
                         modelName: string;
@@ -6976,7 +6976,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           gruposMap.set(key, {
                             productId: line.productId,
                             modelName: line.modelName || 'Calzado',
-                            color: line.color || 'COLOR ESTÃNDAR',
+                            color: line.color || 'COLOR ESTÁNDAR',
                             brand: line.brand || '',
                             serie: (line as any).serie || 'ADULTO',
                             imageUrl: line.imageUrl || '',
@@ -7012,14 +7012,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               </div>
 
                               <div className="flex-1 min-w-0 space-y-2">
-                                {/* TÃ­tulo y SubtÃ­tulo */}
+                                {/* Título y Subtítulo */}
                                 <div>
                                   <h4 className="font-extrabold text-sm text-[var(--foreground)] leading-tight uppercase tracking-tight">
                                     {m.modelName}
                                   </h4>
                                   <div className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--muted-foreground)] mt-0.5">
                                     <span>{m.color}</span>
-                                    <span>Â·</span>
+                                    <span>·</span>
                                     <span className="text-emerald-700 dark:text-emerald-400 font-bold">
                                       Serie: {formatearNombreSerie(m.serie)}
                                     </span>
@@ -7049,7 +7049,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                           className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
                                           title={`Quitar 1 par T${t.numeroTalla}`}
                                         >
-                                          âˆ’
+                                          ��
                                         </button>
                                         <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
                                           {t.cantidad}
@@ -7073,7 +7073,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   ))}
                                 </div>
 
-                                {/* Botones de acción rápida: Media Docena Serie A / B */}
+                                {/* Botones de acci�n r�pida: Media Docena Serie A / B */}
                                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                   {esCurvaUniforme6Tallas(m.tallas) ? (
                                     <>
@@ -7117,7 +7117,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                        − Media Docena (−6 pares)
+                                         Media Docena (6 pares)
                                       </button>
                                     </>
                                   ) : (
@@ -7141,7 +7141,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                        + ½ Doc A
+                                        + � Doc A
                                       </button>
                                       <button
                                         type="button"
@@ -7162,7 +7162,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                        + ½ Doc B
+                                        + � Doc B
                                       </button>
                                       <button
                                         type="button"
@@ -7183,7 +7183,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                        − ½ Doc A
+                                         � Doc A
                                       </button>
                                       <button
                                         type="button"
@@ -7204,7 +7204,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                        − ½ Doc B
+                                         � Doc B
                                       </button>
                                     </>
                                   )}
@@ -7213,10 +7213,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   </span>
                                 </div>
 
-                                {/* ObservaciÃ³n / Nota del modelo */}
+                                {/* Observación / Nota del modelo */}
                                 <div className="pt-0.5 text-xs text-[var(--muted-foreground)] flex items-center gap-1">
-                                  <span className="font-semibold text-slate-500 dark:text-slate-400">+ ObservaciÃ³n:</span>
-                                  <span className="italic">{devMotivo || 'GarantÃ­a / Defecto de fÃ¡brica'}</span>
+                                  <span className="font-semibold text-slate-500 dark:text-slate-400">+ Observación:</span>
+                                  <span className="italic">{devMotivo || 'Garantía / Defecto de fábrica'}</span>
                                 </div>
                               </div>
                             </div>
@@ -7243,7 +7243,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       );
                                     }}
                                     className="w-14 px-1 py-0.5 text-right font-mono font-bold bg-[var(--muted)] border border-[var(--border)] rounded text-[11px]"
-                                    title="Editar costo unitario de devoluciÃ³n"
+                                    title="Editar costo unitario de devolución"
                                   />
                                   <span>/ par</span>
                                 </div>
@@ -7258,7 +7258,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   setDevLines((prev) => prev.filter((_, i) => !m.tallas.some((t) => t.originalIdx === i)));
                                 }}
                                 className="p-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-full transition-colors cursor-pointer"
-                                title="Quitar este modelo de la devoluciÃ³n"
+                                title="Quitar este modelo de la devolución"
                               >
                                 <X size={18} className="stroke-[2.5]" />
                               </button>
@@ -7283,7 +7283,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         Descuento Inmediato de Cuenta
                       </h4>
                       <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
-                        Se rebajarÃ¡ del saldo adeudado con el fabricante.
+                        Se rebajará del saldo adeudado con el fabricante.
                       </p>
                     </div>
                   </div>
@@ -7297,7 +7297,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               </div>
 
-              {/* Botones de acciÃ³n */}
+              {/* Botones de acción */}
               <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
@@ -7329,9 +7329,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
           MODAL: INGRESO MANUAL DE CALZADO DEFECTUOSO
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showManualDefectuosoModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -7349,7 +7349,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     Ingresar Calzado Defectuoso
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    AÃ±ade calzado con fallas de bodega a la bandeja de devoluciÃ³n a fÃ¡brica
+                    Añade calzado con fallas de bodega a la bandeja de devolución a fábrica
                   </p>
                 </div>
               </div>
@@ -7373,7 +7373,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Escriba el nombre, cÃ³digo o marca del modelo..."
+                    placeholder="Escriba el nombre, código o marca del modelo..."
                     value={busquedaManualProd}
                     onChange={(e) => setBusquedaManualProd(e.target.value)}
                     className="w-full pl-10 pr-3.5 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-hidden"
@@ -7417,7 +7417,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             <div>
                               <p className="text-xs font-bold text-[var(--foreground)]">{p.name || p.nombre}</p>
                               <p className="text-[10px] text-[var(--muted-foreground)]">
-                                {p.brand || p.marca || 'Calzado'} â€¢ CÃ³digo: {p.code || p.codigo}
+                                {p.brand || p.marca || 'Calzado'} ⬢ Código: {p.code || p.codigo}
                               </p>
                             </div>
                           </div>
@@ -7445,7 +7445,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     <div>
                       <h4 className="text-xs font-black text-[var(--foreground)]">{manualProd.name || manualProd.nombre}</h4>
                       <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">
-                        {manualProd.brand || manualProd.marca || 'Calzado'} â€¢ {manualProd.code || manualProd.codigo}
+                        {manualProd.brand || manualProd.marca || 'Calzado'} ⬢ {manualProd.code || manualProd.codigo}
                       </p>
                     </div>
                   </div>
@@ -7532,7 +7532,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               </div>
 
-              {/* Botones de acciÃ³n */}
+              {/* Botones de acción */}
               <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
@@ -7564,9 +7564,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          MODAL: CONSTANCIA DE DEVOLUCIÃ“N A PROVEEDOR
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          MODAL: CONSTANCIA DE DEVOLUCI�N A PROVEEDOR
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showConstanciaModal && selectedConstancia && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -7604,7 +7604,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
               {/* Metadatos */}
               <div className="grid grid-cols-2 gap-3 p-3.5 bg-[var(--muted)]/40 rounded-2xl border border-[var(--border)] text-xs">
                 <div>
-                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase block">Fecha de EmisiÃ³n</span>
+                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase block">Fecha de Emisión</span>
                   <span className="font-bold text-[var(--foreground)]">
                     {new Date(selectedConstancia.createdAt).toLocaleDateString('es-EC', {
                       day: '2-digit',
@@ -7645,7 +7645,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         <div>
                           <p className="text-xs font-bold text-[var(--foreground)]">{l.modelName || 'Calzado'}</p>
                           <p className="text-[10px] text-[var(--muted-foreground)]">
-                            Talla: <strong className="text-[var(--foreground)]">{l.numeroTalla}</strong> â€¢ {l.cantidad} par(es) Ã— ${Number(l.precioCosto || 0).toFixed(2)}
+                            Talla: <strong className="text-[var(--foreground)]">{l.numeroTalla}</strong> ⬢ {l.cantidad} par(es) � ${Number(l.precioCosto || 0).toFixed(2)}
                           </p>
                         </div>
                       </div>
@@ -7695,9 +7695,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          MODAL CONSOLIDACIÃ“N DE DEMANDA DE CLIENTES (FASE 5.2)
-         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+          MODAL CONSOLIDACI�N DE DEMANDA DE CLIENTES (FASE 5.2)
+         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showConsolidarDemandaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
@@ -7709,10 +7709,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
                 <div>
                   <h3 className="font-black text-sm text-[var(--foreground)]">
-                    ConsolidaciÃ³n de Demanda para Ã“rdenes de Compra
+                    Consolidación de Demanda para �rdenes de Compra
                   </h3>
                   <p className="text-[11px] text-[var(--muted-foreground)]">
-                    AgrupaciÃ³n automÃ¡tica de calzado faltante de pedidos de clientes en espera de stock.
+                    Agrupación automática de calzado faltante de pedidos de clientes en espera de stock.
                   </p>
                 </div>
               </div>
@@ -7736,7 +7736,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 <div className="text-center py-12 space-y-2 bg-[var(--muted)]/20 border border-[var(--border)] rounded-2xl p-6">
                   <CheckCircle2 size={36} className="mx-auto text-emerald-500" />
                   <h4 className="font-bold text-sm text-[var(--foreground)]">
-                    No hay dÃ©ficit de stock en pedidos pendientes
+                    No hay déficit de stock en pedidos pendientes
                   </h4>
                   <p className="text-xs text-[var(--muted-foreground)] max-w-md mx-auto">
                     Todos los pedidos de clientes cuentan con inventario suficiente o ya se encuentran completados.
@@ -7777,7 +7777,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   {/* Lista de Modelos Faltantes (Rule 7 ModelTallaCurvaCard) */}
                   <div className="space-y-3">
                     <div className="text-[11px] font-black uppercase tracking-wider text-[var(--muted-foreground)]">
-                      Modelos con Pedidos de Clientes en Espera de MercancÃ­a:
+                      Modelos con Pedidos de Clientes en Espera de Mercancía:
                     </div>
 
                     {demandaPendienteData.items.map((item: any) => {
@@ -7824,7 +7824,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     {item.modelName}
                                   </h4>
                                   <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
-                                    â€¢ {item.color}
+                                    ⬢ {item.color}
                                   </span>
                                   <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                                     Serie: {item.serieNombre}
@@ -7848,7 +7848,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                                 <div className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1.5 pt-0.5">
                                   <span>Proveedor sugerido: <strong>{item.supplierName}</strong></span>
-                                  <span>â€¢</span>
+                                  <span>⬢</span>
                                   <span>{item.pedidosAfectados?.length || 0} pedido(s) de clientes</span>
                                 </div>
                               </div>
@@ -7922,7 +7922,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   {/* Observaciones generales */}
                   <div>
                     <label className="text-[11px] font-bold text-[var(--foreground)] block mb-1">
-                      Observaciones o Instrucciones de FabricaciÃ³n:
+                      Observaciones o Instrucciones de Fabricación:
                     </label>
                     <input
                       type="text"
@@ -8004,7 +8004,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* Modal de ConfirmaciÃ³n UI (Reemplaza confirm nativo) */}
+      {/* Modal de Confirmación UI (Reemplaza confirm nativo) */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         title={confirmModal.title}
@@ -8016,7 +8016,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
       />
 
-      {/* Modal de confirmaciÃ³n de descarte de cambios */}
+      {/* Modal de confirmación de descarte de cambios */}
       <UnsavedChangesModal
         isOpen={showDiscardModal}
         targetSectionName="Proveedores"

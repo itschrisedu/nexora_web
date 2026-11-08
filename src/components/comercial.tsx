@@ -176,7 +176,7 @@ function agruparLineasPorModelo(lines: any[]): GrupoModeloResumen[] {
 
 const ESTADO_CONFIG: Record<EstadoPedido, { label: string; color: string; icon: React.ReactNode }> = {
   PENDIENTE:         { label: 'Pendiente',          color: 'bg-amber-500/10 text-amber-600 border-amber-500/20',        icon: <Clock size={12} /> },
-  EN_PREPARACION:    { label: 'En PreparaciÃ³n',     color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',           icon: <Package size={12} /> },
+  EN_PREPARACION:    { label: 'En Preparación',     color: 'bg-blue-500/10 text-blue-600 border-blue-500/20',           icon: <Package size={12} /> },
   EN_ESPERA_STOCK:   { label: 'Pendiente por Pedir', color: 'bg-orange-500/10 text-orange-600 border-orange-500/20',     icon: <Clock size={12} /> },
   ENTREGADO_PARCIAL: { label: 'Entrega Parcial',     color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',           icon: <Package size={12} /> },
   ENTREGADO:         { label: 'Entregado',          color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',  icon: <CheckCircle size={12} /> },
@@ -198,7 +198,7 @@ export default function ComercialComponent({
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  // Estados CanÃ³nicos de la Tesis (4 Estados) + BotÃ³n de Acceso RÃ¡pido 'TODOS'
+  // Estados Canónicos de la Tesis (4 Estados) + Botón de Acceso Rápido 'TODOS'
   type EstadoTesis = 'PENDIENTE' | 'EN_PREPARACION' | 'ENTREGADO' | 'CANCELADO';
   const [filtroEstadoTesis, setFiltroEstadoTesis] = useState<'TODOS' | EstadoTesis>('TODOS');
   const [subFiltroPrep, setSubFiltroPrep] = useState<'TODOS_PREP' | 'EN_PREPARACION' | 'EN_ESPERA_STOCK'>('TODOS_PREP');
@@ -218,7 +218,7 @@ export default function ComercialComponent({
   const [selectedOrderSucursalId, setSelectedOrderSucursalId] = useState<string>('');
   const [pedidoExpandidoId, setPedidoExpandidoId] = useState<string | null>(null);
 
-  // Filtro de rango de fechas para pedidos en 'ENTREGADO' y 'TODOS' (por defecto Ãºltimo mes)
+  // Filtro de rango de fechas para pedidos en 'ENTREGADO' y 'TODOS' (por defecto último mes)
   const fechaHoy = useMemo(() => new Date().toISOString().split('T')[0], []);
   const [filtroFechaDesde, setFiltroFechaDesde] = useState<string>(() => {
     const d = new Date();
@@ -264,7 +264,7 @@ export default function ComercialComponent({
   const [errorMsg, setErrorMsg] = useState('');
   const [savingOffline, setSavingOffline] = useState(false);
 
-  // Estrategia Comercial (Fase 9: EstÃ¡ndar vs DinÃ¡mico)
+  // Estrategia Comercial (Fase 9: Estándar vs Dinámico)
   const [estrategia, setEstrategia] = useState<any>(null);
 
   const cargarEstrategia = useCallback(async () => {
@@ -282,7 +282,7 @@ export default function ComercialComponent({
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editingOrderNumero, setEditingOrderNumero] = useState<string>('');
 
-  // BÃºsqueda de clientes con Debounce de 3 segundos
+  // Búsqueda de clientes con Debounce de 3 segundos
   const [listaClientes, setListaClientes] = useState<any[]>([]);
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [busquedaDebounced, setBusquedaDebounced] = useState('');
@@ -378,13 +378,13 @@ export default function ComercialComponent({
     setBusquedaDebounced('');
     setShowDropdownCliente(false);
     verificarPedidoActivoCliente(nuevoCliente);
-    // Cliente reciÃ©n creado â†’ SIN_CREDITO â†’ forzar CONTADO
+    // Cliente recién creado �  SIN_CREDITO �  forzar CONTADO
     setTipoPago('CONTADO');
-    showToast(`Â¡Cliente ${nuevoCliente.nombre} registrado y seleccionado para el pedido!`, 'success');
+    showToast(`¡Cliente ${nuevoCliente.nombre} registrado y seleccionado para el pedido!`, 'success');
     loadListaClientes();
   };
 
-  // CatÃ¡logo de Productos y LÃ­neas de Pedido
+  // Catálogo de Productos y Líneas de Pedido
   const [catalogoProductos, setCatalogoProductos] = useState<any[]>([]);
   const [lineasPedido, setLineasPedido] = useState<
     {
@@ -406,7 +406,7 @@ export default function ComercialComponent({
     }[]
   >([]);
 
-  // SelecciÃ³n de Producto actual para agregar
+  // Selección de Producto actual para agregar
   const [selectedProductId, setSelectedProductId] = useState('');
   const [precioItem, setPrecioItem] = useState(0);
   const [precioItemInput, setPrecioItemInput] = useState('');
@@ -446,13 +446,13 @@ export default function ComercialComponent({
   const [notasPedido, setNotasPedido] = useState('');
   const [mostrarObservacionGeneral, setMostrarObservacionGeneral] = useState(false);
 
-  // â”€â”€ Anticipos / Adelantos de Dinero â”€â”€
+  // ���� Anticipos / Adelantos de Dinero ����
   const [registraAdelanto, setRegistraAdelanto] = useState(false);
   const [adelantoInput, setAdelantoInput] = useState('');
   const [metodoAdelanto, setMetodoAdelanto] = useState<'EFECTIVO' | 'TRANSFERENCIA' | 'DEPOSITO' | 'CHEQUE'>('EFECTIVO');
   const [referenciaAdelanto, setReferenciaAdelanto] = useState('');
 
-  // â”€â”€ LogÃ­stica de Entrega (Fase E1) â”€â”€
+  // ���� Logística de Entrega (Fase E1) ����
   const [tipoEntrega, setTipoEntrega] = useState<'PRESENCIAL' | 'ENVIO'>('PRESENCIAL');
   const [asumeFlete, setAsumeFlete] = useState<'CLIENTE' | 'EMPRESA'>('CLIENTE');
   const [costoEnvio, setCostoEnvio] = useState('5.00');
@@ -461,13 +461,13 @@ export default function ComercialComponent({
   const [direccionEnvio, setDireccionEnvio] = useState('');
   const [ciudadEnvio, setCiudadEnvio] = useState('');
 
-  // Empresas de Transporte dinÃ¡micas
+  // Empresas de Transporte dinámicas
   const [listaTransportes, setListaTransportes] = useState<any[]>([]);
   const [showNuevoTransporteModal, setShowNuevoTransporteModal] = useState(false);
   const [nuevoTransporteNombre, setNuevoTransporteNombre] = useState('');
   const [guardandoTransporte, setGuardandoTransporte] = useState(false);
 
-  // Modal independiente de GestiÃ³n de EnvÃ­o de Pedido
+  // Modal independiente de Gestión de Envío de Pedido
   const [showModalEnvio, setShowModalEnvio] = useState(false);
   const [pedidoEnvioSeleccionado, setPedidoEnvioSeleccionado] = useState<Pedido | null>(null);
   const [envioModalTipoEntrega, setEnvioModalTipoEntrega] = useState<'PRESENCIAL' | 'ENVIO'>('PRESENCIAL');
@@ -479,7 +479,7 @@ export default function ComercialComponent({
   const [envioModalCiudadEnvio, setEnvioModalCiudadEnvio] = useState('');
   const [savingEnvioModal, setSavingEnvioModal] = useState(false);
 
-  // â”€â”€ Modal independiente de GestiÃ³n RÃ¡pida de Adelanto / Anticipo â”€â”€
+  // ���� Modal independiente de Gestión Rápida de Adelanto / Anticipo ����
   const [showModalAdelanto, setShowModalAdelanto] = useState(false);
   const [pedidoAdelantoSeleccionado, setPedidoAdelantoSeleccionado] = useState<Pedido | null>(null);
   const [modalAdelantoMonto, setModalAdelantoMonto] = useState('');
@@ -489,7 +489,7 @@ export default function ComercialComponent({
 
   const [creatingOrder, setCreatingOrder] = useState(false);
 
-  // â”€â”€ Modal de Entrega Parcial / Total de Pedido â”€â”€
+  // ���� Modal de Entrega Parcial / Total de Pedido ����
   const [showEntregaModal, setShowEntregaModal] = useState(false);
   const [pedidoEntregaSeleccionado, setPedidoEntregaSeleccionado] = useState<Pedido | null>(null);
   const [entregaItemsMap, setEntregaItemsMap] = useState<Record<string, number>>({});
@@ -499,7 +499,7 @@ export default function ComercialComponent({
   const [entregaProductosStockMap, setEntregaProductosStockMap] = useState<Record<string, any>>({});
   const [procesandoEntrega, setProcesandoEntrega] = useState(false);
 
-  // â”€â”€ Modal de ReversiÃ³n / CorrecciÃ³n de Entrega ErrÃ³nea (Fase 2) â”€â”€
+  // ���� Modal de Reversión / Corrección de Entrega Errónea (Fase 2) ����
   const [showRevertirEntregaModal, setShowRevertirEntregaModal] = useState(false);
   const [pedidoRevertirSeleccionado, setPedidoRevertirSeleccionado] = useState<Pedido | null>(null);
   const [revertirItemsMap, setRevertirItemsMap] = useState<Record<string, number>>({});
@@ -509,18 +509,18 @@ export default function ComercialComponent({
   const [editingObservacionProductId, setEditingObservacionProductId] = useState<string | null>(null);
   const [tempObservacionText, setTempObservacionText] = useState('');
 
-    // â”€â”€ Modal de CorrecciÃ³n de Precio Post-Venta / Post-Entrega â”€â”€
+    // ���� Modal de Corrección de Precio Post-Venta / Post-Entrega ����
   const [showCorregirPrecioModal, setShowCorregirPrecioModal] = useState(false);
   const [pedidoACorregir, setPedidoACorregir] = useState<Pedido | null>(null);
   const [preciosCorregirMap, setPreciosCorregirMap] = useState<Record<string, string>>({});
   const [guardandoCorreccionPrecio, setGuardandoCorreccionPrecio] = useState(false);
 
-  // â”€â”€ Modal de DevoluciÃ³n de Calzado por Cliente (Fase 3) â”€â”€
+  // ���� Modal de Devolución de Calzado por Cliente (Fase 3) ����
   const [showDevolucionModal, setShowDevolucionModal] = useState(false);
   const [pedidoDevolucionSeleccionado, setPedidoDevolucionSeleccionado] = useState<Pedido | null>(null);
   const [devolucionItemsMap, setDevolucionItemsMap] = useState<Record<string, number>>({});
   const [devolucionDestinoStock, setDevolucionDestinoStock] = useState<'REINGRESO_INVENTARIO' | 'BAJA_POR_FALLA'>('REINGRESO_INVENTARIO');
-  const [devolucionMotivo, setDevolucionMotivo] = useState('Defecto de fÃ¡brica / GarantÃ­a');
+  const [devolucionMotivo, setDevolucionMotivo] = useState('Defecto de fábrica / Garantía');
   const [devolucionObservacion, setDevolucionObservacion] = useState('');
   const [procesandoDevolucion, setProcesandoDevolucion] = useState(false);
   const [confirmandoDevolucionPaso, setConfirmandoDevolucionPaso] = useState(false);
@@ -679,7 +679,7 @@ export default function ComercialComponent({
   const [productoSeleccionadoObj, setProductoSeleccionadoObj] = useState<any | null>(null);
   const [serieFiltroBuscador, setSerieFiltroBuscador] = useState<string>('TODAS');
 
-  // BÃºsqueda Dual Omnicanal: Modelo + Color (Fase 6)
+  // Búsqueda Dual Omnicanal: Modelo + Color (Fase 6)
   const [filtroModeloCascada, setFiltroModeloCascada] = useState<string>('');
   const [filtroColorCascada, setFiltroColorCascada] = useState<string>('');
   const [showDropdownColoresCascada, setShowDropdownColoresCascada] = useState(false);
@@ -688,15 +688,15 @@ export default function ComercialComponent({
   const colorInputRef = useRef<HTMLInputElement>(null);
   const modeloInputRef = useRef<HTMLInputElement>(null);
 
-  // Paleta de tonos visuales para pÃ­ldoras tÃ¡ctiles mÃ³viles
+  // Paleta de tonos visuales para píldoras táctiles móviles
   const getColorSwatchBg = useCallback((colName: string) => {
     const c = (colName || '').toLowerCase().trim();
     if (c.includes('negro')) return '#1e293b';
-    if (c.includes('cafÃ©') || c.includes('cafe') || c.includes('marrÃ³n') || c.includes('marron')) return '#78350f';
+    if (c.includes('café') || c.includes('cafe') || c.includes('marrón') || c.includes('marron')) return '#78350f';
     if (c.includes('miel') || c.includes('canela') || c.includes('camel') || c.includes('mostaza')) return '#d97706';
     if (c.includes('blanco')) return '#f8fafc';
     if (c.includes('azul')) return '#1d4ed8';
-    if (c.includes('vino') || c.includes('borgoÃ±a') || c.includes('guinda')) return '#831843';
+    if (c.includes('vino') || c.includes('borgoña') || c.includes('guinda')) return '#831843';
     if (c.includes('beige') || c.includes('hueso') || c.includes('crema')) return '#fde68a';
     if (c.includes('rojo')) return '#dc2626';
     if (c.includes('verde')) return '#15803d';
@@ -704,7 +704,7 @@ export default function ComercialComponent({
     return '#94a3b8';
   }, []);
 
-  // Modelos Ãºnicos para el Campo 1 (Modelo)
+  // Modelos únicos para el Campo 1 (Modelo)
   const modelosUnicosCascada = useMemo(() => {
     const map = new Map<string, { modelName: string; modelId?: string; variantes: any[]; colores: string[]; totalStock: number; imageUrl?: string; serieNombre?: string }>();
     catalogoProductos.forEach((p) => {
@@ -743,7 +743,7 @@ export default function ComercialComponent({
       const q = inputBusquedaModeloCascada.toLowerCase().trim();
       list = list.filter((m) => m.modelName.toLowerCase().includes(q));
     }
-    // Ordenar: mayor stock primero, luego alfabÃ©tico
+    // Ordenar: mayor stock primero, luego alfabético
     return list.sort((a, b) => {
       if (b.totalStock !== a.totalStock) return b.totalStock - a.totalStock;
       return a.modelName.localeCompare(b.modelName, 'es', { sensitivity: 'base' });
@@ -786,7 +786,7 @@ export default function ComercialComponent({
       list = variantesModelo.map((v) => {
         const pares = (v.tallas || []).reduce((sum: number, t: any) => sum + (t.cantidad ?? t.stock ?? 0), 0);
         return {
-          color: v.color || 'EstÃ¡ndar',
+          color: v.color || 'Estándar',
           variante: v,
           stock: pares,
           imageUrl: v.imageUrl,
@@ -800,7 +800,7 @@ export default function ComercialComponent({
         if (serieFiltroBuscador !== 'TODAS') {
           if ((p.serieNombre || '').toLowerCase().trim() !== serieFiltroBuscador.toLowerCase().trim()) return;
         }
-        const col = p.color?.trim() || 'EstÃ¡ndar';
+        const col = p.color?.trim() || 'Estándar';
         let existing = map.get(col);
         if (!existing) {
           existing = {
@@ -844,7 +844,7 @@ export default function ComercialComponent({
     return match?.imageUrl;
   }, [catalogoProductos, filtroModeloCascada]);
 
-  // CatÃ¡logo de calzado filtrado para el Buscador RÃ¡pido Profesional
+  // Catálogo de calzado filtrado para el Buscador Rápido Profesional
   const productosFiltradosBuscador = useMemo(() => {
     let list = catalogoProductos;
 
@@ -870,7 +870,7 @@ export default function ComercialComponent({
     }).slice(0, 35);
   }, [catalogoProductos, serieFiltroBuscador, busquedaModelo]);
 
-  // Mapa de cantidad total de pares vendidos por variante para ordenar de mÃ¡s vendidas a menos vendidas
+  // Mapa de cantidad total de pares vendidos por variante para ordenar de más vendidas a menos vendidas
   const ventasPorVarianteMap = useMemo(() => {
     const map = new Map<string, number>();
     pedidos.forEach((ped) => {
@@ -893,7 +893,7 @@ export default function ComercialComponent({
   const handleAplicarCupon = async () => {
     if (!codigoCuponInput.trim()) return;
     if (lineasPedido.length === 0) {
-      setCuponErrorMsg('Agrega productos al pedido antes de aplicar el cupÃ³n.');
+      setCuponErrorMsg('Agrega productos al pedido antes de aplicar el cupón.');
       return;
     }
     setValidandoCupon(true);
@@ -909,13 +909,13 @@ export default function ComercialComponent({
       });
       if (res.valido) {
         setCuponAplicado(res);
-        showToast(res.mensaje || 'Â¡CupÃ³n de descuento aplicado con Ã©xito!', 'success');
+        showToast(res.mensaje || '¡Cupón de descuento aplicado con éxito!', 'success');
       } else {
-        setCuponErrorMsg(res.mensaje || 'El cupÃ³n no es vÃ¡lido.');
+        setCuponErrorMsg(res.mensaje || 'El cupón no es válido.');
         setCuponAplicado(null);
       }
     } catch (err: any) {
-      setCuponErrorMsg(err.message || 'Error al validar cupÃ³n.');
+      setCuponErrorMsg(err.message || 'Error al validar cupón.');
       setCuponAplicado(null);
     } finally {
       setValidandoCupon(false);
@@ -986,14 +986,14 @@ export default function ComercialComponent({
     }
 
     setLineasPedido([...lineasPedido, ...lineasInter]);
-    showToast(`Â¡Calzado agregado con origen ${sucursalStockInfo.sucursalNombre}!`, 'success');
+    showToast(`¡Calzado agregado con origen ${sucursalStockInfo.sucursalNombre}!`, 'success');
   };
 
   const [ultimoPrecioCliente, setUltimoPrecioCliente] = useState<number | null>(null);
   const [fechaUltimaVenta, setFechaUltimaVenta] = useState<string | null>(null);
   const [sucursalUltimaVenta, setSucursalUltimaVenta] = useState<string | null>(null);
 
-  // Debounce de 3 segundos para la bÃºsqueda de clientes (como solicitÃ³ el usuario)
+  // Debounce de 3 segundos para la búsqueda de clientes (como solicitó el usuario)
   useEffect(() => {
     if (!busquedaCliente.trim()) {
       setBusquedaDebounced('');
@@ -1009,7 +1009,7 @@ export default function ComercialComponent({
     return () => clearTimeout(timer);
   }, [busquedaCliente]);
 
-  // Consultar Ãºltimo precio al cliente cuando cambia el producto seleccionado o el cliente (busca a nivel de MODELO en toda la red)
+  // Consultar último precio al cliente cuando cambia el producto seleccionado o el cliente (busca a nivel de MODELO en toda la red)
   useEffect(() => {
     const fetchUltimoPrecio = async () => {
       if (!clientId || !selectedProductId || !online) {
@@ -1028,7 +1028,7 @@ export default function ComercialComponent({
         setUltimoPrecioCliente(precioAnterior);
         setFechaUltimaVenta(data.fechaUltimaVenta ? new Date(data.fechaUltimaVenta).toLocaleDateString('es-EC') : null);
         setSucursalUltimaVenta(data.sucursalNombre || null);
-        // Auto-aplicar el Ãºltimo precio del cliente como precio por defecto
+        // Auto-aplicar el último precio del cliente como precio por defecto
         if (precioAnterior && precioAnterior > 0) {
           setPrecioItem(precioAnterior);
           setPrecioItemInput(String(precioAnterior));
@@ -1055,7 +1055,7 @@ export default function ComercialComponent({
   const [verificandoStockInterSucursal, setVerificandoStockInterSucursal] = useState(false);
   const [resultadoVerificacionStock, setResultadoVerificacionStock] = useState<any | null>(null);
 
-  // Modal: Cancelar / Anular Pedido con sincronizaciÃ³n automÃ¡tica
+  // Modal: Cancelar / Anular Pedido con sincronización automática
   const [pedidoParaCancelar, setPedidoParaCancelar] = useState<any | null>(null);
   const [motivoCancelacion, setMotivoCancelacion] = useState('');
   const [loadingCancelacion, setLoadingCancelacion] = useState(false);
@@ -1119,7 +1119,7 @@ export default function ComercialComponent({
     }
   };
 
-  const handleCrearNuevoTransporte = async (e: React.FormEvent) => {
+  const handleCrearNuevoTransporte = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!nuevoTransporteNombre.trim()) {
       showToast('Ingresa el nombre de la empresa de transporte.', 'warning');
@@ -1130,7 +1130,7 @@ export default function ComercialComponent({
       await ApiService.post('/configuracion/transportes', {
         nombre: nuevoTransporteNombre.trim(),
       });
-      showToast(`Â¡Transporte "${nuevoTransporteNombre.trim()}" registrado exitosamente!`, 'success');
+      showToast(`¡Transporte "${nuevoTransporteNombre.trim()}" registrado exitosamente!`, 'success');
       setCourier(nuevoTransporteNombre.trim());
       setEnvioModalCourier(nuevoTransporteNombre.trim());
       setNuevoTransporteNombre('');
@@ -1174,7 +1174,7 @@ export default function ComercialComponent({
   const handleAbrirOrdenProveedor = (item: any) => {
     setSupplierOrderProductData(item);
     
-    // Determinar si es venta por serie completa o numeraciÃ³n
+    // Determinar si es venta por serie completa o numeración
     const esMediaDocena = item.subtipoSerie === 'MEDIA_DOCENA' || item.subtipoSerie === 'MEDIA_A' || item.subtipoSerie === 'MEDIA_B';
     const esDocena = item.subtipoSerie === 'DOCENA';
     const esSerieCompleta = item.tipoVenta === 'SERIE_COMPLETA' || item.tipoVenta === 'SERIE_ESPECIAL' || esMediaDocena || esDocena;
@@ -1183,7 +1183,7 @@ export default function ComercialComponent({
     setSupplierOrderSubtipoSerie(esDocena ? 'DOCENA' : (item.subtipoSerie === 'MEDIA_B' ? 'MEDIA_B' : 'MEDIA_A'));
     setSupplierOrderCantSeries(1);
 
-    // Mapear tallas si vienen lÃ­neas especÃ­ficas
+    // Mapear tallas si vienen líneas específicas
     const mapTallas: Record<string, number> = {};
     if (item.lineas && Array.isArray(item.lineas)) {
       item.lineas.forEach((l: any) => {
@@ -1191,7 +1191,7 @@ export default function ComercialComponent({
         mapTallas[key] = (mapTallas[key] || 0) + l.cantidad;
       });
     } else {
-      // Tallas estÃ¡ndar por defecto si no vienen
+      // Tallas estándar por defecto si no vienen
       [38, 39, 40, 41, 42].forEach(num => {
         mapTallas[`Talla #${num}`] = 0;
       });
@@ -1201,7 +1201,7 @@ export default function ComercialComponent({
     setSupplierOrderCost(String(item.ultimoCostoLote || item.costPrice || (Number(item.precioUnitario) * 0.6).toFixed(2) || '15.00'));
     setSupplierOrderObservaciones('');
 
-    // SincronizaciÃ³n automÃ¡tica de proveedor al seleccionar modelo
+    // Sincronización automática de proveedor al seleccionar modelo
     const matchedProd = catalogoProductos.find((p) => p.id === item.productId || (p.modelName === item.modelName && p.color === item.color));
     const autoSupplierId = item.supplierId || item.proveedorId || matchedProd?.supplierId || matchedProd?.proveedorId || matchedProd?.suppliers?.[0]?.supplierId || matchedProd?.suppliers?.[0]?.id;
     if (autoSupplierId && listaProveedores.some(p => p.id === autoSupplierId)) {
@@ -1212,7 +1212,7 @@ export default function ComercialComponent({
     setShowSupplierOrderModal(true);
   };
 
-  const handleCrearOrdenProveedor = async (e: React.FormEvent) => {
+  const handleCrearOrdenProveedor = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedSupplierId) {
       showToast('Selecciona un proveedor para emitir la orden.', 'warning');
@@ -1243,7 +1243,7 @@ export default function ComercialComponent({
           .filter(([_, qty]) => qty > 0)
           .map(([key, qty]) => `${key}: ${qty} pares`)
           .join(', ');
-        detalleNumeracion = `Por NumeraciÃ³n: ${tallasDesglose}`;
+        detalleNumeracion = `Por Numeración: ${tallasDesglose}`;
       }
 
       const notaFinal = [
@@ -1263,7 +1263,7 @@ export default function ComercialComponent({
           },
         ],
       });
-      showToast('Â¡Orden de compra y fabricaciÃ³n enviada al proveedor exitosamente!', 'success');
+      showToast('¡Orden de compra y fabricación enviada al proveedor exitosamente!', 'success');
       setShowSupplierOrderModal(false);
       setSupplierOrderProductData(null);
     } catch (err: any) {
@@ -1466,7 +1466,7 @@ export default function ComercialComponent({
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const telefono = clienteTel || cliente?.telefono;
     if (!telefono) {
-      if (esManual) showToast('El cliente no tiene nÃºmero de telÃ©fono registrado.', 'warning');
+      if (esManual) showToast('El cliente no tiene número de teléfono registrado.', 'warning');
       return;
     }
 
@@ -1496,7 +1496,7 @@ export default function ComercialComponent({
         );
         const resolvedImg = item.imageUrl || item.producto?.imageUrl || item.variante?.imageUrl || catProd?.imageUrl || null;
         const resolvedModelName = item.modelName || item.nombre || catProd?.modelName || 'Calzado';
-        const resolvedColor = item.color || catProd?.color || 'Color estÃ¡ndar';
+        const resolvedColor = item.color || catProd?.color || 'Color estándar';
         const resolvedSerie = formatearNombreSerie(item.serieNombre || item.serie || catProd?.serieNombre || 'Serie');
         const resolvedCode = item.codigo || item.code || catProd?.code || '';
 
@@ -1526,7 +1526,7 @@ export default function ComercialComponent({
         const tallasNumeracionPdf = sortedLineas.map((l: any) => `T${resolverTallaNum(l)} (${l.cantidad})`).join(' | ');
         const notaExtra = obsItem ? ` (Nota: ${obsItem})` : '';
 
-        desgloseTexto += `\nðŸ“¦ *${resolvedModelName}* (${resolvedColor})\n   â€¢ Serie: *${resolvedSerie}*\n   â€¢ NumeraciÃ³n: ${tallasDesglose}\n   â€¢ Cantidad: *${formato}* (${totalPares} pares) x $${Number(item.precioUnitario).toFixed(2)} = *$${subtotal.toFixed(2)}*${notaExtra}`;
+        desgloseTexto += `\n�x� *${resolvedModelName}* (${resolvedColor})\n   ⬢ Serie: *${resolvedSerie}*\n   ⬢ Numeración: ${tallasDesglose}\n   ⬢ Cantidad: *${formato}* (${totalPares} pares) x $${Number(item.precioUnitario).toFixed(2)} = *$${subtotal.toFixed(2)}*${notaExtra}`;
 
         lineasComprobante.push({
           modelo: resolvedModelName,
@@ -1581,13 +1581,13 @@ export default function ComercialComponent({
     });
 
     const obsGeneral = (p as any).notas || (p as any).observaciones;
-    const obsGeneralTexto = obsGeneral && obsGeneral.trim() ? `\nðŸ“ *Observaciones:* ${obsGeneral.trim()}` : '';
+    const obsGeneralTexto = obsGeneral && obsGeneral.trim() ? `\n�x� *Observaciones:* ${obsGeneral.trim()}` : '';
 
-    // ReputaciÃ³n y condiciÃ³n de cliente para tiempo de entrega (7 a 15 dÃ­as)
+    // Reputación y condición de cliente para tiempo de entrega (7 a 15 días)
     const reputacion = getClienteReputacion(cliente);
     const esClienteHabitual = reputacion.tipo === 'VIP' || reputacion.tipo === 'CONFIABLE' || (cliente?.totalPedidos ?? 0) > 1 || (cliente?.totalVentas ?? 0) > 0;
     
-    // Identificar si el pedido contiene lÃ­neas sin stock fÃ­sico inmediato o estÃ¡ en espera de producciÃ³n
+    // Identificar si el pedido contiene líneas sin stock físico inmediato o está en espera de producción
     const haySinStock = (p.lines || []).some((l: any) => {
       const stockDisp = l.stockFisico !== undefined ? l.stockFisico : (l.stockDisponible !== undefined ? l.stockDisponible : 999);
       return stockDisp < (l.cantidad || 1);
@@ -1598,23 +1598,23 @@ export default function ComercialComponent({
     let tiempoEntregaTexto = '';
     if (haySinStock) {
       if (esClienteHabitual) {
-        tiempoEntregaTexto = '\nâ³ *Tiempo Estimado de Entrega:* 7 a 15 dÃ­as laborables (ConfecciÃ³n en fÃ¡brica iniciada de inmediato por ser cliente habitual).';
+        tiempoEntregaTexto = '\n⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables (Confección en fábrica iniciada de inmediato por ser cliente habitual).';
       } else if (tieneAbono) {
-        tiempoEntregaTexto = '\nâ³ *Tiempo Estimado de Entrega:* 7 a 15 dÃ­as laborables (ConfecciÃ³n en fÃ¡brica iniciada tras confirmaciÃ³n de su anticipo).';
+        tiempoEntregaTexto = '\n⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables (Confección en fábrica iniciada tras confirmación de su anticipo).';
       } else {
-        tiempoEntregaTexto = '\nâ³ *Tiempo Estimado de Entrega:* 7 a 15 dÃ­as laborables una vez confirmado el anticipo para iniciar la producciÃ³n en fÃ¡brica.';
+        tiempoEntregaTexto = '\n⏳ *Tiempo Estimado de Entrega:* 7 a 15 días laborables una vez confirmado el anticipo para iniciar la producción en fábrica.';
       }
     }
 
-    let desgloseFinancieroTexto = `\nðŸ’° *VALOR TOTAL:* $${totalPagar.toFixed(2)}`;
+    let desgloseFinancieroTexto = `\n�x� *VALOR TOTAL:* $${totalPagar.toFixed(2)}`;
     if (montoAdelanto > 0) {
-      desgloseFinancieroTexto = `\nðŸ’° *VALOR TOTAL:* $${totalPagar.toFixed(2)}\nðŸ’µ *ANTICIPO RECIBIDO (${(p as any).metodoAdelanto || 'EFECTIVO'}):* -$${montoAdelanto.toFixed(2)}\nâ³ *SALDO PENDIENTE A LA ENTREGA:* *$${saldoPendiente.toFixed(2)}*`;
+      desgloseFinancieroTexto = `\n�x� *VALOR TOTAL:* $${totalPagar.toFixed(2)}\n�x� *ANTICIPO RECIBIDO (${(p as any).metodoAdelanto || 'EFECTIVO'}):* -$${montoAdelanto.toFixed(2)}\n⏳ *SALDO PENDIENTE A LA ENTREGA:* *$${saldoPendiente.toFixed(2)}*`;
     }
 
-    const contactoSucursal = emisorData.telefono ? `\nðŸ“ž *Contacto / WhatsApp:* ${emisorData.telefono}` : '';
-    const direccionSucursal = emisorData.direccion ? `\nðŸ“ *UbicaciÃ³n:* ${emisorData.direccion}` : '';
+    const contactoSucursal = emisorData.telefono ? `\n�x~ *Contacto / WhatsApp:* ${emisorData.telefono}` : '';
+    const direccionSucursal = emisorData.direccion ? `\n�x� *Ubicación:* ${emisorData.direccion}` : '';
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepciÃ³n de su pedido:\n\nðŸ“¦ *PEDIDO ${numPedido}*\nðŸ“… *Fecha:* ${fecha}\nðŸ’³ *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\nðŸšš *EnvÃ­o:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (GuÃ­a: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\nðŸ‘Ÿ *DETALLE DE ARTÃCULOS:*${desgloseTexto || '\nâ€¢ ' + (p.lines?.length || 1) + ' Ã­tems'}\n\nðŸ“Š *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares${desgloseFinancieroTexto}\n\nðŸ“¥ *Descarga aquÃ­ tu comprobante oficial de pedido:*\nðŸ‘‰ ${urlComprobante}\n\nPor favor, confÃ­rmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparaciÃ³n y entrega. Â¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*. Confirmamos la recepción de su pedido:\n\n📋 *PEDIDO ${numPedido}*\n📅 *Fecha:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}${obsGeneralTexto}${tiempoEntregaTexto}\n\n👟 *DETALLE DE ARTÍCULOS:*${desgloseTexto || '\n⬢ ' + (p.lines?.length || 1) + ' ítems'}\n\n📦 *Total pares pedidos:* ${(p.lines || []).reduce((sum: number, l: any) => sum + (l.cantidad || 0), 0)} pares${desgloseFinancieroTexto}\n\n📥 *Descarga aquí tu comprobante oficial de pedido:*\n🔗 ${urlComprobante}\n\nPor favor, confírmenos respondiendo a este mensaje con un *"Confirmado"* o *"OK"* para proceder con la preparación y entrega. ¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
 
     const autoEmailLocal = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') : null;
     const autoEmail = autoEmailLocal !== null ? autoEmailLocal === 'true' : (businessConfig?.autoEmailHabilitado ?? false);
@@ -1626,13 +1626,13 @@ export default function ComercialComponent({
       return;
     }
 
-    // EnvÃ­o automÃ¡tico por Correo en segundo plano si estÃ¡ activo y el cliente tiene email
+    // Envío automático por Correo en segundo plano si está activo y el cliente tiene email
     const emailDestino = cliente?.email || (p as any).clienteEmail || (p as any).email;
     let enviadoCorreo = false;
     if (autoEmail && emailDestino) {
       ApiService.post('/notificaciones/email-comprobante', {
         destinatario: emailDestino,
-        asunto: `Comprobante de Pedido ${numPedido} â€” ${negocioNombre}`,
+        asunto: `Comprobante de Pedido ${numPedido} � ${negocioNombre}`,
         tipo: 'PEDIDO',
         detalles: {
           mensaje,
@@ -1659,7 +1659,7 @@ export default function ComercialComponent({
     const cliente = listaClientes.find((c) => c.id === p.clientId);
     const telefono = clienteTel || cliente?.telefono;
     if (!telefono) {
-      if (esManual) showToast('El cliente no tiene nÃºmero de telÃ©fono registrado para WhatsApp.', 'warning');
+      if (esManual) showToast('El cliente no tiene número de teléfono registrado para WhatsApp.', 'warning');
       return;
     }
 
@@ -1689,7 +1689,7 @@ export default function ComercialComponent({
         );
         const resolvedImg = item.imageUrl || item.producto?.imageUrl || item.variante?.imageUrl || catProd?.imageUrl || null;
         const resolvedModelName = item.modelName || item.nombre || catProd?.modelName || 'Calzado';
-        const resolvedColor = item.color || catProd?.color || 'Color estÃ¡ndar';
+        const resolvedColor = item.color || catProd?.color || 'Color estándar';
         const resolvedSerie = formatearNombreSerie(item.serieNombre || item.serie || catProd?.serieNombre || 'Serie');
         const resolvedCode = item.codigo || item.code || catProd?.code || '';
 
@@ -1715,7 +1715,7 @@ export default function ComercialComponent({
           return '?';
         };
 
-        // Ordenar tallas numÃ©ricamente y construir desglose legible
+        // Ordenar tallas numéricamente y construir desglose legible
         const sortedLineas = [...lineas].sort((a, b) => (Number(resolverTallaNum(a)) || 0) - (Number(resolverTallaNum(b)) || 0));
         const tallasDesglose = sortedLineas.map((l: any) => {
           const cEnt = l.cantidadEntregada !== undefined ? l.cantidadEntregada : l.cantidad;
@@ -1728,7 +1728,7 @@ export default function ComercialComponent({
         }).join(' | ');
         const notaExtra = obsItem ? ` (Nota: ${obsItem})` : '';
 
-        desgloseTexto += `\nðŸ“¦ *${resolvedModelName}* (${resolvedColor})\n   â€¢ Serie: *${resolvedSerie}*\n   â€¢ Tallas entregadas: ${tallasDesglose}\n   â€¢ Cantidad acumulada: *${formato}* (${totalParesEntregados}/${totalParesSolicitados} pares) x $${Number(item.precioUnitario).toFixed(2)} = *$${subtotal.toFixed(2)}*${notaExtra}`;
+        desgloseTexto += `\n�x� *${resolvedModelName}* (${resolvedColor})\n   ⬢ Serie: *${resolvedSerie}*\n   ⬢ Tallas entregadas: ${tallasDesglose}\n   ⬢ Cantidad acumulada: *${formato}* (${totalParesEntregados}/${totalParesSolicitados} pares) x $${Number(item.precioUnitario).toFixed(2)} = *$${subtotal.toFixed(2)}*${notaExtra}`;
 
         lineasComprobante.push({
           modelo: resolvedModelName,
@@ -1778,13 +1778,13 @@ export default function ComercialComponent({
       },
     });
 
-    const estadoTexto = esEntregaTotal ? 'âœ… *ENTREGA COMPLETADA (100%)*' : 'ðŸ“¦ *ENTREGA PARCIAL REALIZADA*';
-    const pendienteTexto = !esEntregaTotal ? `\nâ³ *Pares pendientes por entregar:* ${Math.max(0, totalParesPedidoGeneral - totalParesEntregadosGeneral)} pares` : '';
+    const estadoTexto = esEntregaTotal ? '�✅ *ENTREGA COMPLETADA (100%)*' : '�x� *ENTREGA PARCIAL REALIZADA*';
+    const pendienteTexto = !esEntregaTotal ? `\n⏳ *Pares pendientes por entregar:* ${Math.max(0, totalParesPedidoGeneral - totalParesEntregadosGeneral)} pares` : '';
 
-    const contactoSucursal = emisorData.telefono ? `\nðŸ“ž *Contacto / WhatsApp:* ${emisorData.telefono}` : '';
-    const direccionSucursal = emisorData.direccion ? `\nðŸ“ *UbicaciÃ³n:* ${emisorData.direccion}` : '';
+    const contactoSucursal = emisorData.telefono ? `\n�x~ *Contacto / WhatsApp:* ${emisorData.telefono}` : '';
+    const direccionSucursal = emisorData.direccion ? `\n�x� *Ubicación:* ${emisorData.direccion}` : '';
 
-    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\nðŸ“„ *PEDIDO ${numPedido}*\nðŸ“… *Fecha de Entrega:* ${fecha}\nðŸ’³ *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\nðŸšš *EnvÃ­o:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (GuÃ­a: ${p.guiaEnvio})` : ''}` : ''}\n\nðŸ‘Ÿ *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\nâ€¢ ' + (p.lines?.length || 1) + ' Ã­tems'}\n\nðŸ“Š *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\nðŸ’° *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\nðŸ“¥ *Descarga aquÃ­ tu comprobante oficial de entrega en PDF:*\nðŸ‘‰ ${urlComprobante}\n\nÂ¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
+    const mensaje = `Estimado/a *${clienteNombre}*,\n\nLe saludamos de *${negocioNombre}*.\n\nLe notificamos que se ha registrado la entrega de su pedido:\n\n${estadoTexto}\n📋 *PEDIDO ${numPedido}*\n📅 *Fecha de Entrega:* ${fecha}\n💳 *Forma de Pago:* ${p.tipoPago || 'Contado'}${p.tipoEntrega === 'ENVIO' ? `\n🚚 *Envío:* ${p.courier || 'Transporte'}${p.guiaEnvio ? ` (Guía: ${p.guiaEnvio})` : ''}` : ''}\n\n👟 *DETALLE DE CALZADO ENTREGADO:*${desgloseTexto || '\n⬢ ' + (p.lines?.length || 1) + ' ítems'}\n\n📦 *Total pares entregados acumulados:* ${totalParesEntregadosGeneral} de ${totalParesPedidoGeneral} pares${pendienteTexto}\n💰 *Total pedido:* $${Number(p.montoTotal).toFixed(2)}\n\n📥 *Descarga aquí tu comprobante oficial de entrega en PDF:*\n🔗 ${urlComprobante}\n\n¡Muchas gracias por su preferencia!\n*${negocioNombre}*${contactoSucursal}${direccionSucursal}`;
 
     const autoEmailLocal = typeof window !== 'undefined' ? localStorage.getItem('nexora_auto_email_comprobante') : null;
     const autoEmail = autoEmailLocal !== null ? autoEmailLocal === 'true' : (businessConfig?.autoEmailHabilitado ?? false);
@@ -1796,13 +1796,13 @@ export default function ComercialComponent({
       return;
     }
 
-    // EnvÃ­o automÃ¡tico por Correo en segundo plano si estÃ¡ activo y el cliente tiene email
+    // Envío automático por Correo en segundo plano si está activo y el cliente tiene email
     const emailDestino = cliente?.email || (p as any).clienteEmail || (p as any).email;
     let enviadoCorreo = false;
     if (autoEmail && emailDestino) {
       ApiService.post('/notificaciones/email-comprobante', {
         destinatario: emailDestino,
-        asunto: `Comprobante de Entrega de Pedido ${numPedido} â€” ${negocioNombre}`,
+        asunto: `Comprobante de Entrega de Pedido ${numPedido} � ${negocioNombre}`,
         tipo: 'PEDIDO',
         detalles: {
           mensaje,
@@ -1855,7 +1855,7 @@ export default function ComercialComponent({
         setCatalogoProductos(flat);
       }
     } catch (e) {
-      console.error('Error cargando catÃ¡logo para nuevo pedido:', e);
+      console.error('Error cargando catálogo para nuevo pedido:', e);
     }
   };
 
@@ -1887,7 +1887,7 @@ export default function ComercialComponent({
             };
           });
 
-          // Ordenar alfabÃ©ticamente por apellido/nombre
+          // Ordenar alfabéticamente por apellido/nombre
           clientesFormateados.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
           setListaClientes(clientesFormateados);
         }
@@ -1933,7 +1933,7 @@ export default function ComercialComponent({
       setInputBusquedaModeloCascada('');
       setShowDropdownModelosCascada(false);
       setShowDropdownColoresCascada(false);
-      // Usar salePrice del catÃ¡logo como precio base siempre
+      // Usar salePrice del catálogo como precio base siempre
       const precioCatalogo = Number(pObj.salePrice) || Number(pObj.costPrice) || 0;
       setPrecioItem(precioCatalogo);
       setPrecioItemInput(precioCatalogo > 0 ? String(precioCatalogo) : '');
@@ -1946,7 +1946,7 @@ export default function ComercialComponent({
           curvaBase = 'MEDIA_A';
         }
         
-        // Consultar endpoint de alternancia automÃ¡tica inteligente (Fase 5.1)
+        // Consultar endpoint de alternancia automática inteligente (Fase 5.1)
         ApiService.get(`/pedidos/curva-sugerida?productId=${pObjSorted.id}${pObjSorted.modelId ? `&modelId=${pObjSorted.modelId}` : ''}`)
           .then((res: any) => {
             if (res && res.curvaSugerida) {
@@ -2060,16 +2060,16 @@ export default function ComercialComponent({
       if (coincidentes.length > 0) {
         const tallasNombres = coincidentes.map((c) => `T${c.numeroTalla}`).join(', ');
         showToast(
-          `âš ï¸ Advertencia: ${prodObj.modelName} (${tallasNombres}) ya consta en el pedido vigente ${getNumeroPedido(alertaPedidoDuplicado.pedidoExistente)} de este cliente. Verifica si no se trata de un pedido duplicado.`,
+          `�a�️ Advertencia: ${prodObj.modelName} (${tallasNombres}) ya consta en el pedido vigente ${getNumeroPedido(alertaPedidoDuplicado.pedidoExistente)} de este cliente. Verifica si no se trata de un pedido duplicado.`,
           'warning'
         );
       }
     }
 
     setLineasPedido([...lineasPedido, ...lineasAgregadas]);
-    showToast(`Â¡${prodObj.modelName} agregado al pedido!`, 'success');
+    showToast(`¡${prodObj.modelName} agregado al pedido!`, 'success');
 
-    // Limpiar selecciÃ³n de producto y observaciÃ³n del modelo
+    // Limpiar selección de producto y observación del modelo
     setSelectedProductId('');
     setProductoSeleccionadoObj(null);
     setBusquedaModelo('');
@@ -2109,7 +2109,7 @@ export default function ComercialComponent({
       setReferenciaAdelanto('');
     }
 
-    // LogÃ­stica
+    // Logística
     setTipoEntrega(p.tipoEntrega || 'PRESENCIAL');
     setAsumeFlete(p.asumeFlete === 'EMPRESA' ? 'EMPRESA' : 'CLIENTE');
     setCostoEnvio(p.costoEnvio ? String(p.costoEnvio) : '5.00');
@@ -2169,13 +2169,13 @@ export default function ComercialComponent({
         ciudadEnvio: envioModalTipoEntrega === 'ENVIO' ? envioModalCiudadEnvio.trim() || undefined : undefined,
       });
 
-      showToast('Â¡LogÃ­stica de entrega actualizada con Ã©xito!', 'success');
+      showToast('¡Logística de entrega actualizada con éxito!', 'success');
       setShowModalEnvio(false);
       setPedidoEnvioSeleccionado(null);
       await loadPedidos();
     } catch (err: any) {
-      console.error('Error al actualizar logÃ­stica:', err);
-      showToast(err.message || 'Error al actualizar logÃ­stica de envÃ­o', 'error');
+      console.error('Error al actualizar logística:', err);
+      showToast(err.message || 'Error al actualizar logística de envío', 'error');
     } finally {
       setSavingEnvioModal(false);
     }
@@ -2210,7 +2210,7 @@ export default function ComercialComponent({
         referenciaAdelanto: monto > 0 ? modalAdelantoRef.trim() || undefined : undefined,
       });
 
-      showToast(monto > 0 ? `Â¡Anticipo de $${monto.toFixed(2)} registrado correctamente!` : 'Anticipo retirado exitosamente', 'success');
+      showToast(monto > 0 ? `¡Anticipo de $${monto.toFixed(2)} registrado correctamente!` : 'Anticipo retirado exitosamente', 'success');
       setShowModalAdelanto(false);
       setPedidoAdelantoSeleccionado(null);
       await loadPedidos();
@@ -2228,7 +2228,7 @@ export default function ComercialComponent({
       return;
     }
     if (lineasPedido.length === 0) {
-      setErrorMsg('Debes agregar al menos una lÃ­nea de producto al pedido.');
+      setErrorMsg('Debes agregar al menos una línea de producto al pedido.');
       return;
     }
 
@@ -2277,21 +2277,21 @@ export default function ComercialComponent({
 
       if (editingOrderId) {
         await ApiService.put(`/pedidos/${editingOrderId}`, payload);
-        showToast('Â¡Pedido actualizado exitosamente!', 'success');
+        showToast('¡Pedido actualizado exitosamente!', 'success');
       } else {
         const res = await ApiService.post('/pedidos', payload);
-        // Si se aplicÃ³ cupÃ³n, registrar el canje
+        // Si se aplicó cupón, registrar el canje
         if (cuponAplicado && cuponAplicado.promocion?.codigo) {
           try {
             await ApiService.post('/clientes/promociones/canjear', {
               codigo: cuponAplicado.promocion.codigo,
             });
           } catch (e) {
-            console.warn('Error registrando canje de cupÃ³n:', e);
+            console.warn('Error registrando canje de cupón:', e);
           }
         }
 
-        // Si el cliente tiene telÃ©fono registrado, abrir confirmaciÃ³n por WhatsApp
+        // Si el cliente tiene teléfono registrado, abrir confirmación por WhatsApp
         const clienteInfo = listaClientes.find((c) => c.id === clientId);
         if (clienteInfo?.telefono) {
           const subtotalTotal = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
@@ -2351,7 +2351,7 @@ export default function ComercialComponent({
       await loadPedidos();
     } catch (err: any) {
       console.error('Error al guardar pedido:', err);
-      const msg = err.message || 'Error al guardar el pedido. Verifica el stock o el lÃ­mite de crÃ©dito.';
+      const msg = err.message || 'Error al guardar el pedido. Verifica el stock o el límite de crédito.';
       setErrorMsg(msg);
       showToast(msg, 'warning', 5000);
     } finally {
@@ -2427,7 +2427,7 @@ export default function ComercialComponent({
     }
   };
 
-  // Handler: Abrir modal de prÃ©stamo inter-sucursal para pedidos EN_ESPERA_STOCK
+  // Handler: Abrir modal de préstamo inter-sucursal para pedidos EN_ESPERA_STOCK
   const handleAbrirInterSucursal = (pedido: any) => {
     setPedidoInterSucursal(pedido);
     setInterSucursalOrigenId('');
@@ -2460,10 +2460,10 @@ export default function ComercialComponent({
     }
   };
 
-  // Handler: Confirmar y ejecutar prÃ©stamo inter-sucursal
+  // Handler: Confirmar y ejecutar préstamo inter-sucursal
   const handleConfirmarInterSucursal = async () => {
     if (!pedidoInterSucursal || !interSucursalOrigenId) {
-      showToast('Selecciona la sucursal de origen para el prÃ©stamo de mercaderÃ­a.', 'warning');
+      showToast('Selecciona la sucursal de origen para el préstamo de mercadería.', 'warning');
       return;
     }
     if (resultadoVerificacionStock && !resultadoVerificacionStock.tieneStockCompleto) {
@@ -2477,7 +2477,7 @@ export default function ComercialComponent({
         modalidad: interSucursalModalidad,
         notas: interSucursalNotas.trim() || undefined,
       });
-      showToast(res.message || 'PrÃ©stamo inter-sucursal registrado con Ã©xito. El pedido avanzÃ³ a PreparaciÃ³n.', 'success');
+      showToast(res.message || 'Préstamo inter-sucursal registrado con éxito. El pedido avanzó a Preparación.', 'success');
       setModalInterSucursalPedido(false);
       setPedidoInterSucursal(null);
       setResultadoVerificacionStock(null);
@@ -2489,13 +2489,13 @@ export default function ComercialComponent({
     }
   };
 
-  // Handler: Abrir modal de cancelaciÃ³n sincronizada
+  // Handler: Abrir modal de cancelación sincronizada
   const handleAbrirCancelarPedido = (p: any) => {
     setPedidoParaCancelar(p);
     setMotivoCancelacion('');
   };
 
-  // Handler: Confirmar anulaciÃ³n y revertir prÃ©stamos/reservas de forma sincronizada
+  // Handler: Confirmar anulación y revertir préstamos/reservas de forma sincronizada
   const handleConfirmarCancelarPedido = async () => {
     if (!pedidoParaCancelar) return;
     setLoadingCancelacion(true);
@@ -2504,10 +2504,10 @@ export default function ComercialComponent({
         estado: 'CANCELADO',
         motivo: motivoCancelacion.trim() || 'Cancelado por el cliente/usuario',
       });
-      const teniaPrestamo = pedidoParaCancelar.notas?.includes('[PrÃ©stamo Inter-Sucursal]');
+      const teniaPrestamo = pedidoParaCancelar.notas?.includes('[Préstamo Inter-Sucursal]');
       showToast(
         teniaPrestamo
-          ? 'Pedido cancelado. El prÃ©stamo fue revertido y el stock sincronizado en la sucursal prestamista.'
+          ? 'Pedido cancelado. El préstamo fue revertido y el stock sincronizado en la sucursal prestamista.'
           : 'Pedido anulado exitosamente.',
         'success'
       );
@@ -2545,7 +2545,7 @@ export default function ComercialComponent({
         estadoSync: 'PENDIENTE',
       });
 
-      showToast('Pedido guardado localmente (Offline). Se sincronizarÃ¡ al volver la conexiÃ³n.', 'info');
+      showToast('Pedido guardado localmente (Offline). Se sincronizará al volver la conexión.', 'info');
       setShowModal(false);
       setClientId('');
       setClienteSeleccionado(null);
@@ -2561,7 +2561,7 @@ export default function ComercialComponent({
   const handleAbrirEntrega = async (p: Pedido) => {
     const pedidoTenantId = (p as any).tenantId || (p as any).sucursalId;
     if (pedidoTenantId && miLocalId && pedidoTenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
-      showToast(`Solo la sucursal asignada a este pedido (${p.sucursalNombre || 'sucursal propietaria'}) puede registrar la entrega fÃ­sica de la mercaderÃ­a.`, 'warning');
+      showToast(`Solo la sucursal asignada a este pedido (${p.sucursalNombre || 'sucursal propietaria'}) puede registrar la entrega física de la mercadería.`, 'warning');
       return;
     }
 
@@ -2706,7 +2706,7 @@ export default function ComercialComponent({
       const precioNum = parseFloat(valorStr);
       if (isNaN(precioNum) || precioNum <= 0) {
         const desc = m.serieNombre ? `"${m.modelName} (${m.serieNombre})"` : `"${m.modelName}"`;
-        showToast(`Ingresa un precio vÃ¡lido mayor a 0 para el modelo ${desc}`, 'warning');
+        showToast(`Ingresa un precio válido mayor a 0 para el modelo ${desc}`, 'warning');
         return;
       }
       itemsAEnviar.push({
@@ -2738,7 +2738,7 @@ export default function ComercialComponent({
     }
   };
 
-  // â”€â”€ Handlers de ReversiÃ³n / CorrecciÃ³n de Entrega ErrÃ³nea (Fase 2) â”€â”€
+  // ���� Handlers de Reversión / Corrección de Entrega Errónea (Fase 2) ����
   const handleAbrirRevertirEntrega = async (p: Pedido) => {
     const pedidoTenantId = (p as any).tenantId || (p as any).sucursalId;
     if (pedidoTenantId && miLocalId && pedidoTenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
@@ -2754,7 +2754,7 @@ export default function ComercialComponent({
       }
     } catch (e) {}
 
-    // Auto-sanar pedidos existentes cuyo estado es ENTREGADO pero lines tenÃ­an cantidadEntregada en 0
+    // Auto-sanar pedidos existentes cuyo estado es ENTREGADO pero lines tenían cantidadEntregada en 0
     const linesNormalizadas = (orderToUse.lines || []).map((l: any) => {
       const yaEntregado = (l.cantidadEntregada !== undefined && l.cantidadEntregada !== null && l.cantidadEntregada > 0)
         ? l.cantidadEntregada
@@ -2795,10 +2795,10 @@ export default function ComercialComponent({
     try {
       const res = await ApiService.put(`/pedidos/${pedidoRevertirSeleccionado.id}/revertir-entrega`, {
         items,
-        motivo: motivoReversion || 'CorrecciÃ³n de entrega errÃ³nea',
+        motivo: motivoReversion || 'Corrección de entrega errónea',
       });
 
-      showToast(res.message || `ReversiÃ³n exitosa: se restituyeron ${totalPares} pares al inventario.`, 'success');
+      showToast(res.message || `Reversión exitosa: se restituyeron ${totalPares} pares al inventario.`, 'success');
       setShowRevertirEntregaModal(false);
       setPedidoRevertirSeleccionado(null);
       setRevertirItemsMap({});
@@ -2807,13 +2807,13 @@ export default function ComercialComponent({
       await loadPedidos();
       await loadListaClientes();
     } catch (err: any) {
-      showToast(err.message || 'Error al revertir la entrega errÃ³nea', 'error');
+      showToast(err.message || 'Error al revertir la entrega errónea', 'error');
     } finally {
       setProcesandoReversion(false);
     }
   };
 
-  // â”€â”€ Handlers de DevoluciÃ³n de Calzado por Cliente (Fase 3) â”€â”€
+  // ���� Handlers de Devolución de Calzado por Cliente (Fase 3) ����
   const handleAbrirDevolucion = async (p: Pedido) => {
     const pedidoTenantId = (p as any).tenantId || (p as any).sucursalId;
     if (pedidoTenantId && miLocalId && pedidoTenantId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN') {
@@ -2853,7 +2853,7 @@ export default function ComercialComponent({
     });
     setDevolucionItemsMap(initialMap);
     setDevolucionDestinoStock('REINGRESO_INVENTARIO');
-    setDevolucionMotivo('Defecto de fÃ¡brica / GarantÃ­a');
+    setDevolucionMotivo('Defecto de fábrica / Garantía');
     setDevolucionObservacion('');
     setConfirmandoDevolucionPaso(false);
     setShowDevolucionModal(true);
@@ -2870,7 +2870,7 @@ export default function ComercialComponent({
       }));
 
     if (items.length === 0) {
-      showToast('Selecciona al menos 1 par para procesar la devoluciÃ³n.', 'warning');
+      showToast('Selecciona al menos 1 par para procesar la devolución.', 'warning');
       return;
     }
 
@@ -2888,7 +2888,7 @@ export default function ComercialComponent({
         items,
       });
 
-      showToast(res.message || `DevoluciÃ³n exitosa: se procesaron ${totalPares} pares.`, 'success');
+      showToast(res.message || `Devolución exitosa: se procesaron ${totalPares} pares.`, 'success');
       setShowDevolucionModal(false);
       setPedidoDevolucionSeleccionado(null);
       setDevolucionItemsMap({});
@@ -2897,13 +2897,13 @@ export default function ComercialComponent({
       await loadPedidos();
       await loadListaClientes();
     } catch (err: any) {
-      showToast(err.message || 'Error al procesar la devoluciÃ³n del cliente', 'error');
+      showToast(err.message || 'Error al procesar la devolución del cliente', 'error');
     } finally {
       setProcesandoDevolucion(false);
     }
   };
 
-    // â”€â”€ Identificador del local propio del usuario â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ���� Identificador del local propio del usuario ������������������
   const miLocalId = useMemo(() => {
     if (activeSucursalId && activeSucursalId !== 'TODAS') return activeSucursalId;
     if (typeof window !== 'undefined') {
@@ -2917,7 +2917,7 @@ export default function ComercialComponent({
     return '';
   }, [activeSucursalId]);
 
-  // â”€â”€ Lista DinÃ¡mica de Sucursales para Pedidos â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ���� Lista Dinámica de Sucursales para Pedidos ������������������
   const listaSucursalesDisponibles = useMemo(() => {
     const map = new Map<string, { id: string; name: string; isMatriz: boolean }>();
     if (sucursalesEmpresa && sucursalesEmpresa.length > 0) {
@@ -2947,7 +2947,7 @@ export default function ComercialComponent({
     const miLocalItem = res.find((s) => s.id === miLocalId);
     const otrasSucursales = res.filter((s) => s.id !== miLocalId);
 
-    // El resto de sucursales a la derecha: matriz primero, luego alfabÃ©tico
+    // El resto de sucursales a la derecha: matriz primero, luego alfabético
     otrasSucursales.sort((a, b) => {
       if (a.isMatriz && !b.isMatriz) return -1;
       if (!a.isMatriz && b.isMatriz) return 1;
@@ -2977,14 +2977,14 @@ export default function ComercialComponent({
         return true;
       }
 
-      // Si estoy en la pestaÃ±a de OTRA sucursal:
-      // ÃšNICAMENTE puedo ver los pedidos que MI LOCAL creÃ³ en esta otra sucursal.
+      // Si estoy en la pestaña de OTRA sucursal:
+      // �aNICAMENTE puedo ver los pedidos que MI LOCAL creó en esta otra sucursal.
       const pCreadorTenant = (p as any).creadoPorSucursalId;
       return pCreadorTenant && pCreadorTenant === miLocalId;
     });
   }, [pedidos, selectedSucursalPedidoId, listaSucursalesDisponibles, miLocalId, userRole, activeSucursalId]);
 
-  // Fecha del primer pedido registrado en la sucursal seleccionada (lÃ­mite inferior estricto)
+  // Fecha del primer pedido registrado en la sucursal seleccionada (límite inferior estricto)
   const fechaMinimaHistorica = useMemo(() => {
     if (pedidosDeSucursal.length === 0) return '';
     const fechas = pedidosDeSucursal
@@ -2999,7 +2999,7 @@ export default function ComercialComponent({
 
   const pedidosFiltrados = useMemo(() => {
     return pedidosDeSucursal.filter((p) => {
-      // 1. Filtro por los 4 Estados CanÃ³nicos de la Tesis o Acceso RÃ¡pido 'TODOS'
+      // 1. Filtro por los 4 Estados Canónicos de la Tesis o Acceso Rápido 'TODOS'
       if (filtroEstadoTesis === 'PENDIENTE' && p.estado !== 'PENDIENTE') {
         return false;
       }
@@ -3017,7 +3017,7 @@ export default function ComercialComponent({
         return false;
       }
 
-      // 2. Filtro por fecha: aplica en Acceso RÃ¡pido 'TODOS' y en Estado 'ENTREGADO' cuando no estÃ¡ activo verTodoElHistorial
+      // 2. Filtro por fecha: aplica en Acceso Rápido 'TODOS' y en Estado 'ENTREGADO' cuando no está activo verTodoElHistorial
       const aplicaFiltroFecha = (filtroEstadoTesis === 'TODOS' || filtroEstadoTesis === 'ENTREGADO') && !verTodoElHistorial;
       if (aplicaFiltroFecha) {
         const raw = (p as any).fecha || p.createdAt;
@@ -3046,7 +3046,7 @@ export default function ComercialComponent({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="font-extrabold text-xl tracking-tight text-[var(--foreground)]">
-              GestiÃ³n de Pedidos
+              Gestión de Pedidos
             </h2>
             {estrategia && (
               <span
@@ -3057,18 +3057,18 @@ export default function ComercialComponent({
                 }`}
               >
                 {estrategia.estrategiaComercialTipo === 'DINAMICO'
-                  ? `DinÃ¡mico (${estrategia.temporadaEfectiva})`
-                  : 'EstÃ¡ndar'}
+                  ? `Dinámico (${estrategia.temporadaEfectiva})`
+                  : 'Estándar'}
               </span>
             )}
           </div>
           <p className="text-xs text-[var(--muted-foreground)] font-medium">
-            Control de flujo operativo, estados de preparaciÃ³n y entrega
+            Control de flujo operativo, estados de preparación y entrega
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-          {/* BotÃ³n de ExportaciÃ³n de Pendientes de Entrega */}
+          {/* Botón de Exportación de Pendientes de Entrega */}
           <button
             type="button"
             onClick={handleExportarPendientesEntregaPdf}
@@ -3077,8 +3077,7 @@ export default function ComercialComponent({
             className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50"
           >
             {exportandoPendientesPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-            <span>Exportar Pendientes de Entrega</span>
-          </button>
+            <span>Exportar Pendientes de Entrega</span>−</button>
 
         <button
           onClick={() => {
@@ -3108,7 +3107,7 @@ export default function ComercialComponent({
             const esOtraSucursal = sucActiva && sucActiva.id !== activeSucursalId;
             return sucActiva ? (
               <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${esOtraSucursal ? 'bg-amber-400/30 text-amber-200' : 'bg-emerald-500/30 text-emerald-300'}`}>
-                {esOtraSucursal ? 'ðŸ“ ' : ''}{sucActiva.name}
+                {esOtraSucursal ? '�x� ' : ''}{sucActiva.name}
               </span>
             ) : null;
           })()}
@@ -3116,9 +3115,9 @@ export default function ComercialComponent({
         </div>
       </div>
 
-      {/* PestaÃ±as DinÃ¡micas de Sucursal & Filtros de Estado */}
+      {/* Pestañas Dinámicas de Sucursal & Filtros de Estado */}
       <div className="space-y-2.5">
-        {/* PestaÃ±as de Sucursal DinÃ¡micas por Nombre (Una pestaÃ±a por cada sucursal del negocio) */}
+        {/* Pestañas de Sucursal Dinámicas por Nombre (Una pestaña por cada sucursal del negocio) */}
         {listaSucursalesDisponibles.length >= 1 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--muted-foreground)] shrink-0 hidden sm:inline-block">
@@ -3140,7 +3139,7 @@ export default function ComercialComponent({
                     return true;
                   }
 
-                  // PestaÃ±a ajena: solo cuenta los pedidos creados por mi local
+                  // Pestaña ajena: solo cuenta los pedidos creados por mi local
                   const pCreadorTenant = (p as any).creadoPorSucursalId;
                   return pCreadorTenant && pCreadorTenant === miLocalId;
                 }).length;
@@ -3178,15 +3177,14 @@ export default function ComercialComponent({
                       isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
                     }`}>
                       {countPedidos}
-                    </span>
-                  </button>
+                    </span>−</button>
                 );
               })}
             </div>
           </div>
         )}
 
-        {/* Conteo de los 4 Estados CanÃ³nicos de la Tesis */}
+        {/* Conteo de los 4 Estados Canónicos de la Tesis */}
         {(() => {
           const countPendiente = pedidosDeSucursal.filter((p) => p.estado === 'PENDIENTE').length;
           const countEnPreparacion = pedidosDeSucursal.filter((p) => p.estado === 'EN_PREPARACION' || p.estado === 'EN_ESPERA_STOCK').length;
@@ -3205,7 +3203,7 @@ export default function ComercialComponent({
                   Estados del Ciclo:
                 </span>
 
-                {/* BOTÃ“N TODOS REUBICADO */}
+                {/* BOT�N TODOS REUBICADO */}
                 <button
                   type="button"
                   title="Consultar todos los pedidos de la sucursal"
@@ -3218,8 +3216,7 @@ export default function ComercialComponent({
                 >
                   <Layers size={12} className={filtroEstadoTesis === 'TODOS' ? 'text-amber-400' : 'text-slate-400'} />
                   <span>Todos</span>
-                  <span className="text-[10px] opacity-80 font-mono">({pedidosDeSucursal.length})</span>
-                </button>
+                  <span className="text-[10px] opacity-80 font-mono">({pedidosDeSucursal.length})</span>−</button>
 
                 {/* 1. ESTADO PENDIENTE */}
                 <button
@@ -3233,10 +3230,9 @@ export default function ComercialComponent({
                 >
                   <Clock size={12} className="text-amber-500" />
                   <span>1. Pendiente</span>
-                  <span className="text-[10px] opacity-80 font-mono">({countPendiente})</span>
-                </button>
+                  <span className="text-[10px] opacity-80 font-mono">({countPendiente})</span>−</button>
 
-                {/* 2. ESTADO EN PREPARACIÃ“N */}
+                {/* 2. ESTADO EN PREPARACI�N */}
                 <button
                   type="button"
                   onClick={() => {
@@ -3250,9 +3246,8 @@ export default function ComercialComponent({
                   }`}
                 >
                   <ShoppingBag size={12} className="text-blue-500" />
-                  <span>2. En PreparaciÃ³n</span>
-                  <span className="text-[10px] opacity-80 font-mono">({countEnPreparacion})</span>
-                </button>
+                  <span>2. En Preparación</span>
+                  <span className="text-[10px] opacity-80 font-mono">({countEnPreparacion})</span>−</button>
 
                 {/* 3. ESTADO ENTREGADO */}
                 <button
@@ -3269,8 +3264,7 @@ export default function ComercialComponent({
                 >
                   <CheckCircle size={12} className="text-emerald-500" />
                   <span>3. Entregado</span>
-                  <span className="text-[10px] opacity-80 font-mono">({countEntregado})</span>
-                </button>
+                  <span className="text-[10px] opacity-80 font-mono">({countEntregado})</span>−</button>
 
                 {/* 4. ESTADO CANCELADO */}
                 <button
@@ -3284,11 +3278,10 @@ export default function ComercialComponent({
                 >
                   <XCircle size={12} className="text-red-500" />
                   <span>4. Cancelado</span>
-                  <span className="text-[10px] opacity-80 font-mono">({countCancelado})</span>
-                </button>
+                  <span className="text-[10px] opacity-80 font-mono">({countCancelado})</span>−</button>
               </div>
 
-              {/* Sub-filtros Operativos DinÃ¡micos para 'EN_PREPARACION' */}
+              {/* Sub-filtros Operativos Dinámicos para 'EN_PREPARACION' */}
               {filtroEstadoTesis === 'EN_PREPARACION' && (
                 <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-blue-500/5 border border-blue-500/20 rounded-xl text-xs mt-1 animate-in fade-in">
                   <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider px-1">Fase operativa:</span>
@@ -3322,7 +3315,7 @@ export default function ComercialComponent({
                 </div>
               )}
 
-              {/* Sub-filtros Operativos DinÃ¡micos para 'ENTREGADO' */}
+              {/* Sub-filtros Operativos Dinámicos para 'ENTREGADO' */}
               {filtroEstadoTesis === 'ENTREGADO' && (
                 <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-xs mt-1 animate-in fade-in">
                   <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider px-1">Fase de entrega:</span>
@@ -3360,13 +3353,13 @@ export default function ComercialComponent({
         })()}
       </div>
 
-      {/* Componente de Filtro de Rango de Fechas para 'ENTREGADO' y Acceso RÃ¡pido 'TODOS' */}
+      {/* Componente de Filtro de Rango de Fechas para 'ENTREGADO' y Acceso Rápido 'TODOS' */}
       {(filtroEstadoTesis === 'TODOS' || filtroEstadoTesis === 'ENTREGADO') && (
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xs mt-1">
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--foreground)] mr-1">
                 <Calendar size={14} className="text-emerald-500" />
-                <span>Filtrar por perÃ­odo:</span>
+                <span>Filtrar por período:</span>
               </div>
 
               {/* Input Desde */}
@@ -3403,7 +3396,7 @@ export default function ComercialComponent({
                 />
               </div>
 
-              {/* BotÃ³n Preset: Ãšltimo Mes */}
+              {/* Botón Preset: �altimo Mes */}
               <button
                 type="button"
                 onClick={() => {
@@ -3419,10 +3412,10 @@ export default function ComercialComponent({
                     : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:text-[var(--foreground)]'
                 }`}
               >
-                Ãšltimo mes (por defecto)
+                �altimo mes (por defecto)
               </button>
 
-              {/* BotÃ³n Preset: Ver Todo el Historial */}
+              {/* Botón Preset: Ver Todo el Historial */}
               <button
                 type="button"
                 onClick={() => setVerTodoElHistorial(!verTodoElHistorial)}
@@ -3432,7 +3425,7 @@ export default function ComercialComponent({
                     : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:text-[var(--foreground)]'
                 }`}
               >
-                {verTodoElHistorial ? 'âœ“ Mostrando todo el histÃ³rico' : 'Ver todo el histÃ³rico'}
+                {verTodoElHistorial ? '�S Mostrando todo el histórico' : 'Ver todo el histórico'}
               </button>
             </div>
 
@@ -3461,7 +3454,7 @@ export default function ComercialComponent({
             <div className="flex-1">
               <span className="font-extrabold">Vista inter-sucursal restringida: </span>
               <span>
-                EstÃ¡s consultando la sucursal <strong>{targetSuc.name}</strong>. Por polÃ­tica de privacidad operativa, Ãºnicamente se muestran los pedidos que tu local (<strong>{miSucNombre}</strong>) ha solicitado o creado en este establecimiento.
+                Estás consultando la sucursal <strong>{targetSuc.name}</strong>. Por política de privacidad operativa, únicamente se muestran los pedidos que tu local (<strong>{miSucNombre}</strong>) ha solicitado o creado en este establecimiento.
               </span>
             </div>
           </div>
@@ -3482,14 +3475,14 @@ export default function ComercialComponent({
               const targetSuc = listaSucursalesDisponibles.find((s) => s.id === selectedSucursalPedidoId);
               const miSucNombre = listaSucursalesDisponibles.find((s) => s.id === miLocalId)?.name || 'Tu sucursal';
               if (esOtra && targetSuc) {
-                return `${miSucNombre} aÃºn no registra pedidos realizados en ${targetSuc.name}.`;
+                return `${miSucNombre} aún no registra pedidos realizados en ${targetSuc.name}.`;
               }
               return 'No hay pedidos registrados con este estado.';
             })()}
           </p>
           <p className="text-xs">
             {miLocalId && selectedSucursalPedidoId !== miLocalId && userRole !== 'ROL_SUPER_ADMIN'
-              ? 'Cuando crees un pedido asignando como destino esta sucursal, aparecerÃ¡ registrado en este panel.'
+              ? 'Cuando crees un pedido asignando como destino esta sucursal, aparecerá registrado en este panel.'
               : 'Prueba cambiando el filtro de estado o registrando un nuevo pedido.'}
           </p>
         </div>
@@ -3499,7 +3492,7 @@ export default function ComercialComponent({
             <table className="w-full text-sm text-left">
               <thead className="bg-[var(--muted)]/40 text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
                 <tr>
-                  <th className="px-6 py-4 flex items-center gap-1"><ArrowUpDown size={12} />NÂ° Pedido</th>
+                  <th className="px-6 py-4 flex items-center gap-1"><ArrowUpDown size={12} />N° Pedido</th>
                   <th className="px-6 py-4">Cliente</th>
                   <th className="px-6 py-4 text-center">Sucursal / Origen</th>
                   <th className="px-6 py-4 text-center">Estado</th>
@@ -3534,12 +3527,12 @@ export default function ComercialComponent({
                             {p.tipoEntrega === 'ENVIO' ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-extrabold">
                                 <Truck size={10} />
-                                <span>{p.courier || 'EnvÃ­o'}</span>
-                                {p.ciudadEnvio && <span className="text-blue-500">Â· {p.ciudadEnvio}</span>}
+                                <span>{p.courier || 'Envío'}</span>
+                                {p.ciudadEnvio && <span className="text-blue-500">· {p.ciudadEnvio}</span>}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold">
-                                <span>ðŸª Presencial</span>
+                                <span>�x�� Presencial</span>
                               </span>
                             )}
                           </div>
@@ -3579,7 +3572,7 @@ export default function ComercialComponent({
                             </span>
                             {(p as any).creadoPorSucursalNombre && (p as any).creadoPorSucursalId !== (p as any).tenantId && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/15">
-                                â†© Creado desde: {(p as any).creadoPorSucursalNombre}
+                                � � Creado desde: {(p as any).creadoPorSucursalNombre}
                               </span>
                             )}
                             {p.vendedorNombre && (p as any).tenantId !== activeSucursalId && (
@@ -3615,17 +3608,17 @@ export default function ComercialComponent({
                         </td>
                         <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                            {/* BotÃ³n rÃ¡pido para gestionar logÃ­stica de envÃ­o */}
+                            {/* Botón rápido para gestionar logística de envío */}
                             <button
                               type="button"
                               onClick={() => handleAbrirModalEnvio(p)}
                               className="px-2 py-1 bg-blue-500/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-blue-500/20 flex items-center gap-1 cursor-pointer"
-                              title="Gestionar Courier, GuÃ­a y Flete de este pedido"
+                              title="Gestionar Courier, Guía y Flete de este pedido"
                             >
-                              <Truck size={12} /> LogÃ­stica
+                              <Truck size={12} /> Logística
                             </button>
 
-                            {/* BotÃ³n directo para registrar o modificar Anticipo / Adelanto */}
+                            {/* Botón directo para registrar o modificar Anticipo / Adelanto */}
                             {(p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK' || p.estado === 'EN_PREPARACION' || p.estado === 'ENTREGADO_PARCIAL') && (
                               <button
                                 type="button"
@@ -3638,8 +3631,7 @@ export default function ComercialComponent({
                                 title={Number(p.adelanto || 0) > 0 ? `Modificar anticipo registrado ($${Number(p.adelanto).toFixed(2)})` : 'Registrar anticipo o abono de dinero'}
                               >
                                 <DollarSign size={12} />
-                                <span>{Number(p.adelanto || 0) > 0 ? `Anticipo: $${Number(p.adelanto).toFixed(2)}` : '+ Adelanto'}</span>
-                              </button>
+                                <span>{Number(p.adelanto || 0) > 0 ? `Anticipo: $${Number(p.adelanto).toFixed(2)}` : '+ Adelanto'}</span>−</button>
                             )}
 
                             {isUpdating ? (
@@ -3652,7 +3644,7 @@ export default function ComercialComponent({
                                   onClick={() => handleAbrirEditarPedido(p)}
                                   className="px-2.5 py-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-amber-500/20 flex items-center gap-1"
                                 >
-                                  âœï¸ Editar
+                                  �S�️ Editar
                                 </button>
                                 {(p.estado === 'PENDIENTE' || p.estado === 'EN_ESPERA_STOCK') && (
                                   <button
@@ -3689,7 +3681,7 @@ export default function ComercialComponent({
                                   return (
                                     <span
                                       className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-not-allowed opacity-75"
-                                      title={`Solo la sucursal asignada (${p.sucursalNombre || 'otra sucursal'}) puede registrar la entrega fÃ­sica de este pedido`}
+                                      title={`Solo la sucursal asignada (${p.sucursalNombre || 'otra sucursal'}) puede registrar la entrega física de este pedido`}
                                     >
                                       <Lock size={11} /> Entrega en sucursal
                                     </span>
@@ -3704,9 +3696,9 @@ export default function ComercialComponent({
                                         handleAbrirDevolucion(p);
                                       }}
                                       className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
-                                      title="Registrar devoluciÃ³n de calzado por garantÃ­a, defecto o cambio"
+                                      title="Registrar devolución de calzado por garantía, defecto o cambio"
                                     >
-                                      <RotateCcw size={12} /> DevoluciÃ³n
+                                      <RotateCcw size={12} /> Devolución
                                     </button>
                                     <button
                                       type="button"
@@ -3727,14 +3719,13 @@ export default function ComercialComponent({
                                     className="p-1.5 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 transition-colors cursor-pointer shadow-2xs flex items-center justify-center"
                                     title="Enviar Comprobante de Entrega por WhatsApp"
                                   >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                                  </button>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>−</button>
                                   </>
                                 )}
                                 <button
                                   onClick={() => handleAbrirCancelarPedido(p)}
                                   className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
-                                  title="Anular pedido y revertir automÃ¡ticamente prÃ©stamos o reservas"
+                                  title="Anular pedido y revertir automáticamente préstamos o reservas"
                                 >
                                   <XCircle size={12} /> Anular
                                 </button>
@@ -3751,9 +3742,9 @@ export default function ComercialComponent({
                                     handleAbrirDevolucion(p);
                                   }}
                                   className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-rose-500/20 flex items-center gap-1 cursor-pointer"
-                                  title="Registrar devoluciÃ³n de calzado por garantÃ­a, defecto o cambio"
+                                  title="Registrar devolución de calzado por garantía, defecto o cambio"
                                 >
-                                  <RotateCcw size={12} /> DevoluciÃ³n
+                                  <RotateCcw size={12} /> Devolución
                                 </button>
                                 <button
                                   type="button"
@@ -3775,7 +3766,7 @@ export default function ComercialComponent({
                                   className="px-2.5 py-1 bg-violet-600/10 text-violet-600 hover:bg-violet-600 hover:text-white rounded-lg text-xs font-semibold transition-all border border-violet-600/20 flex items-center gap-1"
                                   title="Corregir precio de venta y ajustar notas y cuenta del cliente"
                                 >
-                                  âœï¸ Editar Precio
+                                  �S�️ Editar Precio
                                 </button>
                                 <button
                                   onClick={(e) => {
@@ -3785,8 +3776,7 @@ export default function ComercialComponent({
                                   className="p-1.5 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 transition-colors cursor-pointer shadow-2xs flex items-center justify-center"
                                   title="Enviar Comprobante de Entrega por WhatsApp al Cliente"
                                 >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                                </button>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>−</button>
                               </div>
                             ) : (
                               <span className="text-xs text-[var(--muted-foreground)]">Finalizado</span>
@@ -3800,7 +3790,7 @@ export default function ComercialComponent({
                         <tr className="bg-[#0F172A]/5">
                           <td colSpan={7} className="px-6 py-4">
                             <div className="space-y-3">
-                              {/* Tarjeta de LogÃ­stica de Entrega */}
+                              {/* Tarjeta de Logística de Entrega */}
                               <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                 <div className="flex items-center gap-3">
                                   <div className="p-2.5 bg-blue-500/10 text-blue-600 rounded-xl">
@@ -3808,10 +3798,10 @@ export default function ComercialComponent({
                                   </div>
                                   <div>
                                     <div className="text-xs font-bold text-[var(--foreground)] flex items-center gap-2">
-                                      <span>LogÃ­stica: {p.tipoEntrega === 'ENVIO' ? `ðŸšš EnvÃ­o por ${p.courier || 'Transporte'}` : 'ðŸª Entrega Presencial en Local'}</span>
+                                      <span>Logística: {p.tipoEntrega === 'ENVIO' ? `�xaa Envío por ${p.courier || 'Transporte'}` : '�x�� Entrega Presencial en Local'}</span>
                                       {p.guiaEnvio && (
                                         <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[10px] font-mono">
-                                          GuÃ­a: {p.guiaEnvio}
+                                          Guía: {p.guiaEnvio}
                                         </span>
                                       )}
                                     </div>
@@ -3819,8 +3809,8 @@ export default function ComercialComponent({
                                       {p.tipoEntrega === 'ENVIO' ? (
                                         <>
                                           <span>Destino: {p.ciudadEnvio || 'No especificada'} {p.direccionEnvio ? `(${p.direccionEnvio})` : ''}</span>
-                                          <span className="mx-1.5">Â·</span>
-                                          <span>Flete: {p.asumeFlete === 'EMPRESA' ? `ðŸŸ¢ Asume Empresa ($${Number(p.costoEnvio || 0).toFixed(2)})` : 'ðŸ”µ Cobro en Destino (Paga Cliente)'}</span>
+                                          <span className="mx-1.5">·</span>
+                                          <span>Flete: {p.asumeFlete === 'EMPRESA' ? `�xx� Asume Empresa ($${Number(p.costoEnvio || 0).toFixed(2)})` : '�x� Cobro en Destino (Paga Cliente)'}</span>
                                         </>
                                       ) : (
                                         <span>El cliente retira directamente en el mostrador del local comercial.</span>
@@ -3838,11 +3828,10 @@ export default function ComercialComponent({
                                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shrink-0 flex items-center gap-1"
                                 >
                                   <Truck size={13} />
-                                  <span>Modificar EnvÃ­o / GuÃ­a</span>
-                                </button>
+                                  <span>Modificar Envío / Guía</span>−</button>
                               </div>
 
-                              {/* Tarjeta de Anticipo Registrado / BotÃ³n para Gestionar Anticipo */}
+                              {/* Tarjeta de Anticipo Registrado / Botón para Gestionar Anticipo */}
                               <div className={`p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border ${
                                 Number(p.adelanto || 0) > 0
                                   ? 'bg-amber-500/10 border-amber-500/30'
@@ -3872,7 +3861,7 @@ export default function ComercialComponent({
                                           <span>{p.metodoAdelanto || "EFECTIVO"}</span>
                                           {(p.metodoAdelanto === "TRANSFERENCIA" || p.metodoAdelanto === "DEPOSITO") && p.referenciaAdelanto && (
                                             <span className="font-mono font-normal opacity-90 truncate max-w-[110px]" title={`Ref: ${p.referenciaAdelanto}`}>
-                                              Â· Ref: #{p.referenciaAdelanto.replace(/^#/, "")}
+                                              · Ref: #{p.referenciaAdelanto.replace(/^#/, "")}
                                             </span>
                                           )}
                                         </span>
@@ -3901,8 +3890,7 @@ export default function ComercialComponent({
                                       }`}
                                     >
                                       <DollarSign size={13} />
-                                      <span>{Number(p.adelanto || 0) > 0 ? 'Modificar Anticipo' : '+ Registrar Anticipo'}</span>
-                                    </button>
+                                      <span>{Number(p.adelanto || 0) > 0 ? 'Modificar Anticipo' : '+ Registrar Anticipo'}</span>−</button>
                                   )}
                                 </div>
                               </div>
@@ -3910,7 +3898,7 @@ export default function ComercialComponent({
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-3 flex-wrap">
                                   <span className="font-bold text-xs text-[var(--foreground)]">
-                                    ðŸ“¦ Detalle de ArtÃ­culos Solicitados â€” #{getNumeroPedido(p, idx)}
+                                    �x� Detalle de Artículos Solicitados � #{getNumeroPedido(p, idx)}
                                   </span>
                                   {p.vendedorNombre && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[10px] font-semibold">
@@ -3932,11 +3920,10 @@ export default function ComercialComponent({
                                       handleEnviarConfirmacionWhatsApp(p, undefined, true);
                                     }}
                                     className="px-3 py-1 bg-[#25D366] hover:bg-[#20ba59] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-                                    title="Notificar recepciÃ³n del pedido al cliente por WhatsApp"
+                                    title="Notificar recepción del pedido al cliente por WhatsApp"
                                   >
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                                    <span>Notificar por WhatsApp</span>
-                                  </button>
+                                    <span>Notificar por WhatsApp</span>−</button>
                                 )}
                               </div>
                               {/* Tarjetas compactas agrupadas por modelo / variante con foto y pastillas de tallas */}
@@ -3944,7 +3931,7 @@ export default function ComercialComponent({
                                 {(() => {
                                   const grupos = agruparLineasPorModelo(p.lines || []);
                                   if (grupos.length === 0) {
-                                    return <span className="text-[var(--muted-foreground)] text-xs italic">Sin lÃ­neas de detalle</span>;
+                                    return <span className="text-[var(--muted-foreground)] text-xs italic">Sin líneas de detalle</span>;
                                   }
 
                                   return (
@@ -3974,7 +3961,7 @@ export default function ComercialComponent({
                                             <div className="flex items-start justify-between gap-1">
                                               <div className="min-w-0">
                                                 <div className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider truncate">
-                                                  {g.color ? `${g.color} Â· ${formatearNombreSerie(g.serieNombre)}` : formatearNombreSerie(g.serieNombre)}
+                                                  {g.color ? `${g.color} · ${formatearNombreSerie(g.serieNombre)}` : formatearNombreSerie(g.serieNombre)}
                                                 </div>
                                                 <h4 className="font-extrabold text-xs text-[var(--foreground)] truncate">
                                                   {g.modelName}
@@ -4002,7 +3989,7 @@ export default function ComercialComponent({
                                                   <span className="font-black text-rose-900 dark:text-rose-100">{t.cantidad}</span>
                                                   {t.cantidadEntregada > 0 && (
                                                     <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold ml-0.5">
-                                                      (âœ“{t.cantidadEntregada})
+                                                      (�S{t.cantidadEntregada})
                                                     </span>
                                                   )}
                                                 </span>
@@ -4024,7 +4011,7 @@ export default function ComercialComponent({
                                                   className="text-[10px] text-violet-600 dark:text-violet-400 hover:underline font-bold cursor-pointer"
                                                   title="Modificar precio de este modelo y actualizar saldos de cuenta"
                                                 >
-                                                  âœï¸ Editar
+                                                  �S�️ Editar
                                                 </button>
                                               </div>
                                               <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
@@ -4079,13 +4066,13 @@ export default function ComercialComponent({
                         }`}
                       >
                         {estrategia.estrategiaComercialTipo === 'DINAMICO'
-                          ? `Modo DinÃ¡mico (${estrategia.temporadaEfectiva})`
-                          : 'Modo EstÃ¡ndar'}
+                          ? `Modo Dinámico (${estrategia.temporadaEfectiva})`
+                          : 'Modo Estándar'}
                       </span>
                     )}
                   </div>
                   <p className="text-[11px] text-slate-300 mt-0.5">
-                    {editingOrderId ? 'Modifica los datos del pedido y lÃ­neas de calzado' : 'Selecciona el cliente y agrega las series o tallas'}
+                    {editingOrderId ? 'Modifica los datos del pedido y líneas de calzado' : 'Selecciona el cliente y agrega las series o tallas'}
                   </p>
                 </div>
               </div>
@@ -4094,15 +4081,14 @@ export default function ComercialComponent({
                 className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             {/* Body Modal */}
             <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
               {!online && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs rounded-xl flex items-center gap-2">
-                  <span>ðŸ“¡ Modo Offline: El pedido se guardarÃ¡ localmente y se sincronizarÃ¡ cuando vuelva la conexiÃ³n.</span>
+                  <span>�x� Modo Offline: El pedido se guardará localmente y se sincronizará cuando vuelva la conexión.</span>
                 </div>
               )}
 
@@ -4110,15 +4096,15 @@ export default function ComercialComponent({
               {estrategia?.reglas?.validarMargenMinimo && (
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400">ProtecciÃ³n DinÃ¡mica:</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">Protección Dinámica:</span>
                     <span className="text-[var(--muted-foreground)] text-[11px]">
-                      Margen mÃ­nimo configurado en {estrategia.margenMinimoDinamico}% sobre costo unitario ({estrategia.motivoTemporada}).
+                      Margen mínimo configurado en {estrategia.margenMinimoDinamico}% sobre costo unitario ({estrategia.motivoTemporada}).
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* 1. SECCIÃ“N CLIENTE & PAGO */}
+              {/* 1. SECCI�N CLIENTE & PAGO */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">1. Datos del Cliente & Pago</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -4158,7 +4144,7 @@ export default function ComercialComponent({
                             </button>
                           </div>
 
-                          {/* Alerta / Insignia de ReputaciÃ³n del Cliente */}
+                          {/* Alerta / Insignia de Reputación del Cliente */}
                           <div className={`px-3 py-2 rounded-lg border flex items-center justify-between text-xs ${repSel.badgeClass}`}>
                             <div className="flex items-center gap-2">
                               <span className="text-base">{repSel.icon}</span>
@@ -4169,7 +4155,7 @@ export default function ComercialComponent({
                             </div>
                             {clienteSeleccionado.creditoDisponible !== undefined && clienteSeleccionado.creditoDisponible > 0 && (
                               <div className="text-right">
-                                <span className="text-[9px] opacity-75 block">Cupo CrÃ©dito:</span>
+                                <span className="text-[9px] opacity-75 block">Cupo Crédito:</span>
                                 <span className="font-extrabold font-mono text-xs">${Number(clienteSeleccionado.creditoDisponible).toFixed(2)}</span>
                               </div>
                             )}
@@ -4187,7 +4173,7 @@ export default function ComercialComponent({
                                 <div className="space-y-1 flex-1">
                                   <div className="flex items-center justify-between gap-2 flex-wrap">
                                     <span className="font-black text-amber-900 dark:text-amber-200 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
-                                      âš ï¸ Pedido Vigente en Proceso Detectado
+                                      �a�️ Pedido Vigente en Proceso Detectado
                                     </span>
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${ESTADO_CONFIG[alertaPedidoDuplicado.pedidoExistente.estado]?.color || 'bg-amber-100 text-amber-800'}`}>
                                       {ESTADO_CONFIG[alertaPedidoDuplicado.pedidoExistente.estado]?.label || alertaPedidoDuplicado.pedidoExistente.estado}
@@ -4198,8 +4184,8 @@ export default function ComercialComponent({
                                   </p>
                                   <p className="text-[10px] text-[var(--muted-foreground)]">
                                     {ignoroAlertaDuplicado
-                                      ? 'âœ“ Continuaste con la creaciÃ³n de un nuevo pedido independiente. Si agregas los mismos modelos o tallas, recibirÃ¡s una advertencia.'
-                                      : 'Si el cliente desea pares adicionales, es recomendable aÃ±adirlos a este pedido existente para evitar duplicar comprobantes o envÃ­os.'}
+                                      ? '�S Continuaste con la creación de un nuevo pedido independiente. Si agregas los mismos modelos o tallas, recibirás una advertencia.'
+                                      : 'Si el cliente desea pares adicionales, es recomendable añadirlos a este pedido existente para evitar duplicar comprobantes o envíos.'}
                                   </p>
                                 </div>
                               </div>
@@ -4213,18 +4199,17 @@ export default function ComercialComponent({
                                       setAlertaPedidoDuplicado(null);
                                       setIgnoroAlertaDuplicado(false);
                                       handleAbrirEditarPedido(pedidoAEditar);
-                                      showToast(`Cargado pedido ${getNumeroPedido(pedidoAEditar)} para aÃ±adir calzado adicional.`, 'info');
+                                      showToast(`Cargado pedido ${getNumeroPedido(pedidoAEditar)} para añadir calzado adicional.`, 'info');
                                     }}
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer transition-all"
                                   >
                                     <ExternalLink size={13} />
-                                    <span>Ver / AÃ±adir a este pedido existente</span>
-                                  </button>
+                                    <span>Ver / Añadir a este pedido existente</span>−</button>
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setIgnoroAlertaDuplicado(true);
-                                      showToast('Continuando con la creaciÃ³n de un nuevo pedido independiente.', 'info');
+                                      showToast('Continuando con la creación de un nuevo pedido independiente.', 'info');
                                     }}
                                     className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 border border-amber-500/30 rounded-lg font-bold text-xs cursor-pointer transition-all"
                                   >
@@ -4241,10 +4226,10 @@ export default function ComercialComponent({
                               <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
                               <div className="space-y-0.5">
                                 <span className="font-black block text-rose-700 dark:text-rose-300">
-                                  ðŸ’¡ Sugerencia del Sistema: Venta de Contado
+                                  �x� Sugerencia del Sistema: Venta de Contado
                                 </span>
                                 <span className="text-[11px] opacity-90 leading-tight block">
-                                  El cliente registra antecedentes de atraso o morosidad en compras previas. Se sugiere realizar la venta de <strong>CONTADO</strong> o solicitar anticipo. (La opciÃ³n de crÃ©dito sigue habilitada si usted decide autorizarla).
+                                  El cliente registra antecedentes de atraso o morosidad en compras previas. Se sugiere realizar la venta de <strong>CONTADO</strong> o solicitar anticipo. (La opción de crédito sigue habilitada si usted decide autorizarla).
                                 </span>
                               </div>
                             </div>
@@ -4257,7 +4242,7 @@ export default function ComercialComponent({
                           <div className="relative flex-1">
                             <input
                               type="text"
-                              placeholder="Escribe apellido, nombre o nÃºmero de cÃ©dula..."
+                              placeholder="Escribe apellido, nombre o número de cédula..."
                               value={busquedaCliente}
                               onChange={(e) => {
                                 setBusquedaCliente(e.target.value);
@@ -4282,8 +4267,7 @@ export default function ComercialComponent({
                             title="Registrar nuevo cliente"
                           >
                             <UserPlus size={14} />
-                            <span className="hidden sm:inline">Nuevo</span>
-                          </button>
+                            <span className="hidden sm:inline">Nuevo</span>−</button>
                         </div>
 
                         {showDropdownCliente && busquedaCliente.trim().length > 0 && (
@@ -4312,7 +4296,7 @@ export default function ComercialComponent({
                                       setClienteSeleccionado(c);
                                       setShowDropdownCliente(false);
                                       verificarPedidoActivoCliente(c);
-                                      // PreselecciÃ³n inteligente de forma de pago segÃºn nivel crediticio
+                                      // Preselección inteligente de forma de pago según nivel crediticio
                                       const tieneCredito = c.nivelCredito && c.nivelCredito !== 'SIN_CREDITO' && Number(c.limiteCredito || 0) > 0;
                                       setTipoPago(tieneCredito ? 'CREDITO' : 'CONTADO');
                                     }}
@@ -4325,8 +4309,7 @@ export default function ComercialComponent({
                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] border ${repItem.badgeClass}`}>
                                       <span>{repItem.icon}</span>
                                       <span>{repItem.label}</span>
-                                    </span>
-                                  </button>
+                                    </span>−</button>
                                 );
                               })}
                             {busquedaDebounced.trim().length > 0 &&
@@ -4353,8 +4336,7 @@ export default function ComercialComponent({
                                     className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer"
                                   >
                                     <UserPlus size={14} />
-                                    <span>Registrar a "{busquedaCliente}" como Nuevo Cliente</span>
-                                  </button>
+                                    <span>Registrar a "{busquedaCliente}" como Nuevo Cliente</span>−</button>
                                 </div>
                               )}
                           </div>
@@ -4374,7 +4356,7 @@ export default function ComercialComponent({
                           setTipoPago('CONTADO');
                           if (cuponAplicado?.promocion && cuponAplicado.promocion.aplicaPara === 'SOLO_CREDITO') {
                             setCuponAplicado(null);
-                            setCuponErrorMsg('El cupÃ³n se removiÃ³ automÃ¡ticamente: solo es vÃ¡lido para compras a CrÃ©dito.');
+                            setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para compras a Crédito.');
                           }
                         }}
                         className={`h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -4384,8 +4366,7 @@ export default function ComercialComponent({
                         }`}
                       >
                         <DollarSign size={13} />
-                        <span>Contado</span>
-                      </button>
+                        <span>Contado</span>−</button>
                       {(() => {
                         const clienteSinCredito = !clienteSeleccionado || !clienteSeleccionado.nivelCredito || clienteSeleccionado.nivelCredito === 'SIN_CREDITO' || Number(clienteSeleccionado.limiteCredito || 0) <= 0;
                         return (
@@ -4398,7 +4379,7 @@ export default function ComercialComponent({
                                 setTipoPago('CREDITO');
                                 if (cuponAplicado?.promocion && cuponAplicado.promocion.aplicaPara === 'SOLO_CONTADO') {
                                   setCuponAplicado(null);
-                                  setCuponErrorMsg('El cupÃ³n se removiÃ³ automÃ¡ticamente: solo es vÃ¡lido para pagos de Contado.');
+                                  setCuponErrorMsg('El cupón se removió automáticamente: solo es válido para pagos de Contado.');
                                 }
                               }}
                               className={`w-full h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
@@ -4410,12 +4391,12 @@ export default function ComercialComponent({
                               }`}
                             >
                               <CreditCard size={13} />
-                              <span>CrÃ©dito</span>
-                              {clienteSinCredito && <span className="text-[9px]">ðŸ”’</span>}
+                              <span>Crédito</span>
+                              {clienteSinCredito && <span className="text-[9px]">�x</span>}
                             </button>
                             {clienteSinCredito && (
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 font-semibold">
-                                {!clienteSeleccionado ? 'Selecciona un cliente primero' : 'Cliente sin crÃ©dito asignado'}
+                                {!clienteSeleccionado ? 'Selecciona un cliente primero' : 'Cliente sin crédito asignado'}
                               </div>
                             )}
                           </div>
@@ -4433,16 +4414,16 @@ export default function ComercialComponent({
                     >
                       <option value="VENTA_DIRECTA">Venta Directa</option>
                       <option value="POS">POS Mostrador</option>
-                      <option value="CATALOGO_DIGITAL">CatÃ¡logo Digital / WhatsApp</option>
+                      <option value="CATALOGO_DIGITAL">Catálogo Digital / WhatsApp</option>
                     </select>
                   </div>
 
-                  {/* Selector Elegante de Sucursal de EmisiÃ³n y Despacho (PestaÃ±as tipo pÃ­ldora, sin menÃº desplegable) */}
+                  {/* Selector Elegante de Sucursal de Emisión y Despacho (Pestañas tipo píldora, sin menú desplegable) */}
                   {listaSucursalesDisponibles.length > 1 ? (
                     <div>
                       <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 flex items-center gap-1.5">
                         <Building size={12} className="text-emerald-500" />
-                        <span>Sucursal de EmisiÃ³n y Despacho</span>
+                        <span>Sucursal de Emisión y Despacho</span>
                       </label>
                       <div className="flex flex-wrap gap-1.5 p-1 bg-[var(--muted)]/40 rounded-xl border border-[var(--border)] min-h-[42px] items-center">
                         {listaSucursalesDisponibles.map((s) => {
@@ -4493,7 +4474,7 @@ export default function ComercialComponent({
                     <div>
                       <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 flex items-center gap-1.5">
                         <Building size={12} className="text-emerald-500" />
-                        <span>Sucursal de EmisiÃ³n</span>
+                        <span>Sucursal de Emisión</span>
                       </label>
                       <div className="flex items-center gap-2 px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--foreground)] min-h-[42px]">
                         <Building size={14} className="text-emerald-500" />
@@ -4514,17 +4495,17 @@ export default function ComercialComponent({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                            MÃ©todo de Pago *
+                            Método de Pago *
                           </label>
                           <select
                             value={metodoPagoContado}
                             onChange={(e) => setMetodoPagoContado(e.target.value as any)}
                             className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0F172A]"
                           >
-                            <option value="EFECTIVO">ðŸ’µ Efectivo (Caja)</option>
-                            <option value="TRANSFERENCIA">ðŸ¦ Transferencia Bancaria</option>
-                            <option value="DEPOSITO">ðŸ“¥ DepÃ³sito Bancario</option>
-                            <option value="CHEQUE">ðŸ“ Cheque</option>
+                            <option value="EFECTIVO">�x� Efectivo (Caja)</option>
+                            <option value="TRANSFERENCIA">�x�� Transferencia Bancaria</option>
+                            <option value="DEPOSITO">�x� Depósito Bancario</option>
+                            <option value="CHEQUE">�x� Cheque</option>
                           </select>
                         </div>
 
@@ -4532,7 +4513,7 @@ export default function ComercialComponent({
                         {metodoPagoContado !== 'EFECTIVO' ? (
                           <div>
                             <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                              NÂ° Comprobante / Referencia / Banco *
+                              N° Comprobante / Referencia / Banco *
                             </label>
                             <input
                               type="text"
@@ -4544,20 +4525,20 @@ export default function ComercialComponent({
                           </div>
                         ) : (
                           <div className="flex items-center text-[11px] text-[var(--muted-foreground)] pt-6 italic">
-                            Pago en efectivo registrado en caja automÃ¡ticamente al entregar.
+                            Pago en efectivo registrado en caja automáticamente al entregar.
                           </div>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* 1.1 SECCIÃ“N DE ANTICIPO / ADELANTO DE DINERO */}
+                  {/* 1.1 SECCI�N DE ANTICIPO / ADELANTO DE DINERO */}
                   <div className="sm:col-span-2 p-3.5 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <DollarSign size={16} className="text-amber-600" />
                         <span className="text-xs font-bold text-amber-900 dark:text-amber-300">
-                          Â¿El cliente deja un Adelanto / Anticipo de Dinero?
+                          ¿El cliente deja un Adelanto / Anticipo de Dinero?
                         </span>
                       </div>
                       <button
@@ -4576,7 +4557,7 @@ export default function ComercialComponent({
                             : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-amber-500'
                         }`}
                       >
-                        {registraAdelanto ? 'âœ“ SÃ­, con anticipo' : '+ Registrar Anticipo'}
+                        {registraAdelanto ? '�S Sí, con anticipo' : '+ Registrar Anticipo'}
                       </button>
                     </div>
 
@@ -4601,23 +4582,23 @@ export default function ComercialComponent({
 
                           <div>
                             <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                              MÃ©todo de Anticipo *
+                              Método de Anticipo *
                             </label>
                             <select
                               value={metodoAdelanto}
                               onChange={(e) => setMetodoAdelanto(e.target.value as any)}
                               className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-600"
                             >
-                              <option value="EFECTIVO">ðŸ’µ Efectivo</option>
-                              <option value="TRANSFERENCIA">ðŸ¦ Transferencia</option>
-                              <option value="DEPOSITO">ðŸ“¥ DepÃ³sito</option>
-                              <option value="CHEQUE">ðŸ“ Cheque</option>
+                              <option value="EFECTIVO">�x� Efectivo</option>
+                              <option value="TRANSFERENCIA">�x�� Transferencia</option>
+                              <option value="DEPOSITO">�x� Depósito</option>
+                              <option value="CHEQUE">�x� Cheque</option>
                             </select>
                           </div>
 
                           <div>
                             <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                              NÂ° Comprobante / Ref. (Opcional)
+                              N° Comprobante / Ref. (Opcional)
                             </label>
                             <input
                               type="text"
@@ -4629,7 +4610,7 @@ export default function ComercialComponent({
                           </div>
                         </div>
 
-                        {/* Resumen de cÃ¡lculo en tiempo real */}
+                        {/* Resumen de cálculo en tiempo real */}
                         {(() => {
                           const subtotalActual = lineasPedido.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
                           const montoAd = Number(adelantoInput || 0);
@@ -4656,7 +4637,7 @@ export default function ComercialComponent({
                     )}
                   </div>
 
-                  {/* ObservaciÃ³n General del Pedido (Compacta y Opcional) */}
+                  {/* Observación General del Pedido (Compacta y Opcional) */}
                   <div className="sm:col-span-2 pt-1">
                     {!mostrarObservacionGeneral && !notasPedido ? (
                       <button
@@ -4665,14 +4646,13 @@ export default function ComercialComponent({
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[var(--border)] text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:border-[#0F172A] hover:bg-[var(--card)] transition-all cursor-pointer"
                       >
                         <FileText size={13} />
-                        <span>+ Agregar ObservaciÃ³n General del Pedido</span>
-                      </button>
+                        <span>+ Agregar Observación General del Pedido</span>−</button>
                     ) : (
                       <div className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl space-y-2 animate-in fade-in duration-150">
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider flex items-center gap-1">
                             <FileText size={12} />
-                            <span>ObservaciÃ³n General del Pedido (Opcional)</span>
+                            <span>Observación General del Pedido (Opcional)</span>
                           </label>
                           <button
                             type="button"
@@ -4682,7 +4662,7 @@ export default function ComercialComponent({
                             }}
                             className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer"
                           >
-                            âœ• Quitar / Cerrar
+                            �S" Quitar / Cerrar
                           </button>
                         </div>
                         <textarea
@@ -4698,25 +4678,25 @@ export default function ComercialComponent({
                 </div>
               </div>
 
-              {/* 2. SECCIÃ“N AGREGAR PRODUCTO, MODELO Y TALLA */}
+              {/* 2. SECCI�N AGREGAR PRODUCTO, MODELO Y TALLA */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
                     2. Seleccionar Modelo, Talla y Cantidad
                   </span>
                   <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                    <span>ðŸ‘Ÿ CatÃ¡logo de Calzado</span>
+                    <span>�xx Catálogo de Calzado</span>
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative sm:col-span-2">
-                    {/* Header de SelecciÃ³n de Modelo con PÃ­ldoras de Filtro por Serie */}
+                    {/* Header de Selección de Modelo con Píldoras de Filtro por Serie */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1.5">
                       <label className="block text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
-                        CatÃ¡logo de Calzado * (Buscador por Modelo, Color o CÃ³digo)
+                        Catálogo de Calzado * (Buscador por Modelo, Color o Código)
                       </label>
 
-                      {/* Botones / PÃ­ldoras de Series DinÃ¡micas */}
+                      {/* Botones / Píldoras de Series Dinámicas */}
                       {(() => {
                         const seriesUnicas = Array.from(
                           new Set(
@@ -4762,8 +4742,7 @@ export default function ComercialComponent({
                                   <span>{formatearNombreSerie(ser)}</span>
                                   <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isActiva ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'}`}>
                                     {count}
-                                  </span>
-                                </button>
+                                  </span>−</button>
                               );
                             })}
                           </div>
@@ -4789,14 +4768,13 @@ export default function ComercialComponent({
                               title="Tocar para ampliar foto"
                             >
                               <img src={productoSeleccionadoObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-lg border border-[var(--border)] group-hover:scale-105 transition-transform" />
-                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">ðŸ”</span>
-                            </button>
+                              <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-[10px] transition-opacity">�x�</span>−</button>
                           ) : (
-                            <div className="w-12 h-12 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">ðŸ‘Ÿ</div>
+                            <div className="w-12 h-12 rounded-lg bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">�xx</div>
                           )}
                           <div>
                             <div className="font-extrabold text-sm text-[var(--foreground)]">
-                              {productoSeleccionadoObj.modelName} â€” {productoSeleccionadoObj.color}
+                              {productoSeleccionadoObj.modelName} � {productoSeleccionadoObj.color}
                             </div>
                             <div className="text-[11px] font-semibold text-emerald-700">
                               Serie: {formatearNombreSerie(productoSeleccionadoObj.serieNombre)}
@@ -4826,7 +4804,7 @@ export default function ComercialComponent({
                                         {totalPares} pares
                                       </span>
                                       <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-800 rounded text-[10px] font-bold">
-                                        Â½ {mediasDocenas} doc.
+                                        ½ {mediasDocenas} doc.
                                       </span>
                                       <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-800 rounded text-[10px] font-bold">
                                         1 {docenas} doc.
@@ -4834,7 +4812,7 @@ export default function ComercialComponent({
                                     </>
                                   ) : (
                                     <span className="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 rounded-md text-xs font-bold">
-                                      ðŸ”´ Sin Stock (Bajo Pedido)
+                                      �x� Sin Stock (Bajo Pedido)
                                     </span>
                                   )}
                                 </div>
@@ -4863,7 +4841,7 @@ export default function ComercialComponent({
                           <Search size={16} className="absolute left-3 text-slate-400 pointer-events-none" />
                           <input
                             type="text"
-                            placeholder="Buscar calzado por modelo, color o cÃ³digo (ej. BotÃ­n Negro, MocasÃ­n CafÃ©, Oxford)..."
+                            placeholder="Buscar calzado por modelo, color o código (ej. Botín Negro, Mocasín Café, Oxford)..."
                             value={busquedaModelo}
                             onChange={(e) => {
                               setBusquedaModelo(e.target.value);
@@ -4880,14 +4858,14 @@ export default function ComercialComponent({
                                 setShowDropdownModelo(false);
                               }}
                               className="absolute right-2.5 text-slate-400 hover:text-slate-600 text-xs font-black p-1 rounded-full hover:bg-[var(--muted)] cursor-pointer"
-                              title="Limpiar bÃºsqueda"
+                              title="Limpiar búsqueda"
                             >
-                              âœ•
+                              �S"
                             </button>
                           )}
                         </div>
 
-                        {/* Dropdown de Resultados de BÃºsqueda RÃ¡pida */}
+                        {/* Dropdown de Resultados de Búsqueda Rápida */}
                         {showDropdownModelo && (
                           <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto">
                             {productosFiltradosBuscador.length > 0 ? (
@@ -4930,12 +4908,11 @@ export default function ComercialComponent({
                                             className="w-10 h-10 object-cover rounded-xl border border-[var(--border)] group-hover/zoom:scale-105 transition-transform"
                                           />
                                           <span className="absolute inset-0 bg-black/30 opacity-0 group-hover/zoom:opacity-100 rounded-xl flex items-center justify-center text-white text-[9px] transition-opacity">
-                                            ðŸ”
-                                          </span>
-                                        </button>
+                                            �x�
+                                          </span>−</button>
                                       ) : (
                                         <div className="w-10 h-10 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-sm shrink-0">
-                                          ðŸ‘Ÿ
+                                          �xx
                                         </div>
                                       )}
 
@@ -4950,7 +4927,7 @@ export default function ComercialComponent({
                                         </div>
                                         <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)] mt-0.5">
                                           <span>Serie: <strong className="text-[var(--foreground)]">{formatearNombreSerie(p.serieNombre)}</strong></span>
-                                          {p.baseCode && <span>â€¢ CÃ³d: {p.baseCode}</span>}
+                                          {p.baseCode && <span>⬢ Cód: {p.baseCode}</span>}
                                         </div>
                                       </div>
                                     </div>
@@ -4962,7 +4939,7 @@ export default function ComercialComponent({
                                             {totalPares} pares
                                           </span>
                                           <span className="text-[9px] text-[var(--muted-foreground)] block">
-                                            {docenas > 0 ? `${docenas} doc.` : `${medias} Â½ doc.`}
+                                            {docenas > 0 ? `${docenas} doc.` : `${medias} ½ doc.`}
                                           </span>
                                         </div>
                                       ) : (
@@ -4971,7 +4948,7 @@ export default function ComercialComponent({
                                         </span>
                                       )}
                                       <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-                                        Seleccionar â†’
+                                        Seleccionar � 
                                       </span>
                                     </div>
                                   </div>
@@ -5010,9 +4987,8 @@ export default function ComercialComponent({
                             : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
                         }`}
                       >
-                        <span>ðŸ“¦</span>
-                        <span>Serie Completa (Docena / Â½ Doc.)</span>
-                      </button>
+                        <span>�x�</span>
+                        <span>Serie Completa (Docena / ½ Doc.)</span>−</button>
                       <button
                         type="button"
                         onClick={() => {
@@ -5032,9 +5008,8 @@ export default function ComercialComponent({
                             : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
                         }`}
                       >
-                        <span>ðŸ‘Ÿ</span>
-                        <span>Por Talla (NumeraciÃ³n)</span>
-                      </button>
+                        <span>�xx</span>
+                        <span>Por Talla (Numeración)</span>−</button>
                       <button
                         type="button"
                         onClick={() => {
@@ -5052,9 +5027,8 @@ export default function ComercialComponent({
                             : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-emerald-500'
                         }`}
                       >
-                        <span>â­</span>
-                        <span>Pedido Especial / Otra Serie</span>
-                      </button>
+                        <span>⭐</span>
+                        <span>Pedido Especial / Otra Serie</span>−</button>
                     </div>
                   </div>
 
@@ -5064,7 +5038,7 @@ export default function ComercialComponent({
                       <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2.5">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                            <span>âš¡ Disponibilidad Inter-Sucursal (Otras Sucursales)</span>
+                            <span>�a� Disponibilidad Inter-Sucursal (Otras Sucursales)</span>
                           </span>
                           <span className="text-[10px] bg-amber-500/20 text-amber-900 dark:text-amber-200 px-2.5 py-0.5 rounded-full font-bold">
                             {stockInterSucursalResult.length} sucursal(es) con stock
@@ -5077,7 +5051,7 @@ export default function ComercialComponent({
                                 <span className="font-extrabold text-[var(--foreground)] block">{res.sucursalNombre}</span>
                                 <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10px] text-[var(--muted-foreground)]">
                                   <span>Color: <strong className="text-[var(--foreground)]">{res.color}</strong></span>
-                                  <span>â€¢ Total: <strong className="text-emerald-700 dark:text-emerald-300">{res.stockTotal} pares</strong></span>
+                                  <span>⬢ Total: <strong className="text-emerald-700 dark:text-emerald-300">{res.stockTotal} pares</strong></span>
                                   <span>({res.tallasDisponibles.map((t: any) => `#${t.talla}: ${t.cantidad}p`).join(', ')})</span>
                                 </div>
                               </div>
@@ -5086,8 +5060,7 @@ export default function ComercialComponent({
                                 onClick={() => handleAgregarInterSucursal(res)}
                                 className="px-3 py-1.5 bg-[#0F172A] hover:bg-black text-white text-xs font-bold rounded-lg transition-colors shrink-0 shadow-xs flex items-center justify-center gap-1 cursor-pointer"
                               >
-                                <span>ðŸ“¦ Despachar de {res.sucursalNombre}</span>
-                              </button>
+                                <span>�x� Despachar de {res.sucursalNombre}</span>−</button>
                             </div>
                           ))}
                         </div>
@@ -5095,7 +5068,7 @@ export default function ComercialComponent({
                     </div>
                   )}
 
-                  {/* Componente EstÃ¡ndar ModelTallaCurvaCard para Configurar y Agregar Modelo al Pedido */}
+                  {/* Componente Estándar ModelTallaCurvaCard para Configurar y Agregar Modelo al Pedido */}
                   <div className="sm:col-span-2">
                     {productoSeleccionadoObj ? (() => {
                       const prodObj = productoSeleccionadoObj;
@@ -5118,7 +5091,7 @@ export default function ComercialComponent({
                       const mediasDocenasCount = totalParesConfig / 6;
                       const docenasCount = totalParesConfig / 12;
                       const docenasLabel = totalParesConfig === 6
-                        ? 'Â½ Docena'
+                        ? '½ Docena'
                         : totalParesConfig === 12
                         ? '1 Docena'
                         : totalParesConfig > 0 && totalParesConfig % 12 === 0
@@ -5150,14 +5123,13 @@ export default function ComercialComponent({
                                     })
                                   }
                                   className="relative group cursor-zoom-in shrink-0"
-                                  title="Tocar para ampliar foto en alta resoluciÃ³n"
+                                  title="Tocar para ampliar foto en alta resolución"
                                 >
                                   <img src={prodObj.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform" />
-                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">ðŸ”</span>
-                                </button>
+                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">�x�</span>−</button>
                               ) : (
                                 <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0 border border-[var(--border)]">
-                                  ðŸ‘Ÿ
+                                  �xx
                                 </div>
                               )}
 
@@ -5237,7 +5209,7 @@ export default function ComercialComponent({
                                               className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
                                               title={`Restar 1 par T${t.numero ?? t.nombre}`}
                                             >
-                                              âˆ’
+                                              ��
                                             </button>
                                             <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
                                               {qty}
@@ -5266,7 +5238,7 @@ export default function ComercialComponent({
                                     })}
                                   </div>
 
-                                  {/* Acciones RÃ¡pidas: Media Docena Serie A / B con ValidaciÃ³n y RecomendaciÃ³n de Stock */}
+                                  {/* Acciones Rápidas: Media Docena Serie A / B con Validación y Recomendación de Stock */}
                                   {(() => {
                                     const evalStock = tipoVentaItem !== 'SERIE_ESPECIAL'
                                       ? evaluarDisponibilidadMedias(serieNombreDisplay, tallasList)
@@ -5279,7 +5251,7 @@ export default function ComercialComponent({
                                           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-200 text-[11px] font-semibold">
                                             <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                             <span>
-                                              Curva <strong>{curvaSugeridaInfo.tipo === 'MEDIA_A' ? 'Â½ Media Docena Serie A' : 'Â½ Media Docena Serie B'}</strong> preseleccionada automÃ¡ticamente {curvaSugeridaInfo.alternada ? '(alternando con el pedido anterior)' : '(por balance de stock en bodega)'}.
+                                              Curva <strong>{curvaSugeridaInfo.tipo === 'MEDIA_A' ? '½ Media Docena Serie A' : '½ Media Docena Serie B'}</strong> preseleccionada automáticamente {curvaSugeridaInfo.alternada ? '(alternando con el pedido anterior)' : '(por balance de stock en bodega)'}.
                                             </span>
                                           </div>
                                         )}
@@ -5339,7 +5311,7 @@ export default function ComercialComponent({
                                                 }}
                                                 className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                               >
-                                                âˆ’ Media Docena (âˆ’6 pares)
+                                                �� Media Docena (��6 pares)
                                               </button>
                                             </>
                                           ) : (
@@ -5371,7 +5343,7 @@ export default function ComercialComponent({
                                                 }`}
                                                 title={evalStock ? `Disponibles en bodega: ${evalStock.maxMediasA} media(s) A` : undefined}
                                               >
-                                                <span>+ Â½ Doc A</span>
+                                                <span>+ ½ Doc A</span>
                                                 {evalStock && evalStock.maxMediasA !== 99 && (
                                                   <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${evalStock.mediaADisponible ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'}`}>
                                                     {evalStock.maxMediasA} disp
@@ -5415,7 +5387,7 @@ export default function ComercialComponent({
                                                 }`}
                                                 title={evalStock ? `Disponibles en bodega: ${evalStock.maxMediasB} media(s) B` : undefined}
                                               >
-                                                <span>+ Â½ Doc B</span>
+                                                <span>+ ½ Doc B</span>
                                                 {evalStock && evalStock.maxMediasB !== 99 && (
                                                   <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${evalStock.mediaBDisponible ? 'bg-teal-500/20 text-teal-700 dark:text-teal-300' : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'}`}>
                                                     {evalStock.maxMediasB} disp
@@ -5445,7 +5417,7 @@ export default function ComercialComponent({
                                                 }}
                                                 className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                               >
-                                                âˆ’ Â½ Doc A
+                                                �� ½ Doc A
                                               </button>
 
                                               <button
@@ -5461,7 +5433,7 @@ export default function ComercialComponent({
                                                 }}
                                                 className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                               >
-                                                âˆ’ Â½ Doc B
+                                                �� ½ Doc B
                                               </button>
                                             </>
                                           )}
@@ -5474,7 +5446,7 @@ export default function ComercialComponent({
                                     );
                                   })()}
 
-                                  {/* LÃ­nea de ObservaciÃ³n para este Modelo */}
+                                  {/* Línea de Observación para este Modelo */}
                                   <div className="pt-1">
                                     {!mostrarObsModeloActual && !observacionModeloActual ? (
                                       <button
@@ -5483,16 +5455,15 @@ export default function ComercialComponent({
                                         className="text-[11px] font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
                                       >
                                         <Plus size={11} />
-                                        <span>Agregar observaciÃ³n a este modelo</span>
-                                      </button>
+                                        <span>Agregar observación a este modelo</span>−</button>
                                     ) : (
                                       <div className="flex items-center gap-2 p-2 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl">
                                         <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase shrink-0">
-                                          ðŸ“ Obs:
+                                          �x� Obs:
                                         </span>
                                         <input
                                           type="text"
-                                          placeholder="Ej: Suela especial, hebilla dorada, cuero cafÃ© mate..."
+                                          placeholder="Ej: Suela especial, hebilla dorada, cuero café mate..."
                                           value={observacionModeloActual}
                                           onChange={(e) => setObservacionModeloActual(e.target.value)}
                                           className="flex-1 px-2.5 py-1 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs text-[var(--foreground)] focus:outline-none focus:border-emerald-600"
@@ -5505,7 +5476,7 @@ export default function ComercialComponent({
                                           }}
                                           className="text-[10px] font-bold text-rose-500 hover:underline shrink-0 cursor-pointer"
                                         >
-                                          âœ• Quitar
+                                          �S" Quitar
                                         </button>
                                       </div>
                                     )}
@@ -5514,7 +5485,7 @@ export default function ComercialComponent({
                               </div>
                             </div>
 
-                            {/* Lado Derecho: Resumen, Precio, Subtotal y BotÃ³n de Agregar */}
+                            {/* Lado Derecho: Resumen, Precio, Subtotal y Botón de Agregar */}
                             <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between gap-3 pt-3 lg:pt-0 border-t lg:border-t-0 border-[var(--border)] shrink-0 min-w-[200px]">
                               <div className="text-left lg:text-right">
                                 <div className="text-xs font-black text-[var(--foreground)]">
@@ -5547,11 +5518,11 @@ export default function ComercialComponent({
                                   <span className="text-[11px] text-[var(--muted-foreground)] font-medium">/ par</span>
                                 </div>
 
-                                {/* Sugerencia Inmediata del Ãšltimo Precio Vendido al Cliente */}
+                                {/* Sugerencia Inmediata del �altimo Precio Vendido al Cliente */}
                                 {ultimoPrecioCliente !== null && (
                                   <div className="mt-1 flex flex-col items-start lg:items-end gap-0.5">
                                     <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-[10px] font-black shadow-2xs">
-                                      <span>ðŸ’¡ Vendido antes: ${ultimoPrecioCliente.toFixed(2)}/par</span>
+                                      <span>�x� Vendido antes: ${ultimoPrecioCliente.toFixed(2)}/par</span>
                                       {sucursalUltimaVenta && (
                                         <span className="font-semibold text-[9px] text-amber-700 dark:text-amber-300">({sucursalUltimaVenta})</span>
                                       )}
@@ -5564,10 +5535,9 @@ export default function ComercialComponent({
                                           setPrecioItemInput(String(ultimoPrecioCliente));
                                         }}
                                         className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
-                                        title="Re-aplicar el precio al que se le vendiÃ³ anteriormente este modelo"
+                                        title="Re-aplicar el precio al que se le vendió anteriormente este modelo"
                                       >
-                                        <span>ðŸ‘‰ Usar ${ultimoPrecioCliente.toFixed(2)} sugerido</span>
-                                      </button>
+                                        <span>�x0 Usar ${ultimoPrecioCliente.toFixed(2)} sugerido</span>−</button>
                                     )}
                                   </div>
                                 )}
@@ -5583,26 +5553,25 @@ export default function ComercialComponent({
                                 disabled={totalParesConfig === 0}
                                 className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                               >
-                                <span>Agregar al Pedido</span>
-                              </button>
+                                <span>Agregar al Pedido</span>−</button>
                             </div>
                           </div>
 
-                          {/* Info de Ãºltimo precio al cliente si aplica */}
+                          {/* Info de último precio al cliente si aplica */}
                           {ultimoPrecioCliente !== null && selectedProductId && clientId && (
                             <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl flex items-center justify-between gap-2 text-xs animate-in fade-in duration-200">
                               <div className="flex items-center gap-2">
-                                <span className="text-emerald-600 text-sm shrink-0">ðŸ’¡</span>
+                                <span className="text-emerald-600 text-sm shrink-0">�x�</span>
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="font-bold text-emerald-800 dark:text-emerald-200">
-                                    Ãšltimo precio a este cliente:
+                                    �altimo precio a este cliente:
                                   </span>
                                   <span className="font-black text-emerald-700 dark:text-emerald-300 font-mono text-sm">
                                     ${ultimoPrecioCliente.toFixed(2)}
                                   </span>
                                   {sucursalUltimaVenta && (
                                     <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 font-bold text-[10px]">
-                                      Â· {sucursalUltimaVenta}
+                                      · {sucursalUltimaVenta}
                                     </span>
                                   )}
                                   {fechaUltimaVenta && (
@@ -5620,7 +5589,7 @@ export default function ComercialComponent({
                                     setPrecioItemInput(String(ultimoPrecioCliente));
                                   }}
                                   className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold shrink-0 transition-colors cursor-pointer"
-                                  title="Aplicar el Ãºltimo precio vendido a este cliente"
+                                  title="Aplicar el último precio vendido a este cliente"
                                 >
                                   Usar ${ultimoPrecioCliente.toFixed(2)}
                                 </button>
@@ -5631,7 +5600,7 @@ export default function ComercialComponent({
                       );
                     })() : (
                       <div className="p-6 text-center border-2 border-dashed border-[var(--border)] rounded-2xl bg-[var(--card)]/50">
-                        <span className="text-2xl block mb-1">ðŸ‘Ÿ</span>
+                        <span className="text-2xl block mb-1">�xx</span>
                         <p className="text-xs font-semibold text-[var(--muted-foreground)]">
                           Busca y selecciona un modelo de calzado arriba para configurar su curva de tallas y agregarlo al pedido.
                         </p>
@@ -5654,7 +5623,7 @@ export default function ComercialComponent({
                   </div>
 
                   <div className="space-y-2">
-                    {/* Render de Ã­tems agrupados compactos por Serie y Precio */}
+                    {/* Render de ítems agrupados compactos por Serie y Precio */}
                     {(() => {
                       // Agrupar por productId, color, serieNombre, tipoVenta y precioUnitario
                       const grupos: { [key: string]: typeof lineasPedido } = {};
@@ -5672,7 +5641,7 @@ export default function ComercialComponent({
                         const subtotalGrupo = lineas.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
                         const sortedLineas = [...lineas].sort((a, b) => (a.numeroTalla || 0) - (b.numeroTalla || 0));
 
-                        // Predicado para identificar con precisiÃ³n quirÃºrgica las lÃ­neas de este grupo especÃ­fico
+                        // Predicado para identificar con precisión quirúrgica las líneas de este grupo específico
                         const matchThisGroup = (item: any) =>
                           item.productId === primerItem.productId &&
                           (item.color || '') === (primerItem.color || '') &&
@@ -5698,10 +5667,9 @@ export default function ComercialComponent({
                                   title="Tocar para ampliar foto"
                                 >
                                   <img src={primerItem.imageUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-[var(--border)] group-hover:scale-105 transition-transform" />
-                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">ðŸ”</span>
-                                </button>
+                                  <span className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center text-white text-xs transition-opacity">�x�</span>−</button>
                               ) : (
-                                <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">ðŸ‘Ÿ</div>
+                                <div className="w-12 h-12 rounded-xl bg-[var(--muted)]/50 flex items-center justify-center text-lg shrink-0">�xx</div>
                               )}
 
                               <div className="min-w-0">
@@ -5709,10 +5677,10 @@ export default function ComercialComponent({
                                   {primerItem.modelName}
                                 </div>
                                 <div className="text-xs text-[var(--muted-foreground)]">
-                                  {primerItem.color} Â· <span className="font-semibold text-emerald-600">Serie: {formatearNombreSerie(primerItem.serieNombre)}</span>
+                                  {primerItem.color} · <span className="font-semibold text-emerald-600">Serie: {formatearNombreSerie(primerItem.serieNombre)}</span>
                                 </div>
 
-                                {/* Chips de Tallas Interactivos y Editables con diseÃ±o estandarizado */}
+                                {/* Chips de Tallas Interactivos y Editables con diseño estandarizado */}
                                 <div className="mt-2.5 space-y-2">
                                   <div className="flex flex-wrap items-center gap-2">
                                     {sortedLineas.map((l, i) => (
@@ -5741,7 +5709,7 @@ export default function ComercialComponent({
                                             className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
                                             title={`Quitar 1 par T${l.numeroTalla}`}
                                           >
-                                            âˆ’
+                                            ��
                                           </button>
                                           <span className="w-6 text-center text-xs font-bold font-mono text-[var(--foreground)]">
                                             {l.cantidad}
@@ -5816,7 +5784,7 @@ export default function ComercialComponent({
                                               }}
                                               className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                             >
-                                              − Media Docena (−6 pares)
+                                               Media Docena (6 pares)
                                             </button>
                                           </>
                                         );
@@ -5841,7 +5809,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            + ½ Doc A
+                                            + � Doc A
                                           </button>
                                           <button
                                             type="button"
@@ -5860,7 +5828,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            + ½ Doc B
+                                            + � Doc B
                                           </button>
                                           <button
                                             type="button"
@@ -5881,7 +5849,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            − ½ Doc A
+                                             � Doc A
                                           </button>
                                           <button
                                             type="button"
@@ -5902,7 +5870,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            − ½ Doc B
+                                             � Doc B
                                           </button>
                                         </>
                                       );
@@ -5912,11 +5880,11 @@ export default function ComercialComponent({
                                     </span>
                                   </div>
 
-                                  {/* ObservaciÃ³n especÃ­fica de este modelo en el resumen */}
+                                  {/* Observación específica de este modelo en el resumen */}
                                   {primerItem.observacionModelo ? (
                                     <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/25 rounded-lg flex items-center justify-between gap-2 text-xs">
                                       <div className="flex items-center gap-1.5 text-amber-900 dark:text-amber-200 min-w-0">
-                                        <span className="font-extrabold text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">ðŸ“ Nota:</span>
+                                        <span className="font-extrabold text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">�x� Nota:</span>
                                         <span className="truncate text-[11px] font-medium">{primerItem.observacionModelo}</span>
                                       </div>
                                       <button
@@ -5931,9 +5899,9 @@ export default function ComercialComponent({
                                           setLineasPedido(nuevasLineas);
                                         }}
                                         className="text-[10px] font-bold text-rose-500 hover:underline shrink-0 cursor-pointer"
-                                        title="Eliminar observaciÃ³n de este modelo"
+                                        title="Eliminar observación de este modelo"
                                       >
-                                        âœ•
+                                        �S"
                                       </button>
                                     </div>
                                   ) : editingObservacionProductId === key ? (
@@ -5987,7 +5955,7 @@ export default function ComercialComponent({
                                         }}
                                         className="px-2 py-1 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
                                       >
-                                        âœ•
+                                        �S"
                                       </button>
                                     </div>
                                   ) : (
@@ -6001,8 +5969,7 @@ export default function ComercialComponent({
                                         className="text-[10px] font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:underline flex items-center gap-1 cursor-pointer"
                                       >
                                         <Plus size={10} />
-                                        <span>Agregar observaciÃ³n a este modelo</span>
-                                      </button>
+                                        <span>Agregar observación a este modelo</span>−</button>
                                     </div>
                                   )}
                                 </div>
@@ -6012,7 +5979,7 @@ export default function ComercialComponent({
                             <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[var(--border)]">
                               <div className="text-right">
                                 <div className="text-xs font-bold text-[var(--foreground)]">
-                                  {totalPares} pares ({primerItem.tipoVenta === 'SERIE_COMPLETA' ? (primerItem.subtipoSerie === 'MEDIA_DOCENA' ? 'Â½ Docena' : '1 Docena') : 'NumeraciÃ³n'})
+                                  {totalPares} pares ({primerItem.tipoVenta === 'SERIE_COMPLETA' ? (primerItem.subtipoSerie === 'MEDIA_DOCENA' ? '½ Docena' : '1 Docena') : 'Numeración'})
                                 </div>
                                 {puedeCambiarPrecio ? (
                                   <div className="flex items-center justify-end gap-1 my-0.5" title="Precio unitario para esta serie de calzado">
@@ -6051,14 +6018,13 @@ export default function ComercialComponent({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  // Eliminar exclusivamente las lÃ­neas de esta serie y grupo
+                                  // Eliminar exclusivamente las líneas de esta serie y grupo
                                   setLineasPedido(lineasPedido.filter((l) => !matchThisGroup(l)));
                                 }}
                                 className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                                 title="Eliminar esta serie del pedido"
                               >
-                                <XCircle size={18} />
-                              </button>
+                                <XCircle size={18} />−</button>
                             </div>
                           </div>
                         );
@@ -6068,12 +6034,12 @@ export default function ComercialComponent({
                 </div>
               )}
 
-              {/* CUPÃ“N DE CAMPAÃ‘A PROMOCIONAL - Visible si hay campaÃ±as activas o cupÃ³n aplicado */}
+              {/* CUP�N DE CAMPA�A PROMOCIONAL - Visible si hay campañas activas o cupón aplicado */}
               {(promocionesActivas.length > 0 || cuponAplicado) && lineasPedido.length > 0 && (
                 <div className="p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
-                      <span>ðŸŽŸï¸ CupÃ³n de CampaÃ±a Promocional</span>
+                      <span>🎟️ Cupón de Campaña Promocional</span>
                     </span>
                     {cuponAplicado && (
                       <button
@@ -6081,7 +6047,7 @@ export default function ComercialComponent({
                         onClick={handleRemoverCupon}
                         className="text-[11px] font-bold text-rose-500 hover:underline cursor-pointer"
                       >
-                        Quitar cupÃ³n
+                        Quitar cupón
                       </button>
                     )}
                   </div>
@@ -6091,7 +6057,7 @@ export default function ComercialComponent({
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="Digita un cupÃ³n o selecciona una campaÃ±a..."
+                          placeholder="Digita un cupón o selecciona una campaña..."
                           value={codigoCuponInput}
                           onChange={(e) => {
                             setCodigoCuponInput(e.target.value.toUpperCase());
@@ -6108,8 +6074,7 @@ export default function ComercialComponent({
                           className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1 shadow-xs cursor-pointer"
                         >
                           {validandoCupon ? <Loader2 size={12} className="animate-spin" /> : null}
-                          <span>Aplicar</span>
-                        </button>
+                          <span>Aplicar</span>−</button>
                       </div>
 
                       {showSugerenciasCupon && promocionesActivas.length > 0 && (
@@ -6144,8 +6109,7 @@ export default function ComercialComponent({
                                   {c.tipoDescuento === 'PORCENTAJE'
                                     ? `${Number(c.valorDescuento)}% OFF`
                                     : `$${Number(c.valorDescuento || 0).toFixed(2)} OFF`}
-                                </span>
-                              </button>
+                                </span>−</button>
                             ))}
                           {promocionesActivas.filter(
                             (c) =>
@@ -6154,7 +6118,7 @@ export default function ComercialComponent({
                               c.titulo?.toUpperCase().includes(codigoCuponInput)
                           ).length === 0 && (
                             <div className="px-3 py-2 text-[10px] text-[var(--muted-foreground)] text-center">
-                              No hay campaÃ±as que coincidan.
+                              No hay campañas que coincidan.
                             </div>
                           )}
                         </div>
@@ -6173,7 +6137,7 @@ export default function ComercialComponent({
                         </div>
                         <p className="text-[10px] text-[var(--muted-foreground)]">
                           {cuponAplicado.promocion?.titulo}
-                          {cuponAplicado.cuposRestantes !== undefined && ` Â· Quedan ${cuponAplicado.cuposRestantes} cupos`}
+                          {cuponAplicado.cuposRestantes !== undefined && ` · Quedan ${cuponAplicado.cuposRestantes} cupos`}
                         </p>
                       </div>
 
@@ -6196,16 +6160,16 @@ export default function ComercialComponent({
                 </div>
               )}
 
-              {/* MODALIDAD DE ENTREGA Y LOGÃSTICA (FLETE) */}
+              {/* MODALIDAD DE ENTREGA Y LOGÍSTICA (FLETE) */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-xl border border-[var(--border)] space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-                    Modalidad de Entrega y LogÃ­stica (Flete)
+                    Modalidad de Entrega y Logística (Flete)
                   </span>
                   <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
                     tipoEntrega === 'ENVIO' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
                   }`}>
-                    {tipoEntrega === 'ENVIO' ? 'ðŸšš EnvÃ­o / Encomienda' : 'ðŸª Entrega Presencial en Local'}
+                    {tipoEntrega === 'ENVIO' ? '�xaa Envío / Encomienda' : '�x�� Entrega Presencial en Local'}
                   </span>
                 </div>
 
@@ -6219,8 +6183,7 @@ export default function ComercialComponent({
                         : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
                     }`}
                   >
-                    <span>ðŸª Entrega Presencial (Local)</span>
-                  </button>
+                    <span>�x�� Entrega Presencial (Local)</span>−</button>
                   <button
                     type="button"
                     onClick={() => setTipoEntrega('ENVIO')}
@@ -6231,8 +6194,7 @@ export default function ComercialComponent({
                     }`}
                   >
                     <Truck size={14} />
-                    <span>ðŸšš EnvÃ­o a Domicilio / Encomienda</span>
-                  </button>
+                    <span>�xaa Envío a Domicilio / Encomienda</span>−</button>
                 </div>
 
                 {tipoEntrega === 'ENVIO' && (
@@ -6265,23 +6227,23 @@ export default function ComercialComponent({
                           {listaTransportes.length > 0 ? (
                             listaTransportes.map((t: any) => (
                               <option key={t.id || t.nombre} value={t.nombre}>
-                                {t.nombre === 'Transporte Los Andes' ? 'â­ Transporte Los Andes (Predeterminada)' : t.esPredeterminada ? `â­ ${t.nombre} (Predeterminada)` : `ðŸšš ${t.nombre}`}
+                                {t.nombre === 'Transporte Los Andes' ? '⭐ Transporte Los Andes (Predeterminada)' : t.esPredeterminada ? `⭐ ${t.nombre} (Predeterminada)` : `�xaa ${t.nombre}`}
                               </option>
                             ))
                           ) : (
                             <>
-                              <option value="Transporte Los Andes">â­ Transporte Los Andes (Predeterminada)</option>
-                              <option value="Servientrega">ðŸ“¦ Servientrega</option>
-                              <option value="Cooperativa BaÃ±os">ðŸšŒ Cooperativa BaÃ±os</option>
-                              <option value="Cooperativa Cevallos">ðŸšŒ Cooperativa Cevallos</option>
-                              <option value="Transportes Santa">ðŸšŒ Transportes Santa</option>
-                              <option value="Cooperativa Cita Express">ðŸšŒ Cooperativa Cita Express</option>
-                              <option value="Flota Pelileo">ðŸšŒ Flota Pelileo</option>
-                              <option value="Urbano Express">ðŸšš Urbano Express</option>
-                              <option value="Encomienda Provincial / Transporte">ðŸš› Encomienda Provincial / Transporte</option>
+                              <option value="Transporte Los Andes">⭐ Transporte Los Andes (Predeterminada)</option>
+                              <option value="Servientrega">�x� Servientrega</option>
+                              <option value="Cooperativa Baños">�xaR Cooperativa Baños</option>
+                              <option value="Cooperativa Cevallos">�xaR Cooperativa Cevallos</option>
+                              <option value="Transportes Santa">�xaR Transportes Santa</option>
+                              <option value="Cooperativa Cita Express">�xaR Cooperativa Cita Express</option>
+                              <option value="Flota Pelileo">�xaR Flota Pelileo</option>
+                              <option value="Urbano Express">�🚚 Urbano Express</option>
+                              <option value="Encomienda Provincial / Transporte">�📦 Encomienda Provincial / Transporte</option>
                             </>
                           )}
-                          <option value="__ADD_NEW__">âž• + Registrar Nuevo Transporte...</option>
+                          <option value="__ADD_NEW__">�➕ + Registrar Nuevo Transporte...</option>
                         </select>
                       </div>
 
@@ -6302,11 +6264,11 @@ export default function ComercialComponent({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                          DirecciÃ³n de Entrega / Agencia Destino
+                          Dirección de Entrega / Agencia Destino
                         </label>
                         <input
                           type="text"
-                          placeholder="Ej: Av. 10 de Agosto y ColÃ³n / Agencia Terminal Terrestre"
+                          placeholder="Ej: Av. 10 de Agosto y Colón / Agencia Terminal Terrestre"
                           value={direccionEnvio}
                           onChange={(e) => setDireccionEnvio(e.target.value)}
                           className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
@@ -6315,7 +6277,7 @@ export default function ComercialComponent({
 
                       <div>
                         <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                          NÂ° GuÃ­a de Encomienda / Tracking (Opcional)
+                          N° Guía de Encomienda / Tracking (Opcional)
                         </label>
                         <input
                           type="text"
@@ -6327,10 +6289,10 @@ export default function ComercialComponent({
                       </div>
                     </div>
 
-                    {/* QuiÃ©n asume el Flete */}
+                    {/* Quién asume el Flete */}
                     <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-2">
                       <span className="text-[11px] font-bold text-blue-900 dark:text-blue-300 block">
-                        GestiÃ³n del Costo de EnvÃ­o (Flete)
+                        Gestión del Costo de Envío (Flete)
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                         <div className="flex gap-2">
@@ -6343,7 +6305,7 @@ export default function ComercialComponent({
                                 : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
                             }`}
                           >
-                            ðŸ”µ Cobro en Destino (Paga Cliente)
+                            �x� Cobro en Destino (Paga Cliente)
                           </button>
                           <button
                             type="button"
@@ -6354,7 +6316,7 @@ export default function ComercialComponent({
                                 : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
                             }`}
                           >
-                            ðŸŸ¢ Cubre la Empresa (CortesÃ­a)
+                            �xx� Cubre la Empresa (Cortesía)
                           </button>
                         </div>
 
@@ -6372,12 +6334,12 @@ export default function ComercialComponent({
                               className="w-24 px-2.5 py-1 bg-[var(--card)] border border-emerald-500/40 rounded-lg text-xs font-bold text-emerald-800 focus:outline-none focus:border-emerald-600 text-center"
                             />
                             <span className="text-[10px] text-emerald-600 italic">
-                              (Registra gasto operativo automÃ¡tico)
+                              (Registra gasto operativo automático)
                             </span>
                           </div>
                         ) : (
                           <div className="text-[11px] text-[var(--muted-foreground)] italic">
-                            El cliente pagarÃ¡ el costo del flete directamente a la empresa de transporte al retirar.
+                            El cliente pagará el costo del flete directamente a la empresa de transporte al retirar.
                           </div>
                         )}
                       </div>
@@ -6403,7 +6365,7 @@ export default function ComercialComponent({
                     {descCupon > 0 && (
                       <div className="flex items-center gap-2 text-[11px] text-[var(--muted-foreground)]">
                         <span>Subtotal: ${subtotalBase.toFixed(2)}</span>
-                        <span className="text-purple-600 font-bold">CupÃ³n ({cuponAplicado.promocion?.codigo}): -${descCupon.toFixed(2)}</span>
+                        <span className="text-purple-600 font-bold">Cupón ({cuponAplicado.promocion?.codigo}): -${descCupon.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 flex-wrap">
@@ -6415,11 +6377,11 @@ export default function ComercialComponent({
                       </div>
                       {montoAdelanto > 0 && (
                         <>
-                          <span className="text-slate-300">Â·</span>
+                          <span className="text-slate-300">·</span>
                           <span className="text-emerald-600 font-bold">
                             Anticipo: -${montoAdelanto.toFixed(2)}
                           </span>
-                          <span className="text-slate-300">Â·</span>
+                          <span className="text-slate-300">·</span>
                           <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20 text-amber-900 dark:text-amber-200">
                             <span className="font-bold">Saldo al Entregar:</span>
                             <span className="font-black text-sm font-mono">${saldoRestanteFinal.toFixed(2)}</span>
@@ -6452,8 +6414,7 @@ export default function ComercialComponent({
                       {creatingOrder
                         ? (editingOrderId ? 'Guardando Cambios...' : 'Creando Pedido...')
                         : (editingOrderId ? 'Guardar Cambios del Pedido' : 'Guardar Pedido Completo')}
-                    </span>
-                  </button>
+                    </span>−</button>
                 ) : (
                   <button
                     type="button"
@@ -6470,7 +6431,7 @@ export default function ComercialComponent({
         </div>
       )}
 
-      {/* â”€â”€ MODAL GENERAR ORDEN A PROVEEDOR â”€â”€ */}
+      {/* ���� MODAL GENERAR ORDEN A PROVEEDOR ���� */}
       {showSupplierOrderModal && supplierOrderProductData && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6484,8 +6445,8 @@ export default function ComercialComponent({
                   <Truck size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Orden de FabricaciÃ³n / Compra</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Especifica curva, numeraciÃ³n y observaciones para el proveedor</p>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Orden de Fabricación / Compra</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">Especifica curva, numeración y observaciones para el proveedor</p>
                 </div>
               </div>
               <button
@@ -6497,15 +6458,14 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             <form onSubmit={handleCrearOrdenProveedor} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
-              {/* Resumen del ArtÃ­culo */}
+              {/* Resumen del Artículo */}
               <div className="p-3 bg-[var(--muted)]/30 border border-[var(--border)] rounded-xl space-y-1">
-                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">ArtÃ­culo Solicitado</span>
+                <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">Artículo Solicitado</span>
                 <p className="text-xs font-black text-[var(--foreground)]">
                   {supplierOrderProductData.modelName} ({supplierOrderProductData.color})
                 </p>
@@ -6536,7 +6496,7 @@ export default function ComercialComponent({
                 </select>
               </div>
 
-              {/* Modalidad de Pedido a Proveedor: Serie Completa vs NumeraciÃ³n */}
+              {/* Modalidad de Pedido a Proveedor: Serie Completa vs Numeración */}
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)]">
                   Modalidad de Pedido al Proveedor *
@@ -6552,8 +6512,7 @@ export default function ComercialComponent({
                     }`}
                   >
                     <Package size={13} />
-                    <span>Serie Completa / Curva</span>
-                  </button>
+                    <span>Serie Completa / Curva</span>−</button>
                   <button
                     type="button"
                     onClick={() => setSupplierOrderModalType('NUMERACION')}
@@ -6563,12 +6522,11 @@ export default function ComercialComponent({
                         : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-purple-500'
                     }`}
                   >
-                    <span>ðŸ‘Ÿ Por NumeraciÃ³n</span>
-                  </button>
+                    <span>�xx Por Numeración</span>−</button>
                 </div>
               </div>
 
-              {/* ConfiguraciÃ³n de Serie Completa */}
+              {/* Configuración de Serie Completa */}
               {supplierOrderModalType === 'SERIE_COMPLETA' ? (
                 <div className="p-3.5 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-3">
                   <div>
@@ -6585,7 +6543,7 @@ export default function ComercialComponent({
                             : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/50'
                         }`}
                       >
-                        Â½ Media A (6 pares: 38/1, 39/2, 40/1, 41/1, 42/1)
+                        ½ Media A (6 pares: 38/1, 39/2, 40/1, 41/1, 42/1)
                       </button>
                       <button
                         type="button"
@@ -6596,7 +6554,7 @@ export default function ComercialComponent({
                             : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/50'
                         }`}
                       >
-                        Â½ Media B (6 pares: 38/1, 39/1, 40/2, 41/1, 42/1)
+                        ½ Media B (6 pares: 38/1, 39/1, 40/2, 41/1, 42/1)
                       </button>
                       <button
                         type="button"
@@ -6649,10 +6607,10 @@ export default function ComercialComponent({
                   </div>
                 </div>
               ) : (
-                /* ConfiguraciÃ³n Por NumeraciÃ³n EspecÃ­fica */
+                /* Configuración Por Numeración Específica */
                 <div className="p-3.5 bg-[var(--muted)]/20 border border-[var(--border)] rounded-xl space-y-2">
                   <span className="text-xs font-bold text-[var(--foreground)] block">
-                    ðŸ‘Ÿ Asigna la cantidad de pares por cada nÃºmero de talla:
+                    �xx Asigna la cantidad de pares por cada número de talla:
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {Object.entries(supplierOrderTallasMap).map(([key, qty]) => (
@@ -6756,15 +6714,14 @@ export default function ComercialComponent({
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {savingSupplierOrder ? <Loader2 size={15} className="animate-spin" /> : <Truck size={15} />}
-                  <span>Enviar Orden al Proveedor</span>
-                </button>
+                  <span>Enviar Orden al Proveedor</span>−</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* â”€â”€ MODAL GESTIONAR LOGÃSTICA DE ENVÃO Y FLETE (Fase E1) â”€â”€ */}
+      {/* ���� MODAL GESTIONAR LOGÍSTICA DE ENVÍO Y FLETE (Fase E1) ���� */}
       {showModalEnvio && pedidoEnvioSeleccionado && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6779,10 +6736,10 @@ export default function ComercialComponent({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
-                    LogÃ­stica de EnvÃ­o â€” Pedido #{getNumeroPedido(pedidoEnvioSeleccionado)}
+                    Logística de Envío � Pedido #{getNumeroPedido(pedidoEnvioSeleccionado)}
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Cliente: {pedidoEnvioSeleccionado.clienteNombre || 'Consumidor Final'} Â· Total: ${Number(pedidoEnvioSeleccionado.montoTotal).toFixed(2)}
+                    Cliente: {pedidoEnvioSeleccionado.clienteNombre || 'Consumidor Final'} · Total: ${Number(pedidoEnvioSeleccionado.montoTotal).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -6795,8 +6752,7 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             <form
@@ -6822,8 +6778,7 @@ export default function ComercialComponent({
                         : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[#0F172A]'
                     }`}
                   >
-                    <span>ðŸª Entrega Presencial (Local)</span>
-                  </button>
+                    <span>�x�� Entrega Presencial (Local)</span>−</button>
                   <button
                     type="button"
                     onClick={() => setEnvioModalTipoEntrega('ENVIO')}
@@ -6834,8 +6789,7 @@ export default function ComercialComponent({
                     }`}
                   >
                     <Truck size={14} />
-                    <span>ðŸšš EnvÃ­o / Encomienda</span>
-                  </button>
+                    <span>�xaa Envío / Encomienda</span>−</button>
                 </div>
               </div>
 
@@ -6869,23 +6823,23 @@ export default function ComercialComponent({
                         {listaTransportes.length > 0 ? (
                           listaTransportes.map((t: any) => (
                             <option key={t.id || t.nombre} value={t.nombre}>
-                              {t.nombre === 'Transporte Los Andes' ? 'â­ Transporte Los Andes (Predeterminada)' : t.esPredeterminada ? `â­ ${t.nombre} (Predeterminada)` : `ðŸšš ${t.nombre}`}
+                              {t.nombre === 'Transporte Los Andes' ? '⭐ Transporte Los Andes (Predeterminada)' : t.esPredeterminada ? `⭐ ${t.nombre} (Predeterminada)` : `�xaa ${t.nombre}`}
                             </option>
                           ))
                         ) : (
                           <>
-                            <option value="Transporte Los Andes">â­ Transporte Los Andes (Predeterminada)</option>
-                            <option value="Servientrega">ðŸ“¦ Servientrega</option>
-                            <option value="Cooperativa BaÃ±os">ðŸšŒ Cooperativa BaÃ±os</option>
-                            <option value="Cooperativa Cevallos">ðŸšŒ Cooperativa Cevallos</option>
-                            <option value="Transportes Santa">ðŸšŒ Transportes Santa</option>
-                            <option value="Cooperativa Cita Express">ðŸšŒ Cooperativa Cita Express</option>
-                            <option value="Flota Pelileo">ðŸšŒ Flota Pelileo</option>
-                            <option value="Urbano Express">ðŸšš Urbano Express</option>
-                            <option value="Encomienda Provincial / Transporte">ðŸš› Encomienda Provincial / Transporte</option>
+                            <option value="Transporte Los Andes">⭐ Transporte Los Andes (Predeterminada)</option>
+                            <option value="Servientrega">�x� Servientrega</option>
+                            <option value="Cooperativa Baños">�xaR Cooperativa Baños</option>
+                            <option value="Cooperativa Cevallos">�xaR Cooperativa Cevallos</option>
+                            <option value="Transportes Santa">�xaR Transportes Santa</option>
+                            <option value="Cooperativa Cita Express">�xaR Cooperativa Cita Express</option>
+                            <option value="Flota Pelileo">�xaR Flota Pelileo</option>
+                            <option value="Urbano Express">�🚚 Urbano Express</option>
+                            <option value="Encomienda Provincial / Transporte">�📦 Encomienda Provincial / Transporte</option>
                           </>
                         )}
-                        <option value="__ADD_NEW__">âž• + Registrar Nuevo Transporte...</option>
+                        <option value="__ADD_NEW__">�➕ + Registrar Nuevo Transporte...</option>
                       </select>
                     </div>
 
@@ -6906,11 +6860,11 @@ export default function ComercialComponent({
 
                   <div>
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                      DirecciÃ³n de Entrega / Sucursal de Retiro
+                      Dirección de Entrega / Sucursal de Retiro
                     </label>
                     <input
                       type="text"
-                      placeholder="Ej: Av. 10 de Agosto y ColÃ³n / Agencia Terminal Quitumbe"
+                      placeholder="Ej: Av. 10 de Agosto y Colón / Agencia Terminal Quitumbe"
                       value={envioModalDireccionEnvio}
                       onChange={(e) => setEnvioModalDireccionEnvio(e.target.value)}
                       className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-600"
@@ -6919,7 +6873,7 @@ export default function ComercialComponent({
 
                   <div>
                     <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                      NÂ° de GuÃ­a de Encomienda / Tracking
+                      N° de Guía de Encomienda / Tracking
                     </label>
                     <input
                       type="text"
@@ -6930,10 +6884,10 @@ export default function ComercialComponent({
                     />
                   </div>
 
-                  {/* QuiÃ©n asume el Flete */}
+                  {/* Quién asume el Flete */}
                   <div className="pt-2 border-t border-blue-500/20 space-y-2">
                     <span className="text-[11px] font-bold text-blue-900 dark:text-blue-300 block">
-                      GestiÃ³n del Flete
+                      Gestión del Flete
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -6945,7 +6899,7 @@ export default function ComercialComponent({
                             : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
                         }`}
                       >
-                        ðŸ”µ Cobro en Destino (Paga Cliente)
+                        �x� Cobro en Destino (Paga Cliente)
                       </button>
                       <button
                         type="button"
@@ -6956,7 +6910,7 @@ export default function ComercialComponent({
                             : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]'
                         }`}
                       >
-                        ðŸŸ¢ Cubre la Empresa (CortesÃ­a)
+                        �xx� Cubre la Empresa (Cortesía)
                       </button>
                     </div>
 
@@ -6964,7 +6918,7 @@ export default function ComercialComponent({
                       <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-between gap-3">
                         <div>
                           <span className="text-xs font-bold text-emerald-800 block">Costo de Flete a Registrar ($):</span>
-                          <span className="text-[10px] text-emerald-600">Se aÃ±adirÃ¡ automÃ¡ticamente al Libro de Gastos Operativos</span>
+                          <span className="text-[10px] text-emerald-600">Se añadirá automáticamente al Libro de Gastos Operativos</span>
                         </div>
                         <input
                           type="number"
@@ -6978,7 +6932,7 @@ export default function ComercialComponent({
                       </div>
                     ) : (
                       <p className="text-[11px] text-[var(--muted-foreground)] italic">
-                        El cliente pagarÃ¡ el valor del flete directamente a la empresa de transporte al retirar el paquete.
+                        El cliente pagará el valor del flete directamente a la empresa de transporte al retirar el paquete.
                       </p>
                     )}
                   </div>
@@ -6991,7 +6945,7 @@ export default function ComercialComponent({
                   <div>
                     <div className="text-xs font-bold text-emerald-800">Entrega Presencial en Mostrador</div>
                     <div className="text-[11px] text-[var(--muted-foreground)]">
-                      El cliente retirarÃ¡ su calzado directamente en el local comercial sin costo de flete.
+                      El cliente retirará su calzado directamente en el local comercial sin costo de flete.
                     </div>
                   </div>
                 </div>
@@ -7016,15 +6970,14 @@ export default function ComercialComponent({
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {savingEnvioModal ? <Loader2 size={15} className="animate-spin" /> : <Truck size={15} />}
-                  <span>Guardar LogÃ­stica de Entrega</span>
-                </button>
+                  <span>Guardar Logística de Entrega</span>−</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* â”€â”€ MODAL GESTIONAR ANTICIPO / ADELANTO DE DINERO â”€â”€ */}
+      {/* ���� MODAL GESTIONAR ANTICIPO / ADELANTO DE DINERO ���� */}
       {showModalAdelanto && pedidoAdelantoSeleccionado && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -7053,10 +7006,10 @@ export default function ComercialComponent({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
-                    Anticipo / Adelanto â€” Pedido #{getNumeroPedido(pedidoAdelantoSeleccionado)}
+                    Anticipo / Adelanto � Pedido #{getNumeroPedido(pedidoAdelantoSeleccionado)}
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Cliente: {pedidoAdelantoSeleccionado.clienteNombre || 'Consumidor Final'} Â· Total Pedido: ${Number(pedidoAdelantoSeleccionado.montoTotal).toFixed(2)}
+                    Cliente: {pedidoAdelantoSeleccionado.clienteNombre || 'Consumidor Final'} · Total Pedido: ${Number(pedidoAdelantoSeleccionado.montoTotal).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -7069,8 +7022,7 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             <form
@@ -7081,7 +7033,7 @@ export default function ComercialComponent({
               className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs"
             >
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
-              {/* Resumen Financiero DinÃ¡mico */}
+              {/* Resumen Financiero Dinámico */}
               {(() => {
                 const totalPedido = Number(pedidoAdelantoSeleccionado.montoTotal || 0);
                 const montoAnticipo = Number(modalAdelantoMonto || 0);
@@ -7100,7 +7052,7 @@ export default function ComercialComponent({
                     <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between">
                       <div>
                         <span className="text-xs font-black text-amber-900 dark:text-amber-300 block">Saldo a Cancelar al Entregar:</span>
-                        <span className="text-[10px] text-[var(--muted-foreground)]">Se cobrarÃ¡ al momento de despachar</span>
+                        <span className="text-[10px] text-[var(--muted-foreground)]">Se cobrará al momento de despachar</span>
                       </div>
                       <span className="text-base font-black text-amber-600 dark:text-amber-400 font-mono">${saldoPendiente.toFixed(2)}</span>
                     </div>
@@ -7108,7 +7060,7 @@ export default function ComercialComponent({
                 );
               })()}
 
-              {/* Botones de Atajo RÃ¡pido */}
+              {/* Botones de Atajo Rápido */}
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">
                   Atajos de Anticipo
@@ -7167,23 +7119,23 @@ export default function ComercialComponent({
 
                 <div>
                   <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                    MÃ©todo de Anticipo *
+                    Método de Anticipo *
                   </label>
                   <select
                     value={modalAdelantoMetodo}
                     onChange={(e) => setModalAdelantoMetodo(e.target.value as any)}
                     className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-600"
                   >
-                    <option value="EFECTIVO">ðŸ’µ Efectivo (Caja)</option>
-                    <option value="TRANSFERENCIA">ðŸ¦ Transferencia Bancaria</option>
-                    <option value="DEPOSITO">ðŸ“¥ DepÃ³sito Bancario</option>
-                    <option value="CHEQUE">ðŸ“ Cheque</option>
+                    <option value="EFECTIVO">�x� Efectivo (Caja)</option>
+                    <option value="TRANSFERENCIA">�x�� Transferencia Bancaria</option>
+                    <option value="DEPOSITO">�x� Depósito Bancario</option>
+                    <option value="CHEQUE">�x� Cheque</option>
                   </select>
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                    NÂ° Comprobante / Referencia / Banco (Opcional)
+                    N° Comprobante / Referencia / Banco (Opcional)
                   </label>
                   <input
                     type="text"
@@ -7195,11 +7147,11 @@ export default function ComercialComponent({
                 </div>
               </div>
 
-              {/* Mensaje de SincronizaciÃ³n AutomÃ¡tica */}
+              {/* Mensaje de Sincronización Automática */}
               <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-800 dark:text-blue-300 flex items-center gap-2">
                 <CheckCircle size={14} className="shrink-0 text-blue-600 dark:text-blue-400" />
                 <span>
-                  Este anticipo se sincronizarÃ¡ automÃ¡ticamente como pago inicial en el mÃ³dulo de Cobranzas / Financiero al entregar el pedido.
+                  Este anticipo se sincronizará automáticamente como pago inicial en el módulo de Cobranzas / Financiero al entregar el pedido.
                 </span>
               </div>
 
@@ -7222,15 +7174,14 @@ export default function ComercialComponent({
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {savingAdelantoModal ? <Loader2 size={15} className="animate-spin" /> : <DollarSign size={15} />}
-                  <span>Guardar Anticipo</span>
-                </button>
+                  <span>Guardar Anticipo</span>−</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* â”€â”€ MODAL AGREGAR NUEVA EMPRESA DE TRANSPORTE â”€â”€ */}
+      {/* ���� MODAL AGREGAR NUEVA EMPRESA DE TRANSPORTE ���� */}
       {showNuevoTransporteModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -7254,8 +7205,7 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             <form onSubmit={handleCrearNuevoTransporte} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
@@ -7276,7 +7226,7 @@ export default function ComercialComponent({
               </div>
 
               <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-900 dark:text-blue-300">
-                ðŸ’¡ Esta empresa quedarÃ¡ guardada en el sistema para que todos los vendedores puedan seleccionarla en futuros envÃ­os.
+                �x� Esta empresa quedará guardada en el sistema para que todos los vendedores puedan seleccionarla en futuros envíos.
               </div>
 
               </div>
@@ -7295,8 +7245,7 @@ export default function ComercialComponent({
                   className="flex-1 sm:flex-none px-5 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                 >
                   {guardandoTransporte ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-                  <span>Guardar Transporte</span>
-                </button>
+                  <span>Guardar Transporte</span>−</button>
               </div>
             </form>
           </div>
@@ -7339,15 +7288,14 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             {/* Contenido scrollable */}
             <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 min-h-0 text-xs">
               <div className="flex items-center justify-between flex-wrap gap-2 p-3 bg-[var(--muted)]/40 border border-[var(--border)] rounded-xl text-xs">
                 <div className="text-[var(--muted-foreground)]">
-                  Indica los pares a despachar. El sistema descontarÃ¡ el inventario fÃ­sico y actualizarÃ¡ el estado a <strong className="text-cyan-600 dark:text-cyan-400">Entregado Parcial</strong> o <strong className="text-emerald-600 dark:text-emerald-400">Entregado</strong>.
+                  Indica los pares a despachar. El sistema descontará el inventario físico y actualizará el estado a <strong className="text-cyan-600 dark:text-cyan-400">Entregado Parcial</strong> o <strong className="text-emerald-600 dark:text-emerald-400">Entregado</strong>.
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -7384,7 +7332,7 @@ export default function ComercialComponent({
                     }}
                     className="px-2.5 py-1 bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600 hover:text-white border border-emerald-600/20 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
                   >
-                    âš¡ Llenar Disponibles
+                    �a� Llenar Disponibles
                   </button>
                   <button
                     type="button"
@@ -7397,7 +7345,7 @@ export default function ComercialComponent({
                     }}
                     className="px-2.5 py-1 bg-slate-500/10 text-slate-600 hover:bg-slate-500 hover:text-white border border-slate-500/20 rounded-lg text-xs font-bold transition-all cursor-pointer"
                   >
-                    ðŸ”„ Poner en 0
+                    �x Poner en 0
                   </button>
                 </div>
               </div>
@@ -7409,7 +7357,7 @@ export default function ComercialComponent({
                   <div className="flex-1">
                     <div className="font-bold">Stock insuficiente en ciertas tallas</div>
                     <div className="text-[11px] text-amber-700 dark:text-amber-300">
-                      Las tallas resaltadas en Ã¡mbar o rojo no alcanzan a cubrir el pedido completo por falta de inventario fÃ­sico. Puedes entregar las unidades disponibles o aplicar despacho compensatorio seleccionando una talla sustituta con stock.
+                      Las tallas resaltadas en ámbar o rojo no alcanzan a cubrir el pedido completo por falta de inventario físico. Puedes entregar las unidades disponibles o aplicar despacho compensatorio seleccionando una talla sustituta con stock.
                     </div>
                   </div>
                   <button
@@ -7418,15 +7366,14 @@ export default function ComercialComponent({
                     className="text-amber-500 hover:text-amber-700 p-0.5 cursor-pointer"
                     title="Cerrar advertencia"
                   >
-                    <X size={14} />
-                  </button>
+                    <X size={14} />−</button>
                 </div>
               )}
 
-              {/* Tarjetas interactivas agrupadas por Modelo / Variante (IdÃ©ntico a componente de pedidos) */}
+              {/* Tarjetas interactivas agrupadas por Modelo / Variante (Idéntico a componente de pedidos) */}
               <div className="space-y-3">
                 {(() => {
-                  // Agrupar lÃ­neas por modelo / variante
+                  // Agrupar líneas por modelo / variante
                   const gruposMap = new Map<string, {
                     key: string;
                     productId: string;
@@ -7449,7 +7396,7 @@ export default function ComercialComponent({
                         productId: l.productId,
                         modelName: l.modelName || 'Calzado',
                         color: l.color || '',
-                        serieNombre: l.serieNombre || 'Serie EstÃ¡ndar',
+                        serieNombre: l.serieNombre || 'Serie Estándar',
                         imageUrl: l.imageUrl,
                         precioUnitario: Number(l.precioUnitario || 0),
                         tipoVenta: l.tipoVenta,
@@ -7465,7 +7412,7 @@ export default function ComercialComponent({
                   if (grupos.length === 0) {
                     return (
                       <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
-                        No hay artÃ­culos para entregar en este pedido.
+                        No hay artículos para entregar en este pedido.
                       </div>
                     );
                   }
@@ -7486,7 +7433,7 @@ export default function ComercialComponent({
                     const subtotalDespachoHoy = totalParesADespacharHoy * precioEntregaActual;
 
                     let formato = `${totalParesADespacharHoy} pares`;
-                    if (totalParesADespacharHoy === 6) formato = '6 pares (Â½ Docena)';
+                    if (totalParesADespacharHoy === 6) formato = '6 pares (½ Docena)';
                     else if (totalParesADespacharHoy === 12) formato = '12 pares (1 Docena)';
                     else if (totalParesADespacharHoy > 12 && totalParesADespacharHoy % 12 === 0) formato = `${totalParesADespacharHoy} pares (${totalParesADespacharHoy / 12} Docenas)`;
                     else if (totalParesADespacharHoy > 6 && totalParesADespacharHoy % 6 === 0) formato = `${totalParesADespacharHoy} pares (${(totalParesADespacharHoy / 6) * 0.5} Docenas)`;
@@ -7496,7 +7443,7 @@ export default function ComercialComponent({
                         key={g.key}
                         className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-2xs"
                       >
-                        {/* Izquierda: Imagen, InformaciÃ³n y Steppers por Talla */}
+                        {/* Izquierda: Imagen, Información y Steppers por Talla */}
                         <div className="flex items-start gap-3 min-w-0 flex-1">
                           <div
                             onClick={() => {
@@ -7512,7 +7459,7 @@ export default function ComercialComponent({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-lg">ðŸ‘Ÿ</span>
+                              <span className="text-lg">�xx</span>
                             )}
                           </div>
 
@@ -7521,13 +7468,13 @@ export default function ComercialComponent({
                               {g.modelName}
                             </div>
                             <div className="text-xs text-[var(--muted-foreground)]">
-                              {g.color ? `${g.color.toUpperCase()} Â· ` : ''}
+                              {g.color ? `${g.color.toUpperCase()} · ` : ''}
                               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                                 Serie: {formatearNombreSerie(g.serieNombre)}
                               </span>
                             </div>
 
-                            {/* Chips de Tallas Interactivos con diseÃ±o idÃ©ntico al pedido */}
+                            {/* Chips de Tallas Interactivos con diseño idéntico al pedido */}
                             <div className="mt-2 space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 {sortedTallas.map((l, i) => {
@@ -7599,12 +7546,12 @@ export default function ComercialComponent({
                                         )}
                                       </div>
 
-                                      {/* Talla Sustituta Activa o Selector de SustituciÃ³n */}
+                                      {/* Talla Sustituta Activa o Selector de Sustitución */}
                                       {cantPendiente > 0 && (
                                         <div className="flex items-center gap-1">
                                           {isSustituta ? (
                                             <div className="flex items-center gap-1 text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded-md">
-                                              <span>ðŸ”„ Sustituida por T{activeTallaNumero}</span>
+                                              <span>�x Sustituida por T{activeTallaNumero}</span>
                                               <button
                                                 type="button"
                                                 onClick={() => {
@@ -7619,9 +7566,9 @@ export default function ComercialComponent({
                                                   }));
                                                 }}
                                                 className="hover:text-rose-600 ml-0.5 font-bold cursor-pointer"
-                                                title="Quitar sustituciÃ³n y volver a talla original"
+                                                title="Quitar sustitución y volver a talla original"
                                               >
-                                                âœ•
+                                                �S"
                                               </button>
                                             </div>
                                           ) : (
@@ -7646,7 +7593,7 @@ export default function ComercialComponent({
                                                 className="text-[9px] font-medium bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)] rounded px-1 py-0.5 hover:border-purple-400 focus:outline-hidden cursor-pointer"
                                                 title="Sustituir por otra talla con stock disponible de este mismo modelo"
                                               >
-                                                <option value="">ðŸ”„ Sustituir...</option>
+                                                <option value="">�x Sustituir...</option>
                                                 {tallasAlternativasConStock.map((st: any) => (
                                                   <option key={st.tallaId || st.talla?.id} value={st.tallaId || st.talla?.id}>
                                                     T{st.talla?.numero} (Disp: {st.stockDisponible !== undefined ? st.stockDisponible : (st.stockFisico || 0)})
@@ -7661,7 +7608,7 @@ export default function ComercialComponent({
                                       {/* Stepper y Cantidades */}
                                       {cantPendiente === 0 ? (
                                         <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-auto" title="Talla completada al 100%">
-                                          âœ“ {cantEntregada} entregados
+                                          �S {cantEntregada} entregados
                                         </span>
                                       ) : (
                                         <div className="flex items-center gap-1 ml-auto">
@@ -7686,7 +7633,7 @@ export default function ComercialComponent({
                                             }`}
                                             title={`Quitar 1 par`}
                                           >
-                                            âˆ’
+                                            ��
                                           </button>
                                           <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
                                             {aEntregar}
@@ -7709,9 +7656,9 @@ export default function ComercialComponent({
                                               maxPermitido <= 0
                                                 ? stockDisp <= 0
                                                   ? `Sin stock disponible en bodega para T${activeTallaNumero}`
-                                                  : `Ya se alcanzÃ³ el tope pendiente (${cantPendiente})`
+                                                  : `Ya se alcanzó el tope pendiente (${cantPendiente})`
                                                 : aEntregar >= maxPermitido
-                                                ? `Tope alcanzado (mÃ¡x a entregar hoy: ${maxPermitido})`
+                                                ? `Tope alcanzado (máx a entregar hoy: ${maxPermitido})`
                                                 : `Agregar 1 par T${activeTallaNumero}`
                                             }
                                           >
@@ -7724,7 +7671,7 @@ export default function ComercialComponent({
                                 })}
                               </div>
 
-                              {/* Botones de acciÃ³n rÃ¡pida: Media Docena Serie A / B */}
+                              {/* Botones de acción rápida: Media Docena Serie A / B */}
                               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                     {(() => {
                                       const esUniforme = esCurvaUniforme6Tallas(sortedTallas);
@@ -7771,7 +7718,7 @@ export default function ComercialComponent({
                                               }}
                                               className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                             >
-                                              − Media Docena (−6 pares)
+                                               Media Docena (6 pares)
                                             </button>
                                           </>
                                         );
@@ -7799,7 +7746,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            + ½ Doc A
+                                            + � Doc A
                                           </button>
                                           <button
                                             type="button"
@@ -7821,7 +7768,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            + ½ Doc B
+                                            + � Doc B
                                           </button>
                                           <button
                                             type="button"
@@ -7840,7 +7787,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            − ½ Doc A
+                                             � Doc A
                                           </button>
                                           <button
                                             type="button"
@@ -7859,7 +7806,7 @@ export default function ComercialComponent({
                                             }}
                                             className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                           >
-                                            − ½ Doc B
+                                             � Doc B
                                           </button>
                                         </>
                                       );
@@ -7869,17 +7816,17 @@ export default function ComercialComponent({
                                   </span>
                                 </div>
 
-                              {/* ObservaciÃ³n del modelo */}
+                              {/* Observación del modelo */}
                               {g.observacionModelo ? (
                                 <div className="mt-1.5 p-2 bg-amber-500/10 border border-amber-500/25 rounded-lg flex items-center gap-1.5 text-xs text-amber-900 dark:text-amber-200">
                                   <span className="font-extrabold text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">
-                                    ðŸ“ Nota:
+                                    �x� Nota:
                                   </span>
                                   <span className="truncate text-[11px] font-medium">{g.observacionModelo}</span>
                                 </div>
                               ) : (
                                 <div className="mt-1 text-[10px] font-semibold text-[var(--muted-foreground)] flex items-center gap-1">
-                                  <span>+ ObservaciÃ³n:</span>
+                                  <span>+ Observación:</span>
                                   <span className="font-normal text-slate-400">Sin notas adicionales</span>
                                 </div>
                               )}
@@ -7926,12 +7873,12 @@ export default function ComercialComponent({
                             </div>
                             {totalParesEntregadosAntes > 0 && (
                               <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                                âœ“ {totalParesEntregadosAntes} ya entregados
+                                �S {totalParesEntregadosAntes} ya entregados
                               </div>
                             )}
                           </div>
 
-                          {/* BotÃ³n para resetear este modelo a 0 */}
+                          {/* Botón para resetear este modelo a 0 */}
                           <button
                             type="button"
                             onClick={() => {
@@ -7944,8 +7891,7 @@ export default function ComercialComponent({
                             className="w-6 h-6 rounded-full border border-rose-400/40 text-rose-500 hover:bg-rose-500/10 flex items-center justify-center text-xs font-bold cursor-pointer transition-colors"
                             title="Poner en 0 pares a entregar para este modelo"
                           >
-                            <X size={13} />
-                          </button>
+                            <X size={13} />−</button>
                         </div>
                       </div>
                     );
@@ -7975,7 +7921,7 @@ export default function ComercialComponent({
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                           : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                       }`}>
-                        {esTotal ? 'âœ¨ Entrega Completa (ENTREGADO)' : 'ðŸ“¦ Entrega Parcial (ENTREGADO_PARCIAL)'}
+                        {esTotal ? '�S� Entrega Completa (ENTREGADO)' : '�x� Entrega Parcial (ENTREGADO_PARCIAL)'}
                       </span>
                     </div>
                   </div>
@@ -8006,14 +7952,13 @@ export default function ComercialComponent({
                 className="flex-1 sm:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
               >
                 {procesandoEntrega ? <Loader2 size={15} className="animate-spin" /> : <PackageCheck size={15} />}
-                <span>Confirmar y Despachar</span>
-              </button>
+                <span>Confirmar y Despachar</span>−</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de ReversiÃ³n / CorrecciÃ³n de Entrega ErrÃ³nea (Fase 2) */}
+      {/* Modal de Reversión / Corrección de Entrega Errónea (Fase 2) */}
       {showRevertirEntregaModal && pedidoRevertirSeleccionado && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -8042,7 +7987,7 @@ export default function ComercialComponent({
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Corregir / Revertir Entrega</h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Pedido #{pedidoRevertirSeleccionado.numeroCodigo || pedidoRevertirSeleccionado.id.slice(0, 8)} Â· {pedidoRevertirSeleccionado.clienteNombre || 'Cliente'}
+                    Pedido #{pedidoRevertirSeleccionado.numeroCodigo || pedidoRevertirSeleccionado.id.slice(0, 8)} · {pedidoRevertirSeleccionado.clienteNombre || 'Cliente'}
                   </p>
                 </div>
               </div>
@@ -8056,14 +8001,13 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             {/* Contenido scrollable */}
             <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 min-h-0 text-xs">
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900 dark:text-amber-200">
-                Selecciona la cantidad de pares que fueron entregados por error para restituirlos al inventario fÃ­sico. El saldo del cliente y las notas de entrega se ajustarÃ¡n automÃ¡ticamente.
+                Selecciona la cantidad de pares que fueron entregados por error para restituirlos al inventario físico. El saldo del cliente y las notas de entrega se ajustarán automáticamente.
               </div>
 
               {/* Tarjetas de Modelos con Curva de Tallas entregadas (Rule 7) */}
@@ -8090,7 +8034,7 @@ export default function ComercialComponent({
                         productId: l.productId,
                         modelName: l.modelName || 'Calzado',
                         color: l.color || '',
-                        serieNombre: l.serieNombre || 'Serie EstÃ¡ndar',
+                        serieNombre: l.serieNombre || 'Serie Estándar',
                         imageUrl: l.imageUrl,
                         precioUnitario: Number(l.precioUnitario || 0),
                         tipoVenta: l.tipoVenta,
@@ -8138,7 +8082,7 @@ export default function ComercialComponent({
                               {g.modelName}
                             </h4>
                             <div className="text-xs text-[var(--muted-foreground)]">
-                              {g.color ? `${g.color.toUpperCase()} Â· ` : ''}
+                              {g.color ? `${g.color.toUpperCase()} · ` : ''}
                               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                                 Serie: {formatearNombreSerie(g.serieNombre)}
                               </span>
@@ -8179,7 +8123,7 @@ export default function ComercialComponent({
                                         }`}
                                         title={`Restar 1 par a revertir T${numTalla}`}
                                       >
-                                        âˆ’
+                                        ��
                                       </button>
                                       <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
                                         {aRevertir}
@@ -8198,7 +8142,7 @@ export default function ComercialComponent({
                                             ? 'bg-slate-500/10 text-slate-400 opacity-40 cursor-not-allowed'
                                             : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 cursor-pointer'
                                         }`}
-                                        title={`Sumar 1 par a revertir T${numTalla} (mÃ¡x: ${yaEntregado})`}
+                                        title={`Sumar 1 par a revertir T${numTalla} (máx: ${yaEntregado})`}
                                       >
                                         +
                                       </button>
@@ -8208,7 +8152,7 @@ export default function ComercialComponent({
                               })}
                             </div>
 
-                            {/* Acciones RÃ¡pidas Rule 7 */}
+                            {/* Acciones Rápidas Rule 7 */}
                             <div className="flex items-center gap-2 mt-2">
                               <button
                                 type="button"
@@ -8258,16 +8202,16 @@ export default function ComercialComponent({
                 })()}
               </div>
 
-              {/* Campo de motivo obligatorio para auditorÃ­a */}
+              {/* Campo de motivo obligatorio para auditoría */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[var(--foreground)]">
-                  Motivo de la correcciÃ³n o reversiÃ³n:
+                  Motivo de la corrección o reversión:
                 </label>
                 <input
                   type="text"
                   value={motivoReversion}
                   onChange={(e) => setMotivoReversion(e.target.value)}
-                  placeholder="Ej: Despacho de calzado equivocado al cliente / DevoluciÃ³n inmediata en mostrador"
+                  placeholder="Ej: Despacho de calzado equivocado al cliente / Devolución inmediata en mostrador"
                   className="w-full px-3 py-2 text-xs bg-[var(--background)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
@@ -8300,15 +8244,15 @@ export default function ComercialComponent({
                       </div>
                     </div>
 
-                    {/* Alerta de confirmaciÃ³n in-modal (100% sin alerts ni confirms de navegador) */}
+                    {/* Alerta de confirmación in-modal (100% sin alerts ni confirms de navegador) */}
                     {confirmandoReversionPaso && (
                       <div className="p-4 bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl space-y-2 animate-in fade-in duration-200">
                         <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-extrabold text-xs">
                           <AlertTriangle size={18} className="text-amber-600 shrink-0" />
-                          <span>Â¿Confirmas la restituciÃ³n de estos calzados al inventario?</span>
+                          <span>¿Confirmas la restitución de estos calzados al inventario?</span>
                         </div>
                         <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                          Se devolverÃ¡n <strong>{totalRevertirGeneral} pares</strong> a la bodega fÃ­sica del local y se descontarÃ¡ automÃ¡ticamente <strong>${montoTotalRevertirGeneral.toFixed(2)}</strong> del saldo de la cuenta corriente de este cliente.
+                          Se devolverán <strong>{totalRevertirGeneral} pares</strong> a la bodega física del local y se descontará automáticamente <strong>${montoTotalRevertirGeneral.toFixed(2)}</strong> del saldo de la cuenta corriente de este cliente.
                         </p>
                       </div>
                     )}
@@ -8336,8 +8280,7 @@ export default function ComercialComponent({
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     {procesandoReversion ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
-                    <span>SÃ­, Proceder con la ReversiÃ³n</span>
-                  </button>
+                    <span>Sí, Proceder con la Reversión</span>−</button>
                 </>
               ) : (
                 <>
@@ -8370,8 +8313,7 @@ export default function ComercialComponent({
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     <RotateCcw size={15} />
-                    <span>Continuar a ConfirmaciÃ³n</span>
-                  </button>
+                    <span>Continuar a Confirmación</span>−</button>
                 </>
               )}
             </div>
@@ -8379,9 +8321,9 @@ export default function ComercialComponent({
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      {/* MODAL: REGISTRAR DEVOLUCIÃ“N DE CALZADO POR CLIENTE (FASE 3)        */}
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* MODAL: REGISTRAR DEVOLUCI�N DE CALZADO POR CLIENTE (FASE 3)        */}
+      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
       {showDevolucionModal && pedidoDevolucionSeleccionado && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -8410,9 +8352,9 @@ export default function ComercialComponent({
                   <RotateCcw size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Registrar DevoluciÃ³n de Calzado</h3>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">Registrar Devolución de Calzado</h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Pedido #{pedidoDevolucionSeleccionado.numeroCodigo || pedidoDevolucionSeleccionado.id.slice(0, 8)} Â· {pedidoDevolucionSeleccionado.clienteNombre || 'Cliente'}
+                    Pedido #{pedidoDevolucionSeleccionado.numeroCodigo || pedidoDevolucionSeleccionado.id.slice(0, 8)} · {pedidoDevolucionSeleccionado.clienteNombre || 'Cliente'}
                   </p>
                 </div>
               </div>
@@ -8427,8 +8369,7 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             {/* Contenido scrollable */}
@@ -8436,7 +8377,7 @@ export default function ComercialComponent({
               {/* Selector de Destino de Stock */}
               <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-wider text-[var(--foreground)] block">
-                  Destino de la MercaderÃ­a Devuelta:
+                  Destino de la Mercadería Devuelta:
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button
@@ -8450,12 +8391,11 @@ export default function ComercialComponent({
                   >
                     <Package size={16} className="mt-0.5 shrink-0 text-emerald-600" />
                     <div>
-                      <div className="text-xs font-bold text-[var(--foreground)]">ðŸ“¦ Reingreso a Bodega</div>
+                      <div className="text-xs font-bold text-[var(--foreground)]">�x� Reingreso a Bodega</div>
                       <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
-                        Calzado en Ã³ptimo estado (talla no le quedÃ³, cambio de modelo). Regresa al stock vendible.
+                        Calzado en óptimo estado (talla no le quedó, cambio de modelo). Regresa al stock vendible.
                       </div>
-                    </div>
-                  </button>
+                    </div>−</button>
 
                   <button
                     type="button"
@@ -8468,27 +8408,26 @@ export default function ComercialComponent({
                   >
                     <AlertTriangle size={16} className="mt-0.5 shrink-0 text-rose-600" />
                     <div>
-                      <div className="text-xs font-bold text-[var(--foreground)]">âš ï¸ Falla / GarantÃ­a de FÃ¡brica</div>
+                      <div className="text-xs font-bold text-[var(--foreground)]">�a�️ Falla / Garantía de Fábrica</div>
                       <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">
-                        Calzado con defecto o falla. Queda retenido como merma para reclamo y devoluciÃ³n al fabricante.
+                        Calzado con defecto o falla. Queda retenido como merma para reclamo y devolución al fabricante.
                       </div>
-                    </div>
-                  </button>
+                    </div>−</button>
                 </div>
               </div>
 
-              {/* Selector de Motivo de DevoluciÃ³n */}
+              {/* Selector de Motivo de Devolución */}
               <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-wider text-[var(--foreground)] block">
-                  Motivo de la DevoluciÃ³n:
+                  Motivo de la Devolución:
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    'Defecto de fÃ¡brica / GarantÃ­a',
-                    'Talla no le quedÃ³ al cliente',
+                    'Defecto de fábrica / Garantía',
+                    'Talla no le quedó al cliente',
                     'Cambio de modelo o color',
                     'Falla de pegado o costura',
-                    'CancelaciÃ³n comercial',
+                    'Cancelación comercial',
                   ].map((mot) => (
                     <button
                       key={mot}
@@ -8594,7 +8533,7 @@ export default function ComercialComponent({
                                   </span>
                                 )}
                                 <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                                  Serie: {first.serieNombre || 'EstÃ¡ndar'}
+                                  Serie: {first.serieNombre || 'Estándar'}
                                 </span>
                               </div>
                             </div>
@@ -8608,7 +8547,7 @@ export default function ComercialComponent({
                           </div>
                         </div>
 
-                        {/* Curva de Tallas Entregadas y Controles de DevoluciÃ³n */}
+                        {/* Curva de Tallas Entregadas y Controles de Devolución */}
                         <div className="bg-[var(--muted)]/30 rounded-xl p-2.5 sm:p-3 border border-[var(--border)]/60">
                           <div className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-foreground)] mb-2">
                             Pares Entregados vs Cantidad a Devolver:
@@ -8642,7 +8581,7 @@ export default function ComercialComponent({
                                     </span>
                                   )}
 
-                                  {/* Controles numÃ©ricos âˆ’ / + */}
+                                  {/* Controles numéricos �� / + */}
                                   <div className="flex items-center gap-1 mt-1">
                                     <button
                                       type="button"
@@ -8660,7 +8599,7 @@ export default function ComercialComponent({
                                       }`}
                                       title={`Restar 1 par a devolver T${numTalla}`}
                                     >
-                                      âˆ’
+                                      ��
                                     </button>
                                     <span className="w-5 text-center font-black font-mono text-xs">
                                       {aDevolver}
@@ -8679,7 +8618,7 @@ export default function ComercialComponent({
                                           ? 'opacity-30 cursor-not-allowed bg-[var(--muted)] text-[var(--muted-foreground)]'
                                           : 'bg-rose-500/20 text-rose-700 dark:text-rose-300 hover:bg-rose-500/30 cursor-pointer'
                                       }`}
-                                      title={`Sumar 1 par a devolver T${numTalla} (mÃ¡x disponible: ${disponible})`}
+                                      title={`Sumar 1 par a devolver T${numTalla} (máx disponible: ${disponible})`}
                                     >
                                       +
                                     </button>
@@ -8690,7 +8629,7 @@ export default function ComercialComponent({
                           </div>
                         </div>
 
-                        {/* Acciones RÃ¡pidas y Resumen del Modelo */}
+                        {/* Acciones Rápidas y Resumen del Modelo */}
                         <div className="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border)]/60 flex-wrap">
                           <div className="flex items-center gap-1.5">
                             <button
@@ -8756,7 +8695,7 @@ export default function ComercialComponent({
                   <div className="space-y-3">
                     <div className="p-4 bg-slate-900 text-white rounded-xl flex items-center justify-between flex-wrap gap-3">
                       <div>
-                        <div className="text-xs text-slate-300">Total pares seleccionados para devoluciÃ³n:</div>
+                        <div className="text-xs text-slate-300">Total pares seleccionados para devolución:</div>
                         <div className="text-lg font-black text-rose-400 font-mono">
                           {totalDevolucionGeneral} pares
                         </div>
@@ -8769,17 +8708,17 @@ export default function ComercialComponent({
                       </div>
                     </div>
 
-                    {/* Paso de ConfirmaciÃ³n dentro del Modal */}
+                    {/* Paso de Confirmación dentro del Modal */}
                     {confirmandoDevolucionPaso && (
                       <div className="p-4 bg-rose-500/10 border-2 border-rose-500/30 rounded-2xl space-y-2 animate-in fade-in duration-200">
                         <div className="flex items-center gap-2 text-rose-900 dark:text-rose-200 font-extrabold text-xs">
                           <AlertTriangle size={18} className="text-rose-600 shrink-0" />
-                          <span>Â¿Confirmas el registro formal de esta devoluciÃ³n?</span>
+                          <span>¿Confirmas el registro formal de esta devolución?</span>
                         </div>
                         <p className="text-[11px] text-rose-800 dark:text-rose-300 leading-relaxed">
-                          Se procesarÃ¡n <strong>{totalDevolucionGeneral} pares</strong> con destino{' '}
+                          Se procesarán <strong>{totalDevolucionGeneral} pares</strong> con destino{' '}
                           <strong>{devolucionDestinoStock === 'REINGRESO_INVENTARIO' ? 'REINGRESO A BODEGA' : 'BAJA POR FALLA / PROVEEDOR'}</strong>.
-                          Se descontarÃ¡n automÃ¡ticamente <strong>${montoTotalDevolucionGeneral.toFixed(2)}</strong> de la deuda o se registrarÃ¡n a favor del cliente si ya estaba cancelado.
+                          Se descontarán automáticamente <strong>${montoTotalDevolucionGeneral.toFixed(2)}</strong> de la deuda o se registrarán a favor del cliente si ya estaba cancelado.
                         </p>
                       </div>
                     )}
@@ -8807,8 +8746,7 @@ export default function ComercialComponent({
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     {procesandoDevolucion ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
-                    <span>Confirmar DevoluciÃ³n Definitiva</span>
-                  </button>
+                    <span>Confirmar Devolución Definitiva</span>−</button>
                 </>
               ) : (
                 <>
@@ -8833,7 +8771,7 @@ export default function ComercialComponent({
                     onClick={() => {
                       const totalPares = Object.values(devolucionItemsMap).reduce((acc, q) => acc + (Number(q) || 0), 0);
                       if (totalPares === 0) {
-                        showToast('Selecciona al menos 1 par para procesar la devoluciÃ³n.', 'warning');
+                        showToast('Selecciona al menos 1 par para procesar la devolución.', 'warning');
                         return;
                       }
                       setConfirmandoDevolucionPaso(true);
@@ -8841,8 +8779,7 @@ export default function ComercialComponent({
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px]"
                   >
                     <RotateCcw size={15} />
-                    <span>Continuar a ConfirmaciÃ³n</span>
-                  </button>
+                    <span>Continuar a Confirmación</span>−</button>
                 </>
               )}
             </div>
@@ -8851,7 +8788,7 @@ export default function ComercialComponent({
       )}
 
 
-      {/* Modal de CorrecciÃ³n de Precio Post-Venta / Post-Entrega */}
+      {/* Modal de Corrección de Precio Post-Venta / Post-Entrega */}
       {showCorregirPrecioModal && pedidoACorregir && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -8880,7 +8817,7 @@ export default function ComercialComponent({
                     Corregir Precio de Venta
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Pedido #{pedidoACorregir.numeroCodigo || pedidoACorregir.id.slice(0, 8).toUpperCase()} Â· Se recalculan totales, nota de entrega y saldo
+                    Pedido #{pedidoACorregir.numeroCodigo || pedidoACorregir.id.slice(0, 8).toUpperCase()} · Se recalculan totales, nota de entrega y saldo
                   </p>
                 </div>
               </div>
@@ -8893,14 +8830,13 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             {/* Cuerpo del Modal */}
             <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-200">
-                ðŸ’¡ Si hubo un error en el precio pactado con el cliente, modifÃ­calo aquÃ­ por modelo y serie. Se aplicarÃ¡ a todos los colores de esa serie y se reajustarÃ¡n notas de entrega, total del pedido y saldos de cartera automÃ¡ticamente.
+                �x� Si hubo un error en el precio pactado con el cliente, modifícalo aquí por modelo y serie. Se aplicará a todos los colores de esa serie y se reajustarán notas de entrega, total del pedido y saldos de cartera automáticamente.
               </div>
 
               {(() => {
@@ -8929,7 +8865,7 @@ export default function ComercialComponent({
                       modelKey,
                       modelName: l.modelName || l.product?.name || 'Calzado',
                       colores: new Set<string>(),
-                      serieNombre: l.serieNombre || l.product?.serie?.nombre || 'EstÃ¡ndar',
+                      serieNombre: l.serieNombre || l.product?.serie?.nombre || 'Estándar',
                       imageUrl: l.imageUrl || l.product?.imageUrl,
                       productIds: new Set<string>(),
                       lineIds: new Set<string>(),
@@ -8962,12 +8898,12 @@ export default function ComercialComponent({
                 if (list.length === 0) {
                   return (
                     <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
-                      No se encontraron lÃ­neas de calzado en este pedido.
+                      No se encontraron líneas de calzado en este pedido.
                     </div>
                   );
                 }
 
-                // CÃ¡lculo de totales previos y nuevos
+                // Cálculo de totales previos y nuevos
                 let granTotalNuevo = 0;
                 let granTotalPrevio = 0;
                 list.forEach((m) => {
@@ -8991,7 +8927,7 @@ export default function ComercialComponent({
                         const nuevoSubtotal = m.totalPares * precioEditadoNum;
                         const docenasTexto = m.totalPares % 12 === 0
                           ? `${m.totalPares / 12} ${m.totalPares / 12 === 1 ? 'Docena' : 'Docenas'}`
-                          : (m.totalPares === 6 ? 'Â½ Docena' : `${m.totalPares} pares`);
+                          : (m.totalPares === 6 ? '½ Docena' : `${m.totalPares} pares`);
 
                         return (
                           <div
@@ -9011,7 +8947,7 @@ export default function ComercialComponent({
                                 {m.imageUrl ? (
                                   <img src={m.imageUrl} alt={m.modelName} className="w-full h-full object-cover" />
                                 ) : (
-                                  <span className="text-2xl">ðŸ‘Ÿ</span>
+                                  <span className="text-2xl">�xx</span>
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
@@ -9035,7 +8971,7 @@ export default function ComercialComponent({
                                     ))
                                   ) : (
                                     <span className="text-[10px] text-[var(--muted-foreground)] italic">
-                                      EstÃ¡ndar
+                                      Estándar
                                     </span>
                                   )}
                                 </div>
@@ -9045,7 +8981,7 @@ export default function ComercialComponent({
                                     Serie: {formatearNombreSerie(m.serieNombre)}
                                   </span>
                                   <span className="text-[var(--muted-foreground)] font-medium">
-                                    Â· {m.totalPares} pares ({docenasTexto})
+                                    · {m.totalPares} pares ({docenasTexto})
                                   </span>
                                 </div>
 
@@ -9096,11 +9032,11 @@ export default function ComercialComponent({
                     <div className="p-3.5 bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] block">
-                          Resumen General de la CorrecciÃ³n
+                          Resumen General de la Corrección
                         </span>
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-[var(--foreground)]">
                           <span>Total actual: <strong className="font-mono">${granTotalPrevio.toFixed(2)}</strong></span>
-                          <span>âž”</span>
+                          <span>�~</span>
                           <span>Nuevo total: <strong className="font-mono text-emerald-600">${granTotalNuevo.toFixed(2)}</strong></span>
                         </div>
                       </div>
@@ -9119,7 +9055,7 @@ export default function ComercialComponent({
               })()}
             </div>
 
-            {/* Pie con un solo botÃ³n de Guardar Cambios */}
+            {/* Pie con un solo botón de Guardar Cambios */}
             <div className="p-4 sm:p-5 bg-[var(--muted)]/20 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
@@ -9162,7 +9098,7 @@ export default function ComercialComponent({
                         productIds: new Set<string>(),
                         lineIds: new Set<string>(),
                         modelName: l.modelName || l.product?.name || 'Calzado',
-                        serieNombre: l.serieNombre || l.product?.serie?.nombre || 'EstÃ¡ndar',
+                        serieNombre: l.serieNombre || l.product?.serie?.nombre || 'Estándar',
                         totalPares: 0,
                         precioActual: pUnit,
                       });
@@ -9201,7 +9137,7 @@ export default function ComercialComponent({
         </div>
       )}
 
-      {/* Modal: PrÃ©stamo Inter-Sucursal para Pedidos EN_ESPERA_STOCK */}
+      {/* Modal: Préstamo Inter-Sucursal para Pedidos EN_ESPERA_STOCK */}
       {modalInterSucursalPedido && pedidoInterSucursal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -9227,10 +9163,10 @@ export default function ComercialComponent({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
-                    PrÃ©stamo de MercaderÃ­a Inter-Sucursal
+                    Préstamo de Mercadería Inter-Sucursal
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
-                    Pedido #{pedidoInterSucursal.id.slice(0, 8)} Â· Cliente: {pedidoInterSucursal.clienteNombre || 'Consumidor'}
+                    Pedido #{pedidoInterSucursal.id.slice(0, 8)} · Cliente: {pedidoInterSucursal.clienteNombre || 'Consumidor'}
                   </p>
                 </div>
               </div>
@@ -9243,20 +9179,19 @@ export default function ComercialComponent({
                 className="absolute top-4 sm:top-5 right-4 sm:right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Cerrar ventana"
               >
-                <X size={18} />
-              </button>
+                <X size={18} />−</button>
             </div>
 
             {/* Cuerpo */}
             <div className="p-5 space-y-4 overflow-y-auto">
               <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-xs text-purple-700 dark:text-purple-300">
-                <strong>Â¿CÃ³mo funciona?</strong> Este pedido se encuentra en espera de stock. Al solicitar mercaderÃ­a a otra sucursal, los pares requeridos se descontarÃ¡n del inventario de la sucursal prestamista y el pedido avanzarÃ¡ automÃ¡ticamente a <strong>En PreparaciÃ³n</strong>.
+                <strong>¿Cómo funciona?</strong> Este pedido se encuentra en espera de stock. Al solicitar mercadería a otra sucursal, los pares requeridos se descontarán del inventario de la sucursal prestamista y el pedido avanzará automáticamente a <strong>En Preparación</strong>.
               </div>
 
               {/* Selector de Sucursal Origen */}
               <div>
                 <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                  Sucursal que entregarÃ¡/prestarÃ¡ la mercaderÃ­a *
+                  Sucursal que entregará/prestará la mercadería *
                 </label>
                 <select
                   value={interSucursalOrigenId}
@@ -9268,7 +9203,7 @@ export default function ComercialComponent({
                     .filter((s) => s.id !== pedidoInterSucursal.tenantId && s.id !== pedidoInterSucursal.sucursalId)
                     .map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name || s.nombre} {s.code ? `(${s.code})` : ''} {s.isMatriz ? 'â­ Matriz' : ''}
+                        {s.name || s.nombre} {s.code ? `(${s.code})` : ''} {s.isMatriz ? '⭐ Matriz' : ''}
                       </option>
                     ))}
                 </select>
@@ -9308,17 +9243,17 @@ export default function ComercialComponent({
                         Sin stock suficiente en {resultadoVerificacionStock.sucursalOrigenNombre}
                       </div>
                       <div className="text-[11px] text-rose-700 dark:text-rose-400 mt-0.5 leading-relaxed">
-                        Faltan <strong>{resultadoVerificacionStock.totalFaltante} de los {resultadoVerificacionStock.totalParesRequeridos} pares solicitados</strong>. No es posible solicitar el prÃ©stamo a esta sucursal porque no dispone de la mercaderÃ­a requerida.
+                        Faltan <strong>{resultadoVerificacionStock.totalFaltante} de los {resultadoVerificacionStock.totalParesRequeridos} pares solicitados</strong>. No es posible solicitar el préstamo a esta sucursal porque no dispone de la mercadería requerida.
                       </div>
                     </div>
                   </div>
                 )
               )}
 
-              {/* Modalidad de CompensaciÃ³n */}
+              {/* Modalidad de Compensación */}
               <div>
                 <label className="block text-xs font-bold text-[var(--foreground)] mb-1.5">
-                  Modalidad de CompensaciÃ³n / Arreglo
+                  Modalidad de Compensación / Arreglo
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button
@@ -9330,11 +9265,10 @@ export default function ComercialComponent({
                         : 'border-[var(--border)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]'
                     }`}
                   >
-                    <div className="font-extrabold text-xs">ðŸ”„ ReposiciÃ³n de Pares</div>
+                    <div className="font-extrabold text-xs">�x Reposición de Pares</div>
                     <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
-                      Devolver los mismos pares fÃ­sicos cuando llegue nueva mercaderÃ­a del proveedor.
-                    </div>
-                  </button>
+                      Devolver los mismos pares físicos cuando llegue nueva mercadería del proveedor.
+                    </div>−</button>
                   <button
                     type="button"
                     onClick={() => setInterSucursalModalidad('PAGO_INTERNO')}
@@ -9344,18 +9278,17 @@ export default function ComercialComponent({
                         : 'border-[var(--border)] hover:bg-[var(--muted)]/50 text-[var(--foreground)]'
                     }`}
                   >
-                    <div className="font-extrabold text-xs">ðŸ’µ CompensaciÃ³n Interna</div>
+                    <div className="font-extrabold text-xs">�x� Compensación Interna</div>
                     <div className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
                       Ajuste contable interno de costos entre las cajas o balances de ambas sucursales.
-                    </div>
-                  </button>
+                    </div>−</button>
                 </div>
               </div>
 
-              {/* Resumen de ArtÃ­culos Solicitados en el Pedido con ValidaciÃ³n por Talla */}
+              {/* Resumen de Artículos Solicitados en el Pedido con Validación por Talla */}
               <div>
                 <label className="block text-xs font-bold text-[var(--foreground)] mb-1.5">
-                  ArtÃ­culos que se solicitarÃ¡n en prÃ©stamo:
+                  Artículos que se solicitarán en préstamo:
                 </label>
                 <div className="border border-[var(--border)] rounded-xl p-3 bg-[var(--muted)]/10 space-y-2.5 max-h-56 overflow-y-auto">
                   {pedidoInterSucursal.lines && pedidoInterSucursal.lines.length > 0 ? (
@@ -9363,7 +9296,7 @@ export default function ComercialComponent({
                       <div key={g.key} className="flex items-start justify-between text-xs py-1.5 border-b border-[var(--border)]/40 last:border-0 gap-2">
                         <div className="flex-1 min-w-0">
                           <span className="font-bold text-[var(--foreground)]">{g.modelName}</span>
-                          <span className="text-[var(--muted-foreground)] ml-1">({g.color || 'EstÃ¡ndar'})</span>
+                          <span className="text-[var(--muted-foreground)] ml-1">({g.color || 'Estándar'})</span>
                           <div className="flex flex-wrap gap-1 mt-1">
                             {g.tallas.map((t) => {
                               // Buscar disponibilidad de esta talla en resultadoVerificacionStock
@@ -9395,7 +9328,7 @@ export default function ComercialComponent({
                                 >
                                   <span>T{t.numero}: {t.cantidad}p</span>
                                   <span className="font-normal opacity-85">({tieneDisp ? `disp: ${matchItem.stockDisponible}` : 'Sin stock'})</span>
-                                  <span>{tieneDisp ? 'âœ“' : 'âœ—'}</span>
+                                  <span>{tieneDisp ? '�S' : '�S'}</span>
                                 </span>
                               );
                             })}
@@ -9407,7 +9340,7 @@ export default function ComercialComponent({
                       </div>
                     ))
                   ) : (
-                    <span className="text-xs text-[var(--muted-foreground)] italic">Sin lÃ­neas registradas</span>
+                    <span className="text-xs text-[var(--muted-foreground)] italic">Sin líneas registradas</span>
                   )}
                 </div>
               </div>
@@ -9459,7 +9392,7 @@ export default function ComercialComponent({
                 {loadingInterSucursalPedido ? (
                   <>
                     <Loader2 size={13} className="animate-spin" />
-                    Procesando PrÃ©stamo...
+                    Procesando Préstamo...
                   </>
                 ) : verificandoStockInterSucursal ? (
                   <>
@@ -9474,7 +9407,7 @@ export default function ComercialComponent({
                 ) : (
                   <>
                     <Building size={13} />
-                    Confirmar PrÃ©stamo y Preparar
+                    Confirmar Préstamo y Preparar
                   </>
                 )}
               </button>
@@ -9483,7 +9416,7 @@ export default function ComercialComponent({
         </div>
       )}
 
-      {/* Modal de ConfirmaciÃ³n y SincronizaciÃ³n AutomÃ¡tica para Anular Pedido */}
+      {/* Modal de Confirmación y Sincronización Automática para Anular Pedido */}
       {pedidoParaCancelar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">
@@ -9506,36 +9439,35 @@ export default function ComercialComponent({
                 disabled={loadingCancelacion}
                 className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
               >
-                <X size={16} />
-              </button>
+                <X size={16} />−</button>
             </div>
 
             {/* Contenido */}
             <div className="p-5 space-y-4">
-              {pedidoParaCancelar.notas?.includes('[PrÃ©stamo Inter-Sucursal]') ? (
+              {pedidoParaCancelar.notas?.includes('[Préstamo Inter-Sucursal]') ? (
                 <div className="p-3.5 bg-purple-500/10 border border-purple-500/30 rounded-xl text-xs text-purple-900 dark:text-purple-300 flex items-start gap-2.5">
                   <RefreshCw size={18} className="shrink-0 text-purple-600 mt-0.5" />
                   <div>
-                    <div className="font-black text-xs">ðŸ”„ SincronizaciÃ³n AutomÃ¡tica con Sucursal Prestamista</div>
+                    <div className="font-black text-xs">�x Sincronización Automática con Sucursal Prestamista</div>
                     <div className="text-[11px] text-purple-700 dark:text-purple-400 mt-1 leading-relaxed">
-                      Este pedido cuenta con un prÃ©stamo inter-sucursal activo. Al cancelarlo, <strong>los pares prestados serÃ¡n devueltos y sincronizados de inmediato en el inventario de la sucursal de origen</strong>.
+                      Este pedido cuenta con un préstamo inter-sucursal activo. Al cancelarlo, <strong>los pares prestados serán devueltos y sincronizados de inmediato en el inventario de la sucursal de origen</strong>.
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="p-3.5 bg-slate-500/10 border border-[var(--border)] rounded-xl text-xs text-[var(--muted-foreground)] leading-relaxed">
-                  Al anular este pedido, cualquier reserva de inventario fÃ­sico serÃ¡ liberada de inmediato y las Ã³rdenes de compra asociadas serÃ¡n ajustadas o canceladas de forma automÃ¡tica.
+                  Al anular este pedido, cualquier reserva de inventario físico será liberada de inmediato y las órdenes de compra asociadas serán ajustadas o canceladas de forma automática.
                 </div>
               )}
 
               <div>
                 <label className="block text-xs font-bold text-[var(--foreground)] mb-1">
-                  Motivo de AnulaciÃ³n (Opcional)
+                  Motivo de Anulación (Opcional)
                 </label>
                 <textarea
                   value={motivoCancelacion}
                   onChange={(e) => setMotivoCancelacion(e.target.value)}
-                  placeholder="Ej: Cliente cancelÃ³ por cambio de modelo o falta de tiempo..."
+                  placeholder="Ej: Cliente canceló por cambio de modelo o falta de tiempo..."
                   rows={2}
                   className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-xl text-xs focus:outline-hidden focus:ring-2 focus:ring-rose-500 resize-none"
                 />
@@ -9566,7 +9498,7 @@ export default function ComercialComponent({
                 ) : (
                   <>
                     <XCircle size={13} />
-                    Confirmar AnulaciÃ³n y Sincronizar
+                    Confirmar Anulación y Sincronizar
                   </>
                 )}
               </button>
@@ -9586,7 +9518,7 @@ export default function ComercialComponent({
         onClose={() => setLightboxImage(null)}
       />
 
-      {/* Modal para Crear Nuevo Cliente de forma RÃ¡pida e Inmediata */}
+      {/* Modal para Crear Nuevo Cliente de forma Rápida e Inmediata */}
       <NuevoClienteModal
         isOpen={showNuevoClienteModal}
         onClose={() => setShowNuevoClienteModal(false)}
@@ -9597,7 +9529,7 @@ export default function ComercialComponent({
         zIndexClass="z-[70]"
       />
 
-      {/* Modal de confirmaciÃ³n de descarte de cambios */}
+      {/* Modal de confirmación de descarte de cambios */}
       <UnsavedChangesModal
         isOpen={showDiscardModal}
         targetSectionName="Comercial / Pedidos"
