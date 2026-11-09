@@ -227,14 +227,14 @@ function getCurvaRatio(talla: any, tallas: any[] = []): number {
 
 // Formateo de docenas para etiquetas comerciales
 function getDocenaLabel(pares: number): string {
-  if (pares === 6) return '½ Docena';
-  if (pares === 12) return '1 Docena';
-  if (pares > 0 && pares % 12 === 0) return `${pares / 12} Docenas`;
-  if (pares > 0 && pares % 6 === 0) return `${(pares / 12).toFixed(1)} Docenas`;
-  return `${(pares / 12).toFixed(1)} Doc.`;
+  if (pares === 6) return '½½ Docena';
+  if (pares === 12) return '1½ Docena';
+  if (pares > 0 && pares % 12 === 0) return `${pares / 12}½ Docenas`;
+  if (pares > 0 && pares % 6 === 0) return `${(pares / 12).toFixed(1)}½ Docenas`;
+  return `${(pares / 12).toFixed(1)}½ Doc.`;
 }
 
-// Consolidación de líneas con distribución exacta de tallas
+// Consolidación de líneas con distribución e❌cta de tallas
 function consolidarLineasOrden(lines: OrdenCompraLine[] = [], catalogoProductos: any[] = []) {
   const map = new Map<string, {
     productId: string;
@@ -620,7 +620,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
   const [orderObservaciones, setOrderObservaciones] = useState('');
   const [mostrarObsGeneralOrden, setMostrarObsGeneralOrden] = useState(false);
 
-  // Selector Interactivo de Modelos con Curva exacta
+  // Selector Interactivo de Modelos con Curva e❌cta
   const [busquedaModelo, setBusquedaModelo] = useState('');
   const [showDropdownModelo, setShowDropdownModelo] = useState(false);
   const [serieFiltroOrden, setSerieFiltroOrden] = useState<string>('TODAS');
@@ -1061,7 +1061,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     return (cantidadCurvas || 1) * base;
   }, [subtipoCurva, cantidadCurvas]);
 
-  // Previsualización y distribución exacta de tallas según curva de calzado (Media A, Media B, Docena)
+  // Previsualización y distribución e❌cta de tallas según curva de calzado (Media A, Media B,½ Docena)
   const distribucionPreview = useMemo(() => {
     if (!productoSeleccionado) return [];
     const prodTallas = productoSeleccionado.tallas || productoSeleccionado.stockByTalla || [];
@@ -1089,7 +1089,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
       });
     }
 
-    // Tallas est�ndar de respaldo si no est�n cargadas en BD
+    // Tallas estándar de respaldo si no están cargadas en BD
     const tallasFallback = serieNombreActiva.toUpperCase().includes('JUVENIL')
       ? [34, 35, 36, 37, 38]
       : [38, 39, 40, 41, 42];
@@ -1264,7 +1264,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           .replace(/^\|\s*|\s*\|\s*$/g, '')
           .trim();
 
-        // Serializar la curva exacta de tallas para que persista en BD
+        // Serializar la curva e❌cta de tallas para que persista en BD
         const curvaTag = tallas.length > 0
           ? `[Curva: ${tallas.map((t) => `${t.talla}:${t.cantidad}`).join(', ')}]`
           : '';
@@ -1301,9 +1301,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     }
   };
 
-  // ������������������������������������������������������������������������������������
-  // FASE 5.2 � Handlers para Consolidación de Demanda
-  // ������������������������������������������������������������������������������������
+  // =========================================  =========================================
+  // FASE 5.2 → Handlers para Consolidación de Demanda
+  // =========================================  =========================================
   const handleAbrirConsolidarDemanda = async () => {
     setLoadingDemanda(true);
     setShowConsolidarDemandaModal(true);
@@ -1821,7 +1821,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
       showToast(
         hayFaltantes
-          ? 'Mercancía ingresada con faltantes. La orden queda en �rdenes Parciales hasta completarse todo el pedido.'
+          ? 'Mercancía ingresada con faltantes. La orden queda en órdenes Parciales hasta completarse todo el pedido.'
           : 'Recepción completada exitosamente. Stock físico y saldo por pagar actualizados al instante.',
         'success'
       );
@@ -1923,7 +1923,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     const prov = proveedores.find((pr) => pr.id === p.supplierId);
     const saldo = prov?.saldoPendiente ?? 0;
 
-    const mensaje = `*COMPROBANTE DE PAGO A PROVEEDOR*\n\nEstimado/a *${p.supplier?.nombre || 'Proveedor'}*,\n\nLe confirmamos que se ha registrado un pago a su favor:\n\n�x� *Monto:* $${Number(p.monto).toFixed(2)}\n�x� *Método:* ${p.metodo}${p.banco ? ` (${p.banco})` : ''}\n�x *Comprobante / Ref:* ${p.comprobante || 'N/A'}\n�x& *Fecha:* ${new Date(p.createdAt).toLocaleDateString('es-EC')}\n${p.notas ? `�x� *Concepto:* ${p.notas}\n` : ''}\n�x� *Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Comprobante emitido automáticamente._`;
+    const mensaje = `*COMPROBANTE DE PAGO A PROVEEDOR*\n\nEstimado/a *${p.supplier?.nombre || 'Proveedor'}*,\n\nLe confirmamos que se ha registrado un pago a su favor:\n\n💡 *Monto:* $${Number(p.monto).toFixed(2)}\n💡 *Método:* ${p.metodo}${p.banco ? ` (${p.banco})` : ''}\n📋 *Comprobante / Ref:* ${p.comprobante || 'N/A'}\n📋& *Fecha:* ${new Date(p.createdAt).toLocaleDateString('es-EC')}\n${p.notas ? `📋 *Concepto:* ${p.notas}\n` : ''}\n💡 *Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Comprobante emitido automáticamente._`;
 
     abrirWhatsAppUniversal(numLimpio, mensaje);
   };
@@ -1959,14 +1959,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
     let estadoSaldoStr = '';
     if (saldoPendiente > 0.01) {
-      estadoSaldoStr = `�x� *SALDO PENDIENTE POR PAGAR: $${saldoPendiente.toFixed(2)}*`;
+      estadoSaldoStr = `📦 *SALDO PENDIENTE POR PAGAR: $${saldoPendiente.toFixed(2)}*`;
     } else if (saldoAFavor > 0.01) {
-      estadoSaldoStr = `�xx� *ADELANTO DISPONIBLE A FAVOR: $${saldoAFavor.toFixed(2)}*`;
+      estadoSaldoStr = `💰 *ADELANTO DISPONIBLE A FAVOR: $${saldoAFavor.toFixed(2)}*`;
     } else {
-      estadoSaldoStr = `�S& *CUENTA AL DÍA ($0.00)*`;
+      estadoSaldoStr = `✅ *CUENTA AL DÍA ($0.00)*`;
     }
 
-    const mensaje = `�x9 *ESTADO DE CUENTA � PROVEEDOR*\n\nEstimado/a *${sup.razonSocial || sup.nombre || 'Proveedor'}* (RUC: ${sup.ruc || 'N/A'}),\n\nLe compartimos el extracto de balance comercial y de pagos con corte a *${hoyLegible}*:\n\n�x� *Total Facturado:* $${totalFacturado.toFixed(2)} (${resumen.totalEntregas || 0} entregas)\n�x� *Total Pagado:* $${totalPagado.toFixed(2)} (${resumen.totalPagos || 0} pagos)\n�x *Cruzado con Mercadería:* $${cruzado.toFixed(2)}\n\n������������������������������������������\n${estadoSaldoStr}\n������������������������������������������\n\n_Emitido por ${bName}_`;
+    const mensaje = `📋9 *ESTADO DE CUENTA → PROVEEDOR*\n\nEstimado/a *${sup.razonSocial || sup.nombre || 'Proveedor'}* (RUC: ${sup.ruc || 'N/A'}),\n\nLe compartimos el extracto de balance comercial y de pagos con corte a *${hoyLegible}*:\n\n📋 *Total Facturado:* $${totalFacturado.toFixed(2)} (${resumen.totalEntregas || 0} entregas)\n💡 *Total Pagado:* $${totalPagado.toFixed(2)} (${resumen.totalPagos || 0} pagos)\n📦 *Cruzado con Mercadería:* $${cruzado.toFixed(2)}\n\n→→→→→→→→→→→→→→→→→→→→→\n${estadoSaldoStr}\n→→→→→→→→→→→→→→→→→→→→→\n\n_Emitido por ${bName}_`;
 
     abrirWhatsAppUniversal(numLimpio, mensaje);
   };
@@ -2114,10 +2114,10 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     const saldo = prov?.saldoPendiente ?? 0;
 
     let itemsDetalle = (dev.lines || [])
-      .map((l: any) => `⬢ *${l.modelName || 'Calzado'}* (${l.color || 'Estándar'}) Talla *${l.numeroTalla || '38'}*: ${l.cantidad} par(es) � $${Number(l.precioCosto || 0).toFixed(2)} = $${Number(l.subtotal || 0).toFixed(2)}`)
+      .map((l: any) => `⬢ *${l.modelName || 'Calzado'}* (${l.color || 'Estándar'}) Talla *${l.numeroTalla || '38'}*: ${l.cantidad} par(es) × $${Number(l.precioCosto || 0).toFixed(2)} = $${Number(l.subtotal || 0).toFixed(2)}`)
       .join('\n');
 
-    const mensaje = `*CONSTANCIA DE DEVOLUCI�N DE CALZADO (GARANTÍA / FALLA)*\n\nEstimado/a *${dev.supplier?.razonSocial || 'Proveedor'}*,\n\nLe notificamos formalmente la devolución de mercadería por defecto / garantía:\n\n�x *Comprobante N°:* ${dev.numeroCodigo || 'DEV-0001'}\n�x& *Fecha:* ${new Date(dev.createdAt).toLocaleDateString('es-EC')}\n�x� *Motivo:* ${dev.motivo || 'Falla de fábrica / defecto de fabricación'}\n\n�xx *DETALLE DE MERCADERÍA DEVUELTA:*\n${itemsDetalle}\n\n�x� *Total Pares Devueltos:* ${dev.totalPares || (dev.lines || []).reduce((acc: number, l: any) => acc + l.cantidad, 0)} pares\n�x� *Monto Total Devuelto:* $${Number(dev.totalDevuelto || 0).toFixed(2)}\n�x0 *Descontado de Deuda / Saldo:* -$${Number(dev.deudaDescontada || dev.totalDevuelto || 0).toFixed(2)}\n�x� *Nuevo Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Constancia comercial emitida por sistema NEXORA._`;
+    const mensaje = `*CONSTANCIA DE DEVOLUCIÓN DE CALZADO (GARANTÍA / FALLA)*\n\nEstimado/a *${dev.supplier?.razonSocial || 'Proveedor'}*,\n\nLe notificamos formalmente la devolución de mercadería por defecto / garantía:\n\n📋 *Comprobante N°:* ${dev.numeroCodigo || 'DEV-0001'}\n📋& *Fecha:* ${new Date(dev.createdAt).toLocaleDateString('es-EC')}\n📋 *Motivo:* ${dev.motivo || 'Falla de fábrica / defecto de fabricación'}\n\n👟 *DETALLE DE MERCADERÍA DEVUELTA:*\n${itemsDetalle}\n\n📋 *Total Pares Devueltos:* ${dev.totalPares || (dev.lines || []).reduce((acc: number, l: any) => acc + l.cantidad, 0)} pares\n💡 *Monto Total Devuelto:* $${Number(dev.totalDevuelto || 0).toFixed(2)}\n📋0 *Descontado de Deuda / Saldo:* -$${Number(dev.deudaDescontada || dev.totalDevuelto || 0).toFixed(2)}\n💡 *Nuevo Saldo Pendiente:* $${saldo.toFixed(2)}\n\n_Constancia comercial emitida por sistema NEXORA._`;
 
     abrirWhatsAppUniversal(numLimpio, mensaje);
   };
@@ -2165,7 +2165,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
     });
   }, [ordenes, activeSucursalId, miLocalId, userRole, sucursales]);
 
-  // Pestañas de �rdenes
+  // Pestañas de órdenes
   const ordenesFiltradas = useMemo(() => {
     return ordenesDeSucursal.filter((o) => {
       let matchEstado = true;
@@ -2190,7 +2190,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
   return (
     <div className="space-y-6">
-      {/* �"��"��"��"��"��"� HEADER SUPERIOR & KPIs �"��"��"��"��"��"� */}
+      {/* =========================================   HEADER SUPERIOR & KPIs """"""  ========================================= */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold tracking-tight flex items-center gap-2.5">
@@ -2198,7 +2198,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             Proveedores & Cuentas por Pagar
           </h2>
           <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-            �rdenes de compra acumulativas por docenas, verificación de recepciones y estados de cuenta
+           órdenes de compra acumulativas por docenas, verificación de recepciones y estados de cuenta
           </p>
         </div>
 
@@ -2285,12 +2285,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       </div>
 
-      {/* �"��"��"��"��"��"� TABS PRINCIPALES & BUSCADOR �"��"��"��"��"��"� */}
+      {/* =========================================   TABS PRINCIPALES & BUSCADOR """"""  ========================================= */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-2">
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {([
             ['proveedores', 'Proveedores & Deudas', Truck, 0],
-            ['ordenes', '�rdenes de Compra', FileText, 0],
+            ['ordenes', 'órdenes de Compra', FileText, 0],
             ['ingreso', 'Recepción de Mercancía', PackageCheck, 0],
             ['pagos', 'Historial de Pagos', DollarSign, 0],
             ['devoluciones', 'Devoluciones & Garantías', RotateCcw, pendientesDevolucion.length],
@@ -2334,9 +2334,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          PESTA�A 1: PROVEEDORES & DEUDAS
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          PESTAÑA 1: PROVEEDORES & DEUDAS
+         """""""""""""""""""""""""""""""""""""""""" */}
       {!loading && activeTab === 'proveedores' && (
         proveedoresFiltrados.length === 0 ? (
           <div className="p-16 text-center text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-2xl space-y-2">
@@ -2470,15 +2470,15 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         )
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          PESTA�A 2: �RDENES DE COMPRA (Pestañas Ordenadas)
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          PESTAÑA 2: ÓRDENES DE COMPRA (Pestañas Ordenadas)
+         """""""""""""""""""""""""""""""""""""""""" */}
       {!loading && activeTab === 'ordenes' && (
         <div className="space-y-4">
           {/* Banner explicativo: Pendientes por Pedir vs Enviadas (Despacho diario a las 08:00 AM) */}
           <div className="p-4 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-transparent border border-blue-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
             <div className="flex items-start gap-3">
-              <span className="text-2xl shrink-0 mt-0.5">�xaa</span>
+              <span className="text-2xl shrink-0 mt-0.5">🚚</span>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm text-[var(--foreground)]">
@@ -2518,12 +2518,12 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {[
               { key: 'BORRADOR', label: '⏳ Pendientes por Pedir', count: ordenesDeSucursal.filter((o) => o.estado === 'BORRADOR').length },
-              { key: 'PENDIENTE', label: '�x� En Tránsito (Esperando Entrega)', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE').length },
-              { key: 'ENVIADAS_HISTORIAL', label: '�xaa Historial de Enviadas', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL' || o.estado === 'RECIBIDA').length },
-              { key: 'RECIBIDA_PARCIAL', label: '�x� Parciales (Con Faltantes)', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
-              { key: 'RECIBIDA', label: '�S& Recibidas en Bodega', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA').length },
-              { key: 'CANCELADA', label: '�xa� Canceladas', count: ordenesDeSucursal.filter((o) => o.estado === 'CANCELADA').length },
-              { key: 'TODOS', label: '�x9 Todas las �rdenes', count: ordenesDeSucursal.length },
+              { key: 'PENDIENTE', label: '📋 En Tránsito (Esperando Entrega)', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE').length },
+              { key: 'ENVIADAS_HISTORIAL', label: '🚚 Historial de Enviadas', count: ordenesDeSucursal.filter((o) => o.estado === 'PENDIENTE' || o.estado === 'RECIBIDA_PARCIAL' || o.estado === 'RECIBIDA').length },
+              { key: 'RECIBIDA_PARCIAL', label: '📋 Parciales (Con Faltantes)', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA_PARCIAL').length },
+              { key: 'RECIBIDA', label: '✅ Recibidas en Bodega', count: ordenesDeSucursal.filter((o) => o.estado === 'RECIBIDA').length },
+              { key: 'CANCELADA', label: '❌ Canceladas', count: ordenesDeSucursal.filter((o) => o.estado === 'CANCELADA').length },
+              { key: 'TODOS', label: '📋9 Todas las órdenes', count: ordenesDeSucursal.length },
             ].map((st) => (
               <button
                 key={st.key}
@@ -2632,7 +2632,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               </span>
                               {o.observaciones?.includes('[AJUSTE_MANUAL]') && (
                                 <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20 text-[9px] font-bold" title="Orden fijada manualmente según presupuesto del local">
-                                  <span>�x Ajuste Manual</span>
+                                  <span>📦➖ Ajuste Manual</span>
                                 </span>
                               )}
                             </div>
@@ -2644,7 +2644,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             {o.estado === 'RECIBIDA' || o.estado === 'RECIBIDA_PARCIAL' ? (
                               <div className="flex flex-col items-end">
                                 <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1" title="Fecha de Ingreso de Mercancía a Bodega">
-                                  <span>�x�</span>
+                                  <span>📋</span>
                                   {new Date((o as any).entry?.fechaIngreso || (o as any).entry?.createdAt || o.updatedAt || o.createdAt).toLocaleDateString('es-EC')}
                                 </span>
                                 <span className="text-[10px] text-[var(--muted-foreground)]" title="Fecha en que se realizó el pedido">
@@ -2654,7 +2654,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             ) : o.estado === 'PENDIENTE' ? (
                               <div className="flex flex-col items-end">
                                 <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1" title="Fecha de Envío al Proveedor">
-                                  <span>�x�</span>
+                                  <span>📋</span>
                                   {new Date(o.updatedAt || o.createdAt).toLocaleDateString('es-EC')}
                                 </span>
                                 <span className="text-[10px] text-[var(--muted-foreground)]" title="Fecha en que se realizó el pedido">
@@ -2730,7 +2730,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                 <button
                                   onClick={() => handleCancelarYBloquearReorden(o.id)}
                                   className="p-1.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-600 rounded-lg transition-colors border border-rose-500/20 cursor-pointer"
-                                  title="�xa� Cancelar y No Volver a Generar Automáticamente (Producto ya no se vende)"
+                                  title="❌ Cancelar y No Volver a Generar Automáticamente (Producto ya no se vende)"
                                 >
                                   <Ban size={13} />
                                 </button>
@@ -2748,9 +2748,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          PESTA�A 3: RECEPCI�N DE MERCANCÍA EN BODEGA
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          PESTAÑA 3: RECEPCIÓN DE MERCANCÍA EN BODEGA
+         """""""""""""""""""""""""""""""""""""""""" */}
       {!loading && activeTab === 'ingreso' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-5">
@@ -2872,7 +2872,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-10 h-10 object-cover rounded-lg border" />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center font-bold">�xx</div>
+                        <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center font-bold">👟</div>
                       )}
                       <div>
                         <span className="font-bold text-xs block">{productoSeleccionado.nombre || productoSeleccionado.name}</span>
@@ -2980,15 +2980,15 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         <div>
                           {difGlobal === 0 ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                              �S Pedido Completo (100%)
+                              ✅ Pedido Completo (100%)
                             </span>
                           ) : difGlobal < 0 ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
-                              �a�️ Faltante: {Math.abs(difGlobal)} pares
+                              ⚠️ Faltante: {Math.abs(difGlobal)} pares
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
-                              ��️ Excedente: +{difGlobal} pares extras
+                              ℹ️ Excedente: +{difGlobal} pares extras
                             </span>
                           )}
                         </div>
@@ -3035,7 +3035,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         className="px-2.5 py-1.5 bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)] rounded-xl text-xs font-bold transition-all cursor-pointer"
                         title="Poner todos los pares recibidos en 0 para contar uno por uno"
                       >
-                        <span>� � Poner en 0</span>
+                        <span>  Poner en 0</span>
                       </button>
                     </div>
                   </div>
@@ -3084,7 +3084,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               <div className="flex items-center gap-2">
                                 {totalParesModelo === totalParesEsperadosModelo ? (
                                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                    �S Completo ({totalParesModelo} pares)
+                                    ✅ Completo ({totalParesModelo} pares)
                                   </span>
                                 ) : totalParesModelo < totalParesEsperadosModelo ? (
                                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
@@ -3140,7 +3140,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                           className="w-5 h-5 flex items-center justify-center bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md text-xs font-black transition-colors cursor-pointer"
                                           title={`Restar 1 par T${t.sizeNumber}`}
                                         >
-                                          ��
+                                          ➖
                                         </button>
                                         <input
                                           type="number"
@@ -3199,7 +3199,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-3 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        + Media Docena (+6 pares)
+                                        + Media½ Docena (+6 pares)
                                       </button>
                                       <button
                                         type="button"
@@ -3217,7 +3217,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        �� Media Docena (��6 pares)
+                                        ➖ Media½ Docena (➖6 pares)
                                       </button>
                                     </>
                                   ) : (
@@ -3238,7 +3238,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        + ½ Doc A
+                                        + ½½ Doc A
                                       </button>
                                       <button
                                         type="button"
@@ -3256,7 +3256,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        + ½ Doc B
+                                        + ½½ Doc B
                                       </button>
                                       <button
                                         type="button"
@@ -3274,7 +3274,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        �� ½ Doc A
+                                        ➖ ½½ Doc A
                                       </button>
                                       <button
                                         type="button"
@@ -3292,7 +3292,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/25 rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        �� ½ Doc B
+                                        ➖ ½½ Doc B
                                       </button>
                                     </>
                                   )}
@@ -3308,9 +3308,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         setEntryModelos(updated);
                                       }}
                                       className="px-2.5 py-1 bg-slate-500/10 hover:bg-slate-500/20 text-[var(--foreground)] border border-[var(--border)] rounded-xl text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                                      title="Ajustar cantidades exactamente a lo pedido en la orden para este modelo"
+                                      title="Ajustar cantidades e❌ctamente a lo pedido en la orden para este modelo"
                                     >
-                                      �S Recibir Pedido Exacto
+                                      ✅ Recibir Pedido E❌cto
                                     </button>
                                   )}
                                   <span className="text-[11px] text-[var(--muted-foreground)] font-mono ml-1">
@@ -3406,9 +3406,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          PESTA�A 4: HISTORIAL DE PAGOS
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          PESTAÑA 4: HISTORIAL DE PAGOS
+         """""""""""""""""""""""""""""""""""""""""" */}
       {!loading && activeTab === 'pagos' && (
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm space-y-4 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -3494,9 +3494,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          PESTA�A 5: DEVOLUCIONES & GARANTÍAS A PROVEEDORES
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          PESTAÑA 5: DEVOLUCIONES & GARANTÍAS A PROVEEDORES
+         """""""""""""""""""""""""""""""""""""""""" */}
       {!loading && activeTab === 'devoluciones' && (
         <div className="space-y-6">
           {/* Header de la sección */}
@@ -3623,7 +3623,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
                           {/* Observación / Motivo */}
                           <div className="text-xs text-[var(--muted-foreground)] flex items-center gap-1">
-                            <span className="font-bold text-slate-500 dark:text-slate-400">�x� Motivo:</span>
+                            <span className="font-bold text-slate-500 dark:text-slate-400">📋 Motivo:</span>
                             <span className="italic">{item.motivo || 'Garantía / Falla de fábrica'}</span>
                             <span className="text-[10px] text-slate-400 ml-2 font-mono">({new Date(item.createdAt).toLocaleDateString('es-EC')})</span>
                           </div>
@@ -3659,7 +3659,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
             )}
           </div>
 
-          {/* 2. HISTORIAL DE CONSTANCIAS DE DEVOLUCI�N */}
+          {/* 2. HISTORIAL DE CONSTANCIAS DE DEVOLUCIÓN */}
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm space-y-4 p-5">
             <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
               <div className="flex items-center gap-2">
@@ -3732,9 +3732,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+      {/* """"""""""""""""""""""""""""""""""""""""""
           MODAL: DETALLE DE ORDEN (Con Botón Enviar Explícito)
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showOrderDetailModal && selectedOrder && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -3786,7 +3786,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     </span>
                     {selectedOrder.observaciones?.includes('[AJUSTE_MANUAL]') && (
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1" title="Esta orden fue ajustada manualmente según tu presupuesto y está protegida contra alteraciones automáticas">
-                        <span>�x</span>
+                        <span>📦➖</span>
                         <span>Ajustada Manualmente</span>
                       </span>
                     )}
@@ -3833,7 +3833,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   <div className="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                        �x�
+                        x
                       </div>
                       <div>
                         <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">
@@ -3851,7 +3851,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     </div>
                     {refCode && (
                       <span className="px-2.5 py-1 bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/25 rounded-xl font-mono text-xs font-black">
-                        �x� Ref Pedido: {refCode}
+                        📋 Ref Pedido: {refCode}
                       </span>
                     )}
                   </div>
@@ -3895,7 +3895,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       className="flex items-center gap-1 text-xs font-bold text-[#0F172A] dark:text-amber-400 hover:opacity-80"
                     >
                       <Edit3 size={13} />
-                      <span>{editingOrder ? 'Finalizar Edición' : 'Modificar Orden (Pares / Docenas)'}</span>
+                      <span>{editingOrder ? 'Finalizar Edición' : 'Modificar Orden (Pares /½ Docenas)'}</span>
                     </button>
                   )}
                 </div>
@@ -3976,7 +3976,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                       {fullClientName && (
                                         <span className="px-2.5 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-2xs">
-                                          <span>�x�</span>
+                                          <span>x</span>
                                           <span className="text-blue-500/80 font-normal">Cliente:</span>
                                           <span className="font-extrabold">{fullClientName}</span>
                                           {foundClient && (
@@ -3988,14 +3988,14 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       )}
                                       {refCode && (
                                         <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1 font-mono shadow-2xs">
-                                          <span>�x�</span>
+                                          <span>📋</span>
                                           <span className="text-purple-500/80 font-normal">Pedido:</span>
                                           <span className="font-extrabold">{refCode}</span>
                                         </span>
                                       )}
                                       {detalle && (
                                         <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-2xs">
-                                          <span>�a�</span>
+                                          <span>❌</span>
                                           <span>{detalle}</span>
                                         </span>
                                       )}
@@ -4041,7 +4041,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             ) : (
                               <div className="text-right">
                                 <span className="text-[10px] text-[var(--muted-foreground)] block">
-                                  {line.cantidadPedida} pares ({docenas} doc.) � ${Number(line.precioCosto).toFixed(2)}
+                                  {line.cantidadPedida} pares ({docenas} doc.) × ${Number(line.precioCosto).toFixed(2)}
                                 </span>
                                 <span className="font-extrabold text-[#0F172A] dark:text-amber-400 font-mono text-sm">
                                   ${(line.cantidadPedida * line.precioCosto).toFixed(2)}
@@ -4055,7 +4055,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           </div>
                         </div>
 
-                        {/* Despliegue de Chips de Numeración � con +/- por talla en edición */}
+                        {/* Despliegue de Chips de Numeración → con +/- por talla en edición */}
                         {isExpanded && (
                           <div className="px-4 py-3 bg-[var(--muted)]/20 border-t border-[var(--border)]">
                             <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase mr-1 block mb-2">
@@ -4091,7 +4091,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors"
                                         title={`Quitar 1 par T${td.talla}`}
                                       >
-                                        ��
+                                        ➖
                                       </button>
                                       <span className="w-7 text-center text-xs font-bold font-mono text-[var(--foreground)]">
                                         {td.cantidad}
@@ -4155,7 +4155,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-3 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                      + Media Docena (+6 pares)
+                                      + Media½ Docena (+6 pares)
                                     </button>
                                     <button
                                       type="button"
@@ -4183,7 +4183,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                       Media Docena (6 pares)
+                                       Media½ Docena (6 pares)
                                     </button>
                                   </>
                                 ) : (
@@ -4214,7 +4214,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                      + � Doc A
+                                      + ½½ Doc A
                                     </button>
                                     <button
                                       type="button"
@@ -4242,7 +4242,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                      + � Doc B
+                                      + ½½ Doc B
                                     </button>
                                     <button
                                       type="button"
@@ -4270,7 +4270,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                       � Doc A
+                                       ½½ Doc A
                                     </button>
                                     <button
                                       type="button"
@@ -4298,7 +4298,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       }}
                                       className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
                                     >
-                                       � Doc B
+                                       ½½ Doc B
                                     </button>
                                   </>
                                 )}
@@ -4313,7 +4313,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               {editingOrder ? (
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 shrink-0">
-                                    �x� Observación para proveedor:
+                                    📋 Observación para proveedor:
                                   </span>
                                   <input
                                     type="text"
@@ -4336,7 +4336,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   if (!obsLimpia) return null;
                                   return (
                                     <div className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                                      <span className="font-bold">�x� Observación proveedor:</span>
+                                      <span className="font-bold">📋 Observación proveedor:</span>
                                       <span className="italic font-medium">{obsLimpia}</span>
                                     </div>
                                   );
@@ -4455,7 +4455,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                               // eslint-disable-next-line @next/next/no-img-element
                                               <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
                                             ) : (
-                                              <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">�xx</div>
+                                              <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">👟</div>
                                             )}
                                             <div>
                                               <span className="font-bold block">{p.nombre || p.name}</span>
@@ -4480,7 +4480,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           </div>
                         )}
 
-                        {/* Configuración de Curva Exacta cuando hay producto seleccionado */}
+                        {/* Configuración de Curva E❌cta cuando hay producto seleccionado */}
                         {productoSeleccionado && (
                           <div className="p-3 bg-[var(--card)] rounded-xl border border-[var(--border)] space-y-3">
                             <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
@@ -4489,7 +4489,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-10 h-10 object-cover rounded-xl border border-[var(--border)]" />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-xl bg-[var(--muted)] flex items-center justify-center text-base">�xx</div>
+                                  <div className="w-10 h-10 rounded-xl bg-[var(--muted)] flex items-center justify-center text-base">👟</div>
                                 )}
                                 <div>
                                   <span className="font-black text-xs uppercase block text-[var(--foreground)]">
@@ -4546,7 +4546,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
                                   }`}
                                 >
-                                  1 Docena (12 pares)
+                                  1½ Docena (12 pares)
                                 </button>
                               </div>
                             </div>
@@ -4587,7 +4587,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
                               <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                                  DISTRIBUCI�N DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
+                                  DISTRIBUCIÓN DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
                                 </span>
                                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
                                   Serie: {distribucionPreview.map((d: any) => `${d.cantidad}/${d.talla}`).join(', ')}
@@ -4698,7 +4698,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   className="px-4 py-2.5 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <ArrowLeft size={14} />
-                  <span>Volver a �rdenes</span>
+                  <span>Volver a órdenes</span>
                 </button>
 
                 {(selectedOrder.estado === 'BORRADOR' || selectedOrder.estado === 'PENDIENTE') && !editingOrder && (
@@ -4798,9 +4798,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+      {/* """"""""""""""""""""""""""""""""""""""""""
           MODAL: ESTADO DE CUENTA MASTER-DETAIL
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showCuentaModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -4815,7 +4815,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
-                    Estado de Cuenta � {cuentaCorrienteData?.supplier?.razonSocial || cuentaCorrienteData?.supplier?.nombre || 'Proveedor'}
+                    Estado de Cuenta → {cuentaCorrienteData?.supplier?.razonSocial || cuentaCorrienteData?.supplier?.nombre || 'Proveedor'}
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 truncate">
                     RUC: {cuentaCorrienteData?.supplier?.ruc} ⬢ Histórico de compras, entregas y pagos
@@ -4851,7 +4851,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 <span className="text-xs">Cargando balance...</span>
               </div>
             ) : cuentaCorrienteData ? (() => {
-              /* ���� Calcular desglose detallado de adelantos vs pagos contra deuda ���� */
+              /* =========================================   Calcular desglose detallado de adelantos vs pagos contra deuda →→  ========================================= */
               const resumen = cuentaCorrienteData.resumen;
               const movs = cuentaCorrienteData.movimientos || [];
               const totalFacturado = resumen.totalFacturado || 0;
@@ -4921,7 +4921,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
 
               return (
               <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1 min-h-0 text-xs">
-                {/* ���� PANEL RESUMEN GENERAL (4 tarjetas) ���� */}
+                {/* =========================================   PANEL RESUMEN GENERAL (4 tarjetas) →→  ========================================= */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div className="bg-[var(--muted)]/40 border border-[var(--border)] rounded-2xl p-3.5 space-y-1">
                     <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block">Total Facturado</span>
@@ -4980,7 +4980,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </div>
                 </div>
 
-                {/* ���� DESGLOSE DETALLADO: Adelantos vs Abonos a Deuda ���� */}
+                {/* =========================================   DESGLOSE DETALLADO: Adelantos vs Abonos a Deuda →→  ========================================= */}
                 {(totalPagado > 0 || totalDevoluciones > 0) && (
                   <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 dark:from-slate-800/40 dark:to-blue-900/20 border border-[var(--border)] rounded-2xl p-4 space-y-3">
                     <h4 className="font-extrabold text-[11px] uppercase tracking-wider text-[var(--foreground)] flex items-center gap-2">
@@ -5071,7 +5071,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </div>
                 )}
 
-                {/* ���� TITULO LINEA DE TIEMPO ���� */}
+                {/* =========================================   TITULO LINEA DE TIEMPO →→  ========================================= */}
                 <div className="flex justify-between items-center">
                   <h4 className="font-extrabold text-sm flex items-center gap-2 text-[var(--foreground)]">
                     <History size={16} />
@@ -5086,7 +5086,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </button>
                 </div>
 
-                {/* ���� MOVIMIENTOS CON SALDO ACUMULADO ���� */}
+                {/* =========================================   MOVIMIENTOS CON SALDO ACUMULADO →→  ========================================= */}
                 <div className="space-y-3">
                   {movs.length === 0 ? (
                     <p className="text-center text-[var(--muted-foreground)] py-8">No hay movimientos registrados para este proveedor.</p>
@@ -5211,7 +5211,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                     : 'text-blue-600'
                                 }`}
                               >
-                                {isPago || isDevolucion ? `�� ${Number(mov.monto).toFixed(2)}` : `+ ${Number(mov.monto).toFixed(2)}`}
+                                {isPago || isDevolucion ? `➖ ${Number(mov.monto).toFixed(2)}` : `+ ${Number(mov.monto).toFixed(2)}`}
                               </div>
                               {mov.metodo && (
                                 <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded text-[9px] font-bold border border-emerald-500/20 inline-block mt-0.5">
@@ -5231,7 +5231,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               )}
                               {isDevolucion && (
                                 <span className="px-1.5 py-0.5 bg-rose-500/10 text-rose-700 dark:text-rose-300 rounded text-[9px] font-bold border border-rose-500/20 inline-block mt-0.5">
-                                  DEVOLUCI�N
+                                  DEVOLUCIÓN
                                 </span>
                               )}
 
@@ -5303,7 +5303,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             <div className="mt-3.5 pt-3 border-t border-[var(--border)] space-y-2.5">
                               <div className="flex items-center justify-between">
                                 <span className="font-black text-[11px] text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
-                                  �x� DETALLE DE ARTÍCULOS {isDevolucion ? 'DEVUELTOS' : 'RECIBIDOS'} � {mov.numeroCodigo || mov.titulo}
+                                  📋 DETALLE DE ARTÍCULOS {isDevolucion ? 'DEVUELTOS' : 'RECIBIDOS'} → {mov.numeroCodigo || mov.titulo}
                                 </span>
                                 <span className="text-[10px] text-[var(--muted-foreground)] font-semibold">
                                   {lineas.length} {lineas.length === 1 ? 'ítem' : 'ítems'} ({mov.detalles?.totalPares || 0} pares)
@@ -5339,7 +5339,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                               />
                                             ) : (
                                               <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-base shrink-0">
-                                                �xx
+                                                👟
                                               </div>
                                             )}
                                             <div>
@@ -5416,9 +5416,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+      {/* """"""""""""""""""""""""""""""""""""""""""
           MODAL: REGISTRAR PAGO A PROVEEDOR
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showPaymentModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -5584,9 +5584,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          MODAL: EMITIR NUEVA ORDEN (Borrador con Curva Exacta)
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          MODAL: EMITIR NUEVA ORDEN (Borrador con Curva E❌cta)
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showOrderModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -5686,7 +5686,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 )}
               </div>
 
-              {/* Selector de Modelos con Curva Exacta */}
+              {/* Selector de Modelos con Curva E❌cta */}
               <div className="p-4 bg-[var(--muted)]/20 rounded-2xl border border-[var(--border)] space-y-3">
                 {/* Header con Título a la izquierda y Botones de Series a la derecha */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -5756,11 +5756,11 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={obtenerFotoProducto(productoSeleccionado)} alt="" className="w-12 h-12 object-cover rounded-lg border shrink-0" />
                       ) : (
-                        <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-lg shrink-0">�xx</div>
+                        <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center text-lg shrink-0">👟</div>
                       )}
                       <div>
                         <div className="font-extrabold text-sm text-[var(--foreground)]">
-                          {productoSeleccionado.nombre || productoSeleccionado.name} � {productoSeleccionado.color}
+                          {productoSeleccionado.nombre || productoSeleccionado.name} → {productoSeleccionado.color}
                         </div>
                         <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
                           Marca: {productoSeleccionado.marca} ⬢ Cód: {productoSeleccionado.codigo} ⬢ Serie: {formatearNombreSerie(obtenerSerieProducto(productoSeleccionado))}
@@ -5857,7 +5857,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                       // eslint-disable-next-line @next/next/no-img-element
                                       <img src={obtenerFotoProducto(p)} alt="" className="w-8 h-8 object-cover rounded" />
                                     ) : (
-                                      <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">�xx</div>
+                                      <div className="w-8 h-8 rounded bg-[var(--muted)] flex items-center justify-center text-sm">👟</div>
                                     )}
                                     <div>
                                       <span className="font-bold block">{p.nombre || p.name}</span>
@@ -5882,7 +5882,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                   </div>
                 )}
 
-                {/* Configuración de Curva Exacta */}
+                {/* Configuración de Curva E❌cta */}
                 {productoSeleccionado && (
                   <div className="p-3 bg-[var(--card)] rounded-xl border border-[var(--border)] space-y-3">
                     <div>
@@ -5919,7 +5919,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                               : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]/80'
                           }`}
                         >
-                          1 Docena (12 pares: 38/2, 39/3, 40/3, 41/2, 42/2)
+                          1½ Docena (12 pares: 38/2, 39/3, 40/3, 41/2, 42/2)
                         </button>
                       </div>
                     </div>
@@ -5960,7 +5960,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                     <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase">
-                          DISTRIBUCI�N DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
+                          DISTRIBUCIÓN DE CURVA ({subtipoCurva === 'MEDIA_A' ? 'MEDIA DOCENA A' : subtipoCurva === 'MEDIA_B' ? 'MEDIA DOCENA B' : 'DOCENA COMPLETA'}):
                         </span>
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-full font-mono">
                           Serie: {distribucionPreview.map((d: any) => `${d.cantidad}/${d.talla}`).join(', ')}
@@ -6083,7 +6083,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                             <div>
                               <span className="font-bold text-xs block">{line.producto?.nombre}</span>
                               <span className="text-[10px] text-[var(--muted-foreground)]">
-                                {line.cantidadPedida} pares ({docenas} doc.) � ${line.precioCosto.toFixed(2)}
+                                {line.cantidadPedida} pares ({docenas} doc.) × ${line.precioCosto.toFixed(2)}
                                 {line.observacionLinea && ` ⬢ Nota: ${line.observacionLinea}`}
                               </span>
                             </div>
@@ -6142,9 +6142,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+      {/* """"""""""""""""""""""""""""""""""""""""""
           MODAL: REGISTRAR NUEVO PROVEEDOR
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showSupplierModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6436,7 +6436,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       </div>
 
                       <p className="text-[10px] text-amber-800 dark:text-amber-300/80 leading-tight">
-                        �x� Al registrar al proveedor, este saldo se ingresará automáticamente a su <strong>Cuenta Corriente y Cuentas por Pagar</strong> para control y abonos.
+                        💡 Al registrar al proveedor, este saldo se ingresará automáticamente a su <strong>Cuenta Corriente y Cuentas por Pagar</strong> para control y abonos.
                       </p>
                     </div>
                   )}
@@ -6473,9 +6473,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+      {/* """"""""""""""""""""""""""""""""""""""""""
           MODAL: EDITAR PROVEEDOR
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showEditSupplierModal && editingSupplier && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6691,7 +6691,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                       </div>
 
                       <p className="text-[10px] text-amber-800 dark:text-amber-300/80 leading-tight">
-                        �x� Este saldo se sumará a la <strong>Cuenta Corriente y Cuentas por Pagar</strong> del proveedor para su control y abonos.
+                        💡 Este saldo se sumará a la <strong>Cuenta Corriente y Cuentas por Pagar</strong> del proveedor para su control y abonos.
                       </p>
                     </div>
                   )}
@@ -6728,9 +6728,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+      {/* """"""""""""""""""""""""""""""""""""""""""
           MODAL: PREVISUALIZADOR DE PDF DE ORDEN
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showPdfPreviewModal && pdfPreviewUrl && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -6822,9 +6822,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          MODAL: REGISTRAR DEVOLUCI�N AL PROVEEDOR
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          MODAL: REGISTRAR DEVOLUCIÓN AL PROVEEDOR
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showDevolucionModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -7049,7 +7049,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                           className="w-5 h-5 flex items-center justify-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded text-xs font-black transition-colors cursor-pointer"
                                           title={`Quitar 1 par T${t.numeroTalla}`}
                                         >
-                                          ��
+                                          ➖
                                         </button>
                                         <span className="w-5 text-center text-xs font-bold font-mono text-[var(--foreground)]">
                                           {t.cantidad}
@@ -7073,7 +7073,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   ))}
                                 </div>
 
-                                {/* Botones de acci�n r�pida: Media Docena Serie A / B */}
+                                {/* Botones de acción rápida: Media½ Docena Serie A / B */}
                                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                   {esCurvaUniforme6Tallas(m.tallas) ? (
                                     <>
@@ -7096,7 +7096,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-3 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                        + Media Docena (+6 pares)
+                                        + Media½ Docena (+6 pares)
                                       </button>
                                       <button
                                         type="button"
@@ -7117,7 +7117,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                         Media Docena (6 pares)
+                                         Media½ Docena (6 pares)
                                       </button>
                                     </>
                                   ) : (
@@ -7141,7 +7141,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                        + � Doc A
+                                        + ½½ Doc A
                                       </button>
                                       <button
                                         type="button"
@@ -7162,7 +7162,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                        + � Doc B
+                                        + ½½ Doc B
                                       </button>
                                       <button
                                         type="button"
@@ -7183,7 +7183,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                         � Doc A
+                                         ½½ Doc A
                                       </button>
                                       <button
                                         type="button"
@@ -7204,7 +7204,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                         }}
                                         className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/20 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                       >
-                                         � Doc B
+                                         ½½ Doc B
                                       </button>
                                     </>
                                   )}
@@ -7329,9 +7329,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
+      {/* """"""""""""""""""""""""""""""""""""""""""
           MODAL: INGRESO MANUAL DE CALZADO DEFECTUOSO
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showManualDefectuosoModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -7564,9 +7564,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          MODAL: CONSTANCIA DE DEVOLUCI�N A PROVEEDOR
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          MODAL: CONSTANCIA DE DEVOLUCIÓN A PROVEEDOR
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showConstanciaModal && selectedConstancia && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150"
@@ -7645,7 +7645,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                         <div>
                           <p className="text-xs font-bold text-[var(--foreground)]">{l.modelName || 'Calzado'}</p>
                           <p className="text-[10px] text-[var(--muted-foreground)]">
-                            Talla: <strong className="text-[var(--foreground)]">{l.numeroTalla}</strong> ⬢ {l.cantidad} par(es) � ${Number(l.precioCosto || 0).toFixed(2)}
+                            Talla: <strong className="text-[var(--foreground)]">{l.numeroTalla}</strong> ⬢ {l.cantidad} par(es) × ${Number(l.precioCosto || 0).toFixed(2)}
                           </p>
                         </div>
                       </div>
@@ -7695,9 +7695,9 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
         </div>
       )}
 
-      {/* �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
-          MODAL CONSOLIDACI�N DE DEMANDA DE CLIENTES (FASE 5.2)
-         �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"� */}
+      {/* """"""""""""""""""""""""""""""""""""""""""
+          MODAL CONSOLIDACIÓN DE DEMANDA DE CLIENTES (FASE 5.2)
+         """""""""""""""""""""""""""""""""""""""""" */}
       {showConsolidarDemandaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
@@ -7709,7 +7709,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                 </div>
                 <div>
                   <h3 className="font-black text-sm text-[var(--foreground)]">
-                    Consolidación de Demanda para �rdenes de Compra
+                    Consolidación de Demanda para órdenes de Compra
                   </h3>
                   <p className="text-[11px] text-[var(--muted-foreground)]">
                     Agrupación automática de calzado faltante de pedidos de clientes en espera de stock.
@@ -7900,7 +7900,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                                   </button>
                                 </div>
                                 <span className="text-[9px] text-[var(--muted-foreground)] block mt-0.5">
-                                  {(cantPedir / 12).toFixed(1)} Docenas
+                                  {(cantPedir / 12).toFixed(1)}½ Docenas
                                 </span>
                               </div>
 
@@ -7961,7 +7961,7 @@ export default function ProveedoresComponent({ online, userRole, activeSucursalI
                           Modelos: <strong>{seleccionados.length}</strong>
                         </span>
                         <span>
-                          Pares: <strong className="text-emerald-600 text-sm font-black">{totalPares}</strong> ({ (totalPares / 12).toFixed(1) } Doc.)
+                          Pares: <strong className="text-emerald-600 text-sm font-black">{totalPares}</strong> ({ (totalPares / 12).toFixed(1) }½ Doc.)
                         </span>
                         <span>
                           Costo Est.: <strong className="text-emerald-600 font-mono text-sm font-black">${totalMonto.toFixed(2)}</strong>
