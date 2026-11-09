@@ -3672,9 +3672,16 @@ export default function ComercialComponent({
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>
-                            {cfg.icon}{cfg.label}
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.color}`}>
+                              {cfg.icon}{cfg.label}
+                            </span>
+                            {Array.isArray((p as any).notasEntrega) && (p as any).notasEntrega.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-2xs" title={`${(p as any).notasEntrega.length} nota(s) de entrega emitida(s)`}>
+                                <FileText size={9} /> {(p as any).notasEntrega.length} {(p as any).notasEntrega.length === 1 ? 'Nota' : 'Notas'}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] rounded text-[10px] font-semibold">{p.tipoPago}</span>
@@ -3983,6 +3990,61 @@ export default function ComercialComponent({
                                   )}
                                 </div>
                               </div>
+
+                              {/* Bloque de Notas de Entrega (despachos parciales/totales) */}
+                              {(p.estado === 'ENTREGADO' || p.estado === 'ENTREGADO_PARCIAL') && Array.isArray((p as any).notasEntrega) && (p as any).notasEntrega.length > 0 && (
+                                <div className="p-3 bg-[var(--card)] border border-emerald-500/30 rounded-xl space-y-2">
+                                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                                    <FileText size={14} />
+                                    <span>Notas de Entrega Generadas ({(p as any).notasEntrega.length})</span>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {(p as any).notasEntrega.map((nota: any, ni: number) => {
+                                      const numNota = `NE-${String(nota.numero).padStart(4, '0')}`;
+                                      const fechaNota = nota.fechaDespacho ? new Date(nota.fechaDespacho).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                                      const cobroColor = nota.cobroEstado === 'SALDADO' ? 'text-emerald-600 bg-emerald-500/10' : nota.cobroEstado === 'PENDIENTE' ? 'text-amber-600 bg-amber-500/10' : 'text-cyan-600 bg-cyan-500/10';
+                                      const cobroLabel = nota.cobroEstado === 'SALDADO' ? 'Saldado' : nota.cobroEstado === 'PARCIALMENTE_PAGADO' ? 'Abonado parcial' : 'Pendiente de cobro';
+                                      return (
+                                        <div key={nota.id} className="flex items-center justify-between gap-2 p-2 bg-[var(--muted)]/40 rounded-lg text-[11px]">
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <span className="font-black text-[var(--foreground)]">{numNota}</span>
+                                            <span className="text-[var(--muted-foreground)]">{fechaNota}</span>
+                                            <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${cobroColor}`}>
+                                              {cobroLabel}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            <span className="font-black text-emerald-600 dark:text-emerald-400">${nota.total.toFixed(2)}</span>
+                                            {nota.pdfUrl && (
+                                              <a
+                                                href={nota.pdfUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-2 py-0.5 bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white rounded text-[10px] font-bold transition-all"
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                PDF
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  {p.estado === 'ENTREGADO_PARCIAL' && (() => {
+                                    const totalDespachado = (p as any).notasEntrega.reduce((s: number, n: any) => s + (n.total || 0), 0);
+                                    const totalPedido = Number(p.montoTotal || 0);
+                                    const pendienteDespacho = Math.max(0, totalPedido - totalDespachado);
+                                    if (pendienteDespacho <= 0) return null;
+                                    return (
+                                      <div className="flex items-center gap-2 p-2 bg-slate-500/5 rounded-lg text-[11px] text-[var(--muted-foreground)] border border-dashed border-slate-300 dark:border-slate-700">
+                                        <Package size={12} className="text-slate-400" />
+                                        <span>Pendiente de despacho: <strong className="text-[var(--foreground)]">${pendienteDespacho.toFixed(2)}</strong> (sin cobro exigible hasta la entrega fisica)</span>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
 
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-3 flex-wrap">
@@ -8004,7 +8066,7 @@ export default function ComercialComponent({
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                           : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                       }`}>
-                        {esTotal ? '�S� Entrega Completa (ENTREGADO)' : '�x� Entrega Parcial (ENTREGADO_PARCIAL)'}
+                        {esTotal ? '✅ Entrega Completa (ENTREGADO)' : '📦 Entrega Parcial (ENTREGADO_PARCIAL)'}
                       </span>
                     </div>
                   </div>
